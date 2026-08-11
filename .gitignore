@@ -1,0 +1,81 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors / IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!*.pub
+id_rsa
+id_ed25519
+id_ed25519_*
+!id_ed25519_*.pub
+*.tfvars
+!*.tfvars.example
+kubeconfig
+*.kubeconfig
+credentials.json
+secrets/
+
+# Terraform / IaC local state
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ansible
+*.retry
+.vault_pass
+.vault_pass.txt
+
+# Node / site build
+node_modules/
+dist/
+.astro/
+.next/
+.out/
+.cache/
+coverage/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Logs and local diagnostics
+*.log
+*.out
+tmp/
+.tmp/
+.local/
+
+# Archives / dumps
+*.tar
+*.tar.gz
+*.zip
+!docs/**/*.zip
+
+# Cursor / local agent leftovers (never publish)
+.cursor/
+agent-analyzes/

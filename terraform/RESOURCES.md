@@ -1,7 +1,9 @@
 # Resources I describe as code
 
-Curated samples only. Full client repositories stay private.  
+Curated samples only.  
 Goal: show that an entire cloud platform (network → data → Kubernetes → edge → IAM) can be Terraform/Terragrunt.
+
+**Why not full trees:** security and confidentiality (accounts, hostnames, real CIDRs, long-lived IAM), plus size. Private IaC repos often carry multi-year history; publishing them whole would hide the signal. See also [`SANITIZE.md`](SANITIZE.md) and the root README.
 
 ## cloud.ru / Huawei Cloud (AWS-shaped)
 

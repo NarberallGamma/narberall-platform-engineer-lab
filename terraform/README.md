@@ -5,6 +5,8 @@ Not application code. Not a random `modules/` dump. End-to-end Terraform as I de
 
 **Resource coverage (what I put in code):** [`RESOURCES.md`](RESOURCES.md)
 
+**Full private trees are not here.** Production client/employer repos stay unpublished for security/confidentiality and because they are large multi-year codebases. This folder is a curated, sanitized cut that still shows end-to-end cloud-as-code.
+
 ## How I deliver platforms
 
 From an empty cloud project (or empty rack) to running workloads:

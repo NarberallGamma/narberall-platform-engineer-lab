@@ -1,5 +1,10 @@
 # Platform: OpenStack / Selectel
 
-Terraform for OpenStack + Selectel-class providers: networks, compute, K8s control-plane guests, GitLab, Postgres.
+| File | Resources |
+|------|-----------|
+| `network.tf` | Network, subnet, image data |
+| `kube.tf` | Bastion, kube masters/workers, GitLab, Postgres VMs |
+| `volumes_sg.tf` | Block volumes, attach, server group, SG, floating IP |
+| `providers.tf` / `backend.tf` / `versions.tf` | Provider + state |
 
-Production trees also included Ceph-adjacent disks, logging VMs, VPN, and runners. This sample keeps the core shape without client names.
+Map: [`../../RESOURCES.md`](../../RESOURCES.md)

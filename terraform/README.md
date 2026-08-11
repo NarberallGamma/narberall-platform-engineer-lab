@@ -3,6 +3,8 @@
 This directory is the **Infrastructure as Code** showcase for this lab.  
 Not application code. Not a random `modules/` dump. End-to-end Terraform as I deliver it on real projects.
 
+**Resource coverage (what I put in code):** [`RESOURCES.md`](RESOURCES.md)
+
 ## How I deliver platforms
 
 From an empty cloud project (or empty rack) to running workloads:
@@ -19,11 +21,11 @@ Also operated on **Google Cloud**, **Hetzner**, **VMware**, **Proxmox**, and **b
 
 ## Open in this order
 
-1. **[`platforms/`](platforms/)** - real provider samples (cloud.ru/Huawei, AWS, OpenStack/Selectel)
-2. **[`stacks/multi-env-root/`](stacks/multi-env-root/)** - full multi-env root (network, ECS, CCE, RDS, OBS)
-3. **[`stacks/terragrunt-live/`](stacks/terragrunt-live/)** - Terragrunt DRY live sample
-4. **[`modules/`](modules/)** - reusable building blocks used by stacks
-5. **[`examples/`](examples/)** - minimal greenfield compose + brownfield import checklist
+1. **[`RESOURCES.md`](RESOURCES.md)** - clouds + resource types I describe as code
+2. **[`platforms/`](platforms/)** - provider samples
+3. **[`stacks/multi-env-root/`](stacks/multi-env-root/)** - multi-env root (network → K8s → RDS → Kafka → OBS)
+4. **[`stacks/`](stacks/)** - Terragrunt lives (Huawei-class + AWS)
+5. **[`modules/`](modules/)** / [`examples/`](examples/) - building blocks and small entry points
 
 ```mermaid
 flowchart TB
@@ -42,6 +44,7 @@ flowchart TB
 
 | Path | Role |
 |------|------|
+| [`RESOURCES.md`](RESOURCES.md) | **Resource coverage map** |
 | [`platforms/`](platforms/) | **Provider samples from production work** (sanitized) |
 | [`stacks/`](stacks/) | How roots are laid out (multi-env TF + Terragrunt) |
 | [`modules/`](modules/) | Shared modules consumed by stacks |

@@ -1,6 +1,9 @@
 # Platform: Proxmox
 
-Sanitized Terraform for Proxmox VE (`telmate/proxmox`): Kubernetes node VMs, GitLab, runners, Postgres guests.  
-Derived from real client delivery (hypervisor + guest layout), with brands, keys, and API URLs removed.
+| File | Resources |
+|------|-----------|
+| `kube_masters.tf` / `kube_workers.tf` | K8s + GitLab VMs (`proxmox_vm_qemu`) |
+| `postgres.tf` | Postgres guests with data disks |
+| `providers.tf` / `backend.tf` / `versions.tf` | Provider + GitLab HTTP state |
 
-Also matches Selectel-hosted Proxmox estates where the provider is still Proxmox (not OpenStack).
+Map: [`../../RESOURCES.md`](../../RESOURCES.md)

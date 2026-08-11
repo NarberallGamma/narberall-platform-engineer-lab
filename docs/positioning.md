@@ -13,9 +13,9 @@ Turnkey delivery: infrastructure, application/utilities code, documentation, mon
 
 ## Offers (see `/packages`)
 
-1. **AI Infra Sprint** — LLM/RAG stack, monitoring, backups  
-2. **Cloud Foundation** — IaC, IAM, networking, CI/CD  
-3. **Full Turnkey** — app + infra + AI + docs + observability  
+1. **AI Infra Sprint**  -  LLM/RAG stack, monitoring, backups  
+2. **Cloud Foundation**  -  IaC, IAM, networking, CI/CD  
+3. **Full Turnkey**  -  app + infra + AI + docs + observability  
 
 ## Proof model
 

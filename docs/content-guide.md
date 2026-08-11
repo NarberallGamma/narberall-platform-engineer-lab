@@ -12,7 +12,7 @@ Applies to this repo, the portfolio site, and copy reused on LinkedIn / resume.
 ## Hard bans
 
 - Do not mention Cursor, chatbots, or that text/code was drafted with an assistant
-- Do not use the em dash character `—`; use comma, colon, period, or hyphen `-`
+- Do not use the em dash character ` - `; use comma, colon, period, or hyphen `-`
 - No fluff adjectives without proof
 - No client secrets, real hostnames, or ticket IDs
 

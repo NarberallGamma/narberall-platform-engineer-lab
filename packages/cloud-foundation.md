@@ -13,4 +13,4 @@
 ## Proof in this repo
 
 - Case study: `case-studies/02-cloud-platform-turnkey.md`
-- Code: `reference/infra/`
+- Code: `terraform/`

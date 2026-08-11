@@ -1,14 +1,16 @@
 # Reference implementations
 
-Generic, sanitized code. Not client production trees.
+Generic, sanitized code that is **not** the main Terraform showcase.
 
-| Path | Purpose | Owner |
-|------|---------|-------|
-| [`infra/terraform-ai-stack/`](infra/terraform-ai-stack/) | Cloud baseline for AI-oriented workloads | Work |
-| [`infra/ansible-bootstrap/`](infra/ansible-bootstrap/) | Hardened host baseline | Work |
-| [`infra/monitoring-starter/`](infra/monitoring-starter/) | Observability starter | Work |
-| [`ai/llm-compose-kit/`](ai/llm-compose-kit/) | Compose/k8s kit for LLM + deps | Work |
-| [`apps/`](apps/) | Small sites / apps | Work; home may add `home-*` |
-| [`utilities/`](utilities/) | CLIs and helpers | Work; home optional |
+For **Terraform / Terragrunt IaC**, go to the repo root:
 
-Each subproject needs its own README: purpose, deploy steps, `*.example` configs.
+**[`../terraform/`](../terraform/)**
+
+| Path | Purpose |
+|------|---------|
+| [`ansible-bootstrap/`](ansible-bootstrap/) | Host baseline (Ansible) |
+| [`monitoring-starter/`](monitoring-starter/) | Observability starter |
+| [`ai/llm-compose-kit/`](ai/llm-compose-kit/) | LLM compose kit |
+| [`apps/`](apps/) | Small sites / apps |
+| [`utilities/`](utilities/) | CLIs and helpers |
+| [`infra/`](infra/) | Redirect stub → `../terraform/` |

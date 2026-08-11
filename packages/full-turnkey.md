@@ -17,4 +17,4 @@ One owner from infra to documentation and observability, including application c
 ## Proof in this repo
 
 - Case studies `01`–`03`
-- `reference/apps/`, `reference/utilities/`, `reference/infra/`, `reference/ai/`
+- `reference/apps/`, `reference/utilities/`, `terraform/`, `reference/ai/`

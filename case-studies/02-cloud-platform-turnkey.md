@@ -45,7 +45,7 @@ Terraform, Terragrunt, remote state (S3/OBS-compatible), cloud.ru-class provider
 
 ## Links
 
-- Modules: [`reference/infra/modules/`](../reference/infra/modules/)
-- Multi-env pattern: [`reference/infra/patterns/multi-env-root/`](../reference/infra/patterns/multi-env-root/)
-- Terragrunt pattern: [`reference/infra/patterns/terragrunt-live/`](../reference/infra/patterns/terragrunt-live/)
-- Greenfield example: [`reference/infra/examples/greenfield-platform/`](../reference/infra/examples/greenfield-platform/)
+- Modules: [`terraform/modules/`](../terraform/modules/)
+- Multi-env pattern: [`terraform/stacks/multi-env-root/`](../terraform/stacks/multi-env-root/)
+- Terragrunt pattern: [`terraform/stacks/terragrunt-live/`](../terraform/stacks/terragrunt-live/)
+- Greenfield example: [`terraform/examples/greenfield-platform/`](../terraform/examples/greenfield-platform/)

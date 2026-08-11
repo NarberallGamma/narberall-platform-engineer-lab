@@ -27,5 +27,3 @@ See [`OWNERS.md`](OWNERS.md): work machine owns most paths; home machine fills o
 ## Positioning (short)
 
 > Turnkey cloud and AI infrastructure: IaC, CI/CD, LLM/RAG stacks, apps, docs, and observability.
-
-**License:** MIT

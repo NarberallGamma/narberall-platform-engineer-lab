@@ -1,11 +1,11 @@
 resource "openstack_networking_network_v2" "default" {
-  name           = "project-legacy-b-default"
+  name           = "project-a-b-default"
   admin_state_up = true
 }
 
 resource "openstack_networking_subnet_v2" "default" {
   network_id = openstack_networking_network_v2.default.id
-  name       = "project-legacy-b-default"
+  name       = "project-a-b-default"
   cidr       = "10.198.0.0/24"
   dns_nameservers = [
     "8.8.8.8",

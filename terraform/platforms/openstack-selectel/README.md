@@ -1,5 +1,5 @@
 # Platform: OpenStack / Selectel
 
-Terraform for OpenStack + Selectel-class providers: networks, compute, remote state with S3-compatible backends.
+Terraform for OpenStack + Selectel-class providers: networks, compute, K8s control-plane guests, GitLab, Postgres.
 
-Names and credentials are sanitized. Original client identifiers are not present.
+Production trees also included Ceph-adjacent disks, logging VMs, VPN, and runners. This sample keeps the core shape without client names.

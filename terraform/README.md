@@ -53,10 +53,12 @@ flowchart TB
 
 | Platform | Path | What you see |
 |----------|------|----------------|
-| cloud.ru / Huawei Cloud (AWS-shaped) | [`platforms/cloud-ru-huawei/`](platforms/cloud-ru-huawei/) → stacks/modules | Terragrunt, CCE/RDS/OBS, multi-env root |
-| AWS | [`platforms/aws/`](platforms/aws/) | VPC module, EC2, EIP, EBS, S3 state |
-| OpenStack / Selectel | [`platforms/openstack-selectel/`](platforms/openstack-selectel/) | OpenStack + Selectel providers |
-| Broader cloud / on-prem | [`stacks/multi-cloud-notes/`](stacks/multi-cloud-notes/) | GCP, Hetzner, VMware, Proxmox, bare metal |
+| cloud.ru / Huawei Cloud (AWS-shaped) | [`platforms/cloud-ru-huawei/`](platforms/cloud-ru-huawei/) | Terragrunt, CCE/RDS/OBS, multi-env root |
+| AWS | [`platforms/aws/`](platforms/aws/), [`stacks/aws-terragrunt-live/`](stacks/aws-terragrunt-live/) | VPC/EC2/RDS + large Terragrunt live |
+| OpenStack / Selectel | [`platforms/openstack-selectel/`](platforms/openstack-selectel/) | K8s guests, GitLab, Postgres |
+| Proxmox | [`platforms/proxmox/`](platforms/proxmox/) | VE guests for K8s / GitLab |
+| Cloudflare | [`platforms/cloudflare/`](platforms/cloudflare/) | DNS as code |
+| Broader notes | [`stacks/multi-cloud-notes/`](stacks/multi-cloud-notes/) | GCP, Hetzner, VMware, bare metal |
 
 ## Case studies
 

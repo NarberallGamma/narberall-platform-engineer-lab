@@ -13,12 +13,17 @@ This repo is my public lab: NDA-safe case studies, sanitized reference code, dia
 | Path | What |
 |------|------|
 | [`case-studies/`](case-studies/) | Problem → architecture → result (NDA-safe) |
+| [`reference/infra/`](reference/infra/) | **Terraform showcase:** modules, Terragrunt, multi-env, import examples |
 | [`packages/`](packages/) | Fixed-scope offers (AI Infra / Cloud Foundation / Full Turnkey) |
 | [`reference/`](reference/) | Terraform, Ansible, AI kits, apps, utilities |
 | [`practice/`](practice/) | Workstation tooling + home lab |
 | [`diagrams/`](diagrams/) | Architecture diagrams |
 | [`site/`](site/) | Portfolio website source |
 | [`docs/`](docs/) | Positioning, sanitize checklist, content guide |
+
+## Terraform highlight
+
+I introduce Terraform/Terragrunt from zero on greenfield platforms, and I import existing hand-built cloud into state until `plan` is clean. Start at [`reference/infra/README.md`](reference/infra/README.md).
 
 ## Maintenance zones
 

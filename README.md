@@ -23,7 +23,10 @@ This repo is my public lab: NDA-safe case studies, sanitized reference code, dia
 
 ## Terraform highlight
 
-I introduce Terraform/Terragrunt from zero on greenfield platforms, and I import existing hand-built cloud into state until `plan` is clean. Start at [`reference/infra/README.md`](reference/infra/README.md).
+I introduce Terraform/Terragrunt from zero on greenfield platforms, and I import existing hand-built cloud into state until `plan` is clean.
+
+Browse eras (current cloud.ru-class vs legacy AWS / Selectel): [`reference/infra/eras/`](reference/infra/eras/).  
+Full map: [`reference/infra/README.md`](reference/infra/README.md).
 
 ## Maintenance zones
 

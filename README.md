@@ -32,9 +32,10 @@ All Terraform and Terragrunt code lives in the top-level **[`terraform/`](terraf
 | Go to | Why |
 |-------|-----|
 | [`terraform/README.md`](terraform/README.md) | IaC navigation hub |
-| [`terraform/platforms/`](terraform/platforms/) | Real samples: cloud.ru/Huawei, AWS, OpenStack/Selectel |
+| [`terraform/platforms/`](terraform/platforms/) | Real samples: cloud.ru/Huawei, AWS, OpenStack/Selectel, Proxmox, Cloudflare |
 | [`terraform/stacks/multi-env-root/`](terraform/stacks/multi-env-root/) | Full multi-env root (network, VMs, K8s, RDS, OBS) |
-| [`terraform/stacks/terragrunt-live/`](terraform/stacks/terragrunt-live/) | Terragrunt DRY layout |
+| [`terraform/stacks/terragrunt-live/`](terraform/stacks/terragrunt-live/) | Terragrunt DRY layout (cloud.ru-class) |
+| [`terraform/stacks/aws-terragrunt-live/`](terraform/stacks/aws-terragrunt-live/) | AWS Terragrunt live (EKS / RDS) |
 | [`terraform/modules/`](terraform/modules/) | Reusable modules used by stacks |
 
 I introduce Terraform/Terragrunt from zero on greenfield platforms, and I import hand-built cloud into state until `plan` is clean.

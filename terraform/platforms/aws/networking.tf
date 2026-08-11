@@ -4,7 +4,7 @@ locals {
 
 module "vpc" {
   source               = "terraform-aws-modules/vpc/aws"
-  name                 = "project-legacy-a-infra"
+  name                 = "project-a-infra"
   cidr                 = local.infra_cidr
   azs                  = ["eu-central-1a", "eu-central-1b", "eu-central-1c"]
   private_subnets      = ["10.32.0.0/24", "10.32.1.0/24", "10.32.2.0/24"]
@@ -12,7 +12,7 @@ module "vpc" {
 }
 
 resource "aws_security_group" "infra" {
-  name        = "project-legacy-a-infra"
+  name        = "project-a-infra"
   description = "infrastructure sg"
   vpc_id      = module.vpc.vpc_id
 
@@ -31,12 +31,12 @@ resource "aws_security_group" "infra" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "project-legacy-a-infra" }
+  tags = { Name = "project-a-infra" }
 }
 
 resource "aws_internet_gateway" "infra" {
   vpc_id = module.vpc.vpc_id
-  tags   = { Name = "project-legacy-a-igw" }
+  tags   = { Name = "project-a-igw" }
 }
 
 resource "aws_route" "default_via_igw" {

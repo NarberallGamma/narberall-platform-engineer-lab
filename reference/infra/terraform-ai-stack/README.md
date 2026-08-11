@@ -1,5 +1,5 @@
 # terraform-ai-stack
 
-**Status:** scaffold placeholder (Work PC implements later)
+AI-oriented baseline will compose [`../modules/`](../modules/) plus GPU/LLM-oriented extras.
 
-Generic Terraform modules for an AI-oriented cloud baseline (network, compute, object storage, IAM patterns). No client state files.
+For general platform IaC patterns, start at [`../README.md`](../README.md).

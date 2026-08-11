@@ -1,8 +1,3 @@
-terraform {
-  # This module is now only being tested with Terraform v1.13.3. 
-  required_version = ">= 1.13.3"
-}
-
 resource "sbercloud_vpc" "vpc" {
   name = var.vpc_name
   cidr = var.vpc_cidr

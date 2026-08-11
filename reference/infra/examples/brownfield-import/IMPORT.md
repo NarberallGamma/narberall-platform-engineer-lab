@@ -3,7 +3,7 @@
 Use after writing Terraform that matches live resources.
 
 ```bash
-# 1) Inventory / audit (read-only) — private tooling; not in this repo
+# 1) Inventory / audit (read-only)  -  private tooling; not in this repo
 # 2) Write resource blocks that match reality
 # 3) Import (examples with fake IDs)
 

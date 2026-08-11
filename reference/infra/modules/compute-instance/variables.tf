@@ -1,5 +1,5 @@
 variable "instances" {
-  description = "Карта индивидуальных конфигураций инстансов. Ключ — суффикс имени (напр. \"01\")."
+  description = "Карта индивидуальных конфигураций инстансов. Ключ  -  суффикс имени (напр. \"01\")."
   type = map(object({
     availability_zone  = optional(string)
     networks = list(object({
@@ -39,7 +39,7 @@ variable "instance_name" {
 }
 
 variable "availability_zones" {
-  description = "Список зон доступности (общий fallback). 1 элемент — для всех; длина = instance_count — каждому своя."
+  description = "Список зон доступности (общий fallback). 1 элемент  -  для всех; длина = instance_count  -  каждому своя."
   type        = list(string)
   default     = []
 }

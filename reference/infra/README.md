@@ -25,6 +25,6 @@ Terraform, Terragrunt, IaC, modules, multi-env, brownfield import, remote state 
 
 ## Related placeholders
 
-- [`terraform-ai-stack/`](terraform-ai-stack/) — AI-oriented baseline (evolving)
-- [`monitoring-starter/`](monitoring-starter/) — observability starter
-- [`ansible-bootstrap/`](ansible-bootstrap/) — host baseline
+- [`terraform-ai-stack/`](terraform-ai-stack/)  -  AI-oriented baseline (evolving)
+- [`monitoring-starter/`](monitoring-starter/)  -  observability starter
+- [`ansible-bootstrap/`](ansible-bootstrap/)  -  host baseline

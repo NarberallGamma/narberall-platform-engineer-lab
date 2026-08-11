@@ -1,10 +1,10 @@
-# Era: legacy AWS (Flant-era client style)
+# Platform: AWS
 
-Typical patterns from earlier AWS client delivery:
+Terraform patterns from AWS client delivery (names and CIDRs sanitized):
 
 - `terraform-aws-modules/vpc/aws` for network
 - EC2 + EIP + EBS with `lifecycle.ignore_changes` on `user_data` / `ami`
 - Small reusable `modules/db_instance`
 - S3 remote state + named AWS profile
 
-Names and CIDRs are sanitized. Original client identifiers are not present.
+This is active career experience, published as a clean sample tree for portfolio readers.

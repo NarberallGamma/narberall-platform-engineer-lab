@@ -1,25 +1,39 @@
 # Terraform / Terragrunt (IaC)
 
 This directory is the **Infrastructure as Code** showcase for this lab.  
-Not application code. Not a random `modules/` dump. End-to-end Terraform as I deliver it.
+Not application code. Not a random `modules/` dump. End-to-end Terraform as I deliver it on real projects.
+
+## How I deliver platforms
+
+From an empty cloud project (or empty rack) to running workloads:
+
+1. IAM / project / tenancy baseline
+2. VPC, subnets, routing, security groups, peering when needed
+3. Compute, load balancing, managed DB, object storage
+4. Kubernetes I stand up and operate (managed CCE/EKS-class or self-hosted / bare metal)
+5. CI/CD into the cluster, apps, docs, monitoring handoff
+
+**cloud.ru ≈ Huawei Cloud ≈ AWS mental model.** VPC, ECS (compute), CCE (Kubernetes), RDS, OBS (S3-compatible) map cleanly to AWS skills. Samples here prove that shape of work. Separate AWS and OpenStack/Selectel trees show the same ownership on other providers.
+
+Also operated on **Google Cloud**, **Hetzner**, **VMware**, **Proxmox**, and **bare-metal** Linux in previous companies (summarized under platforms + multi-cloud notes; full client trees stay private).
 
 ## Open in this order
 
-1. **[`eras/`](eras/)** - current cloud.ru-class vs legacy AWS / Selectel style  
-2. **[`stacks/multi-env-root/`](stacks/multi-env-root/)** - full multi-env root (network, ECS, CCE, RDS, OBS)  
-3. **[`stacks/terragrunt-live/`](stacks/terragrunt-live/)** - Terragrunt DRY live sample  
-4. **[`modules/`](modules/)** - reusable building blocks used by stacks  
-5. **[`examples/`](examples/)** - minimal greenfield compose + brownfield import checklist  
+1. **[`platforms/`](platforms/)** - real provider samples (cloud.ru/Huawei, AWS, OpenStack/Selectel)
+2. **[`stacks/multi-env-root/`](stacks/multi-env-root/)** - full multi-env root (network, ECS, CCE, RDS, OBS)
+3. **[`stacks/terragrunt-live/`](stacks/terragrunt-live/)** - Terragrunt DRY live sample
+4. **[`modules/`](modules/)** - reusable building blocks used by stacks
+5. **[`examples/`](examples/)** - minimal greenfield compose + brownfield import checklist
 
 ```mermaid
 flowchart TB
   subgraph terraform_root ["terraform/ IaC root"]
-    Eras[eras current vs legacy]
+    Platforms[platforms real experience]
     Stacks[stacks multi-env and terragrunt]
     Mods[modules reusable]
     Examples[examples]
   end
-  Eras --> Stacks
+  Platforms --> Stacks
   Mods --> Stacks
   Stacks --> Examples
 ```
@@ -28,20 +42,21 @@ flowchart TB
 
 | Path | Role |
 |------|------|
-| [`eras/`](eras/) | **Browse by career era** (current vs Flant-era legacy) |
-| [`stacks/`](stacks/) | **How roots are laid out** (multi-env TF + Terragrunt) |
+| [`platforms/`](platforms/) | **Provider samples from production work** (sanitized) |
+| [`stacks/`](stacks/) | How roots are laid out (multi-env TF + Terragrunt) |
 | [`modules/`](modules/) | Shared modules consumed by stacks |
 | [`examples/`](examples/) | Small entry points / import runbook |
 | [`terraform-ai-stack/`](terraform-ai-stack/) | Placeholder for AI-oriented baseline |
 | [`SANITIZE.md`](SANITIZE.md) | What never goes into git |
 
-## Eras (quick)
+## Platforms (quick)
 
-| Era | Path | Stack |
-|-----|------|-------|
-| Current | [`eras/current-cloud-ru/`](eras/current-cloud-ru/) → points to stacks/modules | cloud.ru-class, Terragrunt, CCE/RDS/OBS |
-| Legacy AWS | [`eras/legacy-aws/`](eras/legacy-aws/) | VPC module, EC2, EIP, EBS, S3 state |
-| Legacy Selectel | [`eras/legacy-openstack-selectel/`](eras/legacy-openstack-selectel/) | OpenStack + Selectel providers |
+| Platform | Path | What you see |
+|----------|------|----------------|
+| cloud.ru / Huawei Cloud (AWS-shaped) | [`platforms/cloud-ru-huawei/`](platforms/cloud-ru-huawei/) → stacks/modules | Terragrunt, CCE/RDS/OBS, multi-env root |
+| AWS | [`platforms/aws/`](platforms/aws/) | VPC module, EC2, EIP, EBS, S3 state |
+| OpenStack / Selectel | [`platforms/openstack-selectel/`](platforms/openstack-selectel/) | OpenStack + Selectel providers |
+| Broader cloud / on-prem | [`stacks/multi-cloud-notes/`](stacks/multi-cloud-notes/) | GCP, Hetzner, VMware, Proxmox, bare metal |
 
 ## Case studies
 
@@ -50,4 +65,4 @@ flowchart TB
 
 ## Keywords
 
-Terraform, Terragrunt, IaC, modules, stacks, multi-env, brownfield import, remote state, AWS, OpenStack, Selectel, Kubernetes, RDS
+Terraform, Terragrunt, IaC, AWS, Huawei Cloud, cloud.ru, Google Cloud, Hetzner, VMware, Proxmox, bare metal, OpenStack, Selectel, Kubernetes, IAM, VPC, CI/CD, modules, stacks, multi-env, brownfield import, remote state, RDS

@@ -1,18 +1,24 @@
-# Multi-cloud notes (AWS / Selectel-class)
+# Multi-cloud and on-prem experience
 
-Thin notes only. Full client trees are not published (NDA / ownership).
+Published `.tf` trees focus on **cloud.ru/Huawei (AWS-shaped)**, **AWS**, and **OpenStack/Selectel**.  
+The same ownership model applied on other platforms in previous roles. Full private trees stay out of git (NDA / ownership).
 
-## Experience signals
+## Platforms operated
 
-| Area | Practice |
-|------|----------|
-| AWS | Profile-based credentials, regional stacks, RDS/MySQL class resources |
-| Selectel / OpenStack-class | Terraform or OpenTofu, S3-compatible state, OS_* env for backend auth |
-| Tooling | `tfswitch` / lock files for multiple platforms when needed |
+| Platform | What I owned |
+|----------|----------------|
+| **AWS** | VPC, EC2, EIP/EBS, RDS-class DB, S3 state; see [`../../platforms/aws/`](../../platforms/aws/) |
+| **cloud.ru / Huawei Cloud** | IAM/project baseline through CCE Kubernetes, RDS, OBS; AWS-analogue skills; see [`../../platforms/cloud-ru-huawei/`](../../platforms/cloud-ru-huawei/) |
+| **Google Cloud** | Project/network bootstrap, compute, and delivery into GKE-class / VM workloads |
+| **Hetzner** | Cloud VMs, networking, Linux baseline for app and CI hosts |
+| **VMware** | VM estates, networking adjacency, guest Linux for platform services |
+| **Proxmox** | Hypervisor clusters, guests, storage-aware layouts for labs and production-like stands |
+| **Bare metal** | Rack/server Linux, bootstrap, and Kubernetes / app platforms without a hyperscaler |
 
-## What is intentionally absent
+## Greenfield pattern (every cloud)
 
-- Client account IDs, DNS zones, production hostnames
-- Copied `clients/*` repositories
+Empty project or empty hardware → IAM/access → VPC/network → compute/data → **Kubernetes I install and run** → CI/CD + apps + monitoring.
 
-Cloud.ru-class modules and patterns in this repo remain the primary code proof. Multi-cloud work is summarized here for recruiters scanning keywords (AWS, Selectel, OpenTofu, remote state).
+## Tooling
+
+Terraform / OpenTofu, Terragrunt, remote state, `tfswitch` / lock files when multiple providers coexist.

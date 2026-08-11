@@ -1,23 +1,5 @@
-# Terraform eras
+# Moved
 
-Compare how my IaC looked over time. All paths are under [`../`](../) (repo `terraform/`).
+Platform samples live under **[`../platforms/`](../platforms/)**.
 
-| Era | Path | Code location |
-|-----|------|----------------|
-| **Current** | [`current-cloud-ru/`](current-cloud-ru/) | Mostly `stacks/` + `modules/` |
-| **Legacy AWS** | [`legacy-aws/`](legacy-aws/) | Self-contained `.tf` samples here |
-| **Legacy Selectel** | [`legacy-openstack-selectel/`](legacy-openstack-selectel/) | Self-contained `.tf` samples here |
-
-```mermaid
-flowchart TB
-  subgraph current [Current]
-    M[modules]
-    S[stacks]
-  end
-  subgraph legacy [Legacy_Flant_era]
-    AWS[legacy-aws]
-    SEL[legacy-openstack-selectel]
-  end
-  current --> Hunter[Hunter reads eras first]
-  legacy --> Hunter
-```
+The word "eras" was retired so the tree reads as real production experience, not "legacy code".

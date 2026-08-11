@@ -1,7 +1,8 @@
-# Stack: multi-env Terraform root (current style)
+# Stack: multi-env Terraform root
 
 One root describes several environments with shared provider and remote state.  
-This is **current** delivery shape: network, ECS/compute, CCE/Kubernetes, RDS, OBS.
+Delivery shape on Huawei Cloud class (cloud.ru): network, ECS/compute, CCE/Kubernetes, RDS, OBS.  
+AWS readers: map ECS→EC2, CCE→EKS-class, OBS→S3.
 
 ## Files
 
@@ -17,5 +18,5 @@ This is **current** delivery shape: network, ECS/compute, CCE/Kubernetes, RDS, O
 ## Navigation
 
 - IaC hub: [`../../README.md`](../../README.md)
-- Era index: [`../../eras/`](../../eras/)
+- Platforms: [`../../platforms/`](../../platforms/)
 - Modules: [`../../modules/`](../../modules/)

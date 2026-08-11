@@ -2,7 +2,7 @@
 
 Generic, sanitized code that is **not** the main Terraform showcase.
 
-For **Terraform / Terragrunt IaC**, go to the repo root:
+For **Terraform / Terragrunt IaC**, go to:
 
 **[`../terraform/`](../terraform/)**
 

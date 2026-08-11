@@ -1,6 +1,7 @@
-# Era: current (cloud.ru-class)
+# Platform: cloud.ru / Huawei Cloud (AWS-shaped)
 
-This is the index for **current** Terraform style.
+Production-style Terraform for Huawei Cloud class environments (cloud.ru and peers).  
+Resource model maps to AWS (VPC, compute, managed Kubernetes, RDS, S3-compatible object storage).
 
 ## Where the code is
 
@@ -16,6 +17,6 @@ This is the index for **current** Terraform style.
 flowchart LR
   Modules[modules] --> MultiEnv[stacks/multi-env-root]
   Modules --> Tg[stacks/terragrunt-live]
-  MultiEnv --> Cloud[Cloud platform]
+  MultiEnv --> Cloud[Huawei-class cloud]
   Tg --> Cloud
 ```

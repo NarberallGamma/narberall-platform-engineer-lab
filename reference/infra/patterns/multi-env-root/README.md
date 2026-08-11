@@ -1,14 +1,16 @@
-# Pattern: multi-env Terraform root
+# Pattern: multi-env Terraform root (current style)
 
-One root module describes several environments (here: `dev` and `prod` network slices) with a shared provider and remote state.
+One root describes several environments with shared provider and remote state. Shape mirrors current platform work: network, ECS/compute, CCE/Kubernetes, RDS, OBS.
 
-## When to use
+## Files
 
-- Single team owns all stands
-- Prefer fewer state files than Terragrunt-per-unit
-- Brownfield import of an existing estate into one (or few) roots
+| File | Content |
+|------|---------|
+| `network_*.tf` | VPC / subnet slices |
+| `ecs_*.tf` | GitLab, Vault raft, related VMs |
+| `cce_*.tf` | Managed Kubernetes + node pools + AZ extension groups |
+| `rds_*.tf` | PostgreSQL HA |
+| `obs.tf` | Object storage buckets |
+| `provider.tf` | Provider + S3-compatible backend |
 
-## Related
-
-- Case study: brownfield import
-- Modules for reuse: `../../modules/`
+See also eras: [`../../eras/current-cloud-ru/`](../../eras/current-cloud-ru/).

@@ -1,24 +1,15 @@
-# Pattern: Terragrunt live (one env)
+# Pattern: Terragrunt live (sample env)
 
-DRY layout: `root.hcl` generates provider + remote state; units under `env-dev/` depend on each other.
+DRY layout with per-unit state. Sample `env-dev` units:
 
-## Layout
+- vpc → subnet → route
+- security-group → compute
 
 ```text
 terragrunt-live/
   root.hcl
-  _env/           # shared source pointers
+  _env/
   env-dev/
-    env.hcl
-    vpc/
-    subnet/
-    route/
+    vpc/ subnet/ route/
+    security-group/ compute/
 ```
-
-## Why this shape
-
-- Per-unit state keys (blast radius)
-- Shared provider/backend generation
-- `dependency` blocks for ordering (vpc → subnet → route)
-
-Credentials and real bucket names are not in git. See `SANITIZE.md` at `reference/infra/`.

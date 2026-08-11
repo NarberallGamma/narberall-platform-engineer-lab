@@ -1,0 +1,4 @@
+os_auth_url  = "https://api.example-selectel.invalid/identity/v3"
+os_region    = "ru-1"
+sel_account  = "REPLACE_ACCOUNT"
+project_name = "project-legacy-b"

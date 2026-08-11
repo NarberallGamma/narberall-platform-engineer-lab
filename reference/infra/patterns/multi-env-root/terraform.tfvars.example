@@ -1,3 +1,18 @@
 region     = "ru-example-1"
 access_key = "REPLACE_ME"
 secret_key = "REPLACE_ME"
+
+image_ubuntu_id = "image-ubuntu-example"
+prod_key_pair   = "project-a-prod-key"
+preprod_key_pair = "project-a-preprod-key"
+
+prod_vpc_id            = "vpc-prod-example"
+prod_subnet_id         = "subnet-prod-example"
+prod_db_vpc_id         = "vpc-prod-db-example"
+prod_db_subnet_id      = "subnet-prod-db-example"
+prod_security_group_id = "sg-prod-example"
+prod_db_password       = "REPLACE_ME"
+
+preprod_vpc_id            = "vpc-preprod-example"
+preprod_subnet_id         = "subnet-preprod-example"
+preprod_security_group_id = "sg-preprod-example"

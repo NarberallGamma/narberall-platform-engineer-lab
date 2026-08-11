@@ -1,30 +1,36 @@
 # Infrastructure as Code (Terraform)
 
-How I work with Terraform on real platforms: greenfield adoption, reusable modules, Terragrunt live layouts, and brownfield import until `plan` is clean.
+How I work with Terraform: greenfield adoption, reusable modules, Terragrunt, multi-env roots, and brownfield import until `plan` is clean.
+
+Also shows **era differences**: current cloud.ru-class code vs legacy AWS / Selectel (Flant-era clients).
+
+## Start here
+
+| Want to see | Go to |
+|-------------|-------|
+| Current modules + K8s/RDS/OBS root | [`modules/`](modules/), [`patterns/multi-env-root/`](patterns/multi-env-root/) |
+| Terragrunt DRY live | [`patterns/terragrunt-live/`](patterns/terragrunt-live/) |
+| Legacy AWS style | [`eras/legacy-aws/`](eras/legacy-aws/) |
+| Legacy Selectel/OpenStack | [`eras/legacy-openstack-selectel/`](eras/legacy-openstack-selectel/) |
+| Era index | [`eras/README.md`](eras/README.md) |
 
 ## Map
 
 | Path | What |
 |------|------|
-| [`modules/`](modules/) | Reusable building blocks (VPC, subnet, route, compute, EIP, peering) |
-| [`patterns/multi-env-root/`](patterns/multi-env-root/) | One root managing several environments |
-| [`patterns/terragrunt-live/`](patterns/terragrunt-live/) | Terragrunt DRY layout (one sample env) |
-| [`patterns/multi-cloud-notes/`](patterns/multi-cloud-notes/) | Notes on AWS / Selectel-class workflows |
-| [`examples/greenfield-platform/`](examples/greenfield-platform/) | Minimal compose of modules |
-| [`examples/brownfield-import/`](examples/brownfield-import/) | Import checklist with fake resource IDs |
-| [`SANITIZE.md`](SANITIZE.md) | Rules before publishing any snippet |
+| [`eras/`](eras/) | Current vs legacy code samples |
+| [`modules/`](modules/) | Reusable building blocks |
+| [`patterns/multi-env-root/`](patterns/multi-env-root/) | One root, several environments (network, ECS, CCE, RDS, OBS) |
+| [`patterns/terragrunt-live/`](patterns/terragrunt-live/) | Terragrunt sample env |
+| [`patterns/multi-cloud-notes/`](patterns/multi-cloud-notes/) | Short multi-cloud notes |
+| [`examples/`](examples/) | Greenfield compose + brownfield import checklist |
+| [`SANITIZE.md`](SANITIZE.md) | Publish rules |
 
 ## Keywords
 
-Terraform, Terragrunt, IaC, modules, multi-env, brownfield import, remote state (S3/OBS-compatible), cloud platform, network, compute
+Terraform, Terragrunt, IaC, modules, multi-env, brownfield import, remote state, AWS, OpenStack, Selectel, Kubernetes, RDS, OBS, cloud platform
 
 ## Case studies
 
 - [Cloud platform turnkey (greenfield)](../../case-studies/02-cloud-platform-turnkey.md)
 - [Brownfield import into Terraform state](../../case-studies/04-terraform-brownfield-import.md)
-
-## Related placeholders
-
-- [`terraform-ai-stack/`](terraform-ai-stack/)  -  AI-oriented baseline (evolving)
-- [`monitoring-starter/`](monitoring-starter/)  -  observability starter
-- [`ansible-bootstrap/`](ansible-bootstrap/)  -  host baseline

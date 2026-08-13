@@ -17,8 +17,9 @@ This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terra
 
 | You are… | Open |
 |-----------|------|
-| Hiring manager / lead | [`docs/experience.md`](docs/experience.md) then [`iac/cloud/`](iac/cloud/) then [case studies](#case-studies-iac-related) |
+| Hiring manager / lead | [`docs/experience.md`](docs/experience.md) (including [education](docs/experience.md#education)) then [`iac/cloud/`](iac/cloud/) then [case studies](#case-studies-iac-related) |
 | Engineer reviewing IaC | [`iac/terraform/`](iac/terraform/) |
+| Engineer reviewing legacy-as-code | [`iac/cloud/vk-cloud.md`](iac/cloud/vk-cloud.md) then [`case-studies/05-legacy-estate-as-code.md`](case-studies/05-legacy-estate-as-code.md) |
 | Engineer reviewing Ansible / edge | [`iac/ansible/`](iac/ansible/) then [`reference/ansible-edge/`](reference/ansible-edge/) |
 | Engineer reviewing OS / hardware depth | [`practice/home-lab/os-workstation.md`](practice/home-lab/os-workstation.md) |
 
@@ -56,7 +57,9 @@ I regularly stand up infrastructure **from zero** in public clouds and on premis
 
 **Cloud.ru note for international readers:** cloud.ru (and similar RU hyperscalers in this lab) is **Huawei Cloud class**. The resource model and day-to-day patterns closely follow **AWS** (VPC, ECS/EC2-class compute, CCE/EKS-class Kubernetes, RDS, OBS/S3, DMS/Kafka-class). That work is transferable AWS-shaped experience.
 
-Also shipped platforms on **AWS**, **Google Cloud**, **Hetzner**, **OpenStack / Selectel**, **VMware**, **Proxmox**, and **bare-metal** servers in previous roles.
+**VK Cloud note for international readers:** VK Cloud (MCS) is **NOVA Cloud class** (Kazakhstan OpenStack IaaS). Under the hood the resource model is **OpenStack**: Nova compute, Cinder volumes, Neutron networks (VPC-equivalent), Keystone identity. That work is transferable OpenStack experience (NOVA Cloud KZ, Selectel-class, and other OpenStack IaaS). Provider in this lab: `vk-cs/vkcs`.
+
+Also shipped platforms on **AWS**, **Google Cloud**, **Hetzner**, **OpenStack / Selectel**, **VK Cloud (NOVA Cloud class / MCS)**, **VMware**, **Proxmox**, and **bare-metal** servers in previous roles.
 
 ```mermaid
 flowchart TB
@@ -66,6 +69,7 @@ flowchart TB
     GCP[Google Cloud]
     HZ[Hetzner]
     OS[OpenStack Selectel]
+    VK[VK Cloud NOVA-class]
     PX[Proxmox]
     VM[VMware]
     BM[Bare metal]
@@ -81,9 +85,11 @@ flowchart TB
 
 Greenfield is the empty-project story. A large part of the work is the other side: **arrive on legacy**, inventory what is already running, and make it operable as a platform without a reckless rebuild.
 
+That claim has a concrete proof in this lab: a console-built **NOVA Cloud class** (VK Cloud / MCS) project (no Terraform before I arrived). I described **the whole layout from zero** (networks / VPC-equivalent, subnets, security groups, flavors, AZs) and brought **70+ VMs** into Terraform, then imported live compute until `plan` was clean. Code and counts: [`case-studies/05-legacy-estate-as-code.md`](case-studies/05-legacy-estate-as-code.md), [`iac/terraform/vkcloud/ESTATE.md`](iac/terraform/vkcloud/ESTATE.md).
+
 | I take over | What “turnkey” means |
 |-------------|----------------------|
-| Hand-built cloud / VMs / clusters | IaC (or import into state), inventory, no more click-ops as source of truth |
+| Hand-built cloud / VMs / clusters | IaC (or import into state), inventory, no more click-ops as source of truth. **Proof:** 70+ VMs + networks/SG catalog, [case 05](case-studies/05-legacy-estate-as-code.md) |
 | Undocumented delivery | Runbooks, diagrams, on-call notes so the next person can ship |
 | Slow release / fragile ops | CI/CD, GitOps: Jenkins and/or GitLab CI + Argo CD, faster path from commit to environment |
 | Cost and waste | Right-size compute, storage, idle environments; cut obvious cloud spend |
@@ -213,6 +219,7 @@ All cloud write-ups and Terraform live under **[`iac/`](iac/)**.
 | [`iac/terraform/RESOURCES.md`](iac/terraform/RESOURCES.md) | Clouds × resource types in code |
 | [`iac/terraform/aws/`](iac/terraform/aws/) | AWS root + Terragrunt live (EKS, RDS, ElastiCache) |
 | [`iac/terraform/cloud-ru-huawei/`](iac/terraform/cloud-ru-huawei/) | Huawei-class multi-env root + Terragrunt |
+| [`iac/terraform/vkcloud/`](iac/terraform/vkcloud/) | **Legacy as code:** VK Cloud / NOVA Cloud class, vkcs, catalog + purpose-split VMs, import |
 | [`iac/terraform/modules/`](iac/terraform/modules/) | Reusable modules |
 | [`iac/terraform/SANITIZE.md`](iac/terraform/SANITIZE.md) | What never goes into git |
 
@@ -230,6 +237,7 @@ flowchart TB
   TF --> AWS[aws]
   TF --> CR[cloud-ru-huawei]
   TF --> OS[openstack-selectel]
+  TF --> VK[vkcloud legacy import]
   TF --> PX[proxmox]
   TF --> CF[cloudflare]
   Mods[modules] --> CR
@@ -279,6 +287,7 @@ flowchart LR
 
 - [Cloud platform turnkey / Terraform from zero](case-studies/02-cloud-platform-turnkey.md)
 - [Brownfield import into Terraform state](case-studies/04-terraform-brownfield-import.md)
+- [Legacy estate as Terraform (VK Cloud / NOVA Cloud class)](case-studies/05-legacy-estate-as-code.md)
 - [AI / LLM platform](case-studies/01-ai-llm-platform.md)
 - [Document AI pipeline](case-studies/03-document-ai-pipeline.md)
 
@@ -286,4 +295,4 @@ flowchart LR
 
 ## Positioning
 
-> Six years, senior in platform niches. Turnkey cloud and AI: greenfield or loaded legacy. De facto lead (train/delegate) under PMs, CTOs, and project-wide tech leads; also a teammate under a dedicated lead; also the single owner on concurrent products. Bank/SBP-class payments, blockchain, delivery e-commerce, Atlassian/Nextcloud. Java/.NET/Go/Kotlin/Python/1C delivery plus SonarQube/Trivy/OSV gates. **Jenkins** (plugins, VM workers → Kubernetes) and **GitLab CI + Argo CD** (branch/tag deploys, auto MR, merge rules). Kafka/Rabbit/NATS/Artemis/Redis. 50+ microservices and JVM/Tomcat monoliths (heap and thread dumps). Secure by default (hardening, EDR, Vault / ESO). ~99.9% SLA, seamless migrations, multi-zone HA, Cisco-style 7-step incidents. Hardware/OS depth in the home lab. Detail: [`docs/experience.md`](docs/experience.md).
+> Six years, senior in platform niches. Turnkey cloud and AI: greenfield or loaded legacy. De facto lead (train/delegate) under PMs, CTOs, and project-wide tech leads; also a teammate under a dedicated lead; also the single owner on concurrent products. Bank/SBP-class payments, blockchain, delivery e-commerce, Atlassian/Nextcloud. Java/.NET/Go/Kotlin/Python/1C delivery plus SonarQube/Trivy/OSV gates. **Jenkins** (plugins, VM workers → Kubernetes) and **GitLab CI + Argo CD** (branch/tag deploys, auto MR, merge rules). Kafka/Rabbit/NATS/Artemis/Redis. 50+ microservices and JVM/Tomcat monoliths (heap and thread dumps). Secure by default (hardening, EDR, Vault / ESO). ~99.9% SLA, seamless migrations, multi-zone HA, Cisco-style 7-step incidents. **B.Sc. Information Systems and Technologies (09.03.02), SPbSUT (Bonch-Bruevich)**; Cisco and Windows Server practice during the degree. Hardware/OS depth in the home lab. Detail: [`docs/experience.md`](docs/experience.md).

@@ -157,6 +157,24 @@ That is the same Cisco-style loop as a downed VM: define, gather (dump + metrics
 
 ---
 
+## Education
+
+**Bachelor of Science** in **Information Systems and Technologies** (Russian classifier **09.03.02**).
+
+**University:** The Bonch-Bruevich Saint Petersburg State University of Telecommunications (SPbSUT / СПбГУТ им. проф. М.А. Бонч-Бруевича). Direction: Information Systems and Technologies (ИСиТ).
+
+The programme was not theory-only. Coursework and labs included:
+
+| Track | What that meant in practice |
+|-------|-----------------------------|
+| **Cisco** | Switching, routing, campus LAN/WAN labs; the same seven-step troubleshooting loop used later on production incidents |
+| **Servers and networks** | Linux and Windows hosts, addressing, services, the unglamorous part of keeping a lab or small office online |
+| **Windows Server at IT companies** | During studies: real-company work on Windows Server estates (AD-adjacent, file/print, day-2), not only campus VMs |
+
+That is why hardware/OS depth and Cisco-style incident method in this lab are not a hobby add-on. They started in the degree and internships, then moved into platform work.
+
+---
+
 ## What a hiring lead can take from this
 
 - **Six years**, senior in platform niches, not a title inflation story
@@ -166,5 +184,6 @@ That is the same Cisco-style loop as a downed VM: define, gather (dump + metrics
 - **Payments / SBP-class banks**, **blockchain**, **delivery e-commerce**, **Atlassian / Nextcloud**, **Kafka-class and Redis**, **50+ microservices and JVM monoliths**
 - Build/deploy for **Java, Kotlin, .NET, Go, Python, 1C**; gates with **SonarQube, Trivy, OSV-Scanner**
 - **Jenkins** (plugins, workers) including **dedicated-VM agents → Kubernetes**; **GitLab CI + Argo CD** (branch/tag deploys, auto MR, merge on written rules)
+- **Education:** B.Sc. 09.03.02 Information Systems and Technologies, SPbSUT (Bonch-Bruevich); Cisco labs, campus servers/networks; Windows Server practice at IT companies during studies
 
 Cloud, Kubernetes, DBMS, SLA, and security defaults: [root README](../README.md) and [positioning](positioning.md).

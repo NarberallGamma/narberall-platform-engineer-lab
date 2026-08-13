@@ -1,0 +1,10 @@
+# Fill locally. terraform.tfvars is gitignored.
+# Do not put real project IDs, usernames, or passwords in git.
+
+auth_url         = "https://identity.example.com:5000/v3/"
+user_domain_name = "service-users"
+username         = "svc-example-terraform"
+password         = "REPLACE_ME"
+project_id       = "00000000000000000000000000000000"
+region           = "RegionOne"
+project_name     = "example-project"

@@ -5,11 +5,12 @@
 ## Required sections
 
 1. Hero  -  Platform Engineer · AI & turnkey
-2. Case studies (3)  -  deep links into `/case-studies` on GitHub
+2. Case studies (5)  -  deep links into `/case-studies` on GitHub (include legacy-as-code / VK Cloud)
 3. Packages  -  AI Infra / Cloud Foundation / Full Turnkey
 4. Practice  -  workstation MCP + home lab cards
 5. Code  -  links into `/iac` and `/reference`
-6. Contact  -  Calendly / email
+6. Education  -  B.Sc. 09.03.02 SPbSUT (Bonch-Bruevich); Cisco / Windows Server practice
+7. Contact  -  Calendly / email
 
 ## Deploy
 

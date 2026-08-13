@@ -12,5 +12,6 @@ Ansible / home-lab edge is **not** a client case study; it lives in [`practice/h
 | [`02-cloud-platform-turnkey.md`](02-cloud-platform-turnkey.md) | Terraform from zero, multi-env turnkey | [`diagrams/case-studies/02-cloud-platform-turnkey.md`](../diagrams/case-studies/02-cloud-platform-turnkey.md) |
 | [`03-document-ai-pipeline.md`](03-document-ai-pipeline.md) | OCR / document AI pipeline | [`diagrams/case-studies/03-document-ai-pipeline.md`](../diagrams/case-studies/03-document-ai-pipeline.md) |
 | [`04-terraform-brownfield-import.md`](04-terraform-brownfield-import.md) | Import hand-built cloud into state | [`diagrams/case-studies/04-terraform-brownfield-import.md`](../diagrams/case-studies/04-terraform-brownfield-import.md) |
+| [`05-legacy-estate-as-code.md`](05-legacy-estate-as-code.md) | **Proof of legacy:** 70+ console-built VMs, full network/SG catalog from zero, import, clean plan | [`diagrams/case-studies/05-legacy-estate-as-code.md`](../diagrams/case-studies/05-legacy-estate-as-code.md) |
 
 Use [`_template.md`](_template.md) for new entries.

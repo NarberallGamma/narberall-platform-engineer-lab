@@ -39,6 +39,17 @@ Experience write-ups: [`../cloud/`](../cloud/).
 | Compute | instances (bastion, kube, GitLab, Postgres), server group | `kube.tf` |
 | Storage | block volumes + attach | `volumes_sg.tf` |
 
+## VK Cloud / NOVA Cloud class (OpenStack IaaS)
+
+NOVA Cloud class (Kazakhstan). Under the hood: OpenStack Nova / Cinder / Neutron / Keystone. Provider: `vk-cs/vkcs`.
+
+| Area | Resource types | Where |
+|------|----------------|--------|
+| Catalog | networks, flavors, AZ, SG, volume types, key pairs as keys | `vkcloud/variables/` |
+| Compute | `vkcs_compute_instance` (purpose-split `vm-*.tf`) | `vkcloud/vm-collaboration.tf`, `vm-identity.tf`, `vm-llm.tf`, `vm-database.tf` |
+| Storage | `vkcs_blockstorage_volume`, `vkcs_compute_volume_attach` | same files |
+| Brownfield | `prevent_destroy`, short `ignore_changes`, import runbook | `vkcloud/brownfield.tf`, `IMPORT.md`, `ESTATE.md` |
+
 ## Proxmox
 
 | Area | Resource types | Where |
@@ -59,3 +70,4 @@ Experience write-ups: [`../cloud/`](../cloud/).
 | Terragrunt DRY (Huawei-class) | `cloud-ru-huawei/live/` |
 | Terragrunt live (AWS account/region/env) | `aws/live/` |
 | Standalone AWS root | `aws/root/` |
+| Brownfield catalog + purpose VMs (vkcs) | `vkcloud/` |

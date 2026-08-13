@@ -31,9 +31,10 @@ flowchart TB
   TF --> AWS[aws/root + aws/live]
   TF --> CR[cloud-ru-huawei/stacks + live]
   TF --> OS[openstack-selectel]
+  TF --> VK[vkcloud]
   TF --> PX[proxmox]
   TF --> CF[cloudflare]
   Mods[modules] --> CR
 ```
 
-**Keywords:** IaC, Terraform, Terragrunt, Ansible, AWS, Huawei Cloud, cloud.ru, Google Cloud, Hetzner, OpenStack, Selectel, VMware, Proxmox, bare metal, Cloudflare, Kubernetes, OpenShift, Deckhouse, IAM, VPC, CI/CD, GitOps, Jenkins, GitLab CI, Argo CD, RDS, PostgreSQL, replication, sharding, HA, SLA, observability, brownfield, incident response, Vault, ESO, EDR, hardening, secrets, audit, Kafka, Redis, SonarQube, Trivy, JVM
+**Keywords:** IaC, Terraform, Terragrunt, Ansible, AWS, Huawei Cloud, cloud.ru, Google Cloud, Hetzner, OpenStack, Selectel, VK Cloud, NOVA Cloud, Kazakhstan, vkcs, VMware, Proxmox, bare metal, Cloudflare, Kubernetes, OpenShift, Deckhouse, IAM, VPC, CI/CD, GitOps, Jenkins, GitLab CI, Argo CD, RDS, PostgreSQL, replication, sharding, HA, SLA, observability, brownfield, legacy estate, incident response, Vault, ESO, EDR, hardening, secrets, audit, Kafka, Redis, SonarQube, Trivy, JVM

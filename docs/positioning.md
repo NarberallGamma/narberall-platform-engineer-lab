@@ -11,7 +11,7 @@ Full six-year narrative (domains, JVM, brokers, org): [`experience.md`](experien
 
 **Greenfield:** empty cloud project or bare metal through IAM, VPC, Kubernetes, CI/CD, apps, and observability.
 
-**Legacy:** arrive on a hand-built estate, automate it, document it, add monitoring, cut waste, and keep shipping — without a reckless rewrite.
+**Legacy:** arrive on a hand-built estate, automate it, document it, add monitoring, cut waste, and keep shipping without a reckless rewrite. **Proof in this lab:** [`../case-studies/05-legacy-estate-as-code.md`](../case-studies/05-legacy-estate-as-code.md) (70+ console-built VMs, full network/SG catalog from zero, import, clean plan).
 
 **Loaded production:** high RPS and large user bases with an annual **~99.9% SLA**. Seamless migrations, multi-zone HA, fault tolerance, metrics that catch a breach early.
 
@@ -40,9 +40,12 @@ Full six-year narrative (domains, JVM, brokers, org): [`experience.md`](experien
 See [`iac/cloud/`](../iac/cloud/) for per-platform write-ups and links into Terraform.
 
 - **cloud.ru / Huawei Cloud** (AWS-shaped resource model; strong transferable AWS practice)
+- **VK Cloud / NOVA Cloud class** (Kazakhstan; OpenStack under the hood: Nova, Cinder, Neutron, Keystone; provider `vkcs`)
 - **AWS**, **Google Cloud**, **Hetzner**
 - **OpenStack / Selectel**, **VMware**, **Proxmox**, **bare metal**
 - **Cloudflare** (DNS as code)
+
+**Education:** B.Sc. in Information Systems and Technologies (09.03.02), The Bonch-Bruevich Saint Petersburg State University of Telecommunications (SPbSUT). Cisco, campus networks and servers in the curriculum; Windows Server practice at IT companies during studies. Detail: [`experience.md#education`](experience.md#education).
 
 ## Audience
 

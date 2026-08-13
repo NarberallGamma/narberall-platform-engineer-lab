@@ -1,0 +1,28 @@
+# VK Cloud (vkcs) provider. Copy to provider.tf locally (do not commit secrets).
+# Docs: https://registry.terraform.io/providers/vk-cs/vkcs/latest/docs
+# Console: project settings -> Terraform (provider mirror URL).
+
+terraform {
+  backend "s3" {
+    bucket                      = "tfstate-example"
+    key                         = "vkcloud/deploy/terraform.tfstate"
+    region                      = "example-region"
+    skip_credentials_validation = true
+    skip_metadata_api_check     = true
+    skip_requesting_account_id  = true
+    skip_region_validation      = true
+    skip_s3_checksum            = true
+    endpoints = {
+      s3 = "https://s3.example.com"
+    }
+  }
+}
+
+provider "vkcs" {
+  auth_url         = var.auth_url
+  user_domain_name = var.user_domain_name
+  username         = var.username
+  password         = var.password
+  project_id       = var.project_id
+  region           = var.region
+}

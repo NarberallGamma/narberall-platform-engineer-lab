@@ -4,6 +4,8 @@ Platforms I have stood up and operated: public cloud, private cloud, and on-prem
 
 **cloud.ru note:** cloud.ru (and similar RU hyperscalers in this lab) is **Huawei Cloud class**. The resource model maps to **AWS** (VPC, ECS/EC2-class compute, CCE/EKS-class Kubernetes, RDS, OBS/S3, DMS/Kafka-class). That delivery is transferable AWS-shaped experience.
 
+**VK Cloud note:** VK Cloud (MCS) is **NOVA Cloud class** (Kazakhstan OpenStack IaaS). Under the hood: **OpenStack** (Nova compute, Cinder volumes, Neutron networks, Keystone). Transferable to NOVA Cloud KZ and other OpenStack IaaS. Provider: `vk-cs/vkcs`.
+
 ## Map
 
 | Platform | What I owned | Published Terraform |
@@ -13,6 +15,7 @@ Platforms I have stood up and operated: public cloud, private cloud, and on-prem
 | [Google Cloud](google-cloud.md) | Project/network bootstrap, compute, GKE-class / VM delivery | Narrative (private trees) |
 | [Hetzner](hetzner.md) | Cloud VMs, networking, Linux baseline for app and CI | Narrative (private trees) |
 | [OpenStack / Selectel](openstack-selectel.md) | Networks, K8s guests, GitLab, Postgres | [`../terraform/openstack-selectel/`](../terraform/openstack-selectel/) |
+| [VK Cloud (NOVA Cloud class)](vk-cloud.md) | **Proof of legacy:** 70+ hand-built VMs + full network/SG catalog from zero, then import | [`../terraform/vkcloud/`](../terraform/vkcloud/) |
 | [Proxmox](proxmox.md) | VE guests for K8s, GitLab, Postgres | [`../terraform/proxmox/`](../terraform/proxmox/) |
 | [VMware](vmware.md) | VM estates, networking adjacency, guest Linux | Narrative (private trees) |
 | [Bare metal](bare-metal.md) | Rack/server Linux, bootstrap, K8s without a hyperscaler | Narrative (private trees) |
@@ -24,6 +27,7 @@ flowchart TB
     CR[cloud-ru-huawei.md]
     AWS[aws.md]
     OS[openstack-selectel.md]
+    VK[vk-cloud.md]
     PX[proxmox.md]
     CF[cloudflare.md]
     GCP[google-cloud.md]
@@ -35,12 +39,14 @@ flowchart TB
     TFcr[cloud-ru-huawei/]
     TFaws[aws/]
     TFos[openstack-selectel/]
+    TFvk[vkcloud/]
     TFpx[proxmox/]
     TFcf[cloudflare/]
   end
   CR --> TFcr
   AWS --> TFaws
   OS --> TFos
+  VK --> TFvk
   PX --> TFpx
   CF --> TFcf
   GCP --> Pattern[same ownership pattern]
@@ -65,6 +71,6 @@ flowchart TB
 Greenfield: empty project or empty rack → apply.  
 Brownfield: inventory → code → `terraform import` → clean `plan`. Same pattern for accelerating delivery, cutting idle spend, and making ops visible.
 
-See case studies: [turnkey from zero](../../case-studies/02-cloud-platform-turnkey.md), [brownfield import](../../case-studies/04-terraform-brownfield-import.md).
+See case studies: [turnkey from zero](../../case-studies/02-cloud-platform-turnkey.md), [brownfield import](../../case-studies/04-terraform-brownfield-import.md), [legacy estate as Terraform](../../case-studies/05-legacy-estate-as-code.md).
 
 Day-2 hosts (Ansible): [`../ansible/`](../ansible/). Positioning: [`../../docs/positioning.md`](../../docs/positioning.md).

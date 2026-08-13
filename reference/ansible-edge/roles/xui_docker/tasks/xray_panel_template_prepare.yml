@@ -1,0 +1,46 @@
+---
+# Совместимость Xray template API: 3.0.x — /panel/xray/*, 3.3+ — /panel/api/xray/*.
+# На 3.3+ Bearer API token проходит checkAPIAuth; cookie нужна только для legacy /panel/xray.
+
+- name: Read 3X-UI panel version from container
+  ansible.builtin.command:
+    cmd: docker exec {{ xui_container_name }} /app/x-ui -v
+  register: xui_panel_version_cmd
+  changed_when: false
+
+- name: Set Xray panel version fact
+  ansible.builtin.set_fact:
+    xui_panel_version: "{{ (xui_panel_version_cmd.stdout | trim).splitlines() | first | default('3.0.0') }}"
+
+- name: Set Xray template API compatibility facts
+  ansible.builtin.set_fact:
+    xui_xray_api_uses_panel_api_prefix: "{{ xui_panel_version is version('3.3', '>=') }}"
+
+- name: Set Xray template API paths
+  ansible.builtin.set_fact:
+    xui_xray_get_url: >-
+      {{
+        xui_panel_url_base + ('panel/api/xray/' if xui_xray_api_uses_panel_api_prefix else 'panel/xray/')
+      }}
+    xui_xray_update_url: >-
+      {{
+        xui_panel_url_base + ('panel/api/xray/update' if xui_xray_api_uses_panel_api_prefix else 'panel/xray/update')
+      }}
+
+- name: Establish cookie session for legacy Xray template routes (/panel/xray)
+  ansible.builtin.import_tasks: panel_cookie_session.yml
+  when:
+    - xui_panel_use_api_token | default(false) | bool
+    - not xui_xray_api_uses_panel_api_prefix | bool
+
+- name: Select headers for Xray template panel routes
+  ansible.builtin.set_fact:
+    xui_panel_xray_headers: >-
+      {{
+        xui_panel_web_post_headers
+        if (
+          xui_panel_use_api_token | default(false) | bool
+          and not xui_xray_api_uses_panel_api_prefix | bool
+        )
+        else xui_panel_post_headers
+      }}

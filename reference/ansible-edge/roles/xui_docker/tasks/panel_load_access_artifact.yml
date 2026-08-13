@@ -1,0 +1,21 @@
+---
+# panel-access.json на control node (логин/пароль не выводятся в setting -show)
+
+- name: Init panel access cache
+  ansible.builtin.set_fact:
+    xui_panel_access_cached: "{{ xui_panel_access_cached | default({}) }}"
+    xui_panel_credentials_from_artifact: false
+
+- name: Read panel-access.json artifact when present
+  ansible.builtin.slurp:
+    src: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/panel-access.json"
+  register: xui_panel_access_slurp
+  delegate_to: localhost
+  become: false
+  failed_when: false
+
+- name: Parse panel-access.json into cache
+  ansible.builtin.set_fact:
+    xui_panel_access_cached: "{{ xui_panel_access_slurp.content | b64decode | from_json }}"
+  when: xui_panel_access_slurp.content is defined
+  no_log: true

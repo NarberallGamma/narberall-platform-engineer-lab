@@ -3,31 +3,61 @@
 ## Role
 
 **Platform Engineer · AI & Cloud Infrastructure**  
-Turnkey delivery: infrastructure, application/utilities code, documentation, monitoring.
+About **six years** on the market. Strong senior in platform / loaded production / CI/CD niches. Turnkey delivery: infrastructure, application delivery (build → gates → prod), documentation, monitoring, and incident operations.
+
+Full six-year narrative (domains, JVM, brokers, org): [`experience.md`](experience.md).
 
 ## Scope of ownership
 
-Greenfield platforms from empty cloud project or bare metal through IAM, VPC, Kubernetes (self-operated), CI/CD, apps, and observability.
+**Greenfield:** empty cloud project or bare metal through IAM, VPC, Kubernetes, CI/CD, apps, and observability.
+
+**Legacy:** arrive on a hand-built estate, automate it, document it, add monitoring, cut waste, and keep shipping — without a reckless rewrite.
+
+**Loaded production:** high RPS and large user bases with an annual **~99.9% SLA**. Seamless migrations, multi-zone HA, fault tolerance, metrics that catch a breach early.
+
+**Crisis:** complex incidents including off-hours. Restore a downed production service (logs + metrics, isolate the layer). Restore connectivity when routing or path blocks cut reachability. Method: **Cisco-style seven-step** (1 define the problem, 2 gather facts, 3 analyze, 4 eliminate causes, 5 hypothesize, 6 test, 7 solve and document).
+
+**Security (day one, no separate TZ required):** industry best practices on hosts and IAM, **EDR** on the estate, OS hardening, users and rights. Secrets: **Vault** and/or cloud stores plus Kubernetes **External Secrets Operator (ESO)** — introduce from scratch if missing; never long-lived secrets in git. CI gates from zero: **SonarQube**, **Trivy**, **OSV-Scanner**.
+
+**How the code is organized:** not a dump monorepo. App, IaC, and pipelines in repos and branches that match promotion. Layout obvious enough that developers, on-call, and **business / technical audit** can walk IAM, secrets, and change history without a reconstruction project. Security that stays operable — not a gate that makes every deploy painful.
+
+**Hardware and OS depth** (home lab and small-office metal): PCs and simple office servers assembled by hand; BIOS/UEFI; RAM/CPU/GPU **overclock and undervolt** with HWiNFO-class sensors (turnkey PC, not “it POSTed”). Diagnosis at hardware **and** OS. Linux kernel (modules, sysctl, traces) and Windows registry/services when the fault lives there. Same machine tuned for LLM, Stable Diffusion, games, and vendor software. Breadth is not limited to cloud consoles and a terminal on a VM. Detail: [`practice/home-lab/os-workstation.md`](../practice/home-lab/os-workstation.md).
+
+**How I work:** I have shipped in a **large team with a dedicated lead** — that is a normal and welcome mode. On later engagements I **trained people and delegated** as a de facto lead (badge optional) while reporting **directly** to PMs, CTOs / technical directors, team leads, and **tech leads of the whole project**. I also own a whole platform as the **single engineer**, often across **more than one project at once**, and stay reachable on those threads. Solo delivery means full ownership and responsiveness, not a preference against teams.
+
+**Domains (six years, NDA-safe):** large **bank / SBP-class** payments (RF Faster Payments, B2B/P2P); **blockchain / smart-contract** programmes; **delivery e-commerce** (food, grocery — thousands of users per hour at peaks); **Atlassian** and **Nextcloud**; LLM/OCR platforms as the same ownership pattern. Runtime path: Java, Kotlin, C#/.NET, Go, Python, 1C:Enterprise. CI: **Jenkins** (plugins, workers, dedicated VMs → Kubernetes) and, more of the recent work, **GitLab CI + Argo CD** (seamless branch/tag deploys, automatic MRs, merge on written parameters). Gates from zero: **SonarQube**, **Trivy**, **OSV-Scanner**. Glue: Kafka, RabbitMQ, NATS, Artemis, Redis. Estates: **50+ microservices** and heavy **JVM/Tomcat monoliths** (heap dumps, thread dumps, GC). Detail: [`experience.md`](experience.md).
+
+## Kubernetes and data
+
+- Clusters: **OpenShift**, **Deckhouse**, vanilla Kubernetes, and cloud PaaS (EKS / CCE / GKE-class)
+- Databases under load: long SQL, locks/blocking, replication lag and failover, read/write spread, balancers in front of the data path, **sharding** when one primary is the ceiling. PostgreSQL / RDS-class in public code; same ops pattern in private estates.
+- Messaging and cache on the critical path: **Kafka**, **RabbitMQ**, **NATS**, **Artemis**, **Redis**
+- Application delivery: Java/Kotlin JVM (including Tomcat and dumps), .NET, Go, Python, 1C — plus CI gates (SonarQube, Trivy, OSV-Scanner)
+- CI/CD: **Jenkins** (plugins, Kubernetes workers instead of dedicated VMs) and **GitLab CI + Argo CD** (branch/tag GitOps, auto MR, merge policy)
 
 ## Cloud and compute
 
+See [`iac/cloud/`](../iac/cloud/) for per-platform write-ups and links into Terraform.
+
 - **cloud.ru / Huawei Cloud** (AWS-shaped resource model; strong transferable AWS practice)
 - **AWS**, **Google Cloud**, **Hetzner**
-- **VMware**, **Proxmox**, **bare metal**
+- **OpenStack / Selectel**, **VMware**, **Proxmox**, **bare metal**
+- **Cloudflare** (DNS as code)
 
 ## Audience
 
-- Hiring managers / tech leads (employment or contract)
+- Hiring managers / tech leads (employment or contract) — team seat or the single platform owner
 - Founders needing MVP + AI + deploy
+- Teams with legacy infra that must become operable fast
 - Agencies needing white-label infra / backend
 
 ## Offers (see `/packages`)
 
 1. **AI Infra Sprint** - LLM/RAG stack, monitoring, backups
-2. **Cloud Foundation** - IaC, IAM, networking, CI/CD
+2. **Cloud Foundation** - IaC, IAM, networking, CI/CD (greenfield or import)
 3. **Full Turnkey** - app + infra + AI + docs + observability
 
 ## Proof model
 
-Case studies (outcomes) + reference code in this repo + live portfolio site.  
+Case studies (outcomes) + [`experience.md`](experience.md) (six years) + [`iac/cloud/`](../iac/cloud/) (keywords) + [`iac/terraform/`](../iac/terraform/) (code) + [`iac/ansible/`](../iac/ansible/) (day-2) + live portfolio site.  
 Not a dump of private client IaC.

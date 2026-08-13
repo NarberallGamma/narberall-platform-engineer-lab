@@ -1,0 +1,28 @@
+# Example: AUTOMATIC1111-class WebUI with GPU passthrough.
+# Image is built locally (not vendored). Checkpoints stay under ./data.
+
+name: sd-webui
+
+x-gpu: &gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            device_ids: ["0"]
+            capabilities: [compute, utility]
+
+services:
+  auto:
+    image: sd-auto:local
+    profiles: ["auto"]
+    <<: *gpu
+    ports:
+      - "${WEBUI_PORT:-7860}:7860"
+    volumes:
+      - ./data:/data
+      - ./output:/output
+    environment:
+      - CLI_ARGS=--xformers --api
+    tty: true
+    restart: unless-stopped

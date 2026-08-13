@@ -1,0 +1,36 @@
+---
+# Справка: xui_outbounds[] в group_vars/xui_proxy.yml
+#
+# Каждый элемент — отдельный VLESS Reality outbound в ядре Xray на Jump.
+# Количество элементов не ограничено.
+#
+# Обязательные поля:
+#   tag                      — тег в Xray (уникальный)
+#   main_artifacts_host      — папка artifacts/xui/<host>/ (после xui_main)
+#   main_inventory_hostname  — хост в [xui_main] (fallback IP из inventory)
+#
+# enabled: true|false — false = пропустить при прогоне
+#
+# Из inbound-summary.json (если не переопределено):
+#   address, port, client_uuid, public_key, short_id
+#
+# Обычно задают явно:
+#   sni, encryption, flow, fingerprint, spider_x
+#   mldsa65_verify — при PQ на main
+#
+# sockopt (опционально):
+#   tcp_fast_open, tcp_keep_alive_interval, tcp_mptcp, penetrate
+#
+# routing:
+#   add_rule: true     — правило: inbound_tag → tag этого outbound
+#   inbound_tag: ...   — inbound Jump (напр. inbound-vless-proxy)
+#
+# Порядок работы для нового NL:
+#   1. [xui_main] + playbooks/xui_main.yml на новом хосте
+#   2. Добавить элемент в xui_outbounds (enabled: true)
+#   3. playbooks/xui_proxy.yml --tags xray,autoconfigure
+#
+# Частично: -e 'xui_outbound_tags_filter=["outbound-vless-main"]'
+#
+# Также в xui_proxy.yml:
+#   xui_routing_outbound_tag — «главный» outbound (proxy-to-main.json, SSH-туннель)

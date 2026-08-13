@@ -1,0 +1,102 @@
+---
+- name: Ensure credentials artifact directory on the control node
+  ansible.builtin.file:
+    path: "{{ prepare_credentials_artifacts_dir }}/{{ inventory_hostname }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+
+- name: Generate root password
+  ansible.builtin.set_fact:
+    prepare_root_password: "{{ lookup('community.general.random_string', length=credentials_password_length, special=false) }}"
+  when: enable_root_password_change | bool
+  no_log: true
+
+- name: Generate password for {{ admin_username }}
+  ansible.builtin.set_fact:
+    prepare_admin_password: "{{ lookup('community.general.random_string', length=credentials_password_length, special=false) }}"
+  when: enable_admin_user | bool
+  no_log: true
+
+- name: Create user {{ admin_username }}
+  ansible.builtin.user:
+    name: "{{ admin_username }}"
+    password: "{{ prepare_admin_password | password_hash('sha512') }}"
+    shell: /bin/bash
+    create_home: true
+    groups: sudo
+    append: true
+  when: enable_admin_user | bool
+  no_log: true
+
+- name: sudo NOPASSWD for {{ admin_username }}
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ admin_username }}"
+    content: "{{ admin_username }} ALL=(ALL) NOPASSWD:ALL\n"
+    mode: "0440"
+    validate: "visudo -cf %s"
+  when: enable_admin_user | bool
+
+- name: Set root password
+  ansible.builtin.user:
+    name: root
+    password: "{{ prepare_root_password | password_hash('sha512') }}"
+  when: enable_root_password_change | bool
+  no_log: true
+
+- name: SSH authorized_keys (root)
+  ansible.builtin.authorized_key:
+    user: root
+    key: "{{ item }}"
+    state: present
+    manage_dir: true
+  loop: "{{ ssh_authorized_keys }}"
+  when:
+    - enable_ssh_authorized_keys | bool
+    - ssh_authorized_keys | length > 0
+
+- name: SSH authorized_keys ({{ admin_username }})
+  ansible.builtin.authorized_key:
+    user: "{{ admin_username }}"
+    key: "{{ item }}"
+    state: present
+    manage_dir: true
+  loop: "{{ ssh_authorized_keys }}"
+  when:
+    - enable_admin_user | bool
+    - enable_ssh_authorized_keys | bool
+    - ssh_authorized_keys | length > 0
+
+- name: Add {{ admin_username }} to docker group when the group already exists
+  ansible.builtin.user:
+    name: "{{ admin_username }}"
+    groups: docker
+    append: true
+  when: enable_admin_user | bool
+  failed_when: false
+
+- name: Save root credentials artifact
+  ansible.builtin.copy:
+    content: |
+      host={{ inventory_hostname }}
+      ansible_host={{ ansible_host | default(inventory_hostname) }}
+      user=root
+      password={{ prepare_root_password }}
+    dest: "{{ prepare_credentials_artifacts_dir }}/{{ inventory_hostname }}/root_credentials.txt"
+    mode: "0600"
+  delegate_to: localhost
+  when: enable_root_password_change | bool
+  no_log: true
+
+- name: Save {{ admin_username }} credentials artifact
+  ansible.builtin.copy:
+    content: |
+      host={{ inventory_hostname }}
+      ansible_host={{ ansible_host | default(inventory_hostname) }}
+      user={{ admin_username }}
+      password={{ prepare_admin_password }}
+    dest: "{{ prepare_credentials_artifacts_dir }}/{{ inventory_hostname }}/{{ admin_username }}_credentials.txt"
+    mode: "0600"
+  delegate_to: localhost
+  when: enable_admin_user | bool
+  no_log: true

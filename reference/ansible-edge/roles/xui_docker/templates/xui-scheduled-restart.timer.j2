@@ -1,0 +1,12 @@
+[Unit]
+Description=Timer for 3X-UI Docker restart ({{ xui_scheduled_restart_mode }}, {{ xui_scheduled_restart_times | join(', ') }})
+Requires={{ xui_scheduled_restart_systemd_service }}.service
+
+[Timer]
+{% for restart_time in xui_scheduled_restart_times %}
+OnCalendar=*-*-* {{ restart_time }}
+{% endfor %}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

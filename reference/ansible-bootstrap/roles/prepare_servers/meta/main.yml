@@ -1,0 +1,11 @@
+---
+dependencies: []
+
+galaxy_info:
+  role_name: prepare_servers
+  description: Host baseline — timezone, apt, hostname, admin user, Docker CE from download.docker.com
+  license: MIT
+  min_ansible_version: "2.14"
+
+collections:
+  - community.general

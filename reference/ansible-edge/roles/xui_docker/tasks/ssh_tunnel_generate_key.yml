@@ -1,0 +1,63 @@
+---
+# Одна пара ключей для tunnel_user (вызывается из ssh_tunnel_users.yml)
+
+- name: Stat tunnel private key
+  ansible.builtin.stat:
+    path: "{{ xui_tunnel_key_private_path }}"
+  register: xui_tunnel_private_stat
+  delegate_to: localhost
+  become: false
+
+- name: Stat tunnel public key
+  ansible.builtin.stat:
+    path: "{{ xui_tunnel_key_public_path }}"
+  register: xui_tunnel_public_stat
+  delegate_to: localhost
+  become: false
+
+- name: Remove incomplete tunnel private key (без .pub после сбоя openssh_keypair)
+  ansible.builtin.file:
+    path: "{{ xui_tunnel_key_private_path }}"
+    state: absent
+  delegate_to: localhost
+  become: false
+  when:
+    - xui_tunnel_private_stat.stat.exists | default(false)
+    - not xui_tunnel_public_stat.stat.exists | default(false)
+
+- name: Remove tunnel key pair when regenerate requested
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ xui_tunnel_key_private_path }}"
+    - "{{ xui_tunnel_key_public_path }}"
+  delegate_to: localhost
+  become: false
+  when: xui_ssh_tunnel_regenerate_keys | bool
+
+- name: Generate tunnel ed25519 key pair (ssh-keygen)
+  ansible.builtin.command:
+    argv:
+      - ssh-keygen
+      - -t
+      - "{{ xui_ssh_tunnel_key_type }}"
+      - -f
+      - "{{ xui_tunnel_key_private_path }}"
+      - -N
+      - ""
+      - -C
+      - "{{ tunnel_user }}@{{ inventory_hostname }}"
+      - -q
+  delegate_to: localhost
+  become: false
+  when: >-
+    (xui_ssh_tunnel_regenerate_keys | bool)
+    or not (xui_tunnel_public_stat.stat.exists | default(false))
+
+- name: Restrict tunnel private key permissions
+  ansible.builtin.file:
+    path: "{{ xui_tunnel_key_private_path }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: false

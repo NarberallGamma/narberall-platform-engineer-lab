@@ -1,0 +1,33 @@
+---
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+  when: ansible_os_family == 'Debian'
+
+- name: Set UFW default policies
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: incoming, policy: "{{ xui_ufw_default_incoming }}" }
+    - { direction: outgoing, policy: "{{ xui_ufw_default_outgoing }}" }
+
+- name: Allow TCP ports for 3X-UI stack
+  community.general.ufw:
+    rule: allow
+    port: "{{ item | string }}"
+    proto: tcp
+  loop: "{{ xui_firewall_tcp_ports_effective }}"
+
+- name: Allow UDP ports for 3X-UI stack
+  community.general.ufw:
+    rule: allow
+    port: "{{ item | string }}"
+    proto: udp
+  loop: "{{ xui_firewall_udp_ports_effective | default([]) }}"
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled

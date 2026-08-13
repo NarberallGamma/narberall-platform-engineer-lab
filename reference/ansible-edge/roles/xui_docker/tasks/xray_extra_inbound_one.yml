@@ -1,0 +1,349 @@
+---
+- name: Set extra inbound protocol facts
+  ansible.builtin.set_fact:
+    xui_extra_inbound_protocol: "{{ xui_extra_inbound_item.protocol | lower }}"
+    xui_extra_inbound_port: "{{ xui_extra_inbound_item.port | int }}"
+
+- name: Assert extra inbound protocol and port
+  ansible.builtin.assert:
+    that:
+      - xui_extra_inbound_protocol in ['trojan', 'shadowsocks']
+      - xui_extra_inbound_port | int > 0
+    fail_msg: >-
+      extra inbound: поддерживаются только protocol=trojan/shadowsocks и port > 0.
+
+- name: Set extra inbound identity facts
+  ansible.builtin.set_fact:
+    xui_extra_inbound_remark: >-
+      {{
+        xui_extra_inbound_item.remark
+        | default(
+          xui_extra_inbound_protocol
+          ~ '-'
+          ~ xui_profile
+          ~ (
+            '-' ~ xui_route_suffix
+            if (xui_route_suffix | default('') | length > 0)
+            else ''
+          ),
+          true
+        )
+      }}
+    xui_extra_inbound_tag: >-
+      {{
+        xui_extra_inbound_item.tag
+        | default(
+          'inbound-'
+          ~ xui_extra_inbound_protocol
+          ~ '-'
+          ~ xui_profile
+          ~ (
+            '-' ~ xui_route_suffix
+            if (xui_route_suffix | default('') | length > 0)
+            else ''
+          ),
+          true
+        )
+      }}
+    xui_extra_inbound_listen: "{{ xui_extra_inbound_item.listen | default(xui_extra_inbound_default_listen) }}"
+    xui_extra_inbound_network: >-
+      {{
+        xui_extra_inbound_item.ss_network | default(xui_extra_inbound_shadowsocks_network)
+        if xui_extra_inbound_protocol == 'shadowsocks'
+        else xui_extra_inbound_item.network | default(xui_extra_inbound_default_network)
+      }}
+    xui_extra_inbound_stream_network: >-
+      {{
+        xui_extra_inbound_item.stream_network
+        | default(
+          'tcp'
+          if xui_extra_inbound_protocol == 'shadowsocks'
+          else (
+            xui_extra_inbound_item.network | default(xui_extra_inbound_default_network)
+          )
+        )
+      }}
+    xui_extra_inbound_security: >-
+      {{
+        xui_extra_inbound_item.security
+        | default(
+          xui_extra_inbound_trojan_security
+          if xui_extra_inbound_protocol == 'trojan'
+          else xui_extra_inbound_default_security
+        )
+      }}
+    xui_extra_inbound_tls_server_name: "{{ xui_extra_inbound_item.tls_server_name | default(xui_extra_inbound_tls_server_name_default) }}"
+    xui_extra_inbound_tls_cert_file: "{{ xui_extra_inbound_item.tls_cert_file | default(xui_extra_inbound_tls_cert_file) }}"
+    xui_extra_inbound_tls_key_file: "{{ xui_extra_inbound_item.tls_key_file | default(xui_extra_inbound_tls_key_file) }}"
+
+- name: Add extra inbound tag to managed list
+  ansible.builtin.set_fact:
+    xui_extra_inbound_managed_tags: "{{ (xui_extra_inbound_managed_tags | default([])) + [xui_extra_inbound_tag] }}"
+
+- name: Refresh inbound list before extra inbound
+  ansible.builtin.import_tasks: xray_panel_inbounds_list.yml
+
+- name: Reset extra inbound match
+  ansible.builtin.set_fact:
+    xui_extra_inbound_record: {}
+    xui_extra_inbound_exists: false
+
+- name: Match extra inbound by remark and port
+  ansible.builtin.set_fact:
+    xui_extra_inbound_record: "{{ item }}"
+  loop: "{{ xui_inbounds_list['json']['obj'] | default([]) }}"
+  when:
+    - item.remark == xui_extra_inbound_remark
+    - (item.port | int) == (xui_extra_inbound_port | int)
+
+- name: Set extra inbound exists fact
+  ansible.builtin.set_fact:
+    xui_extra_inbound_exists: "{{ xui_extra_inbound_record.id is defined }}"
+
+- name: Init Trojan clients list
+  ansible.builtin.set_fact:
+    xui_extra_trojan_clients_effective: []
+  when: xui_extra_inbound_protocol == 'trojan'
+
+- name: Build Trojan clients from users
+  ansible.builtin.include_tasks: xray_extra_trojan_client_one.yml
+  loop: "{{ xui_extra_inbound_item.users | default(xui_client_users) }}"
+  loop_control:
+    loop_var: xui_extra_trojan_user
+    label: "{{ xui_extra_trojan_user }}"
+  when: xui_extra_inbound_protocol == 'trojan'
+
+- name: Set Trojan inbound settings
+  ansible.builtin.set_fact:
+    xui_extra_inbound_settings:
+      clients: "{{ xui_extra_trojan_clients_effective }}"
+      fallbacks: "{{ xui_extra_inbound_item.fallbacks | default([]) }}"
+  when: xui_extra_inbound_protocol == 'trojan'
+  no_log: true
+
+- name: Set Shadowsocks registry key
+  ansible.builtin.set_fact:
+    xui_extra_shadowsocks_registry_key: "{{ xui_extra_inbound_remark }}:shared"
+    xui_extra_shadowsocks_method: "{{ xui_extra_inbound_item.method | default(xui_extra_inbound_shadowsocks_method) }}"
+  when: xui_extra_inbound_protocol == 'shadowsocks'
+
+- name: Generate Shadowsocks shared password when missing
+  ansible.builtin.command: openssl rand -base64 {{ 16 if xui_extra_shadowsocks_method == '2022-blake3-aes-128-gcm' else 32 }}
+  register: xui_extra_shadowsocks_password_cmd
+  changed_when: false
+  when:
+    - xui_extra_inbound_protocol == 'shadowsocks'
+    - (xui_extra_inbound_item.password | default('') | length) == 0
+    - ((xui_extra_inbounds_registry | default({})).get(xui_extra_shadowsocks_registry_key, {}).password | default('') | length) == 0
+  no_log: true
+
+- name: Resolve Shadowsocks shared password
+  ansible.builtin.set_fact:
+    xui_extra_shadowsocks_password: >-
+      {{
+        xui_extra_inbound_item.password
+        | default(
+          (xui_extra_inbounds_registry | default({})).get(xui_extra_shadowsocks_registry_key, {}).password
+          | default(xui_extra_shadowsocks_password_cmd.stdout | trim, true),
+          true
+        )
+      }}
+  when: xui_extra_inbound_protocol == 'shadowsocks'
+  no_log: true
+
+- name: Save Shadowsocks password to registry
+  ansible.builtin.set_fact:
+    xui_extra_inbounds_registry: >-
+      {{
+        xui_extra_inbounds_registry | default({}) | combine({
+          xui_extra_shadowsocks_registry_key: {
+            'protocol': 'shadowsocks',
+            'remark': xui_extra_inbound_remark,
+            'method': xui_extra_shadowsocks_method,
+            'password': xui_extra_shadowsocks_password
+          }
+        }, recursive=True)
+      }}
+  when: xui_extra_inbound_protocol == 'shadowsocks'
+  no_log: true
+
+- name: Init Shadowsocks clients list
+  ansible.builtin.set_fact:
+    xui_extra_shadowsocks_clients_effective: []
+  when: xui_extra_inbound_protocol == 'shadowsocks'
+
+- name: Build Shadowsocks clients from users
+  ansible.builtin.include_tasks: xray_extra_shadowsocks_client_one.yml
+  loop: "{{ xui_extra_inbound_item.users | default(xui_client_users) }}"
+  loop_control:
+    loop_var: xui_extra_shadowsocks_user
+    label: "{{ xui_extra_shadowsocks_user }}"
+  when:
+    - xui_extra_inbound_protocol == 'shadowsocks'
+    - xui_extra_shadowsocks_method != '2022-blake3-chacha20-poly1305'
+
+- name: Set Shadowsocks inbound settings
+  ansible.builtin.set_fact:
+    xui_extra_inbound_settings:
+      method: "{{ xui_extra_shadowsocks_method }}"
+      password: "{{ xui_extra_shadowsocks_password }}"
+      network: "{{ xui_extra_inbound_item.ss_network | default(xui_extra_inbound_shadowsocks_network) }}"
+      clients: "{{ xui_extra_shadowsocks_clients_effective | default([]) }}"
+      ivCheck: "{{ xui_extra_inbound_item.iv_check | default(false) | bool }}"
+  when: xui_extra_inbound_protocol == 'shadowsocks'
+  no_log: true
+
+- name: Render extra inbound API payload to remote temp file
+  ansible.builtin.template:
+    src: extra-inbound-api-payload.json.j2
+    dest: "/tmp/xui-extra-inbound-{{ inventory_hostname }}-{{ xui_extra_inbound_remark }}.json"
+    mode: "0600"
+  no_log: true
+
+- name: Load extra inbound API payload
+  ansible.builtin.slurp:
+    src: "/tmp/xui-extra-inbound-{{ inventory_hostname }}-{{ xui_extra_inbound_remark }}.json"
+  register: xui_extra_inbound_payload_slurp
+  no_log: true
+
+- name: Parse extra inbound API payload object
+  ansible.builtin.set_fact:
+    xui_extra_inbound_api_body_raw: "{{ xui_extra_inbound_payload_slurp.content | b64decode | from_json }}"
+  no_log: true
+
+- name: Stringify extra inbound settings for 3X-UI API
+  ansible.builtin.set_fact:
+    xui_extra_inbound_api_body: >-
+      {{
+        xui_extra_inbound_api_body_raw | combine({
+          'settings': xui_extra_inbound_api_body_raw.settings | to_json,
+          'streamSettings': xui_extra_inbound_api_body_raw.streamSettings | to_json,
+          'sniffing': xui_extra_inbound_api_body_raw.sniffing | to_json
+        })
+      }}
+  no_log: true
+
+- name: Create extra inbound via API
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/inbounds/add"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_post_headers }}"
+    body_format: json
+    body: "{{ xui_extra_inbound_api_body }}"
+    status_code: 200
+  register: xui_extra_inbound_add
+  when: not xui_extra_inbound_exists | bool
+  no_log: true
+
+- name: Assert extra inbound created
+  ansible.builtin.assert:
+    that:
+      - xui_extra_inbound_add['json'] is defined
+      - xui_extra_inbound_add['json']['success'] | default(false) | bool
+    fail_msg: >-
+      3X-UI add failed for extra inbound {{ xui_extra_inbound_remark }}:
+      {{ xui_extra_inbound_add['json']['msg'] | default(xui_extra_inbound_add) }}
+  when: not xui_extra_inbound_exists | bool
+
+- name: Update extra inbound via API
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/inbounds/update/{{ xui_extra_inbound_record['id'] }}"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_post_headers }}"
+    body_format: json
+    body: "{{ xui_extra_inbound_api_body }}"
+    status_code: 200
+  register: xui_extra_inbound_update
+  when: xui_extra_inbound_exists | bool
+  no_log: true
+
+- name: Assert extra inbound updated
+  ansible.builtin.assert:
+    that:
+      - xui_extra_inbound_update['json'] is defined
+      - xui_extra_inbound_update['json']['success'] | default(false) | bool
+    fail_msg: >-
+      3X-UI update failed for extra inbound {{ xui_extra_inbound_remark }}:
+      {{ xui_extra_inbound_update['json']['msg'] | default(xui_extra_inbound_update) }}
+  when: xui_extra_inbound_exists | bool
+
+- name: Refresh inbound list after extra inbound apply
+  ansible.builtin.import_tasks: xray_panel_inbounds_list.yml
+
+- name: Save extra inbound summary artifact
+  ansible.builtin.copy:
+    content: >-
+      {{
+        {
+          'host': inventory_hostname,
+          'profile': xui_profile,
+          'route_suffix': xui_route_suffix | default(''),
+          'protocol': xui_extra_inbound_protocol,
+          'remark': xui_extra_inbound_remark,
+          'tag': xui_extra_inbound_tag,
+          'port': xui_extra_inbound_port | int,
+          'network': xui_extra_inbound_network,
+          'stream_network': xui_extra_inbound_stream_network,
+          'security': xui_extra_inbound_security,
+          'public_ip': xui_ssl_ipv4_effective,
+          'route_to_proxy_outbound': (
+            xui_profile == 'proxy'
+            and xui_extra_inbound_item.route_to_proxy_outbound | default(xui_extra_inbound_route_to_proxy_outbound) | bool
+          )
+        } | to_nice_json
+      }}
+    dest: >-
+      {{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_extra_inbounds_artifacts_subdir }}/{{ xui_extra_inbound_remark }}.json
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+
+- name: Export Trojan client links
+  ansible.builtin.copy:
+    content: >-
+      trojan://{{ client.password }}@{{ xui_ssl_ipv4_effective }}:{{ xui_extra_inbound_port | int }}?type=tcp&security={{ xui_extra_inbound_security }}&sni={{ xui_extra_inbound_tls_server_name }}#{{ xui_extra_inbound_remark }}-{{ client.email }}
+    dest: >-
+      {{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_clients_links_subdir }}/{{ client.email }}.txt
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  loop: "{{ xui_extra_trojan_clients_effective | default([]) }}"
+  loop_control:
+    loop_var: client
+    label: "{{ client.email }}"
+  when:
+    - xui_export_extra_inbound_links | bool
+    - xui_extra_inbound_protocol == 'trojan'
+  no_log: true
+
+- name: Export Shadowsocks link
+  ansible.builtin.copy:
+    content: >-
+      ss://{{ xui_extra_inbound_settings.method | urlencode | replace('/', '%2F') }}:{{ xui_extra_inbound_settings.password | urlencode | replace('/', '%2F') }}:{{ client.password | urlencode | replace('/', '%2F') }}@{{ xui_ssl_ipv4_effective }}:{{ xui_extra_inbound_port | int }}?type={{ xui_extra_inbound_network }}#{{ xui_extra_inbound_remark }}-{{ client.email }}
+    dest: >-
+      {{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_clients_links_subdir }}/{{ client.email }}.txt
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  loop: "{{ xui_extra_shadowsocks_clients_effective | default([]) }}"
+  loop_control:
+    loop_var: client
+    label: "{{ client.email }}"
+  when:
+    - xui_export_extra_inbound_links | bool
+    - xui_extra_inbound_protocol == 'shadowsocks'
+    - xui_extra_shadowsocks_clients_effective | default([]) | length > 0
+  no_log: true
+
+- name: Remove legacy shared Shadowsocks link
+  ansible.builtin.file:
+    path: >-
+      {{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_clients_links_subdir }}/{{ xui_extra_inbound_remark }}.txt
+    state: absent
+  delegate_to: localhost
+  become: false
+  when:
+    - xui_extra_inbound_protocol == 'shadowsocks'
+    - xui_extra_shadowsocks_clients_effective | default([]) | length > 0

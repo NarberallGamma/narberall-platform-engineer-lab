@@ -1,0 +1,124 @@
+---
+- name: Generate Reality X25519 key pair
+  ansible.builtin.shell: |
+    set -euo pipefail
+    docker exec {{ xui_container_name }} {{ xui_xray_bin }} x25519
+  args:
+    executable: /bin/bash
+  register: xui_x25519_raw
+  changed_when: false
+  no_log: true
+
+- name: Parse Reality private and public keys
+  ansible.builtin.set_fact:
+    xui_reality_private_key: >-
+      {{
+        (xui_x25519_raw.stdout | default('')
+         | regex_search('PrivateKey:\s*(\S+)', '\1')
+         | default(
+           xui_x25519_raw.stdout | default('') | regex_search('Private key:\s*(\S+)', '\1'),
+           true
+         )
+         | default([], true) | flatten | first
+         | default('', true))
+      }}
+    xui_reality_public_key: >-
+      {{
+        (xui_x25519_raw.stdout | default('')
+         | regex_search('Password \(PublicKey\):\s*(\S+)', '\1')
+         | default(
+           xui_x25519_raw.stdout | default('') | regex_search('PublicKey:\s*(\S+)', '\1'),
+           true
+         )
+         | default(
+           xui_x25519_raw.stdout | default('') | regex_search('Public key:\s*(\S+)', '\1'),
+           true
+         )
+         | default([], true) | flatten | first
+         | default('', true))
+      }}
+  no_log: true
+
+- name: Generate Reality short IDs
+  ansible.builtin.set_fact:
+    xui_reality_short_ids: >-
+      {{
+        xui_reality_short_ids | default([]) + [
+          lookup('password', '/dev/null chars=hexdigits length=' ~ (xui_reality_short_id_length | string)) | lower
+        ]
+      }}
+  loop: "{{ range(xui_reality_short_ids_count | int) | list }}"
+  no_log: true
+
+- name: Generate client UUID
+  ansible.builtin.command: cat /proc/sys/kernel/random/uuid
+  register: xui_uuidgen
+  changed_when: false
+  when: xui_inbound_clients_effective | default([]) | length == 0
+
+- name: Set client UUID
+  ansible.builtin.set_fact:
+    xui_client_uuid: "{{ xui_uuidgen.stdout | trim | lower }}"
+  when: xui_inbound_clients_effective | default([]) | length == 0
+
+- name: Generate VLESS encryption (ML-KEM-768) via xray vlessenc
+  ansible.builtin.shell: |
+    set -euo pipefail
+    docker exec {{ xui_container_name }} {{ xui_xray_bin }} vlessenc
+  args:
+    executable: /bin/bash
+  register: xui_vlessenc_raw
+  changed_when: false
+  no_log: true
+  when: xui_inbound_ml_kem_enabled | bool
+
+- name: Parse ML-KEM-768 decryption and encryption from vlessenc
+  ansible.builtin.set_fact:
+    xui_inbound_decryption_effective: >-
+      {{
+        (xui_vlessenc_raw.stdout | default('')
+         | regex_findall('"decryption":\s*"([^"]+)"'))
+        | last
+        | default('', true)
+      }}
+    xui_inbound_encryption_effective: >-
+      {{
+        (xui_vlessenc_raw.stdout | default('')
+         | regex_findall('"encryption":\s*"([^"]+)"'))
+        | last
+        | default('', true)
+      }}
+  when: xui_inbound_ml_kem_enabled | bool
+  no_log: true
+
+- name: Assert ML-KEM-768 keys parsed from vlessenc
+  ansible.builtin.assert:
+    that:
+      - xui_inbound_decryption_effective | length > 0
+      - xui_inbound_encryption_effective | length > 0
+    fail_msg: >-
+      xray vlessenc: не удалось разобрать decryption/encryption.
+      Проверить вывод «docker exec {{ xui_container_name }} {{ xui_xray_bin }} vlessenc».
+  when: xui_inbound_ml_kem_enabled | bool
+
+- name: Apply VLESS encryption facts
+  ansible.builtin.import_tasks: xray_inbound_encryption_facts.yml
+
+- name: Generate mldsa65 seed when enabled
+  ansible.builtin.import_tasks: xray_mldsa65_seed.yml
+  when: xui_inbound_mldsa65_enabled | bool
+
+- name: Assert mldsa65 seed when enabled
+  ansible.builtin.assert:
+    that:
+      - xui_reality_mldsa65_seed | default('') | length > 0
+    fail_msg: "mldsa65: не удалось получить Seed (xray mldsa65)."
+  when: xui_inbound_mldsa65_enabled | bool
+
+- name: Assert Reality keys generated
+  ansible.builtin.assert:
+    that:
+      - xui_reality_private_key | length > 0
+      - xui_reality_public_key | length > 0
+      - (xui_inbound_clients_effective | default([]) | length > 0) or (xui_client_uuid | default('') | length > 0)
+      - xui_reality_short_ids | length > 0

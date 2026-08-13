@@ -1,0 +1,12 @@
+{
+  "host": "{{ inventory_hostname }}",
+  "profile": "{{ xui_profile }}",
+  "public_ip": "{{ xui_ssl_ipv4_effective }}",
+  "first_init": {{ xui_panel_first_init | default(false) | lower }},
+  "panel_url": "{{ xui_panel_access_url }}",
+  "panel_port": {{ xui_panel_port }},
+  "web_base_path": "{{ xui_panel_web_base_path_normalized }}",
+  "username": "{{ xui_panel_username_effective }}",
+  "password": "{{ xui_panel_password_effective }}",
+  "api_token": "{{ xui_panel_api_token | default('') }}"
+}

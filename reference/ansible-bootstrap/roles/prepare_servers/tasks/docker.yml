@@ -1,0 +1,159 @@
+---
+# Docker Engine from download.docker.com when enable_docker is true.
+# Paths: docker_data_dir (data-root in daemon.json), containerd_data_dir (root in config.toml).
+
+- name: Resolve Docker apt distro (ubuntu / debian)
+  ansible.builtin.set_fact:
+    docker_apt_dist: "{{ 'ubuntu' if ansible_distribution == 'Ubuntu' else ('debian' if ansible_distribution == 'Debian' else '') }}"
+
+- name: Assert official Docker repo is supported
+  ansible.builtin.assert:
+    that:
+      - docker_apt_dist | length > 0
+    fail_msg: "Official Docker repo is Ubuntu/Debian only (got {{ ansible_distribution }})."
+
+- name: Map architecture for Docker apt (amd64 / arm64 / armhf)
+  ansible.builtin.set_fact:
+    docker_apt_arch: >-
+      {{
+        'arm64' if ansible_architecture == 'aarch64'
+        else ('armhf' if ansible_architecture == 'armv7l'
+        else ('amd64' if ansible_architecture == 'x86_64' else ansible_architecture))
+      }}
+
+- name: Stop Docker before removing distro packages
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+  loop:
+    - docker.socket
+    - docker
+  failed_when: false
+  when: docker_remove_distro_packages | bool
+
+- name: Remove distro Docker packages
+  ansible.builtin.apt:
+    name: "{{ docker_distro_packages_remove }}"
+    state: absent
+    purge: true
+    autoremove: true
+    lock_timeout: "{{ prepare_servers_apt_lock_timeout }}"
+  when: docker_remove_distro_packages | bool
+
+- name: Install apt HTTPS dependencies
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+    state: present
+    update_cache: true
+    lock_timeout: "{{ prepare_servers_apt_lock_timeout }}"
+
+- name: Ensure apt keyring directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Docker repository GPG key
+  ansible.builtin.get_url:
+    url: "https://download.docker.com/linux/{{ docker_apt_dist }}/gpg"
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Docker CE apt repository (download.docker.com, {{ docker_apt_channel }})
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ docker_apt_arch }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/{{ docker_apt_dist }} {{ ansible_distribution_release }} {{ docker_apt_channel }}"
+    filename: docker
+    state: present
+
+- name: APT pin — docker-ce only from download.docker.com
+  ansible.builtin.template:
+    src: docker-ce-apt-pin.pref.j2
+    dest: /etc/apt/preferences.d/99-docker-ce.pref
+    mode: "0644"
+
+- name: Refresh apt cache after adding Docker repo
+  ansible.builtin.apt:
+    update_cache: true
+    lock_timeout: "{{ prepare_servers_apt_lock_timeout }}"
+
+- name: Install Docker Engine and Compose V2 (docker-ce from official repo)
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    lock_timeout: "{{ prepare_servers_apt_lock_timeout }}"
+    install_recommends: false
+
+- name: Read docker-ce apt policy
+  ansible.builtin.command: apt-cache policy docker-ce
+  register: prepare_docker_ce_policy
+  changed_when: false
+
+- name: Assert docker-ce comes from download.docker.com
+  ansible.builtin.assert:
+    that:
+      - "'download.docker.com' in prepare_docker_ce_policy.stdout"
+    fail_msg: >-
+      docker-ce is not from the official Docker repository.
+      apt-cache policy: {{ prepare_docker_ce_policy.stdout }}
+
+- name: Ensure Docker data directory exists
+  ansible.builtin.file:
+    path: "{{ docker_data_dir }}"
+    state: directory
+    mode: "0755"
+  when: docker_data_dir != "/var/lib/docker"
+
+- name: Configure Docker daemon data-root
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "data-root": "{{ docker_data_dir }}"
+      }
+    mode: "0644"
+  when: docker_data_dir != "/var/lib/docker"
+  notify: restart docker
+
+- name: Ensure containerd data directory exists
+  ansible.builtin.file:
+    path: "{{ containerd_data_dir }}"
+    state: directory
+    mode: "0711"
+  when: containerd_data_dir != "/var/lib/containerd"
+
+- name: Configure containerd root in /etc/containerd/config.toml
+  ansible.builtin.lineinfile:
+    path: /etc/containerd/config.toml
+    regexp: "^#?root\\s*=.*"
+    line: 'root = "{{ containerd_data_dir }}"'
+    insertafter: '^disabled_plugins'
+    backup: true
+  when: containerd_data_dir != "/var/lib/containerd"
+  notify: restart containerd stack
+
+- name: Start and enable Docker service
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Add ansible_user to docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true
+
+- name: Add admin user to docker group
+  ansible.builtin.user:
+    name: "{{ admin_username }}"
+    groups: docker
+    append: true
+  when: enable_admin_user | bool

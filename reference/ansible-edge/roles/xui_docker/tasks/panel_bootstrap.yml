@@ -1,0 +1,237 @@
+---
+- name: Check if panel already configured
+  ansible.builtin.command: >-
+    docker exec {{ xui_container_name }} /app/x-ui setting -show true
+  register: xui_panel_show
+  changed_when: false
+  failed_when: false
+
+- name: Detect default credentials flag
+  ansible.builtin.set_fact:
+    xui_panel_has_default_credential: >-
+      {{
+        'hasDefaultCredential: true' in (xui_panel_show.stdout | default(''))
+      }}
+    xui_panel_first_init: >-
+      {{
+        'hasDefaultCredential: true' in (xui_panel_show.stdout | default(''))
+        or xui_panel_show.rc != 0
+      }}
+  when: xui_panel_show.rc == 0
+
+- name: Assume fresh panel when show command failed
+  ansible.builtin.set_fact:
+    xui_panel_has_default_credential: true
+    xui_panel_first_init: true
+  when: xui_panel_show.rc != 0
+
+- name: Parse existing panel port and webBasePath from show output
+  ansible.builtin.set_fact:
+    xui_panel_existing_port: >-
+      {{
+        (xui_panel_show.stdout | default('')
+         | regex_search('port:\s*(\d+)', '\1')
+         | default([], true) | flatten | first
+         | default(xui_panel_port | string, true) | string)
+      }}
+    xui_panel_existing_web_base_path: >-
+      {{
+        (xui_panel_show.stdout | default('')
+         | regex_search('webBasePath:\s*(\S+)', '\1')
+         | default([], true) | flatten | first
+         | default('', true) | string)
+      }}
+  when:
+    - xui_panel_show.rc == 0
+    - not xui_panel_has_default_credential | bool
+
+- name: Load panel-access.json before choosing credentials
+  ansible.builtin.import_tasks: panel_load_access_artifact.yml
+
+- name: Use panel username from group_vars
+  ansible.builtin.set_fact:
+    xui_panel_username_effective: "{{ xui_panel_username }}"
+  when: xui_panel_username | length > 0
+
+- name: Use panel username from artifact when panel already configured
+  ansible.builtin.set_fact:
+    xui_panel_username_effective: "{{ xui_panel_access_cached.username }}"
+    xui_panel_credentials_from_artifact: true
+  when:
+    - xui_panel_username | length == 0
+    - xui_panel_username_effective | default('') | length == 0
+    - xui_panel_access_cached.username | default('') | length > 0
+    - not xui_panel_has_default_credential | bool
+  no_log: true
+
+- name: Generate random panel username on first init only
+  ansible.builtin.set_fact:
+    xui_panel_username_effective: "{{ lookup('password', '/dev/null chars=ascii_letters length=10') }}"
+  when:
+    - xui_panel_username | length == 0
+    - xui_panel_username_effective | default('') | length == 0
+    - xui_panel_has_default_credential | bool
+  no_log: true
+
+- name: Use panel password from group_vars
+  ansible.builtin.set_fact:
+    xui_panel_password_effective: "{{ xui_panel_password }}"
+  when: xui_panel_password | length > 0
+  no_log: true
+
+- name: Use panel password from artifact when panel already configured
+  ansible.builtin.set_fact:
+    xui_panel_password_effective: "{{ xui_panel_access_cached.password }}"
+    xui_panel_credentials_from_artifact: true
+  when:
+    - xui_panel_password | length == 0
+    - xui_panel_password_effective | default('') | length == 0
+    - xui_panel_access_cached.password | default('') | length > 0
+    - not xui_panel_has_default_credential | bool
+  no_log: true
+
+- name: Generate random panel password on first init only
+  ansible.builtin.set_fact:
+    xui_panel_password_effective: >-
+      {{ lookup('password', '/dev/null chars=ascii_letters,digits length=' ~ (xui_panel_password_length | string)) }}
+  when:
+    - xui_panel_password | length == 0
+    - xui_panel_password_effective | default('') | length == 0
+    - xui_panel_has_default_credential | bool
+  no_log: true
+
+- name: Generate web base path when empty
+  ansible.builtin.set_fact:
+    xui_panel_web_base_path_effective: "{{ xui_panel_web_base_path }}"
+  when: xui_panel_web_base_path | length > 0
+
+- name: Generate random web base path
+  ansible.builtin.set_fact:
+    xui_panel_web_base_path_effective: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=18') }}"
+  when: xui_panel_web_base_path | length == 0
+  no_log: true
+
+- name: Use existing web base path on re-run
+  ansible.builtin.set_fact:
+    xui_panel_web_base_path_effective: "{{ xui_panel_existing_web_base_path }}"
+  when:
+    - xui_panel_existing_web_base_path is defined
+    - xui_panel_existing_web_base_path | length > 0
+    - xui_panel_web_base_path | length == 0
+
+- name: Normalize web base path before applying panel settings
+  ansible.builtin.import_tasks: panel_normalize_web_base_path.yml
+
+- name: Apply panel settings (credentials and port) on first init
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - "{{ xui_container_name }}"
+      - /app/x-ui
+      - setting
+      - -username
+      - "{{ xui_panel_username_effective }}"
+      - -password
+      - "{{ xui_panel_password_effective }}"
+      - -port
+      - "{{ xui_panel_port | string }}"
+      - -webBasePath
+      - "{{ xui_panel_web_base_path_effective }}"
+  register: xui_panel_setting
+  changed_when: xui_panel_setting.rc == 0
+  no_log: true
+  when: >-
+    xui_panel_has_default_credential | bool
+    or xui_panel_bootstrap_on_existing | bool
+
+- name: Sync panel login in container from artifact or -e (CLI, без веб-логина)
+  ansible.builtin.import_tasks: panel_apply_credentials_cli.yml
+  when:
+    - xui_panel_sync_credentials_from_artifact | default(true) | bool
+    - not xui_panel_has_default_credential | bool
+    - xui_panel_credentials_from_artifact | default(false) | bool
+      or xui_panel_bootstrap_on_existing | bool
+
+- name: Set panel listen IP when configured
+  ansible.builtin.command: >-
+    docker exec {{ xui_container_name }} /app/x-ui setting
+    -listenIP {{ xui_panel_listen_ip | quote }}
+  when: xui_panel_listen_ip | length > 0
+  notify: Restart xui container
+
+- name: Configure panel TLS certificate paths
+  ansible.builtin.command: >-
+    docker exec {{ xui_container_name }} /app/x-ui cert
+    -webCert /root/cert/ip/fullchain.pem
+    -webCertKey /root/cert/ip/privkey.pem
+  when: xui_enable_ssl | bool
+  notify: Restart xui container
+
+- name: Flush handlers after panel configuration
+  ansible.builtin.meta: flush_handlers
+
+- name: Normalize web base path before building panel URL
+  ansible.builtin.import_tasks: panel_normalize_web_base_path.yml
+
+- name: Build panel URL base (API under …/<webBasePath>/panel/…)
+  ansible.builtin.set_fact:
+    xui_panel_web_base_path_normalized: "{{ xui_panel_web_base_path_effective }}"
+    xui_panel_url_base: >-
+      https://{{ xui_ssl_ipv4_effective }}:{{ xui_panel_port }}/{{ xui_panel_web_base_path_effective }}/
+
+- name: Fetch API token from panel
+  ansible.builtin.command: >-
+    docker exec {{ xui_container_name }} /app/x-ui setting -getApiToken true
+  register: xui_api_token_cmd
+  changed_when: false
+  failed_when: false
+
+- name: Parse API token
+  ansible.builtin.set_fact:
+    xui_panel_api_token_effective: >-
+      {{
+        (xui_api_token_cmd.stdout | default('')
+         | regex_search('apiToken:\s*(\S+)', '\1')
+         | default([], true) | flatten | first
+         | default('', true))
+        | regex_replace("^\['?", '')
+        | regex_replace("'?\]$", '')
+        | trim
+      }}
+  no_log: true
+
+- name: Set API token alias for artifacts template
+  ansible.builtin.set_fact:
+    xui_panel_api_token: "{{ xui_panel_api_token_effective }}"
+  no_log: true
+
+- name: Build panel access URL
+  ansible.builtin.set_fact:
+    xui_panel_access_url: "{{ xui_panel_url_base }}"
+
+- name: Ensure artifacts directory exists
+  ansible.builtin.file:
+    path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+
+- name: Save panel credentials artifact (always)
+  ansible.builtin.template:
+    src: panel-credentials.txt.j2
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/panel-credentials.txt"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  no_log: true
+
+- name: Save panel access JSON artifact (always)
+  ansible.builtin.template:
+    src: panel-access.json.j2
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/panel-access.json"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  no_log: true

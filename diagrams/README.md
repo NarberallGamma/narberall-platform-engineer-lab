@@ -1,10 +1,12 @@
 # Diagrams
 
-Prefer SVG/PNG from Excalidraw/draw.io, or Mermaid in case studies.
+Prefer SVG/PNG from Excalidraw/draw.io, or Mermaid next to the case / practice page.
 
-| Path | Owner |
-|------|-------|
-| `case-studies/` | Work PC |
-| `practice/home-lab/` | Home PC (`HOME_SLOT`) |
+| Path | Use |
+|------|-----|
+| [`case-studies/`](case-studies/) | Architecture for published case studies |
+| [`practice/home-lab/`](practice/home-lab/) | Dual-boot, local AI, Ansible edge, Android SSH |
+
+Code those diagrams point at: [`../iac/`](../iac/) (cloud, terraform, ansible), [`../reference/`](../reference/), [`../practice/`](../practice/).
 
 No real IPs or client hostnames in labels.

@@ -1,0 +1,73 @@
+---
+- name: Set Shadowsocks client email
+  ansible.builtin.set_fact:
+    xui_extra_shadowsocks_client_email: >-
+      {{
+        xui_extra_shadowsocks_user
+        ~ '-'
+        ~ xui_extra_inbound_protocol
+        ~ '-'
+        ~ xui_profile
+        ~ (
+          '-' ~ xui_route_suffix
+          if (xui_route_suffix | default('') | length > 0)
+          else ''
+        )
+      }}
+
+- name: Set Shadowsocks client registry key
+  ansible.builtin.set_fact:
+    xui_extra_shadowsocks_client_registry_key: "{{ xui_extra_inbound_remark }}:{{ xui_extra_shadowsocks_client_email }}"
+
+- name: Generate Shadowsocks client key when missing
+  ansible.builtin.command: openssl rand -base64 {{ 16 if xui_extra_shadowsocks_method == '2022-blake3-aes-128-gcm' else 32 }}
+  register: xui_extra_shadowsocks_client_password_cmd
+  changed_when: false
+  when: >-
+    ((xui_extra_inbounds_registry | default({})).get(xui_extra_shadowsocks_client_registry_key, {}).password | default('') | length) == 0
+  no_log: true
+
+- name: Resolve Shadowsocks client key
+  ansible.builtin.set_fact:
+    xui_extra_shadowsocks_client_password: >-
+      {{
+        (xui_extra_inbounds_registry | default({})).get(xui_extra_shadowsocks_client_registry_key, {}).password
+        | default(xui_extra_shadowsocks_client_password_cmd.stdout | trim, true)
+      }}
+  no_log: true
+
+- name: Save Shadowsocks client key to registry
+  ansible.builtin.set_fact:
+    xui_extra_inbounds_registry: >-
+      {{
+        xui_extra_inbounds_registry | default({}) | combine({
+          xui_extra_shadowsocks_client_registry_key: {
+            'protocol': 'shadowsocks',
+            'remark': xui_extra_inbound_remark,
+            'email': xui_extra_shadowsocks_client_email,
+            'method': xui_extra_shadowsocks_method,
+            'password': xui_extra_shadowsocks_client_password
+          }
+        }, recursive=True)
+      }}
+  no_log: true
+
+- name: Append Shadowsocks client
+  ansible.builtin.set_fact:
+    xui_extra_shadowsocks_clients_effective: >-
+      {{
+        xui_extra_shadowsocks_clients_effective + [{
+          'method': '',
+          'password': xui_extra_shadowsocks_client_password,
+          'email': xui_extra_shadowsocks_client_email,
+          'limitIp': 0,
+          'totalGB': 0,
+          'expiryTime': 0,
+          'enable': true,
+          'tgId': 0,
+          'subId': '',
+          'comment': '',
+          'reset': 0
+        }]
+      }}
+  no_log: true

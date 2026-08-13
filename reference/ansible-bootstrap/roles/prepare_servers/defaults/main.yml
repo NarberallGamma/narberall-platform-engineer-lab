@@ -1,0 +1,34 @@
+---
+timezone: UTC
+
+enable_timezone: true
+enable_apt_basics: true
+enable_apt_upgrade: false
+enable_hostname_change: false
+enable_root_password_change: true
+enable_docker: false
+
+enable_admin_user: true
+admin_username: platform
+
+enable_ssh_authorized_keys: true
+ssh_authorized_keys: []
+
+credentials_password_length: 30
+enable_ssh_hardening: false
+
+prepare_credentials_artifacts_dir: "{{ playbook_dir }}/../artifacts/credentials"
+
+prepare_servers_apt_lock_timeout: 600
+
+# Override in group_vars/prepare.yml (example: /docker/system)
+docker_data_dir: "/var/lib/docker"
+containerd_data_dir: "/var/lib/containerd"
+docker_apt_channel: stable
+docker_remove_distro_packages: true
+docker_distro_packages_remove:
+  - docker.io
+  - docker-doc
+  - docker-compose
+  - docker-compose-v2
+  - podman-docker

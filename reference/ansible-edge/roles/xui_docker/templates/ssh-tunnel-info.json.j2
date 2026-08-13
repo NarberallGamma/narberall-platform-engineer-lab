@@ -1,0 +1,23 @@
+{
+  "profile": "{{ xui_profile }}",
+  "inventory_hostname": "{{ inventory_hostname }}",
+  "jump_host": "{{ ansible_host }}",
+  "ssh_port": {{ xui_ssh_port | int }},
+  "socat": {
+    "systemd_unit": "{{ xui_ssh_tunnel_systemd_unit }}.service",
+    "listen_bind": "{{ xui_ssh_tunnel_listen_bind }}",
+    "listen_port": {{ xui_ssh_tunnel_listen_port | int }},
+    "target_host": "{{ xui_ssh_tunnel_target_host_effective }}",
+    "target_port": {{ xui_ssh_tunnel_target_port | int }}
+  },
+  "client": {
+    "example_local_port": {{ xui_ssh_tunnel_client_local_port | int }},
+    "remote_forward_target": "127.0.0.1:{{ xui_ssh_tunnel_listen_port }}"
+  },
+  "tunnel_users": {{ xui_ssh_tunnel_users | to_json }},
+  "artifacts": {
+    "keys_dir": "ssh-tunnel/keys",
+    "users_dir": "ssh-tunnel/users"
+  },
+  "notes": "Порт socat не открывается в UFW — только localhost. Провайдер видит SSH до Jump."
+}

@@ -2,28 +2,31 @@
 
 ```mermaid
 flowchart TB
-  subgraph modules [Reusable_modules]
-    Vpc[vpc]
-    Subnet[subnet]
-    Route[route]
-    Compute[compute_instance]
+  Mods[iac/terraform/modules]
+  subgraph huawei [cloud-ru-huawei]
+    MultiEnv[stacks/multi-env-root]
+    TgLive[live]
   end
-  subgraph patterns [Delivery_patterns]
-    MultiEnv[multi_env_root]
-    TgLive[terragrunt_live]
+  subgraph awsfold [aws]
+    Root[root]
+    Live[live]
   end
-  subgraph cloud [Cloud_platform]
+  subgraph platform [Cloud platform]
     Net[Network]
     Vm[Compute]
-    Data[Managed_data]
+    Data[Managed data]
     K8s[Kubernetes]
   end
-  Vpc --> MultiEnv
-  Subnet --> MultiEnv
-  Route --> TgLive
-  Compute --> TgLive
+  Mods --> MultiEnv
+  Mods --> TgLive
   MultiEnv --> Net
-  TgLive --> Vm
   MultiEnv --> Data
   MultiEnv --> K8s
+  TgLive --> Vm
+  Root --> Net
+  Live --> K8s
 ```
+
+Case study: [`../../case-studies/02-cloud-platform-turnkey.md`](../../case-studies/02-cloud-platform-turnkey.md).  
+Code: [`../../iac/terraform/`](../../iac/terraform/), [`../../iac/cloud/`](../../iac/cloud/).
+

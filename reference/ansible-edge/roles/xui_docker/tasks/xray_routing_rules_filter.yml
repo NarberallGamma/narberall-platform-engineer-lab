@@ -1,0 +1,40 @@
+---
+# Убрать старые rules для managed outbound и для inbound-vless-proxy-ru (без rejectattr/inboundTag).
+
+- name: Init filtered routing rules list
+  ansible.builtin.set_fact:
+    xui_routing_rules_filtered: []
+
+- name: Keep routing rules not superseded by proxy outbound merge
+  ansible.builtin.set_fact:
+    xui_routing_rules_filtered: "{{ xui_routing_rules_filtered + [item] }}"
+  loop: "{{ xui_xray_config.routing.rules | default([]) }}"
+  loop_control:
+    label: "{{ item.type | default('rule') }}"
+  vars:
+    _inbound_tags: >-
+      {{
+        [item.inboundTag]
+        if (item.inboundTag is defined and item.inboundTag is string)
+        else (item.inboundTag | default([]))
+      }}
+    _drop_outbound: >-
+      {{
+        (item.outboundTag | default('')) in xui_outbound_managed_tags
+        or (item.outboundTag | default('')) in (xui_routing_stale_outbound_tags | default([]))
+      }}
+    _drop_inbound: >-
+      {{
+        (
+          (
+            (
+              xui_routing_managed_inbound_tags
+              | default([xui_routing_inbound_tag] if (xui_routing_inbound_tag | default('') | length > 0) else [])
+            )
+            + (xui_routing_stale_inbound_tags | default([]))
+          )
+          | intersect(_inbound_tags)
+          | length
+        ) > 0
+      }}
+  when: not (_drop_outbound | bool) and not (_drop_inbound | bool)

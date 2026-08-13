@@ -1,0 +1,49 @@
+---
+- name: Resolve chain client email for proxy route outbound
+  ansible.builtin.set_fact:
+    xui_route_outbound_protocol: "{{ xui_route_item.protocol | default('vless') | lower }}"
+    xui_route_chain_client_email: >-
+      {{
+        xui_route_item.chain_client_email
+        | default(
+          xui_chain_client_email
+          | default('client-main-' ~ xui_route_item.main_artifacts_host, true),
+          true
+        )
+      }}
+
+- name: Append outbound spec from proxy route target
+  ansible.builtin.set_fact:
+    xui_outbounds_from_routes: >-
+      {{
+        xui_outbounds_from_routes | default([]) + [{
+          'tag': xui_route_item.outbound_tag | default('outbound-vless-' ~ xui_route_item.route_suffix),
+          'enabled': xui_route_item.enabled | default(true),
+          'protocol': xui_route_outbound_protocol,
+          'route_suffix': xui_route_item.route_suffix,
+          'main_artifacts_host': xui_route_item.main_artifacts_host,
+          'main_inventory_hostname': xui_route_item.main_inventory_hostname | default(xui_route_item.main_artifacts_host),
+          'address': xui_route_item.address | default(''),
+          'port': xui_route_item.main_port | default(0),
+          'client_uuid': xui_route_item.client_uuid | default(''),
+          'public_key': xui_route_item.public_key | default(''),
+          'short_id': xui_route_item.short_id | default(''),
+          'sni': xui_route_item.sni | default(xui_outbound_sni | default('www.example.com')),
+          'encryption': xui_route_item.encryption | default(xui_outbound_encryption),
+          'flow': xui_route_item.flow | default(xui_outbound_flow),
+          'fingerprint': xui_route_item.fingerprint | default(xui_outbound_fingerprint),
+          'spider_x': xui_route_item.spider_x | default(xui_outbound_spider_x),
+          'mldsa65_verify': xui_route_item.mldsa65_verify | default(''),
+          'chain_client_email': xui_route_chain_client_email,
+          'routing': {
+            'add_rule': (
+              not (xui_routing_per_inbound | default(false) | bool)
+              and (
+                (xui_route_item.outbound_tag | default('outbound-vless-' ~ xui_route_item.route_suffix))
+                == xui_routing_outbound_tag
+              )
+            ),
+            'inbound_tag': xui_routing_inbound_tag
+          }
+        }]
+      }}

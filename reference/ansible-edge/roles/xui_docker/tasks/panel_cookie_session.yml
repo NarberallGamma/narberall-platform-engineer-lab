@@ -1,0 +1,140 @@
+---
+# Сессия панели по cookie + CSRF (legacy /panel/xray/*; на 3.3+ Xray template — /panel/api/xray/*).
+# API token не проходит checkLogin на группе /panel — только checkAPIAuth на /panel/api.
+
+- name: Init panel cookie session variables
+  ansible.builtin.set_fact:
+    xui_panel_cookies_string: "{{ xui_panel_cookies_string | default('') }}"
+    xui_csrf_token: "{{ xui_csrf_token | default('') }}"
+
+- name: Establish panel session (GET webBasePath root)
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}"
+    method: GET
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    status_code: [200, 302]
+  register: xui_panel_http_root
+  failed_when: false
+
+- name: Store cookies from panel root
+  ansible.builtin.set_fact:
+    xui_panel_cookies_string: "{{ xui_panel_http_root['cookies_string'] | default(xui_panel_cookies_string) }}"
+  when:
+    - xui_panel_http_root['cookies_string'] is defined
+    - xui_panel_http_root['cookies_string'] | length > 0
+
+- name: Fetch CSRF token (webBasePath, не …/panel/)
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}csrf-token"
+    method: GET
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers:
+      Cookie: "{{ xui_panel_cookies_string }}"
+      Accept: application/json
+    return_content: true
+    status_code: [200]
+  register: xui_panel_http_csrf
+
+- name: Store cookies after CSRF prefetch
+  ansible.builtin.set_fact:
+    xui_panel_cookies_string: "{{ xui_panel_http_csrf['cookies_string'] | default(xui_panel_cookies_string) }}"
+  when:
+    - xui_panel_http_csrf['cookies_string'] is defined
+    - xui_panel_http_csrf['cookies_string'] | length > 0
+
+- name: Parse CSRF JSON from response body when uri module omitted json
+  ansible.builtin.set_fact:
+    xui_panel_http_csrf_json: "{{ xui_panel_http_csrf.content | from_json }}"
+  when: xui_panel_http_csrf['json'] is not defined
+
+- name: Assert CSRF response is JSON
+  ansible.builtin.assert:
+    that:
+      - >-
+        (xui_panel_http_csrf['json'] is defined)
+        or (xui_panel_http_csrf_json is defined)
+      - >-
+        (xui_panel_http_csrf['json']['obj'] | default(xui_panel_http_csrf_json.obj | default('')))
+        | length > 0
+    fail_msg: >-
+      CSRF: ожидался JSON от {{ xui_panel_url_base }}csrf-token
+      (не {{ xui_panel_url_base }}panel/csrf-token), status={{ xui_panel_http_csrf['status'] | default('?') }}.
+      webBasePath={{ xui_panel_web_base_path_effective | default('?') }}.
+
+- name: Parse CSRF token
+  ansible.builtin.set_fact:
+    xui_csrf_token: >-
+      {{
+        xui_panel_http_csrf['json']['obj']
+        if (xui_panel_http_csrf['json'] is defined)
+        else xui_panel_http_csrf_json.obj
+      }}
+
+- name: Login to panel
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}login"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers:
+      Cookie: "{{ xui_panel_cookies_string }}"
+      X-CSRF-Token: "{{ xui_csrf_token }}"
+    body_format: json
+    body:
+      username: "{{ xui_panel_username_effective }}"
+      password: "{{ xui_panel_password_effective }}"
+    status_code: 200
+  register: xui_panel_http_login
+  no_log: true
+
+- name: Store cookies after login
+  ansible.builtin.set_fact:
+    xui_panel_cookies_string: "{{ xui_panel_http_login['cookies_string'] | default(xui_panel_cookies_string) }}"
+  when:
+    - xui_panel_http_login['cookies_string'] is defined
+    - xui_panel_http_login['cookies_string'] | length > 0
+
+- name: Assert panel login succeeded
+  ansible.builtin.assert:
+    that:
+      - xui_panel_http_login['json'] is defined
+      - xui_panel_http_login['json']['success'] | default(false) | bool
+    fail_msg: >-
+      3X-UI login failed ({{ xui_panel_url_base }}login).
+      Проверить xui_panel_username и xui_panel_password (-e) или panel-access.json.
+
+- name: Refresh CSRF token after login
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}csrf-token"
+    method: GET
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers:
+      Cookie: "{{ xui_panel_cookies_string }}"
+      Accept: application/json
+    return_content: true
+    status_code: [200]
+  register: xui_panel_http_csrf
+
+- name: Store cookies after CSRF refresh
+  ansible.builtin.set_fact:
+    xui_panel_cookies_string: "{{ xui_panel_http_csrf['cookies_string'] | default(xui_panel_cookies_string) }}"
+  when:
+    - xui_panel_http_csrf['cookies_string'] is defined
+    - xui_panel_http_csrf['cookies_string'] | length > 0
+
+- name: Update CSRF token after login
+  ansible.builtin.set_fact:
+    xui_csrf_token: "{{ xui_panel_http_csrf['json']['obj'] }}"
+
+- name: Set cookie headers for panel web routes (/panel/xray, …)
+  ansible.builtin.set_fact:
+    xui_panel_web_headers:
+      Cookie: "{{ xui_panel_cookies_string }}"
+      Accept: application/json
+    xui_panel_web_post_headers: >-
+      {{
+        {
+          'Cookie': xui_panel_cookies_string,
+          'Accept': 'application/json',
+          'X-CSRF-Token': xui_csrf_token
+        }
+      }}

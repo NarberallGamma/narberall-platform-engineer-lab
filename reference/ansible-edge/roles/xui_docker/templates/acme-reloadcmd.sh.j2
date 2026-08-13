@@ -1,0 +1,8 @@
+#!/bin/sh
+# acme.sh --reloadcmd: применить обновлённый LE IP cert к панели 3X-UI
+set -eu
+docker exec {{ xui_container_name }} /app/x-ui cert \
+  -webCert /root/cert/ip/fullchain.pem \
+  -webCertKey /root/cert/ip/privkey.pem \
+  >/dev/null 2>&1 || true
+docker restart {{ xui_container_name }} >/dev/null 2>&1 || true

@@ -1,0 +1,59 @@
+---
+- name: Validate scheduled restart time format (HH:MM:SS)
+  ansible.builtin.assert:
+    that:
+      - item is match('^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]$')
+    fail_msg: "xui_scheduled_restart_times: use HH:MM:SS, got '{{ item }}'"
+  loop: "{{ xui_scheduled_restart_times }}"
+  tags: [scheduled_restart, xray_restart]
+
+- name: Validate scheduled restart mode
+  ansible.builtin.assert:
+    that:
+      - xui_scheduled_restart_mode in ['xray', 'container', 'full']
+    fail_msg: "xui_scheduled_restart_mode must be xray, container, or full"
+  tags: [scheduled_restart, xray_restart]
+
+- name: Deploy scheduled restart script on host
+  ansible.builtin.template:
+    src: xui-scheduled-restart.sh.j2
+    dest: "{{ xui_scheduled_restart_script_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [scheduled_restart, xray_restart]
+
+- name: Ensure scheduled restart log file exists
+  ansible.builtin.file:
+    path: "{{ xui_scheduled_restart_log_file }}"
+    state: touch
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [scheduled_restart, xray_restart]
+
+- name: Deploy systemd service for scheduled restart
+  ansible.builtin.template:
+    src: xui-scheduled-restart.service.j2
+    dest: "/etc/systemd/system/{{ xui_scheduled_restart_systemd_service }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [scheduled_restart, xray_restart]
+
+- name: Deploy systemd timer for scheduled restart
+  ansible.builtin.template:
+    src: xui-scheduled-restart.timer.j2
+    dest: "/etc/systemd/system/{{ xui_scheduled_restart_systemd_timer }}.timer"
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [scheduled_restart, xray_restart]
+
+- name: Enable and start scheduled restart timer
+  ansible.builtin.systemd:
+    name: "{{ xui_scheduled_restart_systemd_timer }}.timer"
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [scheduled_restart, xray_restart]

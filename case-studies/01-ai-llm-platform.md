@@ -1,6 +1,6 @@
 # Case study: AI / LLM inference platform
 
-**Status:** stub (Work PC fills from career notes)  
+**Status:** stub  
 **Context:** Internal / enterprise AI platform (GPU VM → OpenAI-compatible API)  
 **Role:** Platform Engineer (sole owner)
 
@@ -10,7 +10,7 @@ Stand up production-usable LLM inference with HTTPS API, ops automation, and cap
 
 ## Architecture
 
-_(diagram TBD → `diagrams/case-studies/01-ai-llm-platform`)_
+See diagram: [`diagrams/case-studies/01-ai-llm-platform.md`](../diagrams/case-studies/01-ai-llm-platform.md)
 
 ## What shipped
 
@@ -29,4 +29,5 @@ Linux, Docker, nginx, llama.cpp / GPU, Ansible, optional RAG edge
 
 ## Links
 
-- Reference: `../reference/ai/llm-compose-kit/`
+- Reference: [`reference/ai/llm-compose-kit/`](../reference/ai/llm-compose-kit/)
+- Home lab GPU story: [`practice/home-lab/ai-lab.md`](../practice/home-lab/ai-lab.md)

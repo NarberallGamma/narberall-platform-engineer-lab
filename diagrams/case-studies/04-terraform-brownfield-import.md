@@ -9,3 +9,7 @@ flowchart LR
   Plan -->|drift| Code
   Plan -->|clean| Managed[Managed_by_IaC]
 ```
+
+Case study: [`../../case-studies/04-terraform-brownfield-import.md`](../../case-studies/04-terraform-brownfield-import.md).  
+Code: [`../../iac/terraform/examples/brownfield-import/`](../../iac/terraform/examples/brownfield-import/).
+

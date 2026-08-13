@@ -1,0 +1,12 @@
+---
+# GET /panel/api/inbounds/list → register xui_inbounds_list (нужен до port migrate / match).
+
+- name: List existing inbounds via panel API
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/inbounds/list"
+    method: GET
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_auth_headers }}"
+    return_content: true
+    status_code: [200]
+  register: xui_inbounds_list

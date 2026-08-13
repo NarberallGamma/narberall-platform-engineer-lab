@@ -1,0 +1,73 @@
+---
+# Включение/отключение логирования Xray через шаблон панели (xrayTemplateConfig).
+# Примеры:
+#   --tags xray_logging --limit jump-1.example.com
+#   -e xui_xray_logging_profile=default   # вернуть warning + access none
+
+- name: Resolve panel URL and credentials
+  ansible.builtin.import_tasks: panel_resolve_context.yml
+
+- name: Panel API session
+  ansible.builtin.import_tasks: xray_panel_session.yml
+
+- name: Prepare Xray template API (version-aware paths and auth)
+  ansible.builtin.import_tasks: xray_panel_template_prepare.yml
+
+- name: Build effective Xray log block from profile
+  ansible.builtin.set_fact:
+    xui_xray_log_block_effective: >-
+      {{
+        {
+          'loglevel': xui_xray_log_level,
+          'access': xui_xray_log_access,
+          'error': xui_xray_log_error,
+          'dnsLog': xui_xray_log_dns | bool,
+          'maskAddress': xui_xray_log_mask_address
+        }
+        if (xui_xray_logging_profile | default('max') == 'max')
+        else {
+          'loglevel': 'warning',
+          'access': 'none',
+          'error': '',
+          'dnsLog': false,
+          'maskAddress': ''
+        }
+      }}
+
+- name: Fetch current Xray template config
+  ansible.builtin.import_tasks: xray_panel_template_fetch.yml
+
+- name: Merge log section into Xray config
+  ansible.builtin.set_fact:
+    xui_xray_config: >-
+      {{
+        xui_xray_config | combine({
+          'log': xui_xray_log_block_effective
+        })
+      }}
+
+- name: Apply Xray logging config
+  ansible.builtin.import_tasks: xray_panel_template_apply.yml
+
+- name: Restart Xray after logging change
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/server/restartXrayService"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_post_headers }}"
+    status_code: 200
+  when: xui_xray_logging_restart_xray | bool
+  changed_when: true
+
+- name: Save active Xray logging profile artifact
+  ansible.builtin.copy:
+    content: |
+      {
+        "profile": "{{ xui_xray_logging_profile | default('max') }}",
+        "log": {{ xui_xray_log_block_effective | to_nice_json }},
+        "updated_at": "{{ ansible_date_time.iso8601 }}"
+      }
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/xray-logging.json"
+    mode: "0600"
+  delegate_to: localhost
+  become: false

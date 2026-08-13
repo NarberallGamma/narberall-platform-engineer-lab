@@ -1,0 +1,43 @@
+#!/bin/bash
+# Ansible: плановый перезапуск 3X-UI в Docker (mode={{ xui_scheduled_restart_mode }})
+# container — docker restart {{ xui_container_name }} (панель + xray)
+# xray — SIGUSR1 (legacy; hot reload, не полный рестарт)
+set -euo pipefail
+
+CONTAINER="{{ xui_container_name }}"
+LOG_FILE="{{ xui_scheduled_restart_log_file }}"
+MODE="{{ xui_scheduled_restart_mode }}"
+
+log_msg() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+}
+
+if [ "$(docker inspect -f {% raw %}'{{.State.Running}}'{% endraw %} "$CONTAINER" 2>/dev/null || echo false)" != "true" ]; then
+    log_msg "FAILED: container $CONTAINER is not running"
+    exit 1
+fi
+
+log_msg "=== Starting scheduled restart (mode=$MODE, container=$CONTAINER) ==="
+
+case "$MODE" in
+    xray)
+        if docker kill --signal=USR1 "$CONTAINER" >> "$LOG_FILE" 2>&1; then
+            log_msg "SUCCESS: SIGUSR1 sent — xray-core restart requested (same as x-ui restart-xray)"
+            exit 0
+        fi
+        ;;
+    container|full)
+        if docker restart "$CONTAINER" >> "$LOG_FILE" 2>&1; then
+            log_msg "SUCCESS: docker restart completed (panel + xray)"
+            exit 0
+        fi
+        ;;
+    *)
+        log_msg "FAILED: unknown mode '$MODE' (use xray or container)"
+        exit 2
+        ;;
+esac
+
+EXIT_CODE=$?
+log_msg "FAILED: scheduled restart failed with exit code $EXIT_CODE"
+exit "$EXIT_CODE"

@@ -1,10 +1,12 @@
 # Practice (Lab & tooling)
 
-Not client case studies. Shows depth: workstation automation + home AI lab.
+Not client case studies. Same ownership pattern as production: reproducible OS, IaC-style deploys, local AI, MCP workstation. Home lab also shows **hardware and OS internals** (BIOS, OC/undervolt, kernel, Windows registry, workload tuning) — breadth beyond servers and a terminal session.
 
-| Path | Owner | Topic |
-|------|-------|-------|
-| [`workstation/`](workstation/) | Work machine | WSL ops tooling, ITSM/wiki automation |
-| [`home-lab/`](home-lab/) | **Home machine only** | Arch/Windows, local LLM, pet projects |
+| Path | Topic |
+|------|-------|
+| [`workstation/`](workstation/) | Cursor / MCP / scripts: how the environment is stood up (WSL then native Linux) |
+| [`home-lab/`](home-lab/) | Dual-boot workstation, hardware/BIOS, kernel/registry, local LLM/SD, Ansible edge, Android SSH |
 
-Site section title: **Practice** (never «Hobbies»).
+Site section title: **Practice** (never "Hobbies").
+
+Sanitized code for the same topics: [`../reference/`](../reference/).

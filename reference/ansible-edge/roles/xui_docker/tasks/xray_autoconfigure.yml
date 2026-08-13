@@ -1,0 +1,132 @@
+---
+- name: Resolve panel URL and credentials (if panel tag was skipped)
+  ansible.builtin.import_tasks: panel_resolve_context.yml
+  tags:
+    - xray
+    - autoconfigure
+
+- name: Discover Xray binary in container
+  ansible.builtin.shell: |
+    set -euo pipefail
+    docker exec {{ xui_container_name }} sh -c 'ls /app/bin/xray-linux-* 2>/dev/null | head -1'
+  args:
+    executable: /bin/bash
+  register: xui_xray_bin_cmd
+  changed_when: false
+  tags:
+    - xray
+    - autoconfigure
+
+- name: Set Xray binary path
+  ansible.builtin.set_fact:
+    xui_xray_bin: "{{ xui_xray_bin_cmd.stdout | trim }}"
+  tags:
+    - xray
+    - autoconfigure
+
+- name: Set main inbound naming from route suffix (до panel session / match)
+  ansible.builtin.set_fact:
+    xui_inbound_remark: "vless-{{ xui_profile }}-{{ xui_route_suffix }}"
+    xui_inbound_tag: "inbound-vless-{{ xui_profile }}-{{ xui_route_suffix }}"
+  when:
+    - xui_profile == 'main'
+    - xui_route_suffix | default('') | length > 0
+  tags:
+    - xray
+    - autoconfigure
+
+- name: Load clients registry
+  ansible.builtin.import_tasks: xray_clients_registry_load.yml
+  tags:
+    - xray
+    - autoconfigure
+
+- name: Panel API session and inbound idempotency check
+  ansible.builtin.import_tasks: xray_panel_session.yml
+  tags:
+    - xray
+    - autoconfigure
+    - panel
+
+- name: Remove legacy main inbounds marked for cleanup
+  ansible.builtin.import_tasks: xray_inbound_legacy_cleanup.yml
+  vars:
+    xui_legacy_inbound_remarks_remove: "{{ xui_main_legacy_inbound_remarks_remove | default([]) }}"
+  when:
+    - xui_profile == 'main'
+    - xui_route_suffix | default('') | length > 0
+    - xui_main_legacy_inbound_remarks_remove | default([]) | length > 0
+  tags:
+    - xray
+    - autoconfigure
+
+- name: Configure main inbound with users and links
+  ansible.builtin.import_tasks: xray_inbound_autoconfigure_one.yml
+  when:
+    - xui_profile == 'main'
+    - xui_route_suffix | default('') | length > 0
+  tags:
+    - xray
+    - autoconfigure
+
+- name: Save clients registry after main inbound
+  ansible.builtin.import_tasks: xray_clients_registry_save.yml
+  when:
+    - xui_profile == 'main'
+    - xui_route_suffix | default('') | length > 0
+  tags:
+    - xray
+    - autoconfigure
+
+- name: Save main per-route inbound summary path
+  ansible.builtin.copy:
+    content: "{{ xui_inbound_summary | to_nice_json }}"
+    dest: >-
+      {{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_inbounds_artifacts_subdir }}/{{ xui_inbound_remark }}.json
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  when:
+    - xui_profile == 'main'
+    - xui_route_suffix | default('') | length > 0
+    - xui_inbound_summary is defined
+  tags:
+    - xray
+    - autoconfigure
+
+- name: Copy main inbound summary to legacy path for proxy compatibility
+  ansible.builtin.copy:
+    content: "{{ xui_inbound_summary | to_nice_json }}"
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/inbound-summary.json"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  when:
+    - xui_profile == 'main'
+    - xui_route_suffix | default('') | length > 0
+    - xui_inbound_summary is defined
+  tags:
+    - xray
+    - autoconfigure
+
+- name: Configure extra main inbounds
+  ansible.builtin.import_tasks: xray_extra_inbounds.yml
+  when:
+    - xui_profile == 'main'
+    - xui_extra_inbounds | default([]) | length > 0
+  tags:
+    - xray
+    - autoconfigure
+    - extra_inbounds
+
+- name: Single inbound path (proxy Jump or main without route_suffix)
+  ansible.builtin.import_tasks: xray_autoconfigure_legacy.yml
+  when: >-
+    (xui_profile == 'proxy')
+    or (
+      xui_profile == 'main'
+      and (xui_route_suffix | default('') | length == 0)
+    )
+  tags:
+    - xray
+    - autoconfigure

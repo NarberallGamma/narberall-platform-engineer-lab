@@ -1,0 +1,53 @@
+---
+- name: Skip role when disabled
+  ansible.builtin.meta: end_host
+  when: not host_metrics_enabled | bool
+  tags: [metrics, always]
+
+- name: Resolve vnstat network interface
+  ansible.builtin.set_fact:
+    host_metrics_vnstat_iface_effective: >-
+      {{
+        host_metrics_vnstat_interface
+        if (host_metrics_vnstat_interface | default('') | length > 0)
+        else ansible_default_ipv4.interface | default('eth0')
+      }}
+  tags: [metrics, always]
+
+- name: Install metrics packages
+  ansible.builtin.apt:
+    name: "{{ host_metrics_packages }}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == 'Debian'
+  tags: [metrics]
+
+- name: Configure sysstat history and collection
+  ansible.builtin.import_tasks: sysstat.yml
+  when:
+    - host_metrics_sysstat_enabled | bool
+    - ansible_os_family == 'Debian'
+  tags: [metrics, sysstat]
+
+- name: Configure vnstat for primary interface
+  ansible.builtin.import_tasks: vnstat.yml
+  when:
+    - host_metrics_vnstat_enabled | bool
+    - ansible_os_family == 'Debian'
+  tags: [metrics, vnstat]
+
+- name: Configure disk usage snapshots
+  ansible.builtin.import_tasks: disk_snapshot.yml
+  when: host_metrics_disk_snapshot_enabled | bool
+  tags: [metrics, disk_snapshot]
+
+- name: Deploy metrics report script
+  ansible.builtin.template:
+    src: host-metrics-report.sh.j2
+    dest: "{{ host_metrics_report_script_path }}"
+    mode: "0755"
+  tags: [metrics, report]
+
+- name: Configure sudo for metrics report
+  ansible.builtin.import_tasks: sudoers.yml
+  tags: [metrics, sudoers]

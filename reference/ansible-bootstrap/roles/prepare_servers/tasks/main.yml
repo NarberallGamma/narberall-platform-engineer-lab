@@ -1,0 +1,96 @@
+---
+- name: SSH hardening (separate run — tag ssh_hardening)
+  ansible.builtin.include_tasks: ssh_hardening.yml
+  when: enable_ssh_hardening | bool
+  tags:
+    - ssh_hardening
+    - never
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+  when: enable_timezone | bool
+  tags:
+    - prepare
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+  when: enable_apt_basics | bool
+  ignore_errors: true
+  tags:
+    - prepare
+
+- name: Dist-upgrade installed packages
+  ansible.builtin.apt:
+    upgrade: dist
+    autoremove: true
+    lock_timeout: "{{ prepare_servers_apt_lock_timeout }}"
+  when: enable_apt_upgrade | bool
+  tags:
+    - prepare
+
+- name: Install baseline packages (Ubuntu — software-properties-common)
+  ansible.builtin.apt:
+    name:
+      - software-properties-common
+      - net-tools
+    state: present
+  when: enable_apt_basics | bool
+  register: ubuntu_packages_install
+  ignore_errors: true
+  tags:
+    - prepare
+
+- name: Install baseline packages (Debian fallback)
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - net-tools
+    state: present
+  when: enable_apt_basics | bool and ubuntu_packages_install.failed | default(false)
+  tags:
+    - prepare
+
+- name: Install sudo (for admin user)
+  ansible.builtin.apt:
+    name: sudo
+    state: present
+  when: enable_admin_user | bool
+  tags:
+    - prepare
+
+- name: Accounts, passwords, and SSH keys
+  ansible.builtin.include_tasks:
+    file: users_and_access.yml
+    apply:
+      tags:
+        - prepare
+  when: >
+    (enable_admin_user | bool) or
+    (enable_root_password_change | bool) or
+    ((enable_ssh_authorized_keys | bool) and (ssh_authorized_keys | length > 0))
+  tags:
+    - prepare
+
+- name: Set hostname from inventory ({{ inventory_hostname }})
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+  when:
+    - enable_hostname_change | bool
+    - inventory_hostname | length > 0
+    - inventory_hostname != ansible_hostname
+  tags:
+    - prepare
+
+- name: Install and configure Docker
+  ansible.builtin.include_tasks:
+    file: docker.yml
+    apply:
+      tags:
+        - prepare
+  when: enable_docker | bool
+  tags:
+    - prepare

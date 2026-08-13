@@ -1,0 +1,25 @@
+---
+- name: Generate mldsa65 seed and Verify for Reality
+  ansible.builtin.shell: |
+    set -euo pipefail
+    _out="$(docker exec {{ xui_container_name }} {{ xui_xray_bin }} mldsa65 2>&1)"
+    _seed="$(printf '%s\n' "$_out" | awk '/^Seed:[[:space:]]/ { print $2; exit }')"
+    _verify="$(printf '%s\n' "$_out" | awk '/^(Verify|Veify):[[:space:]]/ {
+      sub(/^(Verify|Veify):[[:space:]]*/, "");
+      print;
+      exit
+    }')"
+    printf '%s\n---XUI---\n%s\n' "$_seed" "$_verify"
+  args:
+    executable: /bin/bash
+  register: xui_mldsa65_raw
+  changed_when: false
+  no_log: true
+  when: xui_inbound_mldsa65_enabled | bool
+
+- name: Parse mldsa65 seed and Verify
+  ansible.builtin.set_fact:
+    xui_reality_mldsa65_seed: "{{ (xui_mldsa65_raw.stdout | default('') | split('---XUI---'))[0] | trim }}"
+    xui_reality_mldsa65_verify: "{{ (xui_mldsa65_raw.stdout | default('') | split('---XUI---'))[1] | default('') | trim }}"
+  when: xui_inbound_mldsa65_enabled | bool
+  no_log: true

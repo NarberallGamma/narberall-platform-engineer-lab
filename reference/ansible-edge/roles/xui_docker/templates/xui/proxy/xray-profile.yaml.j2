@@ -1,0 +1,126 @@
+# 3X-UI / Xray — профиль PROXY (Jump RU). Сверка с vless/README.md
+
+profile: proxy
+server_role: jump_ru
+host: {{ inventory_hostname }}
+public_ip: {{ xui_ssl_ipv4_effective | default(ansible_host) }}
+
+panel:
+  port: {{ xui_panel_port }}
+
+inbound:
+  connection:
+    enable: true
+    remark: "{{ xui_inbound_remark }}"
+    protocol: {{ xui_inbound_protocol }}
+    port: {{ xui_inbound_port }}
+    network: {{ xui_inbound_network }}
+    security: {{ xui_inbound_security }}
+
+  client_auth:
+    ml_kem_enabled: {{ xui_inbound_ml_kem_enabled | bool | lower }}
+    mldsa65_enabled: {{ xui_inbound_mldsa65_enabled | bool | lower }}
+    flow: "{{ xui_inbound_flow }}"
+
+  reality:
+    target: "{{ xui_inbound_reality_dest }}"
+    server_names:
+{% if xui_inbound_reality_server_names | length > 0 %}
+{% for sn in xui_inbound_reality_server_names %}
+      - "{{ sn }}"
+{% endfor %}
+{% else %}
+      - "{{ xui_inbound_reality_sni }}"
+{% endif %}
+    utls_fingerprint: "{{ xui_inbound_reality_fingerprint }}"
+    max_timediff_ms: {{ xui_inbound_reality_max_timediff }}
+    min_client_ver: "{{ xui_inbound_reality_min_client_ver }}"
+    max_client_ver: "{{ xui_inbound_reality_max_client_ver }}"
+    spider_x: "{{ xui_inbound_reality_spider_x }}"
+    show: {{ xui_inbound_reality_show | bool | lower }}
+    xver: {{ xui_inbound_reality_xver }}
+
+  sockopt:
+    tcp_fast_open: {{ xui_inbound_sockopt_tcp_fast_open | bool | lower }}
+    tcp_keep_alive_interval: {{ xui_inbound_sockopt_tcp_keep_alive_interval }}
+    tcp_keep_alive_idle: {{ xui_inbound_sockopt_tcp_keep_alive_idle }}
+    tcp_max_seg: {{ xui_inbound_sockopt_tcp_max_seg }}
+    tcp_congestion: {{ xui_inbound_sockopt_tcp_congestion }}
+
+  sniffing:
+    enabled: {{ xui_sniffing_enabled | bool | lower }}
+    dest_override: {{ xui_sniffing_dest_override | to_json }}
+    metadata_only: {{ xui_sniffing_metadata_only | bool | lower }}
+    route_only: {{ xui_sniffing_route_only | bool | lower }}
+
+outbound:
+  enabled: {{ xui_outbound_enabled | bool | lower }}
+  tag: "{{ xui_outbound_tag }}"
+  # default: outbound-main → main server (inventory [xui_main])
+  address: "{{ xui_outbound_address }}"
+  port: {{ xui_outbound_port }}
+  protocol: {{ xui_outbound_protocol }}
+  security: {{ xui_outbound_security }}
+  flow: "{{ xui_outbound_flow }}"
+  encryption: "{{ xui_outbound_encryption }}"
+  reality:
+    server_name: "{{ xui_outbound_sni }}"
+    fingerprint: "{{ xui_outbound_fingerprint }}"
+    spider_x: "{{ xui_outbound_spider_x }}"
+    public_key: "{{ xui_outbound_public_key }}"
+    short_id: "{{ xui_outbound_short_id }}"
+    mldsa65_verify: "{{ xui_outbound_mldsa65_verify }}"
+
+  sockopt:
+    tcp_fast_open: {{ xui_outbound_sockopt_tcp_fast_open | bool | lower }}
+    tcp_keep_alive_interval: {{ xui_outbound_sockopt_tcp_keep_alive_interval }}
+    tcp_mptcp: {{ xui_outbound_sockopt_tcp_mptcp | bool | lower }}
+    penetrate: {{ xui_outbound_sockopt_penetrate | bool | lower }}
+
+routing:
+  enabled: {{ xui_routing_enabled | bool | lower }}
+  rule: "inbound_tag → {{ xui_routing_outbound_tag }}"
+  inbound_tag: "{{ xui_routing_inbound_tag }}"  # тег inbound в панели (inbound-443 / vless-main)
+  outbound_tag: "{{ xui_routing_outbound_tag }}"
+
+# Пример JSON исходящего (вставить в панель → Outbounds → JSON)
+outbound_json_example: |
+  {
+    "protocol": "vless",
+    "tag": "{{ xui_outbound_tag }}",
+    "settings": {
+      "vnext": [{
+        "address": "{{ xui_outbound_address }}",
+        "port": {{ xui_outbound_port }},
+        "users": [{
+          "id": "<UUID с NL inbound для Jump>",
+          "encryption": "{{ xui_outbound_encryption }}",
+          "flow": "{{ xui_outbound_flow }}"
+        }]
+      }]
+    },
+    "streamSettings": {
+      "network": "tcp",
+      "security": "reality",
+      "realitySettings": {
+        "serverName": "{{ xui_outbound_sni }}",
+        "fingerprint": "{{ xui_outbound_fingerprint }}",
+        "publicKey": "<с NL inbound Reality>",
+        "shortId": "<shortId с NL>",
+        "spiderX": "{{ xui_outbound_spider_x }}"
+      },
+      "tcpSettings": { "header": { "type": "none" } },
+      "sockopt": {
+        "tcpFastOpen": {{ xui_outbound_sockopt_tcp_fast_open | lower }},
+        "tcpKeepAliveInterval": {{ xui_outbound_sockopt_tcp_keep_alive_interval }},
+        "tcpMptcp": {{ xui_outbound_sockopt_tcp_mptcp | lower }},
+        "penetrate": {{ xui_outbound_sockopt_penetrate | lower }}
+      }
+    }
+  }
+
+operator_notes:
+  - Jump inbound dest/SNI from group_vars.
+  - Outbound tag {{ xui_outbound_tag }} → main; SNI {{ xui_outbound_sni }}
+  - Routing: inbound tag → {{ xui_routing_outbound_tag }}
+

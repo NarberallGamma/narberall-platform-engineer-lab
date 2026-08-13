@@ -1,0 +1,48 @@
+---
+- name: Ensure clients links directory exists (localhost)
+  ansible.builtin.file:
+    path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_clients_links_subdir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  when: xui_export_client_vless_links | default(true) | bool
+
+- name: Save client VLESS link text file
+  ansible.builtin.copy:
+    content: "{{ lookup('template', 'client-vless-uri.txt.j2') }}\n"
+    dest: >-
+      {{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_clients_links_subdir }}/{{ client.email }}.txt
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  loop: "{{ xui_inbound_clients_effective | default([]) }}"
+  loop_control:
+    loop_var: client
+    label: "{{ client.email }}"
+  when: xui_export_client_vless_links | default(true) | bool
+
+- name: Save client VLESS link JSON
+  ansible.builtin.copy:
+    content: >-
+      {{
+        {
+          'email': client.email,
+          'uuid': client.id,
+          'inbound_remark': xui_inbound_remark,
+          'inbound_tag': xui_inbound_tag,
+          'route_suffix': xui_route_suffix,
+          'vless_uri': lookup('template', 'client-vless-uri.txt.j2') | trim,
+          'fragment': xui_inbound_remark ~ '-' ~ client.email
+        } | to_nice_json
+      }}
+    dest: >-
+      {{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_clients_links_subdir }}/{{ client.email }}.json
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  loop: "{{ xui_inbound_clients_effective | default([]) }}"
+  loop_control:
+    loop_var: client
+    label: "{{ client.email }}"
+  when: xui_export_client_vless_links | default(true) | bool

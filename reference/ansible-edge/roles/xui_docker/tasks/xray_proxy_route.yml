@@ -1,0 +1,173 @@
+---
+# Несколько outbound на proxy: vars xui_outbounds[] + inbound-summary каждого main-хоста
+- name: Prepare proxy outbound list
+  ansible.builtin.import_tasks: xray_proxy_outbounds_prepare.yml
+  tags: [xray, autoconfigure, proxy_outbounds]
+
+- name: Init resolved outbounds accumulator
+  ansible.builtin.set_fact:
+    xui_outbounds_resolved: []
+
+- name: Resolve each outbound from main artifacts
+  ansible.builtin.include_tasks: xray_proxy_outbound_resolve_item.yml
+  loop: "{{ xui_outbounds_effective }}"
+  loop_control:
+    loop_var: xui_outbound_item
+    label: "{{ xui_outbound_item.tag }}"
+  when: xui_outbound_item.enabled | default(true) | bool
+
+- name: Collect managed outbound tags
+  ansible.builtin.set_fact:
+    xui_outbound_managed_tags: "{{ xui_outbounds_resolved | map(attribute='tag') | list }}"
+
+- name: Collect outbound tags to replace in live config (managed + stale)
+  ansible.builtin.set_fact:
+    xui_outbound_tags_to_replace: >-
+      {{
+        (xui_outbound_managed_tags + (xui_routing_stale_outbound_tags | default([])))
+        | unique
+        | list
+      }}
+
+- name: Prepare Xray template API (version-aware paths and auth)
+  ansible.builtin.import_tasks: xray_panel_template_prepare.yml
+
+- name: Fetch current Xray template config
+  ansible.builtin.import_tasks: xray_panel_template_fetch.yml
+
+- name: Init Xray outbound objects list
+  ansible.builtin.set_fact:
+    xui_outbound_xray_objects: []
+
+- name: Build Xray outbound objects from resolved records
+  ansible.builtin.include_tasks: xray_proxy_outbound_build_xray.yml
+  loop: "{{ xui_outbounds_resolved }}"
+  loop_control:
+    loop_var: xui_outbound_resolved_item
+    label: "{{ xui_outbound_resolved_item.tag }}"
+
+- name: Remove managed outbound tags from config
+  ansible.builtin.set_fact:
+    xui_xray_config: >-
+      {{
+        xui_xray_config | combine({
+          'outbounds': (
+            xui_xray_config.outbounds | default([])
+            | rejectattr('tag', 'in', xui_outbound_tags_to_replace)
+            | list
+          ) + xui_outbound_xray_objects
+        })
+      }}
+
+- name: Init outbound routing rules list
+  ansible.builtin.set_fact:
+    xui_outbound_routing_rules: []
+
+- name: Build proxy routing rules (per-inbound or legacy single)
+  ansible.builtin.import_tasks: xray_proxy_routing_rules_build.yml
+
+- name: Filter existing routing rules before merge
+  ansible.builtin.import_tasks: xray_routing_rules_filter.yml
+  when: xui_outbound_routing_rules | length > 0
+
+- name: Merge routing rules into Xray config
+  ansible.builtin.set_fact:
+    xui_xray_config: >-
+      {{
+        xui_xray_config | combine({
+          'routing': {
+            'domainStrategy': xui_xray_config.routing.domainStrategy | default('AsIs'),
+            'rules': (xui_routing_rules_filtered | default([])) + xui_outbound_routing_rules
+          }
+        })
+      }}
+  when: xui_outbound_routing_rules | length > 0
+
+- name: Save merged Xray config to temp file
+  ansible.builtin.copy:
+    content: "{{ xui_xray_config | to_nice_json }}"
+    dest: "/tmp/xui-xray-config-{{ inventory_hostname }}.json"
+    mode: "0600"
+
+- name: Apply Xray template config (outbounds + routing)
+  ansible.builtin.import_tasks: xray_panel_template_apply.yml
+
+- name: Verify outbounds persisted in panel after apply
+  ansible.builtin.import_tasks: xray_panel_template_fetch.yml
+
+- name: Assert all managed proxy outbounds exist in live Xray config
+  ansible.builtin.assert:
+    that:
+      - item in (xui_xray_config.outbounds | default([]) | map(attribute='tag') | list)
+    fail_msg: >-
+      Outbound «{{ item }}» отсутствует в Xray template после apply.
+      Проверить panel/api/xray/update и перезапуск Xray.
+  loop: "{{ xui_outbound_managed_tags }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Restart Xray on proxy after routing
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/server/restartXrayService"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_post_headers }}"
+    status_code: 200
+  changed_when: true
+
+- name: Save proxy outbounds artifact (all targets)
+  ansible.builtin.copy:
+    content: "{{ xui_outbounds_resolved | to_nice_json }}"
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/proxy-outbounds.json"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+
+- name: Save legacy proxy-to-main artifact (primary routed outbound)
+  ansible.builtin.set_fact:
+    xui_proxy_primary_outbound: >-
+      {{
+        (
+          xui_outbounds_resolved
+          | selectattr('tag', 'equalto', xui_routing_outbound_tag)
+          | list
+          | first
+          | default(xui_outbounds_resolved | first, true)
+        )
+      }}
+
+- name: Write proxy-to-main.json for backward compatibility
+  ansible.builtin.copy:
+    content: |
+      {
+        "main_artifacts_host": "{{ xui_proxy_primary_outbound.main_artifacts_host }}",
+        "main_ip": "{{ xui_proxy_primary_outbound.address }}",
+        "main_port": {{ xui_proxy_primary_outbound.port | int }},
+        "outbound_tag": "{{ xui_proxy_primary_outbound.tag }}",
+        "inbound_tag": "{{ xui_proxy_primary_outbound.routing_inbound_tag }}",
+        "inbound_tags": {{ xui_proxy_routing_inbound_tags | unique | to_json }},
+        "client_uuid": "{{ xui_proxy_primary_outbound.client_uuid }}",
+        "public_key": "{{ xui_proxy_primary_outbound.public_key }}",
+        "short_id": "{{ xui_proxy_primary_outbound.short_id }}",
+        "sni": "{{ xui_proxy_primary_outbound.sni }}"
+      }
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/proxy-to-main.json"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+
+- name: Save active proxy routing choice artifact
+  ansible.builtin.copy:
+    content: |
+      {
+        "mode": "{{ 'per_inbound' if (xui_routing_per_inbound | default(false) | bool) else 'single' }}",
+        "inbound_tag": "{{ xui_routing_inbound_tag }}",
+        "inbound_tags": {{ xui_proxy_routing_inbound_tags | unique | to_json }},
+        "outbound_tag": "{{ xui_routing_outbound_tag }}",
+        "routing_rules": {{ xui_outbound_routing_rules | to_json }},
+        "updated_at": "{{ ansible_date_time.iso8601 }}"
+      }
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/proxy-routing-active.json"
+    mode: "0600"
+  delegate_to: localhost
+  become: false

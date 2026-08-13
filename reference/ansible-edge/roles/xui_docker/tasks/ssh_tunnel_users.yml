@@ -1,0 +1,101 @@
+---
+- name: Ensure SSH tunnel artifacts directories exist (control node)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0700"
+  loop:
+    - "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/ssh-tunnel/keys"
+    - "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/ssh-tunnel/users"
+  delegate_to: localhost
+  become: false
+  tags: [ssh_tunnel, ssh_tunnel_users]
+
+- name: Generate tunnel SSH key pairs for users
+  ansible.builtin.include_tasks: ssh_tunnel_generate_key.yml
+  vars:
+    xui_tunnel_key_private_path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/ssh-tunnel/keys/{{ tunnel_user }}"
+    xui_tunnel_key_public_path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/ssh-tunnel/keys/{{ tunnel_user }}.pub"
+  loop: "{{ xui_ssh_tunnel_users }}"
+  loop_control:
+    loop_var: tunnel_user
+  tags: [ssh_tunnel, ssh_tunnel_users]
+
+- name: Ensure tunnel-users group exists
+  ansible.builtin.group:
+    name: "{{ xui_ssh_tunnel_group }}"
+    state: present
+  tags: [ssh_tunnel, ssh_tunnel_users]
+
+- name: Ensure tunnel-only SSH users exist (no login shell, no sudo)
+  ansible.builtin.user:
+    name: "{{ tunnel_user }}"
+    group: "{{ xui_ssh_tunnel_group }}"
+    shell: /usr/sbin/nologin
+    create_home: true
+  loop: "{{ xui_ssh_tunnel_users }}"
+  loop_control:
+    loop_var: tunnel_user
+  tags: [ssh_tunnel, ssh_tunnel_users]
+
+- name: Deploy sshd Match block for tunnel users
+  ansible.builtin.template:
+    src: ssh-tunnel-sshd-match.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-xui-ssh-tunnel-users.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload sshd
+  tags: [ssh_tunnel, ssh_tunnel_users]
+
+- name: Verify sshd configuration is valid
+  ansible.builtin.command: sshd -t
+  changed_when: false
+  tags: [ssh_tunnel, ssh_tunnel_users]
+
+- name: Set restricted authorized_key for tunnel user
+  ansible.builtin.authorized_key:
+    user: "{{ tunnel_user }}"
+    state: present
+    exclusive: true
+    key: "{{ lookup('file', xui_tunnel_key_public_path) }}"
+  vars:
+    xui_tunnel_key_public_path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/ssh-tunnel/keys/{{ tunnel_user }}.pub"
+    key_options: 'command="sleep infinity",permitopen="127.0.0.1:{{ xui_ssh_tunnel_listen_port }}",no-pty,no-agent-forwarding,no-X11-forwarding,no-user-rc'
+  loop: "{{ xui_ssh_tunnel_users }}"
+  loop_control:
+    loop_var: tunnel_user
+  tags: [ssh_tunnel, ssh_tunnel_users]
+
+- name: Ensure per-user SSH tunnel artifacts directory
+  ansible.builtin.file:
+    path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/ssh-tunnel/users/{{ tunnel_user }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  loop: "{{ xui_ssh_tunnel_users }}"
+  loop_control:
+    loop_var: tunnel_user
+  tags: [ssh_tunnel, ssh_tunnel_users]
+
+- name: Save per-user connection instructions artifact
+  ansible.builtin.template:
+    src: ssh-tunnel-connection.txt.j2
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/ssh-tunnel/users/{{ tunnel_user }}/connection.txt"
+    mode: "0640"
+  delegate_to: localhost
+  become: false
+  loop: "{{ xui_ssh_tunnel_users }}"
+  loop_control:
+    loop_var: tunnel_user
+  tags: [ssh_tunnel, ssh_tunnel_users]
+
+- name: Refresh SSH tunnel summary artifact (with users)
+  ansible.builtin.template:
+    src: ssh-tunnel-info.json.j2
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/ssh-tunnel-info.json"
+    mode: "0640"
+  delegate_to: localhost
+  become: false
+  tags: [ssh_tunnel, ssh_tunnel_users]

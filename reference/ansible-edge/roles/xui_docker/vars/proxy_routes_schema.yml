@@ -1,0 +1,21 @@
+---
+# xui_proxy_routes[] — цели main для outbound на Jump (один inbound vless-proxy-ru :443)
+#
+# route_suffix: nl | by | …
+#   → outbound tag: outbound-vless-<suffix>
+#   → main inbound: vless-main-<suffix>, chain UUID: client-main-<main_artifacts_host>
+#
+# Активный маршрут (legacy single mode): xui_routing_outbound_tag
+# Per-inbound mode: xui_routing_per_inbound + xui_proxy_routing_rules[]
+# Переключение legacy без пересоздания inbound:
+#   --tags routing -e xui_routing_outbound_tag=outbound-vless-by
+#
+# Обязательно в элементе:
+#   route_suffix, main_artifacts_host (после xui_main на main)
+#
+# Клиенты Jump: <user>-proxy-ru (xui_route_suffix: ru, xui_client_users в xui_proxy.yml)
+#
+# Артефакты:
+#   artifacts/xui/<proxy>/clients/<email>.txt
+#   artifacts/xui/<proxy>/proxy-outbounds.json
+#   artifacts/xui/<proxy>/proxy-routing-active.json

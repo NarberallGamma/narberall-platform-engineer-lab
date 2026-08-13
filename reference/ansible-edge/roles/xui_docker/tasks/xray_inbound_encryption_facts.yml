@@ -1,0 +1,14 @@
+---
+- name: Use none VLESS client encryption (без ML-KEM в Clients)
+  ansible.builtin.set_fact:
+    xui_inbound_decryption_effective: "none"
+    xui_inbound_encryption_effective: "none"
+  when: not xui_inbound_ml_kem_enabled | bool
+
+- name: Keep ML-KEM encryption from panel when enabled (sync)
+  ansible.builtin.set_fact:
+    xui_inbound_decryption_effective: "{{ xui_existing_settings.decryption | default('none') }}"
+    xui_inbound_encryption_effective: "{{ xui_existing_settings.encryption | default('none') }}"
+  when:
+    - xui_inbound_ml_kem_enabled | bool
+    - xui_existing_settings is defined

@@ -1,0 +1,13 @@
+---
+- name: Restart vnstat
+  ansible.builtin.service:
+    name: vnstat
+    state: restarted
+  when: ansible_os_family == 'Debian'
+
+- name: Restart sysstat collect timer
+  ansible.builtin.systemd:
+    name: sysstat-collect.timer
+    state: restarted
+    daemon_reload: true
+  when: ansible_os_family == 'Debian'

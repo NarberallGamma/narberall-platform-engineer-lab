@@ -1,0 +1,12 @@
+---
+- name: Resolve proxy outbound facts for profile template
+  ansible.builtin.import_tasks: profile_proxy_resolve_outbound.yml
+  when: xui_profile == 'proxy'
+
+- name: Render Xray profile YAML for {{ xui_profile }}
+  ansible.builtin.template:
+    src: "xui/{{ xui_profile }}/xray-profile.yaml.j2"
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/xray-profile-{{ xui_profile }}.yaml"
+    mode: "0600"
+  delegate_to: localhost
+  become: false

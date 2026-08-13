@@ -1,0 +1,44 @@
+---
+# Миграция: один inbound на xui_inbound_port с другим remark → sync (ключи Reality сохраняются).
+
+- name: Init inbounds on desired port list
+  ansible.builtin.set_fact:
+    xui_inbounds_on_port: []
+
+- name: Collect inbounds listening on target port
+  ansible.builtin.set_fact:
+    xui_inbounds_on_port: "{{ xui_inbounds_on_port + [item] }}"
+  loop: "{{ xui_inbounds_list['json']['obj'] | default([]) }}"
+  loop_control:
+    label: "{{ item.remark | default('inbound') }}:{{ item.port | default('?') }}"
+  when: (item.port | default(0) | int) == (xui_inbound_port | int)
+
+- name: Fail when multiple inbounds share the same port
+  ansible.builtin.assert:
+    that:
+      - xui_inbounds_on_port | length <= 1
+    fail_msg: >-
+      На порту {{ xui_inbound_port }} несколько inbound ({{ xui_inbounds_on_port | map(attribute='remark') | list }}).
+      Удалить лишние вручную в панели или задать xui_proxy_legacy_inbound_remarks_remove.
+
+- name: Select inbound occupant on target port
+  ansible.builtin.set_fact:
+    xui_inbound_port_occupant: "{{ xui_inbounds_on_port | first | default({}, true) }}"
+  when: xui_inbounds_on_port | length == 1
+
+- name: Adopt port occupant for rename via sync (preserve Reality keys)
+  ansible.builtin.set_fact:
+    xui_inbound_record: "{{ xui_inbound_port_occupant }}"
+    xui_inbound_exists: true
+  when:
+    - xui_inbounds_on_port | length == 1
+    - xui_inbound_port_occupant.remark | default('') != xui_inbound_remark
+
+- name: Note inbound port migration via sync
+  ansible.builtin.debug:
+    msg: >-
+      Inbound «{{ xui_inbound_port_occupant.remark }}» на порту {{ xui_inbound_port }}
+      → «{{ xui_inbound_remark }}» (sync, без пересоздания).
+  when:
+    - xui_inbound_port_occupant is defined
+    - xui_inbound_port_occupant.remark | default('') != xui_inbound_remark

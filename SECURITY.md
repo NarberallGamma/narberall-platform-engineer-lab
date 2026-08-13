@@ -10,7 +10,7 @@ Forbidden in this repo:
 
 - Production `.tfvars`, kubeconfigs, private keys, tokens
 - Client hostnames, internal URLs, ticket keys
-- Home LAN IPs, VPN configs with credentials
+- Personal LAN IPs, VPN configs with credentials
 
 Allowed:
 

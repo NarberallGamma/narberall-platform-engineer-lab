@@ -39,6 +39,6 @@ Terraform, S3-compatible remote state, cloud.ru-class provider, import workflow,
 
 ## Links
 
-- Import example (fake IDs): [`terraform/examples/brownfield-import/`](../terraform/examples/brownfield-import/)
-- Multi-env root pattern: [`terraform/stacks/multi-env-root/`](../terraform/stacks/multi-env-root/)
+- Import example (fake IDs): [`iac/terraform/examples/brownfield-import/`](../iac/terraform/examples/brownfield-import/)
+- Multi-env root pattern: [`iac/terraform/cloud-ru-huawei/stacks/multi-env-root/`](../iac/terraform/cloud-ru-huawei/stacks/multi-env-root/)
 - Related greenfield story: [`02-cloud-platform-turnkey.md`](02-cloud-platform-turnkey.md)

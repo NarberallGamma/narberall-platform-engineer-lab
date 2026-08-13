@@ -1,0 +1,56 @@
+---
+xui_profile: main
+
+xui_docker_network_mode: host
+xui_docker_image_version: "v3.4.1"
+
+xui_panel_port: 28471
+xui_panel_web_base_path: panel
+xui_panel_username: platform
+xui_acme_email: acme@example.com
+
+xui_route_suffix: eu-1
+
+xui_main_legacy_inbound_remarks_remove: []
+
+xui_client_users:
+  - user-a
+  - user-b
+  - user-c
+
+# Placeholders only. Real dest/SNI stay in private group_vars, not in git.
+xui_inbound_reality_dest: "www.example.com:443"
+xui_inbound_reality_sni: "www.example.com"
+xui_inbound_reality_server_names:
+  - "www.example.com"
+
+xui_inbound_reality_fingerprint: firefox
+xui_inbound_reality_max_timediff: 60000
+xui_inbound_ml_kem_enabled: false
+xui_inbound_mldsa65_enabled: false
+xui_reality_short_ids_count: 8
+xui_inbound_flow: ""
+xui_outbound_enabled: false
+xui_routing_enabled: false
+
+xui_autoconfigure_xray: true
+
+xui_extra_inbounds:
+  - protocol: trojan
+    remark: "trojan-main-{{ xui_route_suffix }}"
+    tag: "inbound-trojan-main-{{ xui_route_suffix }}"
+    port: 8443
+    security: tls
+    tls_server_name: "{{ xui_ssl_ipv4_effective }}"
+    users: "{{ xui_client_users }}"
+
+  - protocol: shadowsocks
+    remark: "shadowsocks-main-{{ xui_route_suffix }}"
+    tag: "inbound-shadowsocks-main-{{ xui_route_suffix }}"
+    port: 8388
+    method: "2022-blake3-aes-256-gcm"
+    ss_network: tcp,udp
+
+xui_scheduled_restart_mode: container
+xui_scheduled_restart_times:
+  - "05:00:00"

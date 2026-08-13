@@ -1,0 +1,5 @@
+# Copy to ssh-tunnel.conf locally. Do not commit filled values.
+HOST=jump.example.com
+USER=tunnel
+KEY_PATH=/config/key
+KEY_HOST_PATH=/path/to/private_key

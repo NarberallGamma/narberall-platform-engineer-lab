@@ -1,0 +1,173 @@
+---
+- name: Assert Docker is available
+  ansible.builtin.command: docker info
+  register: xui_docker_info
+  changed_when: false
+  failed_when: xui_docker_info.rc != 0
+  tags: [preflight]
+
+- name: Set SSL IPv4 from inventory when empty
+  ansible.builtin.set_fact:
+    xui_ssl_ipv4_effective: "{{ xui_ssl_ipv4 | default('') | trim }}"
+  tags: [preflight]
+
+- name: Default SSL IPv4 to ansible_host
+  ansible.builtin.set_fact:
+    xui_ssl_ipv4_effective: "{{ ansible_host }}"
+  when: xui_ssl_ipv4_effective | length == 0
+  tags: [preflight]
+
+- name: Build firewall TCP port list when not set
+  ansible.builtin.set_fact:
+    xui_firewall_tcp_ports_effective: "{{ xui_firewall_tcp_ports }}"
+  when: xui_firewall_tcp_ports | length > 0
+  tags: [preflight]
+
+- name: Default firewall TCP ports from role ports
+  ansible.builtin.set_fact:
+    xui_firewall_tcp_ports_effective: >-
+      {{
+        [
+          xui_ssh_port | int,
+          xui_acme_http_port | int,
+          xui_vless_port | int,
+          xui_panel_port | int
+        ] | unique | sort
+      }}
+  when: xui_firewall_tcp_ports | length == 0
+  tags: [preflight]
+
+- name: Add extra inbound TCP ports to firewall list
+  ansible.builtin.set_fact:
+    xui_firewall_tcp_ports_effective: >-
+      {{ (xui_firewall_tcp_ports_effective + [item.port | int]) | unique | sort }}
+  loop: "{{ xui_extra_inbounds | default([]) }}"
+  loop_control:
+    label: "{{ item.port | default('?') }}"
+  when:
+    - xui_extra_inbounds | default([]) | length > 0
+    - item.enabled | default(true) | bool
+  tags: [preflight]
+
+- name: Build firewall UDP port list when not set
+  ansible.builtin.set_fact:
+    xui_firewall_udp_ports_effective: "{{ xui_firewall_udp_ports }}"
+  when: xui_firewall_udp_ports | length > 0
+  tags: [preflight]
+
+- name: Default firewall UDP ports from role ports
+  ansible.builtin.set_fact:
+    xui_firewall_udp_ports_effective: []
+  when: xui_firewall_udp_ports | length == 0
+  tags: [preflight]
+
+- name: Add UDP extra inbound ports to firewall list
+  ansible.builtin.set_fact:
+    xui_firewall_udp_ports_effective: >-
+      {{ (xui_firewall_udp_ports_effective + [item.port | int]) | unique | sort }}
+  loop: "{{ xui_extra_inbounds | default([]) }}"
+  loop_control:
+    label: "{{ item.port | default('?') }}"
+  when:
+    - xui_extra_inbounds | default([]) | length > 0
+    - item.enabled | default(true) | bool
+    - "'udp' in ((item.ss_network | default(item.network | default(''))) | string).split(',')"
+  tags: [preflight]
+
+- name: Build Docker publish ports list
+  ansible.builtin.set_fact:
+    xui_docker_publish_ports_effective:
+      - "{{ xui_panel_port }}:{{ xui_panel_port }}"
+      - "{{ xui_vless_port }}:{{ xui_vless_port }}"
+  when: xui_docker_network_mode | default('') | length == 0
+  tags: [preflight]
+
+- name: Add extra inbound ports to Docker publish list
+  ansible.builtin.set_fact:
+    xui_docker_publish_ports_effective: >-
+      {{ (xui_docker_publish_ports_effective + [((item.port | string) ~ ':' ~ (item.port | string))]) | unique }}
+  loop: "{{ xui_extra_inbounds | default([]) }}"
+  loop_control:
+    label: "{{ item.port | default('?') }}"
+  when:
+    - xui_docker_network_mode | default('') | length == 0
+    - xui_extra_inbounds | default([]) | length > 0
+    - item.enabled | default(true) | bool
+  tags: [preflight]
+
+- name: Add UDP extra inbound ports to Docker publish list
+  ansible.builtin.set_fact:
+    xui_docker_publish_ports_effective: >-
+      {{ (xui_docker_publish_ports_effective + [((item.port | string) ~ ':' ~ (item.port | string) ~ '/udp')]) | unique }}
+  loop: "{{ xui_extra_inbounds | default([]) }}"
+  loop_control:
+    label: "{{ item.port | default('?') }}"
+  when:
+    - xui_docker_network_mode | default('') | length == 0
+    - xui_extra_inbounds | default([]) | length > 0
+    - item.enabled | default(true) | bool
+    - "'udp' in ((item.ss_network | default(item.network | default(''))) | string).split(',')"
+  tags: [preflight]
+
+- name: Resolve main artifacts host for proxy (папка inbound-summary.json)
+  ansible.builtin.set_fact:
+    xui_main_artifacts_host_effective: >-
+      {{
+        xui_main_artifacts_host
+        if (xui_main_artifacts_host | default('') | length > 0)
+        else xui_main_inventory_hostname
+      }}
+  when: xui_profile == 'proxy'
+  tags: [preflight]
+
+- name: Resolve main server IP from inventory when not set in group_vars
+  ansible.builtin.set_fact:
+    xui_main_server_ip: "{{ hostvars[xui_main_inventory_hostname]['ansible_host'] }}"
+  when:
+    - xui_profile == 'proxy'
+    - xui_main_server_ip | default('') | length == 0
+    - xui_main_inventory_hostname | length > 0
+    - xui_main_inventory_hostname in hostvars
+  tags: [preflight]
+
+- name: Validate main connect settings for proxy (legacy single outbound)
+  ansible.builtin.assert:
+    that:
+      - xui_main_artifacts_host_effective | default('') | length > 0
+      - xui_main_server_ip | default('') | length > 0
+    fail_msg: >-
+      Proxy: задать xui_main_artifacts_host (папка артефактов main) и xui_main_server_ip (IP NL),
+      либо xui_main_inventory_hostname в inventory для ansible_host.
+  when:
+    - xui_profile == 'proxy'
+    - xui_outbound_enabled | default(false) | bool
+    - xui_outbounds | default([]) | length == 0
+  tags: [preflight]
+
+- name: Init SSH tunnel target host from variable
+  ansible.builtin.set_fact:
+    xui_ssh_tunnel_target_host_effective: "{{ xui_ssh_tunnel_target_host | default('') | trim }}"
+  when: xui_ssh_tunnel_enabled | bool
+  tags: [preflight, ssh_tunnel]
+
+- name: Default SSH tunnel target to main server IP
+  ansible.builtin.set_fact:
+    xui_ssh_tunnel_target_host_effective: "{{ xui_main_server_ip }}"
+  when:
+    - xui_ssh_tunnel_enabled | bool
+    - xui_ssh_tunnel_target_host_effective | default('') | length == 0
+    - xui_main_server_ip | default('') | length > 0
+  tags: [preflight, ssh_tunnel]
+
+- name: Validate SSH tunnel is configured for proxy profile
+  ansible.builtin.assert:
+    that:
+      - xui_profile == 'proxy'
+      - xui_ssh_tunnel_target_host_effective | default('') | length > 0
+      - xui_ssh_tunnel_listen_port | int > 0
+      - xui_ssh_tunnel_target_port | int > 0
+    fail_msg: >-
+      SSH tunnel: включите только на proxy (xui_profile=proxy), задайте
+      xui_main_inventory_hostname или xui_ssh_tunnel_target_host.
+  when: xui_ssh_tunnel_enabled | bool
+  tags: [preflight, ssh_tunnel]

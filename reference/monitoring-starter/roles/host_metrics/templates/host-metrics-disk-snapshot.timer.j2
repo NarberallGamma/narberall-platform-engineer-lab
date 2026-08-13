@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic disk usage snapshot for host metrics
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec={{ host_metrics_disk_snapshot_interval_hours }}h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

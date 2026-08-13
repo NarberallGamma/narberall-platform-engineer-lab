@@ -1,0 +1,74 @@
+---
+# Сбор routing rules для proxy: per-inbound (протокол → outbound) или legacy (все inbound → один outbound).
+
+- name: Init proxy routing inbound tags
+  ansible.builtin.set_fact:
+    xui_proxy_routing_inbound_tags: ["{{ xui_routing_inbound_tag }}"]
+
+- name: Add extra proxy inbound tags to routing
+  ansible.builtin.set_fact:
+    xui_proxy_routing_inbound_tags: >-
+      {{
+        xui_proxy_routing_inbound_tags + [
+          item.tag
+          | default(
+            'inbound-'
+            ~ (item.protocol | lower)
+            ~ '-'
+            ~ xui_profile
+            ~ (
+              '-' ~ xui_route_suffix
+              if (xui_route_suffix | default('') | length > 0)
+              else ''
+            ),
+            true
+          )
+        ]
+      }}
+  loop: "{{ xui_extra_inbounds | default([]) }}"
+  loop_control:
+    label: "{{ item.remark | default(item.protocol) }}"
+  when:
+    - item.enabled | default(true) | bool
+    - item.route_to_proxy_outbound | default(xui_extra_inbound_route_to_proxy_outbound) | bool
+
+- name: Set managed routing inbound tags
+  ansible.builtin.set_fact:
+    xui_routing_managed_inbound_tags: "{{ xui_proxy_routing_inbound_tags | unique }}"
+
+- name: Init outbound routing rules list
+  ansible.builtin.set_fact:
+    xui_outbound_routing_rules: []
+
+- name: Build per-inbound routing rules from config
+  ansible.builtin.set_fact:
+    xui_outbound_routing_rules: >-
+      {{
+        xui_outbound_routing_rules + [{
+          'type': 'field',
+          'inboundTag': [item.inbound_tag],
+          'outboundTag': item.outbound_tag
+        }]
+      }}
+  loop: "{{ xui_proxy_routing_rules | default([]) }}"
+  loop_control:
+    label: "{{ item.inbound_tag }} → {{ item.outbound_tag }}"
+  when: xui_routing_per_inbound | default(false) | bool
+
+- name: Assert per-inbound routing rules configured
+  ansible.builtin.assert:
+    that:
+      - xui_proxy_routing_rules | default([]) | length > 0
+      - xui_outbound_routing_rules | length > 0
+    fail_msg: >-
+      xui_routing_per_inbound: true — задать xui_proxy_routing_rules[]
+      (inbound_tag → outbound_tag для каждого протокола на Jump).
+  when: xui_routing_per_inbound | default(false) | bool
+
+- name: Build legacy single routing rule for all proxy inbounds
+  ansible.builtin.set_fact:
+    xui_outbound_routing_rules:
+      - type: field
+        inboundTag: "{{ xui_proxy_routing_inbound_tags | unique }}"
+        outboundTag: "{{ xui_routing_outbound_tag }}"
+  when: not (xui_routing_per_inbound | default(false) | bool)

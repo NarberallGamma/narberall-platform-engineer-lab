@@ -1,0 +1,4 @@
+# Copy to hosts.ini locally.
+
+[host_metrics]
+vps-1.example.com

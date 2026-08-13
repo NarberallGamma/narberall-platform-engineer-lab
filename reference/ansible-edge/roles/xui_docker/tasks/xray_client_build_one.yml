@@ -1,0 +1,92 @@
+---
+- name: Reset ephemeral UUID for this client build
+  ansible.builtin.set_fact:
+    xui_one_client_uuid: ""
+
+- name: Set client email from explicit build var (system client)
+  ansible.builtin.set_fact:
+    xui_one_client_email: "{{ xui_build_client_email }}"
+  when: xui_build_client_email | default('') | length > 0
+
+- name: Compute client email for user
+  ansible.builtin.set_fact:
+    xui_one_client_email: "{{ xui_client_user }}-{{ xui_client_name_suffix }}"
+  when: xui_client_user is defined
+
+- name: Resolve client UUID from registry
+  ansible.builtin.set_fact:
+    xui_one_client_uuid: "{{ xui_clients_registry[xui_one_client_email].uuid }}"
+  when:
+    - xui_one_client_email in (xui_clients_registry | default({}))
+    - xui_clients_registry[xui_one_client_email].uuid | default('') | length > 0
+
+- name: Discard UUID already assigned to another inbound client
+  ansible.builtin.set_fact:
+    xui_one_client_uuid: ""
+  when:
+    - xui_one_client_uuid | default('') | length > 0
+    - xui_inbound_clients_effective | default([]) | length > 0
+    - xui_one_client_uuid in (xui_inbound_clients_effective | map(attribute='id') | list)
+
+- name: Resolve client UUID from existing panel inbound
+  ansible.builtin.set_fact:
+    xui_one_client_uuid: >-
+      {{
+        (xui_existing_settings.clients | default([])
+         | selectattr('email', 'equalto', xui_one_client_email)
+         | map(attribute='id')
+         | list
+         | first)
+      }}
+  when:
+    - xui_one_client_uuid | default('') | length == 0
+    - (xui_existing_settings.clients | default([])
+       | selectattr('email', 'equalto', xui_one_client_email)
+       | list
+       | length) > 0
+
+- name: Discard panel UUID already assigned to another inbound client
+  ansible.builtin.set_fact:
+    xui_one_client_uuid: ""
+  when:
+    - xui_one_client_uuid | default('') | length > 0
+    - xui_inbound_clients_effective | default([]) | length > 0
+    - xui_one_client_uuid in (xui_inbound_clients_effective | map(attribute='id') | list)
+
+- name: Generate new client UUID
+  ansible.builtin.command: cat /proc/sys/kernel/random/uuid
+  register: xui_one_client_uuid_cmd
+  changed_when: false
+  when: xui_one_client_uuid | default('') | length == 0
+
+- name: Store generated client UUID
+  ansible.builtin.set_fact:
+    xui_one_client_uuid: "{{ xui_one_client_uuid_cmd.stdout | trim | lower }}"
+  when: xui_one_client_uuid | default('') | length == 0
+
+- name: Append client to inbound list
+  ansible.builtin.set_fact:
+    xui_inbound_clients_effective: >-
+      {{
+        xui_inbound_clients_effective + [{
+          'id': xui_one_client_uuid,
+          'email': xui_one_client_email,
+          'flow': xui_inbound_flow,
+          'limitIp': 0,
+          'totalGB': 0,
+          'expiryTime': 0,
+          'enable': true,
+          'tgId': 0,
+          'subId': '',
+          'reset': 0
+        }]
+      }}
+    xui_clients_registry: >-
+      {{
+        xui_clients_registry | default({}) | combine({
+          xui_one_client_email: {
+            'uuid': xui_one_client_uuid,
+            'inbound_remark': xui_inbound_remark
+          }
+        }, recursive=True)
+      }}

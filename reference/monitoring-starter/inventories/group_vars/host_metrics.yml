@@ -1,0 +1,34 @@
+---
+# Parameters for playbooks/host_metrics.yml
+# Inventory group [host_metrics]
+
+host_metrics_enabled: true
+
+# --- sysstat (sar): CPU, load, RAM, swap, disk I/O ---
+host_metrics_sysstat_enabled: true
+host_metrics_sysstat_history_days: 14
+host_metrics_sysstat_interval_minutes: 10
+# Ubuntu/Debian: /var/log/sysstat/saDD; RHEL/legacy: /var/log/sa/saDD
+host_metrics_sysstat_sa_dirs:
+  - /var/log/sysstat
+  - /var/log/sa
+
+# --- vnstat: rx/tx by hour and day ---
+host_metrics_vnstat_enabled: true
+# Empty — ansible_default_ipv4.interface
+host_metrics_vnstat_interface: ""
+
+# --- Disk occupancy snapshots (CSV) ---
+host_metrics_disk_snapshot_enabled: true
+host_metrics_disk_snapshot_interval_hours: 6
+host_metrics_disk_snapshot_retention_days: 14
+
+# --- Paths on the host ---
+host_metrics_report_script_path: /usr/local/bin/host-metrics-report.sh
+host_metrics_log_dir: /var/log/host-metrics
+host_metrics_disk_csv: "{{ host_metrics_log_dir }}/disk-usage.csv"
+
+# --- Packages (Debian/Ubuntu) ---
+host_metrics_packages:
+  - sysstat
+  - vnstat

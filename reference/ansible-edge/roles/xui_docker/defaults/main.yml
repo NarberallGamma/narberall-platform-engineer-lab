@@ -1,0 +1,274 @@
+---
+# Профиль: main | proxy (переопределяется в group_vars)
+xui_profile: main
+
+# Каталоги на хосте
+xui_app_base_dir: "/docker/apps/3x-ui"
+xui_db_dir: "{{ xui_app_base_dir }}/db"
+xui_cert_dir: "{{ xui_app_base_dir }}/cert"
+xui_cert_ip_dir: "{{ xui_cert_dir }}/ip"
+xui_compose_project_dir: "{{ xui_app_base_dir }}"
+
+# Docker
+xui_container_name: "3xui_app"
+xui_compose_service_name: "3xui"
+xui_docker_image_repo: "ghcr.io/mhsanaei/3x-ui"
+xui_docker_image_version: "v3.4.1"
+xui_docker_image: "{{ xui_docker_image_repo }}:{{ xui_docker_image_version }}"
+xui_docker_build: false
+xui_docker_build_context: ""
+xui_docker_pull: true
+xui_docker_compose_version: "3.8"
+xui_restart_policy: "unless-stopped"
+# Пусто — bridge и ports: в compose; host — только на main (group_vars)
+xui_docker_network_mode: ""
+xui_docker_compose_recreate: auto
+xui_enable_fail2ban: true
+xui_timezone: "{{ timezone | default('UTC') }}"
+
+# Порты
+xui_ssh_port: 22
+xui_acme_http_port: 80
+xui_vless_port: 443
+xui_panel_port: 28471
+
+# UFW
+xui_configure_ufw: true
+xui_ufw_default_incoming: deny
+xui_ufw_default_outgoing: allow
+xui_firewall_tcp_ports: []
+xui_firewall_udp_ports: []
+
+# SSL Let's Encrypt (IP, shortlived)
+xui_enable_ssl: true
+xui_ssl_force_reissue: false
+xui_ssl_ipv4: ""
+xui_ssl_ipv6: ""
+xui_acme_email: "acme@example.com"
+xui_acme_cert_profile: "shortlived"
+xui_acme_cert_days: 6
+# acme.sh устанавливается от root (become); не ansible_env.HOME удалённого пользователя SSH
+xui_acme_install_dir: "/root/.acme.sh"
+# shortlived LE (~6 дней): перевыпуск через ansible при сроке < 3 суток
+xui_acme_expiry_threshold_seconds: 259200
+# Перед standalone ACME: остановить unit'ы, часто держащие :80 (nginx после prepare_servers)
+xui_acme_stop_services_before_issue:
+  - nginx
+  - apache2
+  - caddy
+
+# Панель
+xui_panel_username: ""
+xui_panel_password: ""
+xui_panel_web_base_path: ""
+xui_panel_listen_ip: ""
+xui_panel_bootstrap_on_existing: false
+# При повторном panel: записать логин/пароль из артефакта/-e в контейнер (docker … setting)
+xui_panel_sync_credentials_from_artifact: true
+xui_panel_password_length: 30
+
+# Таймауты (секунды)
+xui_acme_issue_timeout: 600
+xui_acme_issue_poll: 15
+xui_docker_pull_timeout: 900
+xui_docker_compose_up_timeout: 300
+xui_panel_start_timeout: 120
+xui_panel_start_delay: 5
+xui_panel_start_retries: 24
+
+xui_artifacts_subdir: "xui"
+xui_deploy_profile_template: true
+
+# --- Inbound (общие; vless/README + 3X-UI UI) ---
+xui_inbound_remark: "vless-main"
+xui_inbound_protocol: vless
+xui_inbound_port: "{{ xui_vless_port }}"
+xui_inbound_listen: ""
+xui_inbound_network: tcp
+xui_inbound_security: reality
+xui_inbound_tcp_header_type: none
+xui_inbound_proxy_protocol: false
+xui_inbound_http_camouflage: false
+
+# Flow: пусто для цепочки Jump→NL и при ML-KEM (см. vless README, outbound JSON)
+xui_inbound_flow: ""
+
+xui_inbound_reality_dest: ""
+xui_inbound_reality_sni: ""
+xui_inbound_reality_server_names: []  # пусто → [sni] в шаблоне
+xui_inbound_reality_show: false
+xui_inbound_reality_xver: 0
+xui_inbound_reality_fingerprint: firefox
+xui_inbound_reality_max_timediff: 60000
+xui_inbound_reality_spider_x: "/"
+# xui_inbound_reality_min_client_ver: "25.9.11"
+xui_inbound_reality_min_client_ver: ""
+xui_inbound_reality_max_client_ver: ""
+
+# VLESS Clients: ML-KEM в decryption/encryption (ломает часть мобильных клиентов)
+xui_inbound_ml_kem_enabled: false
+# Reality: mldsa65 Seed/Verify в панели (как Jump на скриншотах; encryption при этом none)
+xui_inbound_mldsa65_enabled: true
+# Устарело: использовать xui_inbound_ml_kem_enabled и xui_inbound_mldsa65_enabled
+xui_inbound_pq_enabled: false
+xui_inbound_pq_auth_label: "ML-KEM-768 (Post-Quantum)"
+xui_inbound_decryption: ""
+xui_inbound_encryption: ""
+
+# Sniffing (маршрутизация по доменам, без metadataOnly/routeOnly)
+xui_sniffing_enabled: true
+xui_sniffing_dest_override:
+  - http
+  - tls
+  - quic
+  - fakedns
+xui_sniffing_metadata_only: false
+xui_sniffing_route_only: false
+
+# Sockopt: TFO, keepalive, BBR
+xui_inbound_sockopt_enabled: true
+xui_inbound_sockopt_mark: 0
+xui_inbound_sockopt_tcp_fast_open: true
+xui_inbound_sockopt_tcp_keep_alive_interval: 30
+xui_inbound_sockopt_tcp_keep_alive_idle: 300
+xui_inbound_sockopt_tcp_max_seg: 1440
+xui_inbound_sockopt_tcp_user_timeout: 10000
+xui_inbound_sockopt_tcp_window_clamp: 600
+xui_inbound_sockopt_tcp_mptcp: false
+xui_inbound_sockopt_penetrate: false
+xui_inbound_sockopt_domain_strategy: UseIP
+xui_inbound_sockopt_tcp_congestion: bbr
+xui_inbound_sockopt_tproxy: "off"
+
+# Автоконфигурация Xray через API панели (inbound / outbound / routing)
+xui_autoconfigure_xray: true
+xui_inbound_tag: "inbound-443"
+xui_main_inventory_hostname: ""
+# Папка artifacts/xui/<host>/ для main (inventory_hostname); IP — для outbound/tunnel на proxy
+xui_main_artifacts_host: ""
+xui_main_server_ip: ""
+xui_client_email: "{{ 'client-' ~ xui_profile ~ '-' ~ inventory_hostname }}"
+# Суффикс маршрута: nl, by, … → remark vless-main-nl, email user-a-main-eu
+xui_route_suffix: ""
+# Технический клиент inbound (chain): client-main-<host> / client-proxy-<host>
+xui_system_client_enabled: true
+xui_system_client_email: "{{ 'client-' ~ xui_profile ~ '-' ~ inventory_hostname }}"
+# UUID на main для outbound Jump→main (пусто → client-main-<main_artifacts_host>)
+xui_chain_client_email: ""
+# Пользователи: <user>-<profile>-<route_suffix> — задавать в group_vars xui_main.yml / xui_proxy.yml
+xui_client_users: []
+xui_export_client_vless_links: true
+xui_clients_registry_filename: clients-registry.json
+xui_clients_links_subdir: clients
+xui_inbounds_artifacts_subdir: inbounds
+# Proxy: цели main для outbound (один inbound на Jump, см. xui_proxy.yml)
+xui_proxy_routes: []
+# Дополнительные inbound'ы рядом с основным VLESS Reality.
+# Поддерживаемые protocol: trojan, shadowsocks.
+xui_extra_inbounds: []
+xui_extra_inbounds_registry_filename: extra-inbounds-registry.json
+xui_extra_inbounds_artifacts_subdir: extra-inbounds
+xui_extra_inbound_default_network: tcp
+xui_extra_inbound_default_listen: ""
+xui_extra_inbound_default_security: none
+xui_extra_inbound_trojan_security: tls
+xui_extra_inbound_tls_server_name_default: "{{ xui_ssl_ipv4_effective | default(xui_ssl_ipv4 | default('')) }}"
+xui_extra_inbound_tls_cert_file: "/root/cert/ip/fullchain.pem"
+xui_extra_inbound_tls_key_file: "/root/cert/ip/privkey.pem"
+xui_extra_inbound_shadowsocks_method: "2022-blake3-aes-256-gcm"
+xui_extra_inbound_shadowsocks_network: "tcp"
+xui_extra_inbound_route_to_proxy_outbound: true
+xui_export_extra_inbound_links: true
+# Удалить inbound с этими remark (миграция, старые multi-port)
+xui_proxy_legacy_inbound_remarks_remove: []
+xui_reality_short_ids_count: 8
+xui_reality_short_id_length: 8
+# При существующем inbound — применить streamSettings/sniffing/encryption из vars (ключи сохраняются)
+xui_inbound_sync_enabled: true
+xui_panel_api_timeout: 60
+xui_panel_validate_certs: false
+
+# --- Outbound (proxy → один или несколько main/NL серверов) ---
+# Список (предпочтительно на proxy): каждый элемент — отдельный VLESS outbound в ядре Xray.
+# Ключи по умолчанию из artifacts/xui/<main_artifacts_host>/inbound-summary.json
+# (сначала xui_main на целевом хосте). Пример — group_vars/xui_proxy.yml.
+xui_outbounds: []
+# Прогон только выбранных outbound: -e 'xui_outbound_tags_filter=["outbound-vless-main"]'
+xui_outbound_tags_filter: []
+
+# Legacy: один outbound (если xui_outbounds пуст — собирается из полей ниже)
+xui_outbound_enabled: false
+xui_outbound_tag: "outbound-main"
+xui_outbound_protocol: vless
+xui_outbound_port: 443
+xui_outbound_security: reality
+xui_outbound_flow: ""
+xui_outbound_encryption: "none"
+xui_outbound_sni: ""
+xui_outbound_public_key: ""
+xui_outbound_short_id: ""
+xui_outbound_fingerprint: firefox
+xui_outbound_spider_x: "/"
+xui_outbound_mldsa65_verify: ""
+
+xui_outbound_sockopt_enabled: true
+xui_outbound_sockopt_tcp_fast_open: true
+xui_outbound_sockopt_tcp_keep_alive_interval: 30
+xui_outbound_sockopt_tcp_mptcp: false
+xui_outbound_sockopt_penetrate: false
+
+# Маршрутизация Jump: inbound tag → outbound tag
+xui_routing_enabled: false
+xui_routing_inbound_tag: ""
+xui_routing_outbound_tag: "{{ xui_outbound_tag }}"
+# true: отдельное правило на каждый inbound (VLESS→vless-fi, Trojan→trojan-fi, …)
+xui_routing_per_inbound: false
+# Список правил при xui_routing_per_inbound: true (см. group_vars/xui_proxy.yml)
+xui_proxy_routing_rules: []
+# Удалить устаревшие routing rules при merge (миграция inbound/outbound тегов)
+xui_routing_stale_inbound_tags:
+  - inbound-vless-proxy
+xui_routing_stale_outbound_tags:
+  - outbound-vless-main
+
+# Optional TLS ping of configured SNI before dest change
+xui_reality_tls_ping_checklist:
+  - "www.example.com"
+
+# --- Запасной канал: SSH → socat (Jump) → main:443 (vless/README, ssh-tunnel-vless) ---
+xui_ssh_tunnel_enabled: false
+xui_ssh_tunnel_manage_users: true
+xui_ssh_tunnel_regenerate_keys: false
+xui_ssh_tunnel_listen_port: 10443
+xui_ssh_tunnel_listen_bind: "127.0.0.1"
+xui_ssh_tunnel_target_host: ""
+xui_ssh_tunnel_target_port: 443
+xui_ssh_tunnel_systemd_unit: "ssh-tunnel-socat"
+xui_ssh_tunnel_packages:
+  - socat
+xui_ssh_tunnel_group: "tunnel-users"
+xui_ssh_tunnel_users: []
+xui_ssh_tunnel_client_local_port: 10809
+xui_ssh_tunnel_key_type: ed25519
+
+# --- Плановый перезапуск 3X-UI в Docker (vless/ssh-tunnel-vless/server/x-ui-daily-restart.*) ---
+xui_scheduled_restart_enabled: true
+# container: только docker restart; xray: SIGUSR1 без рестарта контейнера
+xui_scheduled_restart_mode: container
+xui_scheduled_restart_post_wait_seconds: 10
+xui_scheduled_restart_times:
+  - "05:00:00"
+xui_scheduled_restart_log_file: "/var/log/x-ui-daily-restart.log"
+xui_scheduled_restart_script_path: "/usr/local/bin/x-ui-docker-scheduled-restart.sh"
+xui_scheduled_restart_systemd_service: "x-ui-docker-scheduled-restart"
+xui_scheduled_restart_systemd_timer: "x-ui-docker-scheduled-restart"
+
+# --- Xray logging (тег xray_logging; панель → Xray Configs → Log) ---
+# profile: max | default
+xui_xray_logging_profile: default
+xui_xray_log_level: debug
+xui_xray_log_access: "./access.log"
+xui_xray_log_error: "./error.log"
+xui_xray_log_dns: true
+xui_xray_log_mask_address: ""
+xui_xray_logging_restart_xray: true

@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# Load report: sysstat (CPU/RAM/IO) + vnstat (network) + disk CSV
+# Ansible role: host_metrics
+set -euo pipefail
+
+IFACE="{{ host_metrics_vnstat_iface_effective }}"
+HISTORY_DAYS="{{ host_metrics_sysstat_history_days }}"
+DISK_CSV="{{ host_metrics_disk_csv }}"
+
+usage() {
+  cat <<'EOF'
+Usage: host-metrics-report.sh [today|week|month]
+
+  today   summary for today (default)
+  week    last 7 days
+  month   last 30 days (vnstat / sysstat where data exists)
+
+Sources:
+  CPU/RAM/IO  — sysstat (sar), {{ host_metrics_sysstat_sa_dirs | join(' or ') }}
+  Network     — vnstat -i <iface>
+  Disk %      — {{ host_metrics_disk_csv }}
+EOF
+}
+
+period="${1:-today}"
+
+print_header() {
+  echo "============================================================"
+  echo " HOST: $(hostname -f 2>/dev/null || hostname)  PERIOD: ${period}"
+  echo " DATE: $(date -Iseconds)"
+  echo " IFACE: ${IFACE}"
+  echo "============================================================"
+}
+
+sar_file_for_offset() {
+  local offset="$1"
+  local day dir f
+  day="$(date -d "-${offset} days" +%d 2>/dev/null || date -v-${offset}d +%d)"
+  for dir in {% for d in host_metrics_sysstat_sa_dirs %}"{{ d }}"{% if not loop.last %} {% endif %}{% endfor %}; do
+    f="${dir}/sa${day}"
+    if [ -f "${f}" ]; then
+      echo "${f}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+print_sysstat_day() {
+  local offset="$1"
+  local label="$2"
+  local sa
+  sa="$(sar_file_for_offset "${offset}")" || return 0
+  echo ""
+  echo "--- CPU / load (${label}) ---"
+  sar -q -f "${sa}" 2>/dev/null | tail -n +4 | grep -E 'Average|^[0-9]' | tail -5 || true
+  echo ""
+  echo "--- Memory (${label}) ---"
+  sar -r -f "${sa}" 2>/dev/null | tail -n +4 | grep -E 'Average|^[0-9]' | tail -5 || true
+  echo ""
+  echo "--- Disk I/O (${label}) ---"
+  sar -d -f "${sa}" 2>/dev/null | tail -n +4 | grep -E 'Average|dev' | tail -8 || true
+}
+
+print_sysstat() {
+  case "${period}" in
+    today)
+      print_sysstat_day 0 "today"
+      ;;
+    week)
+      local i
+      for i in $(seq 0 6); do
+        print_sysstat_day "${i}" "$(date -d "-${i} days" +%Y-%m-%d 2>/dev/null || echo "day-${i}")"
+      done
+      ;;
+    month)
+      local i
+      for i in $(seq 0 29); do
+        print_sysstat_day "${i}" "$(date -d "-${i} days" +%Y-%m-%d 2>/dev/null || echo "day-${i}")"
+      done
+      ;;
+  esac
+}
+
+print_vnstat() {
+  echo ""
+  echo "--- Network (vnstat) ---"
+  if ! command -v vnstat >/dev/null 2>&1; then
+    echo "vnstat not installed"
+    return
+  fi
+  case "${period}" in
+    today)
+      vnstat -i "${IFACE}" -h 2>/dev/null || vnstat -i "${IFACE}" 2>/dev/null | head -30
+      ;;
+    week)
+      vnstat -i "${IFACE}" -w 2>/dev/null || true
+      echo ""
+      vnstat -i "${IFACE}" -d 2>/dev/null | tail -10 || true
+      ;;
+    month)
+      vnstat -i "${IFACE}" -m 2>/dev/null || true
+      echo ""
+      vnstat -i "${IFACE}" -d 2>/dev/null | tail -35 || true
+      ;;
+  esac
+}
+
+print_disk_csv() {
+  echo ""
+  echo "--- Disk usage snapshots (${DISK_CSV}) ---"
+  if [ ! -f "${DISK_CSV}" ]; then
+    echo "(no data yet — wait for timer or run disk-snapshot.sh)"
+    return
+  fi
+  case "${period}" in
+    today)
+      head -1 "${DISK_CSV}"
+      grep "^$(date -Idate)" "${DISK_CSV}" 2>/dev/null || tail -5 "${DISK_CSV}"
+      ;;
+    week)
+      head -1 "${DISK_CSV}"
+      awk -v cutoff="$(date -d '-7 days' +%Y-%m-%d 2>/dev/null || date -v-7d +%Y-%m-%d)" '$1 >= cutoff' "${DISK_CSV}" 2>/dev/null || tail -30 "${DISK_CSV}"
+      ;;
+    month)
+      head -1 "${DISK_CSV}"
+      tail -120 "${DISK_CSV}"
+      ;;
+  esac
+}
+
+case "${period}" in
+  today|week|month) ;;
+  -h|--help) usage; exit 0 ;;
+  *) echo "Unknown period: ${period}" >&2; usage >&2; exit 1 ;;
+esac
+
+print_header
+print_sysstat
+print_vnstat
+print_disk_csv
+echo ""
+echo "Done."

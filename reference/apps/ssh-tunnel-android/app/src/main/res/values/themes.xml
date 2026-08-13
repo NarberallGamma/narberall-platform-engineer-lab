@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SshTunnel" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="colorSurface">@color/background_dark</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="android:statusBarColor">@color/surface_dark</item>
+        <item name="android:navigationBarColor">@color/background_dark</item>
+        <!-- Splash (Android 12+): same icon as launcher so launch screen matches app tray -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground_inset</item>
+        <item name="android:windowSplashScreenBackground">@color/primary</item>
+    </style>
+</resources>

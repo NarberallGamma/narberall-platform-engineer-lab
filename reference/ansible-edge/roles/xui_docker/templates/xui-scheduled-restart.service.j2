@@ -1,0 +1,12 @@
+[Unit]
+Description=Scheduled 3X-UI Docker restart ({{ xui_scheduled_restart_mode }}, {{ xui_container_name }})
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ xui_scheduled_restart_script_path }}
+User=root
+
+[Install]
+WantedBy=multi-user.target

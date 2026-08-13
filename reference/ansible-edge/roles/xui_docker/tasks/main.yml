@@ -1,0 +1,67 @@
+---
+- name: Preflight and derived variables
+  ansible.builtin.import_tasks: preflight.yml
+  tags: [always, preflight]
+
+- name: Application directories
+  ansible.builtin.import_tasks: directories.yml
+  tags: [dirs]
+
+- name: UFW firewall
+  ansible.builtin.import_tasks: ufw.yml
+  tags: [ufw]
+  when: xui_configure_ufw | bool
+
+- name: Let's Encrypt IP certificate (acme.sh on host)
+  ansible.builtin.import_tasks: ssl_acme_ip.yml
+  tags: [ssl]
+  when: xui_enable_ssl | bool
+
+- name: Docker Compose stack
+  ansible.builtin.import_tasks: compose.yml
+  tags: [compose]
+
+- name: Scheduled Xray restart (systemd timer on host)
+  ansible.builtin.import_tasks: xui_scheduled_restart.yml
+  tags: [scheduled_restart, xray_restart]
+  when:
+    - xui_scheduled_restart_enabled | bool
+    - xui_scheduled_restart_times | length > 0
+
+- name: Panel bootstrap and artifacts
+  ansible.builtin.import_tasks: panel_bootstrap.yml
+  tags: [panel]
+
+- name: Xray auto-configuration (keys, inbound, proxy route)
+  ansible.builtin.import_tasks: xray_autoconfigure.yml
+  tags: [xray, autoconfigure]
+  when: xui_autoconfigure_xray | bool
+
+- name: Xray logging (debug / access log via panel API)
+  ansible.builtin.import_tasks: xray_logging_apply.yml
+  tags: [xray_logging, xray_debug]
+
+- name: Switch proxy active routing (outbound tag)
+  ansible.builtin.import_tasks: xray_proxy_routing_apply.yml
+  tags: [routing]
+  when:
+    - xui_profile == 'proxy'
+    - xui_autoconfigure_xray | bool
+
+- name: Xray profile template (main / proxy)
+  ansible.builtin.import_tasks: profile_template.yml
+  tags: [profile]
+  when: xui_deploy_profile_template | bool
+
+- name: SSH tunnel backup channel (socat on Jump)
+  ansible.builtin.import_tasks: ssh_tunnel_socat.yml
+  tags: [ssh_tunnel, ssh_tunnel_socat]
+  when: xui_ssh_tunnel_enabled | bool
+
+- name: SSH tunnel-only users and keys
+  ansible.builtin.import_tasks: ssh_tunnel_users.yml
+  tags: [ssh_tunnel, ssh_tunnel_users]
+  when:
+    - xui_ssh_tunnel_enabled | bool
+    - xui_ssh_tunnel_manage_users | bool
+    - xui_ssh_tunnel_users | length > 0

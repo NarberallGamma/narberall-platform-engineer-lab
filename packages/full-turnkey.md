@@ -1,6 +1,5 @@
 # Full Turnkey
 
-**Owner:** Work PC  
 **Duration:** scoped per MVP
 
 ## Deliverables
@@ -12,9 +11,9 @@
 
 ## Message
 
-One owner from infra to documentation and observability, including application code where it unblocks delivery.
+One owner from infra to documentation and observability, including application **build, deploy, and gates** (Java, Kotlin, .NET, Go, Python, 1C; SonarQube / Trivy / OSV-Scanner). CI: **Jenkins** (plugins, workers, VM→Kubernetes) and **GitLab CI + Argo CD** (branch/tag, auto MR, merge rules). That can be **solo** on one or several concurrent products (reachable) — or as a teammate in a large org with a lead — or as a **de facto lead** who trains and delegates while reporting to a PM or CTO. About **six years** of that: bank/SBP-class, blockchain, delivery e-commerce, Atlassian/Nextcloud, 50+ services and JVM monoliths. Greenfield or **legacy**. Loaded production (~99.9% SLA): seamless migrations, multi-zone HA, DBMS and brokers under load, incidents including off-hours. **Secure by default**. Full narrative: `docs/experience.md`.
 
 ## Proof in this repo
 
 - Case studies `01`–`03`
-- `reference/apps/`, `reference/utilities/`, `terraform/`, `reference/ai/`
+- `reference/apps/`, `reference/utilities/`, `iac/terraform/`, `reference/ai/`

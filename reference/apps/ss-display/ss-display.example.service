@@ -1,0 +1,19 @@
+# Example systemd user unit. Copy and edit paths for your system:
+#   cp ss-display.example.service ~/.config/systemd/user/ss-display.service
+#   systemctl --user daemon-reload && systemctl --user enable --now ss-display.service
+
+[Unit]
+Description=SteelSeries keyboard OLED (ss-display)
+After=graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/src/ss-display
+Environment=SS_DISPLAY_CONFIG=%h/src/ss-display/config.local.yaml
+ExecStart=%h/src/ss-display/.venv/bin/python ss-display.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

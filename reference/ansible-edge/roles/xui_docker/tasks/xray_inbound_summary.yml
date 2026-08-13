@@ -1,0 +1,113 @@
+---
+- name: Assert inbound record is available for summary
+  ansible.builtin.assert:
+    that:
+      - xui_inbound_record is defined
+      - xui_inbound_record | length > 0
+    fail_msg: >-
+      Inbound «{{ xui_inbound_remark }}» не найден после inbounds/add.
+      Проверить ответ API и шаблон inbound-api-payload.
+
+- name: Set chain client email for inbound summary
+  ansible.builtin.set_fact:
+    xui_chain_client_email: "{{ xui_system_client_email }}"
+
+- name: Resolve chain client UUID from system client only
+  ansible.builtin.set_fact:
+    xui_chain_client_uuid: >-
+      {{
+        (xui_inbound_clients_effective | default([])
+         | selectattr('email', 'equalto', xui_system_client_email)
+         | map(attribute='id')
+         | list
+         | first)
+        | default('', true)
+      }}
+
+- name: Assert system chain client exists in inbound
+  ansible.builtin.assert:
+    that:
+      - xui_chain_client_uuid | default('') | length > 0
+    fail_msg: >-
+      Нет клиента {{ xui_system_client_email }} в inbound — chain UUID для proxy outbound не определён.
+
+- name: Build inbound summary for artifacts and proxy
+  ansible.builtin.set_fact:
+    xui_inbound_summary:
+      host: "{{ inventory_hostname }}"
+      profile: "{{ xui_profile }}"
+      route_suffix: "{{ xui_route_suffix | default('') }}"
+      public_ip: "{{ xui_ssl_ipv4_effective }}"
+      remark: "{{ xui_inbound_remark }}"
+      tag: "{{ xui_inbound_record.tag | default(xui_inbound_tag) }}"
+      port: "{{ xui_inbound_port | int }}"
+      client_uuid: "{{ xui_chain_client_uuid }}"
+      client_email: "{{ xui_chain_client_email }}"
+      chain_client_uuid: "{{ xui_chain_client_uuid }}"
+      chain_client_email: "{{ xui_chain_client_email }}"
+      reality_public_key: "{{ xui_reality_public_key }}"
+      reality_short_ids: "{{ xui_reality_short_ids }}"
+      reality_short_id_primary: "{{ xui_reality_short_ids[0] }}"
+      reality_sni: "{{ xui_inbound_reality_sni }}"
+      reality_dest: "{{ xui_inbound_reality_dest }}"
+      fingerprint: "{{ xui_inbound_reality_fingerprint }}"
+      outbound_sni: "{{ xui_outbound_sni | default(xui_inbound_reality_sni) }}"
+      vless_connect_address: "{{ xui_ssl_ipv4_effective }}"
+      vless_connect_port: "{{ xui_inbound_port | int }}"
+      reality_mldsa65_verify: "{{ xui_reality_mldsa65_verify | default('') }}"
+
+- name: Add clients list to inbound summary
+  ansible.builtin.set_fact:
+    xui_inbound_summary: >-
+      {{
+        xui_inbound_summary | combine({
+          'clients': (
+            xui_inbound_clients_effective | default([])
+            | json_query('[].{email: email, uuid: id}')
+          )
+        })
+      }}
+  when: xui_inbound_clients_effective | default([]) | length > 0
+
+- name: Ensure inbound artifacts subdirectory exists (localhost)
+  ansible.builtin.file:
+    path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_inbounds_artifacts_subdir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+
+- name: Save inbound summary artifact (main legacy path)
+  ansible.builtin.copy:
+    content: "{{ xui_inbound_summary | to_nice_json }}"
+    dest: >-
+      {{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_inbound_summary_artifact | default('inbound-summary.json') }}
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  when:
+    - xui_profile == 'main'
+    - xui_route_suffix | default('') | length == 0
+
+- name: Save inbound summary artifact (main named route)
+  ansible.builtin.copy:
+    content: "{{ xui_inbound_summary | to_nice_json }}"
+    dest: >-
+      {{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_inbounds_artifacts_subdir }}/{{ xui_inbound_remark }}.json
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  when:
+    - xui_profile == 'main'
+    - xui_route_suffix | default('') | length > 0
+
+- name: Save inbound summary artifact (proxy legacy single inbound)
+  ansible.builtin.copy:
+    content: "{{ xui_inbound_summary | to_nice_json }}"
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/inbound-summary.json"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  when:
+    - xui_profile == 'proxy'
+    - xui_route_suffix | default('') | length == 0

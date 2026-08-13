@@ -1,0 +1,56 @@
+---
+# Сессия 3X-UI: Bearer API token (предпочтительно) или cookie + CSRF на webBasePath.
+
+- name: Init panel auth flags
+  ansible.builtin.set_fact:
+    xui_panel_cookies_string: ""
+    xui_csrf_token: ""
+    xui_panel_use_api_token: "{{ xui_panel_api_token_effective | default('') | length > 0 }}"
+
+- name: Fetch API token when not resolved yet
+  ansible.builtin.import_tasks: panel_fetch_api_token.yml
+  when: not xui_panel_use_api_token | bool
+
+- name: Refresh API token auth flag
+  ansible.builtin.set_fact:
+    xui_panel_use_api_token: "{{ xui_panel_api_token_effective | default('') | length > 0 }}"
+
+- name: Panel API session via Bearer token
+  when: xui_panel_use_api_token | bool
+  block:
+    - name: Set Bearer auth headers
+      ansible.builtin.set_fact:
+        xui_panel_auth_headers:
+          Authorization: "Bearer {{ xui_panel_api_token_effective }}"
+          Accept: application/json
+
+    - name: List existing inbounds via API token (idempotency)
+      ansible.builtin.import_tasks: xray_panel_inbounds_list.yml
+
+    - name: Match inbound by remark and port (API token)
+      ansible.builtin.import_tasks: xray_inbound_match.yml
+
+- name: Panel API session via cookie login
+  when: not xui_panel_use_api_token | bool
+  block:
+    - name: Establish panel cookie session
+      ansible.builtin.import_tasks: panel_cookie_session.yml
+
+    - name: Set cookie auth headers for panel API
+      ansible.builtin.set_fact:
+        xui_panel_auth_headers: "{{ xui_panel_web_headers }}"
+
+    - name: List existing inbounds (idempotency)
+      ansible.builtin.import_tasks: xray_panel_inbounds_list.yml
+
+    - name: Match inbound by remark and port (cookie session)
+      ansible.builtin.import_tasks: xray_inbound_match.yml
+
+- name: Build POST headers for panel API (cookie session needs CSRF)
+  ansible.builtin.set_fact:
+    xui_panel_post_headers: >-
+      {{
+        xui_panel_web_post_headers
+        if (not xui_panel_use_api_token | bool)
+        else xui_panel_auth_headers
+      }}

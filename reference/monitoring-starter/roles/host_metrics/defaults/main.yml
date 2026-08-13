@@ -1,0 +1,3 @@
+---
+# Role defaults — override in inventories/group_vars/host_metrics.yml
+host_metrics_enabled: true

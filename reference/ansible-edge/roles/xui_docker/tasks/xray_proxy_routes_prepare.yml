@@ -1,0 +1,30 @@
+---
+# xui_proxy_routes[] → xui_outbounds_effective + per-route inbound facts.
+
+- name: Assert proxy routes or legacy outbounds configured
+  ansible.builtin.assert:
+    that:
+      - (xui_proxy_routes | default([]) | length > 0)
+        or (xui_outbounds | default([]) | length > 0)
+        or (xui_outbound_enabled | default(false) | bool)
+    fail_msg: >-
+      Proxy: задать xui_proxy_routes (цели main) или xui_outbounds / legacy outbound.
+
+- name: Init outbounds list from proxy routes
+  ansible.builtin.set_fact:
+    xui_outbounds_from_routes: []
+  when: xui_proxy_routes | default([]) | length > 0
+
+- name: Build each outbound from proxy route
+  ansible.builtin.include_tasks: xray_proxy_route_outbound_item.yml
+  loop: "{{ xui_proxy_routes | default([]) }}"
+  loop_control:
+    loop_var: xui_route_item
+    index_var: route_idx
+    label: "{{ xui_route_item.route_suffix }}"
+  when: xui_proxy_routes | default([]) | length > 0
+
+- name: Use outbounds built from proxy routes
+  ansible.builtin.set_fact:
+    xui_outbounds: "{{ xui_outbounds_from_routes }}"
+  when: xui_proxy_routes | default([]) | length > 0

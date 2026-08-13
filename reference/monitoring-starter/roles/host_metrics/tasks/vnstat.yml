@@ -1,0 +1,26 @@
+---
+- name: Ensure vnstat database directory exists
+  ansible.builtin.file:
+    path: /var/lib/vnstat
+    state: directory
+    mode: "0755"
+
+- name: Add primary interface to vnstat
+  ansible.builtin.command: >-
+    vnstat --add -i {{ host_metrics_vnstat_iface_effective }} --force
+  register: host_metrics_vnstat_add
+  changed_when: host_metrics_vnstat_add.rc == 0
+  failed_when: false
+  notify: Restart vnstat
+
+- name: Verify vnstat sees primary interface
+  ansible.builtin.command: vnstat -i {{ host_metrics_vnstat_iface_effective }}
+  register: host_metrics_vnstat_check
+  changed_when: false
+  failed_when: host_metrics_vnstat_check.rc != 0
+
+- name: Enable and start vnstat daemon
+  ansible.builtin.service:
+    name: vnstat
+    enabled: true
+    state: started

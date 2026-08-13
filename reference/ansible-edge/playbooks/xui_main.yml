@@ -1,0 +1,11 @@
+---
+- name: 3X-UI in Docker (profile main)
+  hosts: xui_main
+  gather_facts: true
+  become: true
+
+  vars:
+    xui_artifacts_dir: "{{ playbook_dir }}/../artifacts/xui"
+
+  roles:
+    - role: xui_docker

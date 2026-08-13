@@ -1,0 +1,13 @@
+# SSH tunnel user: {{ tunnel_user }}
+# Jump: {{ ansible_host }}  |  socat: 127.0.0.1:{{ xui_ssh_tunnel_listen_port }} → {{ xui_ssh_tunnel_target_host_effective }}:{{ xui_ssh_tunnel_target_port }}
+
+Private key (this artifact dir):
+  ssh-tunnel/keys/{{ tunnel_user }}
+
+Linux / macOS:
+  ssh -i "ssh-tunnel/keys/{{ tunnel_user }}" -N -o ServerAliveInterval=60 -o ExitOnForwardFailure=yes -L {{ xui_ssh_tunnel_client_local_port }}:127.0.0.1:{{ xui_ssh_tunnel_listen_port }} {{ tunnel_user }}@{{ ansible_host }}
+
+Windows (PowerShell):
+  ssh -i "ssh-tunnel\keys\{{ tunnel_user }}" -N -o ServerAliveInterval=60 -o ExitOnForwardFailure=yes -L {{ xui_ssh_tunnel_client_local_port }}:127.0.0.1:{{ xui_ssh_tunnel_listen_port }} {{ tunnel_user }}@{{ ansible_host }}
+
+VLESS client: SOCKS/HTTP 127.0.0.1:{{ xui_ssh_tunnel_client_local_port }}, профиль main (NL).

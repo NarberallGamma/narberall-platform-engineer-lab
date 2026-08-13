@@ -1,6 +1,6 @@
 # Case study: Document AI / OCR pipeline
 
-**Status:** stub (Work PC fills from career notes)  
+**Status:** stub  
 **Context:** Enterprise document processing (OCR → structured JSON → LLM)  
 **Role:** Platform Engineer + integration owner
 
@@ -10,7 +10,7 @@ Reliable PDF/image capture to structured fields with API handoff to ERP-class sy
 
 ## Architecture
 
-_(diagram TBD)_
+See diagram: [`diagrams/case-studies/03-document-ai-pipeline.md`](../diagrams/case-studies/03-document-ai-pipeline.md)
 
 ## What shipped
 
@@ -29,4 +29,4 @@ OCR engine, LLM extraction, Docker, API gateway patterns, ERP integration edge
 
 ## Links
 
-- Related practice: enterprise SaaS ops (Nextcloud / ITSM) lives in `practice/workstation/` (not this case)
+- Related practice: workstation MCP tooling in [`practice/workstation/`](../practice/workstation/) (not this case)

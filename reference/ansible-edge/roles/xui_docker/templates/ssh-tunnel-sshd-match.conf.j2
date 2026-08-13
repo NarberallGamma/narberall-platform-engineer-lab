@@ -1,0 +1,8 @@
+# Ansible: ограничения для пользователей запасного SSH-туннеля (группа {{ xui_ssh_tunnel_group }})
+Match Group {{ xui_ssh_tunnel_group }}
+    AllowTcpForwarding yes
+    PermitTTY no
+    X11Forwarding no
+    AllowAgentForwarding no
+    PermitTunnel no
+    ForceCommand sleep infinity

@@ -1,0 +1,18 @@
+---
+# Сопоставление inbound по remark + port (port в API бывает string/int).
+
+- name: Reset inbound match
+  ansible.builtin.set_fact:
+    xui_inbound_record: {}
+
+- name: Match inbound by remark and port
+  ansible.builtin.set_fact:
+    xui_inbound_record: "{{ item }}"
+  loop: "{{ xui_inbounds_list['json']['obj'] | default([]) }}"
+  when:
+    - item.remark == xui_inbound_remark
+    - (item.port | int) == (xui_inbound_port | int)
+
+- name: Set inbound exists from matched record
+  ansible.builtin.set_fact:
+    xui_inbound_exists: "{{ xui_inbound_record.id is defined }}"

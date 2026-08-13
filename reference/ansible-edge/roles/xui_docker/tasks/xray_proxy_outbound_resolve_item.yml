@@ -1,0 +1,225 @@
+---
+- name: Resolve chain client email on main for outbound
+  ansible.builtin.set_fact:
+    xui_outbound_protocol: "{{ xui_outbound_item.protocol | default('vless') | lower }}"
+    xui_outbound_chain_email: >-
+      {{
+        xui_outbound_item.chain_client_email
+        if (xui_outbound_item.chain_client_email | default('') | length > 0)
+        else (
+          xui_chain_client_email
+          if (xui_chain_client_email | default('') | length > 0)
+          else ('client-main-' ~ (
+            xui_outbound_item.main_artifacts_host
+            if (xui_outbound_item.main_artifacts_host | default('') | length > 0)
+            else xui_outbound_item.main_inventory_hostname
+          ))
+        )
+      }}
+
+- name: Resolve main artifacts host for outbound
+  ansible.builtin.set_fact:
+    xui_outbound_main_host: >-
+      {{
+        xui_outbound_item.main_artifacts_host
+        if (xui_outbound_item.main_artifacts_host | default('') | length > 0)
+        else xui_outbound_item.main_inventory_hostname
+      }}
+
+- name: Resolve main summary artifact path for outbound
+  ansible.builtin.set_fact:
+    xui_outbound_main_summary_path: >-
+      {{
+        xui_artifacts_dir ~ '/' ~ xui_outbound_main_host ~ '/'
+        ~ (
+          (
+            xui_inbounds_artifacts_subdir ~ '/vless-main-' ~ xui_outbound_item.route_suffix ~ '.json'
+            if xui_outbound_protocol == 'vless'
+            else xui_extra_inbounds_artifacts_subdir ~ '/' ~ xui_outbound_protocol ~ '-main-' ~ xui_outbound_item.route_suffix ~ '.json'
+          )
+          if (xui_outbound_item.route_suffix | default('') | length > 0)
+          else 'inbound-summary.json'
+        )
+      }}
+
+- name: Load inbound summary for outbound target
+  ansible.builtin.slurp:
+    src: "{{ xui_outbound_main_summary_path }}"
+  register: xui_outbound_main_slurp
+  delegate_to: localhost
+  become: false
+
+- name: Assert inbound-summary exists for outbound target
+  ansible.builtin.assert:
+    that:
+      - xui_outbound_main_slurp.content is defined
+      - xui_outbound_main_slurp.content | length > 0
+    fail_msg: >-
+      Outbound «{{ xui_outbound_item.tag }}»: нет
+      {{ xui_artifacts_dir }}/{{ xui_outbound_main_host }}/inbound-summary.json.
+      Сначала выполнить xui_main на этом хосте (--tags xray,autoconfigure).
+  delegate_to: localhost
+  become: false
+
+- name: Parse main inbound summary for outbound
+  ansible.builtin.set_fact:
+    xui_outbound_main_summary: "{{ xui_outbound_main_slurp.content | b64decode | from_json }}"
+
+- name: Load extra inbound registry for non-VLESS outbound
+  ansible.builtin.slurp:
+    src: "{{ xui_artifacts_dir }}/{{ xui_outbound_main_host }}/{{ xui_extra_inbounds_registry_filename }}"
+  register: xui_outbound_extra_registry_slurp
+  delegate_to: localhost
+  become: false
+  when: xui_outbound_protocol != 'vless'
+
+- name: Parse extra inbound registry for non-VLESS outbound
+  ansible.builtin.set_fact:
+    xui_outbound_extra_registry: "{{ xui_outbound_extra_registry_slurp.content | b64decode | from_json }}"
+  when: xui_outbound_protocol != 'vless'
+
+- name: Resolve extra inbound client registry key
+  ansible.builtin.set_fact:
+    xui_outbound_extra_registry_key: >-
+      {{
+        xui_outbound_main_summary.remark
+        ~ ':'
+        ~ xui_outbound_chain_email
+      }}
+  when: xui_outbound_protocol != 'vless'
+
+- name: Assert extra inbound client exists for outbound
+  ansible.builtin.assert:
+    that:
+      - xui_outbound_extra_registry is defined
+      - xui_outbound_extra_registry.get(xui_outbound_extra_registry_key, {}).password | default('') | length > 0
+    fail_msg: >-
+      Outbound «{{ xui_outbound_item.tag }}»: нет клиента {{ xui_outbound_chain_email }}
+      в {{ xui_extra_inbounds_registry_filename }} для {{ xui_outbound_main_summary.remark }}.
+  delegate_to: localhost
+  become: false
+  when: xui_outbound_protocol != 'vless'
+
+- name: Resolve main inventory hostname for IP fallback
+  ansible.builtin.set_fact:
+    xui_outbound_inv_host: >-
+      {{
+        xui_outbound_item.main_inventory_hostname
+        if (xui_outbound_item.main_inventory_hostname | default('') | length > 0)
+        else xui_outbound_main_host
+      }}
+
+- name: Build resolved outbound record
+  ansible.builtin.set_fact:
+    xui_outbound_one_resolved:
+      tag: "{{ xui_outbound_item.tag }}"
+      protocol: "{{ xui_outbound_protocol }}"
+      route_suffix: "{{ xui_outbound_item.route_suffix | default('') }}"
+      main_artifacts_host: "{{ xui_outbound_main_host }}"
+      main_inventory_hostname: "{{ xui_outbound_inv_host }}"
+      address: >-
+        {{
+          xui_outbound_item.address
+          if (xui_outbound_item.address | default('') | length > 0)
+          else (
+            xui_outbound_main_summary.public_ip
+            | default(xui_outbound_main_summary.vless_connect_address | default('', true), true)
+            | default(
+              hostvars[xui_outbound_inv_host]['ansible_host']
+              if (xui_outbound_inv_host in hostvars)
+              else '',
+              true
+            )
+          )
+        }}
+      port: >-
+        {{
+          (xui_outbound_item.port | default(0) | int)
+          if (xui_outbound_item.port | default(0) | int > 0)
+          else (
+            xui_outbound_main_summary.port
+            | default(xui_outbound_main_summary.vless_connect_port | default(xui_outbound_port, true), true)
+            | int
+          )
+        }}
+      client_uuid: >-
+        {{
+          xui_outbound_item.get('client_uuid', '')
+          if (xui_outbound_item.get('client_uuid', '') | length > 0)
+          else (
+            (xui_outbound_main_summary.clients | default([])
+             | selectattr('email', 'equalto', xui_outbound_chain_email)
+             | map(attribute='uuid')
+             | list
+             | first)
+            | default(
+              xui_outbound_main_summary.get(
+                'chain_client_uuid',
+                xui_outbound_main_summary.get('client_uuid', '')
+              ),
+              true
+            )
+          )
+        }}
+      password: >-
+        {{
+          xui_outbound_item.get('password', '')
+          if (xui_outbound_item.get('password', '') | length > 0)
+          else (
+            xui_outbound_extra_registry.get(xui_outbound_extra_registry_key, {}).password
+            | default('', true)
+          )
+        }}
+      public_key: >-
+        {{
+          xui_outbound_item.get('public_key', '')
+          if (xui_outbound_item.get('public_key', '') | length > 0)
+          else xui_outbound_main_summary.reality_public_key | default('')
+        }}
+      short_id: >-
+        {{
+          xui_outbound_item.get('short_id', '')
+          if (xui_outbound_item.get('short_id', '') | length > 0)
+          else xui_outbound_main_summary.reality_short_id_primary | default('')
+        }}
+      sni: >-
+        {{
+          xui_outbound_item.get('sni', '')
+          if (xui_outbound_item.get('sni', '') | length > 0)
+          else (
+            xui_outbound_main_summary.reality_sni
+            | default(xui_outbound_main_summary.outbound_sni | default(xui_outbound_main_summary.public_ip | default('', true), true), true)
+          )
+        }}
+      encryption: "{{ xui_outbound_item.encryption | default(xui_outbound_encryption) }}"
+      flow: "{{ xui_outbound_item.flow | default(xui_outbound_flow) }}"
+      fingerprint: "{{ xui_outbound_item.fingerprint | default(xui_outbound_fingerprint) }}"
+      spider_x: "{{ xui_outbound_item.spider_x | default(xui_outbound_spider_x) }}"
+      mldsa65_verify: >-
+        {{
+          xui_outbound_item.mldsa65_verify
+          if (xui_outbound_item.mldsa65_verify | default('') | length > 0)
+          else (
+            xui_outbound_main_summary.reality_mldsa65_verify | default('')
+            if (xui_outbound_main_summary.reality_mldsa65_verify | default('') | length > 0)
+            else (xui_outbound_mldsa65_verify | default(''))
+          )
+        }}
+      sockopt_tcp_fast_open: >-
+        {{ (xui_outbound_item.sockopt | default({})).tcp_fast_open | default(xui_outbound_sockopt_tcp_fast_open) | bool }}
+      sockopt_tcp_keep_alive_interval: >-
+        {{ (xui_outbound_item.sockopt | default({})).tcp_keep_alive_interval | default(xui_outbound_sockopt_tcp_keep_alive_interval) | int }}
+      sockopt_tcp_mptcp: >-
+        {{ (xui_outbound_item.sockopt | default({})).tcp_mptcp | default(xui_outbound_sockopt_tcp_mptcp) | bool }}
+      sockopt_penetrate: >-
+        {{ (xui_outbound_item.sockopt | default({})).penetrate | default(xui_outbound_sockopt_penetrate) | bool }}
+      routing_add_rule: "{{ (xui_outbound_item.routing | default({})).add_rule | default(false) | bool }}"
+      routing_inbound_tag: >-
+        {{
+          (xui_outbound_item.routing | default({})).inbound_tag
+          | default(xui_routing_inbound_tag, true)
+        }}
+
+- name: Append resolved outbound to list
+  ansible.builtin.set_fact:
+    xui_outbounds_resolved: "{{ xui_outbounds_resolved + [xui_outbound_one_resolved] }}"

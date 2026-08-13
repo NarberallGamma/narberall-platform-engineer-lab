@@ -1,0 +1,4 @@
+artifacts/
+inventories/hosts.ini
+inventories/host_vars/
+*.retry

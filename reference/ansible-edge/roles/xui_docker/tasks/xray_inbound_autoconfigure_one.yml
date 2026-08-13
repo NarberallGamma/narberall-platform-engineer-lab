@@ -1,0 +1,92 @@
+---
+# Один inbound: remark/port из facts, клиенты из xui_client_users, idempotent sync.
+
+- name: Refresh inbound list when panel session was skipped (--tags without panel)
+  ansible.builtin.import_tasks: xray_panel_inbounds_list.yml
+  when: xui_inbounds_list is not defined or xui_inbounds_list['json'] is not defined
+
+- name: Migrate inbound on target port when remark changed (vless-main → vless-main-nl)
+  ansible.builtin.import_tasks: xray_inbound_port_migrate.yml
+
+- name: Find inbound by remark (any port)
+  ansible.builtin.set_fact:
+    xui_inbound_by_remark: >-
+      {{
+        (xui_inbounds_list['json']['obj'] | default([]))
+        | selectattr('remark', 'equalto', xui_inbound_remark)
+        | list
+        | first
+        | default({}, true)
+      }}
+
+- name: Detect inbound on wrong port
+  ansible.builtin.set_fact:
+    xui_inbound_wrong_port: >-
+      {{
+        (xui_inbound_by_remark | default({}) | length > 0)
+        and (
+          (xui_inbound_by_remark.port | default(0) | int)
+          != (xui_inbound_port | int)
+        )
+      }}
+
+- name: Delete inbound on wrong port
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/inbounds/del/{{ xui_inbound_by_remark['id'] }}"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_post_headers }}"
+    status_code: 200
+  when: xui_inbound_wrong_port | bool
+
+- name: Clear inbound exists after wrong-port delete
+  ansible.builtin.set_fact:
+    xui_inbound_exists: false
+  when: xui_inbound_wrong_port | bool
+
+- name: Refresh inbound list after wrong-port delete
+  ansible.builtin.import_tasks: xray_panel_inbounds_list.yml
+  when: xui_inbound_wrong_port | bool
+
+- name: Match inbound by remark and port
+  ansible.builtin.import_tasks: xray_inbound_match.yml
+  when: not (xui_inbound_exists | default(false) | bool)
+
+- name: Init empty existing settings when inbound missing
+  ansible.builtin.set_fact:
+    xui_existing_settings:
+      clients: []
+  when: not xui_inbound_exists | bool
+
+- name: Parse existing inbound settings when present
+  ansible.builtin.set_fact:
+    xui_existing_settings: >-
+      {{
+        xui_inbound_record.settings
+        if xui_inbound_record.settings is mapping
+        else (xui_inbound_record.settings | from_json)
+      }}
+  when: xui_inbound_exists | bool
+
+- name: Build inbound clients list
+  ansible.builtin.import_tasks: xray_clients_build.yml
+
+- name: Generate Xray keys and create inbound when missing
+  ansible.builtin.import_tasks: xray_keys.yml
+  when: not xui_inbound_exists | bool
+
+- name: Create inbound via API when missing
+  ansible.builtin.import_tasks: xray_panel_inbound.yml
+  when: not xui_inbound_exists | bool
+
+- name: Sync existing inbound to desired Ansible config
+  ansible.builtin.import_tasks: xray_panel_inbound_sync.yml
+  when:
+    - xui_inbound_exists | bool
+    - xui_inbound_sync_enabled | default(true) | bool
+
+- name: Export VLESS links for clients
+  ansible.builtin.import_tasks: xray_export_client_links.yml
+  when:
+    - xui_export_client_vless_links | default(true) | bool
+    - xui_inbound_clients_effective | default([]) | length > 0

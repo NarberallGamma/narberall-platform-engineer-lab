@@ -1,0 +1,68 @@
+---
+- name: Init effective outbound list
+  ansible.builtin.set_fact:
+    xui_outbounds_effective: []
+
+- name: Build effective outbound from legacy single-outbound vars
+  ansible.builtin.set_fact:
+    xui_outbounds_effective:
+      - tag: "{{ xui_outbound_tag }}"
+        enabled: true
+        main_artifacts_host: >-
+          {{ xui_main_artifacts_host if (xui_main_artifacts_host | default('') | length > 0)
+             else xui_main_inventory_hostname }}
+        main_inventory_hostname: "{{ xui_main_inventory_hostname }}"
+        address: ""
+        port: 0
+        client_uuid: ""
+        public_key: ""
+        short_id: ""
+        sni: "{{ xui_outbound_sni }}"
+        encryption: "{{ xui_outbound_encryption }}"
+        flow: "{{ xui_outbound_flow }}"
+        fingerprint: "{{ xui_outbound_fingerprint }}"
+        spider_x: "{{ xui_outbound_spider_x }}"
+        mldsa65_verify: "{{ xui_outbound_mldsa65_verify | default('') }}"
+        routing:
+          add_rule: "{{ xui_routing_enabled | bool }}"
+          inbound_tag: "{{ xui_routing_inbound_tag }}"
+  when:
+    - xui_outbounds | default([]) | length == 0
+    - xui_outbound_enabled | default(false) | bool
+
+- name: Use configured xui_outbounds list
+  ansible.builtin.set_fact:
+    xui_outbounds_effective: "{{ xui_outbounds }}"
+  when: xui_outbounds | default([]) | length > 0
+
+- name: Filter outbounds by tag limit
+  ansible.builtin.set_fact:
+    xui_outbounds_effective: >-
+      {{
+        xui_outbounds_effective
+        | selectattr('tag', 'in', xui_outbound_tags_filter)
+        | list
+      }}
+  when: xui_outbound_tags_filter | default([]) | length > 0
+
+- name: Assert proxy has at least one outbound defined
+  ansible.builtin.assert:
+    that:
+      - xui_outbounds_effective | length > 0
+    fail_msg: >-
+      Proxy: задать xui_outbounds (список) или включить xui_outbound_enabled с legacy-переменными.
+
+- name: Assert each outbound has tag and main artifacts source
+  ansible.builtin.assert:
+    that:
+      - item.tag is defined
+      - item.tag | length > 0
+      - >-
+        (item.main_artifacts_host | default('') | length > 0)
+        or (item.main_inventory_hostname | default('') | length > 0)
+    fail_msg: >-
+      Outbound «{{ item.tag | default('?') }}»: нужны tag и main_artifacts_host
+      (папка artifacts/xui/<host>/) или main_inventory_hostname.
+  loop: "{{ xui_outbounds_effective }}"
+  loop_control:
+    label: "{{ item.tag | default('outbound') }}"

@@ -1,0 +1,30 @@
+---
+- name: Assert existing inbound record
+  ansible.builtin.assert:
+    that:
+      - xui_inbound_record['id'] is defined
+    fail_msg: "Inbound «{{ xui_inbound_remark }}» не найден в панели."
+
+- name: Parse existing inbound stream settings
+  ansible.builtin.set_fact:
+    xui_existing_stream: >-
+      {{
+        xui_inbound_record.streamSettings
+        if xui_inbound_record.streamSettings is mapping
+        else (xui_inbound_record.streamSettings | from_json)
+      }}
+    xui_existing_settings: >-
+      {{
+        xui_inbound_record.settings
+        if xui_inbound_record.settings is mapping
+        else (xui_inbound_record.settings | from_json)
+      }}
+
+- name: Extract Reality keys from existing inbound
+  ansible.builtin.set_fact:
+    xui_reality_public_key: "{{ xui_existing_stream.realitySettings.settings.publicKey }}"
+    xui_reality_short_ids: "{{ xui_existing_stream.realitySettings.shortIds }}"
+    xui_client_uuid: "{{ xui_existing_settings.clients[0].id }}"
+
+- name: Build summary from existing inbound
+  ansible.builtin.import_tasks: xray_inbound_summary.yml

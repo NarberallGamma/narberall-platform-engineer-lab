@@ -1,0 +1,23 @@
+---
+- name: Fetch current Xray template config
+  ansible.builtin.uri:
+    url: "{{ xui_xray_get_url }}"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_xray_headers }}"
+    return_content: true
+    status_code: [200]
+  register: xui_xray_get
+
+- name: Parse Xray template wrapper JSON
+  ansible.builtin.set_fact:
+    xui_xray_wrapper: "{{ xui_xray_get['json']['obj'] | from_json }}"
+
+- name: Extract Xray config object
+  ansible.builtin.set_fact:
+    xui_xray_config: >-
+      {{
+        (xui_xray_wrapper.xraySetting | from_json)
+        if (xui_xray_wrapper.xraySetting is string)
+        else xui_xray_wrapper.xraySetting
+      }}

@@ -1,0 +1,81 @@
+# 3X-UI / Xray — профиль MAIN (NL). Сверка с vless/README.md
+# Ключи Reality / ML-KEM: только через UI (Get New Cert / Get New keys)
+
+profile: main
+server_role: primary_nl
+host: {{ inventory_hostname }}
+public_ip: {{ xui_ssl_ipv4_effective | default(ansible_host) }}
+
+panel:
+  port: {{ xui_panel_port }}
+  remark: {{ xui_inbound_remark }}
+
+inbound:
+  connection:
+    enable: true
+    remark: "{{ xui_inbound_remark }}"
+    protocol: {{ xui_inbound_protocol }}
+    listen: "{{ xui_inbound_listen }}"
+    port: {{ xui_inbound_port }}
+    network: {{ xui_inbound_network }}
+    security: {{ xui_inbound_security }}
+
+  client_auth:
+    ml_kem_enabled: {{ xui_inbound_ml_kem_enabled | bool | lower }}
+    mldsa65_enabled: {{ xui_inbound_mldsa65_enabled | bool | lower }}
+    decryption: "none"  # как Jump на скриншотах, если ml_kem_enabled false
+    encryption: "none"
+    flow: "{{ xui_inbound_flow }}"  # пусто — без xtls-rprx-vision при PQ
+
+  transport:
+    tcp_header: {{ xui_inbound_tcp_header_type }}
+    proxy_protocol: {{ xui_inbound_proxy_protocol | bool | lower }}
+    http_camouflage: {{ xui_inbound_http_camouflage | bool | lower }}
+    sockopt_enabled: {{ xui_inbound_sockopt_enabled | bool | lower }}
+
+  sockopt:
+    mark: {{ xui_inbound_sockopt_mark }}
+    tcp_fast_open: {{ xui_inbound_sockopt_tcp_fast_open | bool | lower }}
+    tcp_keep_alive_interval: {{ xui_inbound_sockopt_tcp_keep_alive_interval }}
+    tcp_keep_alive_idle: {{ xui_inbound_sockopt_tcp_keep_alive_idle }}
+    tcp_max_seg: {{ xui_inbound_sockopt_tcp_max_seg }}
+    tcp_user_timeout: {{ xui_inbound_sockopt_tcp_user_timeout }}
+    tcp_window_clamp: {{ xui_inbound_sockopt_tcp_window_clamp }}
+    tcp_mptcp: {{ xui_inbound_sockopt_tcp_mptcp | bool | lower }}
+    penetrate: {{ xui_inbound_sockopt_penetrate | bool | lower }}
+    domain_strategy: {{ xui_inbound_sockopt_domain_strategy }}
+    tcp_congestion: {{ xui_inbound_sockopt_tcp_congestion }}
+    tproxy: "{{ xui_inbound_sockopt_tproxy }}"
+
+  reality:
+    show: {{ xui_inbound_reality_show | bool | lower }}
+    xver: {{ xui_inbound_reality_xver }}
+    target: "{{ xui_inbound_reality_dest }}"
+    server_names:
+{% if xui_inbound_reality_server_names | length > 0 %}
+{% for sn in xui_inbound_reality_server_names %}
+      - "{{ sn }}"
+{% endfor %}
+{% else %}
+      - "{{ xui_inbound_reality_sni }}"
+{% endif %}
+    utls_fingerprint: "{{ xui_inbound_reality_fingerprint }}"
+    max_timediff_ms: {{ xui_inbound_reality_max_timediff }}
+    min_client_ver: "{{ xui_inbound_reality_min_client_ver }}"
+    max_client_ver: "{{ xui_inbound_reality_max_client_ver }}"
+    spider_x: "{{ xui_inbound_reality_spider_x }}"
+    # private_key, public_key, short_ids, mldsa65_seed: Get New Cert / Get New Seed в UI
+
+  sniffing:
+    enabled: {{ xui_sniffing_enabled | bool | lower }}
+    dest_override: {{ xui_sniffing_dest_override | to_json }}
+    metadata_only: {{ xui_sniffing_metadata_only | bool | lower }}
+    route_only: {{ xui_sniffing_route_only | bool | lower }}
+
+outbound:
+  enabled: false
+
+operator_notes:
+  - Stream dest/SNI/fingerprint come from group_vars, not from this file.
+  - After changing dest, rotate inbound keys via the panel API tasks (xray_keys).
+

@@ -1,0 +1,55 @@
+---
+# Verify (публичный ключ PQ для клиента/outbound) выводится из Seed: xray mldsa65 -i "<seed>"
+
+- name: Clear invalid mldsa65 verify (сырой stdout, Seed/Veify в значении)
+  ansible.builtin.set_fact:
+    xui_reality_mldsa65_verify: ""
+  when:
+    - xui_inbound_mldsa65_enabled | default(false) | bool
+    - xui_reality_mldsa65_verify | default('') | length > 0
+    - >-
+      (xui_reality_mldsa65_verify | default('')) is search('Seed:')
+      or (xui_reality_mldsa65_verify | default('')) is search('Veify:')
+      or (xui_reality_mldsa65_verify | default('')) is search('Verify:')
+      or (xui_reality_mldsa65_verify | default('')) is search('\n')
+      or (xui_reality_mldsa65_verify | default('') | length) < 64
+
+- name: Derive mldsa65 Verify from Seed when missing
+  ansible.builtin.shell: |
+    set -euo pipefail
+    docker exec {{ xui_container_name }} {{ xui_xray_bin }} mldsa65 -i "{{ xui_reality_mldsa65_seed }}" 2>&1 \
+      | awk '/^(Verify|Veify):[[:space:]]/ {
+          sub(/^(Verify|Veify):[[:space:]]*/, "");
+          print;
+          exit
+        }'
+  args:
+    executable: /bin/bash
+  register: xui_mldsa65_derive_raw
+  changed_when: false
+  no_log: true
+  when:
+    - xui_inbound_mldsa65_enabled | default(false) | bool
+    - xui_reality_mldsa65_seed | default('') | length > 0
+    - xui_reality_mldsa65_verify | default('') | length == 0
+
+- name: Set mldsa65 Verify from derive output
+  ansible.builtin.set_fact:
+    xui_reality_mldsa65_verify: "{{ xui_mldsa65_derive_raw.stdout | default('') | trim }}"
+  when:
+    - xui_mldsa65_derive_raw is defined
+    - xui_mldsa65_derive_raw.stdout is defined
+  no_log: true
+
+- name: Assert mldsa65 Verify parsed from derive output
+  ansible.builtin.assert:
+    that:
+      - xui_reality_mldsa65_verify | default('') | length >= 64
+      - xui_reality_mldsa65_verify | default('') is not search('Seed:')
+      - xui_reality_mldsa65_verify | default('') is not search('Veify:')
+    fail_msg: >-
+      Не удалось извлечь Verify/Veify из вывода xray mldsa65 -i (ожидается одна строка ключа после Verify:/Veify:).
+  when:
+    - xui_mldsa65_derive_raw is defined
+    - xui_mldsa65_derive_raw.stdout is defined
+  no_log: true

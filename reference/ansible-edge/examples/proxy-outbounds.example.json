@@ -1,0 +1,8 @@
+[
+  {
+    "tag": "outbound-main-eu-1",
+    "address": "main-eu-1.example.com",
+    "port": 443,
+    "uuid": "00000000-0000-0000-0000-000000000001"
+  }
+]

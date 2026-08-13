@@ -1,0 +1,52 @@
+---
+- name: Ensure artifacts host directory exists (localhost)
+  ansible.builtin.file:
+    path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+
+- name: Check clients registry artifact
+  ansible.builtin.stat:
+    path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_clients_registry_filename }}"
+  register: xui_clients_registry_stat
+  delegate_to: localhost
+  become: false
+
+- name: Load clients registry from artifact
+  ansible.builtin.slurp:
+    src: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_clients_registry_filename }}"
+  register: xui_clients_registry_slurp
+  delegate_to: localhost
+  become: false
+  when: xui_clients_registry_stat.stat.exists | bool
+
+- name: Parse clients registry
+  ansible.builtin.set_fact:
+    xui_clients_registry: >-
+      {{
+        (xui_clients_registry_slurp.content | b64decode | from_json)
+        if (xui_clients_registry_stat.stat.exists | bool)
+        else {}
+      }}
+
+- name: Sanitize registry — user emails must not reuse system client UUID
+  ansible.builtin.set_fact:
+    xui_clients_registry: >-
+      {{
+        xui_clients_registry | combine({
+          item.key: item.value | combine({'uuid': ''})
+        }, recursive=True)
+      }}
+  loop: "{{ xui_clients_registry | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  vars:
+    _system_uuid: "{{ xui_clients_registry[xui_system_client_email].uuid | default('') }}"
+  when:
+    - xui_clients_registry | length > 0
+    - xui_system_client_enabled | default(true) | bool
+    - _system_uuid | length > 0
+    - item.key != xui_system_client_email
+    - item.value.uuid | default('') == _system_uuid

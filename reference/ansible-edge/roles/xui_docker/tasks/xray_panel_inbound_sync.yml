@@ -1,0 +1,138 @@
+---
+- name: Assert existing inbound record for sync
+  ansible.builtin.assert:
+    that:
+      - xui_inbound_record['id'] is defined
+    fail_msg: "Inbound «{{ xui_inbound_remark }}» не найден для sync."
+
+- name: Parse existing inbound for sync
+  ansible.builtin.set_fact:
+    xui_existing_stream: >-
+      {{
+        xui_inbound_record.streamSettings
+        if xui_inbound_record.streamSettings is mapping
+        else (xui_inbound_record.streamSettings | from_json)
+      }}
+    xui_existing_settings: >-
+      {{
+        xui_inbound_record.settings
+        if xui_inbound_record.settings is mapping
+        else (xui_inbound_record.settings | from_json)
+      }}
+
+- name: Load Reality keys from existing inbound
+  ansible.builtin.set_fact:
+    xui_reality_private_key: "{{ xui_existing_stream.realitySettings.privateKey }}"
+    xui_reality_public_key: "{{ xui_existing_stream.realitySettings.settings.publicKey }}"
+    xui_reality_short_ids: "{{ xui_existing_stream.realitySettings.shortIds }}"
+    xui_reality_mldsa65_seed: "{{ xui_existing_stream.realitySettings.mldsa65Seed | default('') }}"
+  no_log: true
+
+- name: Reconcile inbound clients for sync
+  ansible.builtin.import_tasks: xray_clients_build.yml
+
+- name: Generate mldsa65 seed on sync when enabled but missing
+  ansible.builtin.import_tasks: xray_mldsa65_seed.yml
+  when:
+    - xui_inbound_mldsa65_enabled | bool
+    - xui_reality_mldsa65_seed | default('') | length == 0
+
+- name: Derive mldsa65 Verify from Seed for proxy outbound
+  ansible.builtin.import_tasks: xray_mldsa65_verify_from_seed.yml
+  when: xui_inbound_mldsa65_enabled | bool
+
+- name: Apply VLESS encryption facts for sync
+  ansible.builtin.import_tasks: xray_inbound_encryption_facts.yml
+
+- name: Render desired inbound payload to remote temp file
+  ansible.builtin.template:
+    src: inbound-api-payload.json.j2
+    dest: "/tmp/xui-inbound-sync-{{ inventory_hostname }}-{{ xui_inbound_remark }}.json"
+    mode: "0600"
+  no_log: true
+
+- name: Load desired inbound payload
+  ansible.builtin.slurp:
+    src: "/tmp/xui-inbound-sync-{{ inventory_hostname }}-{{ xui_inbound_remark }}.json"
+  register: xui_inbound_sync_slurp
+  no_log: true
+
+- name: Parse desired inbound payload object
+  ansible.builtin.set_fact:
+    xui_inbound_api_body_raw: "{{ xui_inbound_sync_slurp.content | b64decode | from_json }}"
+  no_log: true
+
+- name: Apply reconciled clients list to inbound settings
+  ansible.builtin.set_fact:
+    xui_inbound_api_body_raw: >-
+      {{
+        xui_inbound_api_body_raw | combine({
+          'settings': (xui_inbound_api_body_raw.settings | combine({
+            'clients': xui_inbound_clients_effective
+          }))
+        }, recursive=True)
+      }}
+  no_log: true
+
+- name: Stringify settings/streamSettings/sniffing for 3X-UI update API
+  ansible.builtin.set_fact:
+    xui_inbound_api_body: >-
+      {{
+        xui_inbound_api_body_raw | combine({
+          'settings': xui_inbound_api_body_raw.settings | to_json,
+          'streamSettings': xui_inbound_api_body_raw.streamSettings | to_json,
+          'sniffing': xui_inbound_api_body_raw.sniffing | to_json
+        })
+      }}
+  no_log: true
+
+- name: Update VLESS Reality inbound via API
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/inbounds/update/{{ xui_inbound_record['id'] }}"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_post_headers }}"
+    body_format: json
+    body: "{{ xui_inbound_api_body }}"
+    status_code: 200
+  register: xui_inbound_update
+  no_log: true
+
+- name: Assert inbound updated via API
+  ansible.builtin.assert:
+    that:
+      - xui_inbound_update['json'] is defined
+      - xui_inbound_update['json']['success'] | default(false) | bool
+    fail_msg: >-
+      3X-UI inbounds/update failed: {{ xui_inbound_update['json']['msg'] | default(xui_inbound_update) }}
+
+- name: Refresh inbound list after sync
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/inbounds/list"
+    method: GET
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_auth_headers }}"
+    return_content: true
+  register: xui_inbounds_list
+
+- name: Match inbound after sync
+  ansible.builtin.import_tasks: xray_inbound_match.yml
+
+- name: Build and save inbound summary after sync
+  ansible.builtin.import_tasks: xray_inbound_summary.yml
+
+- name: Export VLESS links after sync
+  ansible.builtin.import_tasks: xray_export_client_links.yml
+  when:
+    - xui_export_client_vless_links | default(true) | bool
+    - xui_inbound_clients_effective | default([]) | length > 0
+
+- name: Restart Xray after inbound sync
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/server/restartXrayService"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_post_headers }}"
+    status_code: 200
+  when: not (xui_skip_inbound_restart | default(false) | bool)
+  changed_when: true

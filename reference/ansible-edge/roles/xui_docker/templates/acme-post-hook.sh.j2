@@ -1,0 +1,12 @@
+#!/bin/sh
+# acme.sh --post-hook: вернуть сервисы после standalone renew/issue
+set -eu
+STATE="{{ xui_app_base_dir }}/.acme-stopped-services"
+if [ ! -f "${STATE}" ]; then
+  exit 0
+fi
+while read -r svc; do
+  [ -n "${svc}" ] || continue
+  systemctl start "${svc}" 2>/dev/null || true
+done < "${STATE}"
+rm -f "${STATE}"

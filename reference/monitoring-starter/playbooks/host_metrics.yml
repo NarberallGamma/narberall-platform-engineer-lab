@@ -1,0 +1,8 @@
+---
+- name: Host metrics (sysstat + vnstat)
+  hosts: host_metrics
+  gather_facts: true
+  become: true
+
+  roles:
+    - role: host_metrics

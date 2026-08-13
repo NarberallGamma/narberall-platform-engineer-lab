@@ -18,9 +18,10 @@ IAM / project baseline
         ▼
 VPC / subnets / routes / security
         │
-        ├── modules (vpc, subnet, route, compute, ...)
-        ├── stack A: multi-env Terraform root (dev / preprod / prod)
-        └── stack B: Terragrunt live (per-unit state, DRY includes)
+        ├── iac/terraform/modules
+        ├── cloud-ru-huawei/stacks/multi-env-root  (dev / preprod / prod)
+        ├── cloud-ru-huawei/live                   (Terragrunt, per-unit state)
+        └── aws/root + aws/live
                 │
                 ▼
         remote state (S3-compatible)
@@ -32,10 +33,11 @@ VPC / subnets / routes / security
 ## What shipped
 
 - Cloud baseline: IAM/project settings, VPC, routing, security groups from zero
-- Infra as code: Terraform (and Terragrunt where multi-project DRY mattered)
+- Infra as code: Terraform (and Terragrunt where multi-project DRY mattered); layout split by cloud / modules / live so a new engineer and audit can follow it
 - Modules: reusable network and compute building blocks
 - Kubernetes: clusters I stood up and accompanied (managed Huawei/cloud.ru CCE-class and self-hosted / bare-metal where needed)
-- CI/CD: pipelines delivering apps into those clusters
+- CI/CD: pipelines delivering apps into those clusters (**Jenkins**; **GitLab CI + Argo CD** for branch/tag GitOps); secrets via Vault / protected CI / ESO-class patterns, not files in git
+- Host and IAM hardening as part of the first delivery (users, rights, EDR where the estate uses it)
 - Docs and monitoring handoff as part of platform delivery
 
 ## Results
@@ -52,9 +54,10 @@ Terraform, Terragrunt, remote state (S3/OBS-compatible), Huawei Cloud class / cl
 
 ## Links
 
-- Platforms index: [`terraform/platforms/`](../terraform/platforms/)
-- Modules: [`terraform/modules/`](../terraform/modules/)
-- Multi-env stack: [`terraform/stacks/multi-env-root/`](../terraform/stacks/multi-env-root/)
-- Terragrunt stack: [`terraform/stacks/terragrunt-live/`](../terraform/stacks/terragrunt-live/)
-- Greenfield example: [`terraform/examples/greenfield-platform/`](../terraform/examples/greenfield-platform/)
-- Multi-cloud notes: [`terraform/stacks/multi-cloud-notes/`](../terraform/stacks/multi-cloud-notes/)
+- Cloud experience: [`iac/cloud/`](../iac/cloud/)
+- Modules: [`iac/terraform/modules/`](../iac/terraform/modules/)
+- Huawei-class multi-env root: [`iac/terraform/cloud-ru-huawei/stacks/multi-env-root/`](../iac/terraform/cloud-ru-huawei/stacks/multi-env-root/)
+- Huawei-class Terragrunt live: [`iac/terraform/cloud-ru-huawei/live/`](../iac/terraform/cloud-ru-huawei/live/)
+- AWS: [`iac/terraform/aws/`](../iac/terraform/aws/)
+- Greenfield example: [`iac/terraform/examples/greenfield-platform/`](../iac/terraform/examples/greenfield-platform/)
+- Day-2 Ansible: [`iac/ansible/`](../iac/ansible/)

@@ -1,0 +1,9 @@
+# Example: GIF-only OLED profile (no system stats).
+# Copy to config.local.yaml and set appearance.image to a GIF path.
+#
+# SteelSeries Apex / Apex Pro OLED: 128 x 40 pixels recommended.
+appearance:
+  image: "/path/to/your/animation.gif"
+  delay: 5
+
+sensors: {}

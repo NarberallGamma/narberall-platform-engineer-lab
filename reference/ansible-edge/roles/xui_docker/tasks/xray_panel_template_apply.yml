@@ -1,0 +1,23 @@
+---
+- name: Apply Xray template config (form body; panel/api/xray/update на 3.3+ тоже принимает form)
+  ansible.builtin.uri:
+    url: "{{ xui_xray_update_url }}"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_xray_headers }}"
+    body_format: form-urlencoded
+    body:
+      xraySetting: "{{ xui_xray_config | to_json }}"
+      outboundTestUrl: "{{ xui_xray_wrapper.outboundTestUrl | default('https://www.google.com/generate_204') }}"
+    return_content: true
+    status_code: 200
+  register: xui_xray_update
+
+- name: Assert Xray template update succeeded
+  ansible.builtin.assert:
+    that:
+      - xui_xray_update['json'] is defined
+      - xui_xray_update['json']['success'] | default(false) | bool
+    fail_msg: >-
+      {{ xui_xray_update_url }}: success=false,
+      msg={{ xui_xray_update['json']['msg'] | default('?') }}

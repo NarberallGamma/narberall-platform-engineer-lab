@@ -1,15 +1,15 @@
 # Portfolio site
 
-**Status:** scaffold later (Work PC chooses Astro or Next static)
+**Status:** scaffold later (Astro or Next static)
 
 ## Required sections
 
-1. Hero  -  Platform Engineer · AI & turnkey  
-2. Case studies (3)  -  deep links into `/case-studies` on GitHub  
-3. Packages  -  AI Infra / Cloud Foundation / Full Turnkey  
-4. Practice  -  workstation + home lab cards  
-5. Code  -  links into `/reference`  
-6. Contact  -  Calendly / email  
+1. Hero  -  Platform Engineer · AI & turnkey
+2. Case studies (3)  -  deep links into `/case-studies` on GitHub
+3. Packages  -  AI Infra / Cloud Foundation / Full Turnkey
+4. Practice  -  workstation MCP + home lab cards
+5. Code  -  links into `/iac` and `/reference`
+6. Contact  -  Calendly / email
 
 ## Deploy
 

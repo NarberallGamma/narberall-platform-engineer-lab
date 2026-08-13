@@ -1,0 +1,115 @@
+---
+# Legacy-переменные xui_outbound_* для xray-profile.yaml.j2 (список xui_outbounds[])
+
+- name: Load proxy-outbounds.json when primary outbound fact is missing
+  ansible.builtin.slurp:
+    src: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/proxy-outbounds.json"
+  register: xui_proxy_outbounds_slurp
+  delegate_to: localhost
+  become: false
+  failed_when: false
+  when: xui_proxy_primary_outbound is not defined
+
+- name: Parse proxy-outbounds.json
+  ansible.builtin.set_fact:
+    xui_proxy_outbounds_cached: "{{ xui_proxy_outbounds_slurp.content | b64decode | from_json }}"
+  when:
+    - xui_proxy_primary_outbound is not defined
+    - xui_proxy_outbounds_slurp.content is defined
+
+- name: Choose primary outbound record for profile
+  ansible.builtin.set_fact:
+    xui_profile_outbound_record: >-
+      {{
+        xui_proxy_primary_outbound
+        if (xui_proxy_primary_outbound is defined)
+        else (
+          (
+            xui_proxy_outbounds_cached
+            | selectattr('tag', 'equalto', xui_routing_outbound_tag)
+            | list
+            | first
+          )
+          | default(xui_proxy_outbounds_cached | first, true)
+        )
+      }}
+  when: >-
+    (xui_proxy_primary_outbound is defined)
+    or (xui_proxy_outbounds_cached is defined)
+
+- name: Load proxy-to-main.json as fallback for profile outbound
+  ansible.builtin.slurp:
+    src: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/proxy-to-main.json"
+  register: xui_proxy_to_main_slurp
+  delegate_to: localhost
+  become: false
+  failed_when: false
+  when: xui_profile_outbound_record is not defined
+
+- name: Parse proxy-to-main.json
+  ansible.builtin.set_fact:
+    xui_proxy_to_main_cached: "{{ xui_proxy_to_main_slurp.content | b64decode | from_json }}"
+  when:
+    - xui_profile_outbound_record is not defined
+    - xui_proxy_to_main_slurp.content is defined
+
+- name: Build profile outbound record from proxy-to-main.json
+  ansible.builtin.set_fact:
+    xui_profile_outbound_record:
+      tag: "{{ xui_proxy_to_main_cached.outbound_tag }}"
+      address: "{{ xui_proxy_to_main_cached.main_ip }}"
+      port: "{{ xui_proxy_to_main_cached.main_port }}"
+      client_uuid: "{{ xui_proxy_to_main_cached.client_uuid }}"
+      public_key: "{{ xui_proxy_to_main_cached.public_key }}"
+      short_id: "{{ xui_proxy_to_main_cached.short_id }}"
+      sni: "{{ xui_proxy_to_main_cached.sni }}"
+      encryption: "{{ xui_outbound_encryption }}"
+      flow: "{{ xui_outbound_flow }}"
+      fingerprint: "{{ xui_outbound_fingerprint }}"
+      spider_x: "{{ xui_outbound_spider_x }}"
+      mldsa65_verify: "{{ xui_outbound_mldsa65_verify | default('') }}"
+      routing_inbound_tag: "{{ xui_proxy_to_main_cached.inbound_tag }}"
+  when: xui_proxy_to_main_cached is defined
+
+- name: Map primary outbound to legacy profile template variables
+  ansible.builtin.set_fact:
+    xui_outbound_enabled: true
+    xui_outbound_tag: "{{ xui_profile_outbound_record.tag }}"
+    xui_outbound_address: "{{ xui_profile_outbound_record.address }}"
+    xui_outbound_port: "{{ xui_profile_outbound_record.port | int }}"
+    xui_outbound_protocol: "{{ xui_outbound_protocol }}"
+    xui_outbound_security: "{{ xui_outbound_security }}"
+    xui_outbound_encryption: "{{ xui_profile_outbound_record.encryption | default(xui_outbound_encryption) }}"
+    xui_outbound_flow: "{{ xui_profile_outbound_record.flow | default(xui_outbound_flow) }}"
+    xui_outbound_sni: "{{ xui_profile_outbound_record.sni }}"
+    xui_outbound_public_key: "{{ xui_profile_outbound_record.public_key }}"
+    xui_outbound_short_id: "{{ xui_profile_outbound_record.short_id }}"
+    xui_outbound_fingerprint: "{{ xui_profile_outbound_record.fingerprint | default(xui_outbound_fingerprint) }}"
+    xui_outbound_spider_x: "{{ xui_profile_outbound_record.spider_x | default(xui_outbound_spider_x) }}"
+    xui_outbound_mldsa65_verify: "{{ xui_profile_outbound_record.mldsa65_verify | default(xui_outbound_mldsa65_verify | default('')) }}"
+    xui_outbound_sockopt_tcp_fast_open: >-
+      {{ xui_profile_outbound_record.sockopt_tcp_fast_open | default(xui_outbound_sockopt_tcp_fast_open) | bool }}
+    xui_outbound_sockopt_tcp_keep_alive_interval: >-
+      {{ xui_profile_outbound_record.sockopt_tcp_keep_alive_interval | default(xui_outbound_sockopt_tcp_keep_alive_interval) | int }}
+    xui_outbound_sockopt_tcp_mptcp: >-
+      {{ xui_profile_outbound_record.sockopt_tcp_mptcp | default(xui_outbound_sockopt_tcp_mptcp) | bool }}
+    xui_outbound_sockopt_penetrate: >-
+      {{ xui_profile_outbound_record.sockopt_penetrate | default(xui_outbound_sockopt_penetrate) | bool }}
+    xui_routing_enabled: true
+    xui_routing_inbound_tag: >-
+      {{
+        xui_profile_outbound_record.routing_inbound_tag
+        | default(xui_inbound_tag, true)
+      }}
+    xui_routing_outbound_tag: "{{ xui_profile_outbound_record.tag }}"
+  when: xui_profile_outbound_record is defined
+
+- name: Assert proxy profile outbound variables are available
+  ansible.builtin.assert:
+    that:
+      - xui_outbound_address | default('') | length > 0
+      - xui_outbound_public_key | default('') | length > 0
+    fail_msg: >-
+      Нет данных outbound для профиля proxy. Выполнить --tags xray,autoconfigure
+      (создаёт proxy-outbounds.json / proxy-to-main.json) или задать legacy xui_outbound_*.
+  when: xui_profile == 'proxy'

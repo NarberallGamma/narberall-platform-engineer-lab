@@ -1,0 +1,67 @@
+---
+- name: Set Trojan client email
+  ansible.builtin.set_fact:
+    xui_extra_trojan_client_email: >-
+      {{
+        xui_extra_trojan_user
+        ~ '-'
+        ~ xui_extra_inbound_protocol
+        ~ '-'
+        ~ xui_profile
+        ~ (
+          '-' ~ xui_route_suffix
+          if (xui_route_suffix | default('') | length > 0)
+          else ''
+        )
+      }}
+
+- name: Set Trojan client registry key
+  ansible.builtin.set_fact:
+    xui_extra_trojan_registry_key: "{{ xui_extra_inbound_remark }}:{{ xui_extra_trojan_client_email }}"
+
+- name: Generate Trojan client password when missing
+  ansible.builtin.set_fact:
+    xui_extra_trojan_password: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=32') }}"
+  when: >-
+    ((xui_extra_inbounds_registry | default({})).get(xui_extra_trojan_registry_key, {}).password | default('') | length) == 0
+  no_log: true
+
+- name: Reuse Trojan client password from registry
+  ansible.builtin.set_fact:
+    xui_extra_trojan_password: "{{ (xui_extra_inbounds_registry | default({})).get(xui_extra_trojan_registry_key, {}).password }}"
+  when: >-
+    ((xui_extra_inbounds_registry | default({})).get(xui_extra_trojan_registry_key, {}).password | default('') | length) > 0
+  no_log: true
+
+- name: Save Trojan client password to registry
+  ansible.builtin.set_fact:
+    xui_extra_inbounds_registry: >-
+      {{
+        xui_extra_inbounds_registry | default({}) | combine({
+          xui_extra_trojan_registry_key: {
+            'protocol': 'trojan',
+            'remark': xui_extra_inbound_remark,
+            'email': xui_extra_trojan_client_email,
+            'password': xui_extra_trojan_password
+          }
+        }, recursive=True)
+      }}
+  no_log: true
+
+- name: Append Trojan client
+  ansible.builtin.set_fact:
+    xui_extra_trojan_clients_effective: >-
+      {{
+        xui_extra_trojan_clients_effective + [{
+          'password': xui_extra_trojan_password,
+          'email': xui_extra_trojan_client_email,
+          'limitIp': 0,
+          'totalGB': 0,
+          'expiryTime': 0,
+          'enable': true,
+          'tgId': 0,
+          'subId': '',
+          'reset': 0
+        }]
+      }}
+  no_log: true

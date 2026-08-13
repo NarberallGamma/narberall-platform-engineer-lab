@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SSH Tunnel</string>
+    <string name="status_connected">Tunnels (UP)</string>
+    <string name="status_disconnected">Tunnels (DOWN)</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_stop">Stop</string>
+    <string name="menu_config">Settings</string>
+    <string name="menu_log">Log</string>
+    <string name="menu_status">Status</string>
+    <string name="menu_test">Test</string>
+    <string name="log_title">Log</string>
+    <string name="save_log">Save log</string>
+    <string name="refresh_log">Refresh</string>
+    <string name="status_detail_title">Tunnel status</string>
+    <string name="status_up">UP</string>
+    <string name="status_down">DOWN</string>
+    <string name="test_tunnel">Test tunnel</string>
+</resources>

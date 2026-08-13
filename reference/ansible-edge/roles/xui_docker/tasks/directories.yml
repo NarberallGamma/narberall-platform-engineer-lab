@@ -1,0 +1,12 @@
+---
+- name: Create 3X-UI base directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ xui_app_base_dir }}"
+    - "{{ xui_db_dir }}"
+    - "{{ xui_cert_dir }}"
+    - "{{ xui_cert_ip_dir }}"
+    - "{{ xui_compose_project_dir }}"

@@ -1,0 +1,70 @@
+{% set _server_names = xui_inbound_reality_server_names if (xui_inbound_reality_server_names | length > 0) else [xui_inbound_reality_sni] %}
+{
+  "enable": true,
+  "remark": "{{ xui_inbound_remark }}",
+  "listen": "{{ xui_inbound_listen }}",
+  "port": {{ xui_inbound_port | int }},
+  "protocol": "vless",
+  "expiryTime": 0,
+  "total": 0,
+  "tag": "{{ xui_inbound_tag }}",
+  "settings": {
+    "clients": {{ xui_inbound_clients_effective | default([]) | to_json }},
+    "decryption": "{{ xui_inbound_decryption_effective }}",
+    "encryption": "{{ xui_inbound_encryption_effective }}"
+  },
+  "streamSettings": {
+    "network": "tcp",
+    "security": "reality",
+    "realitySettings": {
+      "show": {{ xui_inbound_reality_show | bool | lower }},
+      "xver": {{ xui_inbound_reality_xver | int }},
+      "target": "{{ xui_inbound_reality_dest }}",
+      "serverNames": {{ _server_names | to_json }},
+      "privateKey": "{{ xui_reality_private_key }}",
+      "maxTimediff": {{ xui_inbound_reality_max_timediff | int }},
+{% if xui_inbound_reality_min_client_ver | length > 0 %}
+      "minClientVer": "{{ xui_inbound_reality_min_client_ver }}",
+{% endif %}
+{% if xui_inbound_reality_max_client_ver | length > 0 %}
+      "maxClientVer": "{{ xui_inbound_reality_max_client_ver }}",
+{% endif %}
+      "shortIds": {{ xui_reality_short_ids | to_json }},
+{% if xui_inbound_mldsa65_enabled | bool and (xui_reality_mldsa65_seed | default('') | length > 0) %}
+      "mldsa65Seed": "{{ xui_reality_mldsa65_seed }}",
+{% endif %}
+      "settings": {
+        "publicKey": "{{ xui_reality_public_key }}",
+        "fingerprint": "{{ xui_inbound_reality_fingerprint }}",
+        "serverName": "",
+        "spiderX": "{{ xui_inbound_reality_spider_x }}"
+      }
+    },
+    "tcpSettings": {
+      "header": { "type": "none" },
+      "acceptProxyProtocol": false
+    },
+{% if xui_inbound_sockopt_enabled | bool %}
+    "sockopt": {
+      "mark": {{ xui_inbound_sockopt_mark | int }},
+      "tcpFastOpen": {{ xui_inbound_sockopt_tcp_fast_open | bool | lower }},
+      "tcpKeepAliveInterval": {{ xui_inbound_sockopt_tcp_keep_alive_interval | int }},
+      "tcpKeepAliveIdle": {{ xui_inbound_sockopt_tcp_keep_alive_idle | int }},
+      "tcpMaxSeg": {{ xui_inbound_sockopt_tcp_max_seg | int }},
+      "tcpUserTimeout": {{ xui_inbound_sockopt_tcp_user_timeout | int }},
+      "tcpWindowClamp": {{ xui_inbound_sockopt_tcp_window_clamp | int }},
+      "tcpMptcp": {{ xui_inbound_sockopt_tcp_mptcp | bool | lower }},
+      "penetrate": {{ xui_inbound_sockopt_penetrate | bool | lower }},
+      "domainStrategy": "{{ xui_inbound_sockopt_domain_strategy }}",
+      "tcpcongestion": "{{ xui_inbound_sockopt_tcp_congestion }}",
+      "tproxy": "{{ xui_inbound_sockopt_tproxy }}"
+    }
+{% endif %}
+  },
+  "sniffing": {
+    "enabled": {{ xui_sniffing_enabled | bool | lower }},
+    "destOverride": {{ xui_sniffing_dest_override | to_json }},
+    "metadataOnly": {{ xui_sniffing_metadata_only | bool | lower }},
+    "routeOnly": {{ xui_sniffing_route_only | bool | lower }}
+  }
+}

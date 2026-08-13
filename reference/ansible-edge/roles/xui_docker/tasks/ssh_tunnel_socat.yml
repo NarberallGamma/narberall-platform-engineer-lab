@@ -1,0 +1,43 @@
+---
+- name: Install packages for SSH tunnel socat
+  ansible.builtin.apt:
+    name: "{{ xui_ssh_tunnel_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [ssh_tunnel, ssh_tunnel_socat]
+
+- name: Deploy socat systemd unit for SSH tunnel
+  ansible.builtin.template:
+    src: ssh-tunnel-socat.service.j2
+    dest: "/etc/systemd/system/{{ xui_ssh_tunnel_systemd_unit }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart SSH tunnel socat service
+  tags: [ssh_tunnel, ssh_tunnel_socat]
+
+- name: Enable and start SSH tunnel socat service
+  ansible.builtin.systemd:
+    name: "{{ xui_ssh_tunnel_systemd_unit }}.service"
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [ssh_tunnel, ssh_tunnel_socat]
+
+- name: Verify socat listens on tunnel bind address
+  ansible.builtin.wait_for:
+    host: "{{ xui_ssh_tunnel_listen_bind }}"
+    port: "{{ xui_ssh_tunnel_listen_port }}"
+    state: started
+    timeout: 30
+  tags: [ssh_tunnel, ssh_tunnel_socat]
+
+- name: Save SSH tunnel summary artifact
+  ansible.builtin.template:
+    src: ssh-tunnel-info.json.j2
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/ssh-tunnel-info.json"
+    mode: "0640"
+  delegate_to: localhost
+  become: false
+  tags: [ssh_tunnel, ssh_tunnel_socat]

@@ -1,0 +1,69 @@
+---
+# Собрать xui_inbound_clients_effective и обновить registry (idempotent UUID по email).
+
+- name: Assert client users configured in group_vars
+  ansible.builtin.assert:
+    that:
+      - xui_client_users | default([]) | length > 0
+    fail_msg: >-
+      Задать xui_client_users в group_vars (xui_main.yml / xui_proxy.yml).
+
+- name: Set client email suffix for inbound
+  ansible.builtin.set_fact:
+    xui_client_name_suffix: "{{ xui_profile }}-{{ xui_route_suffix }}"
+
+- name: Init inbound clients list
+  ansible.builtin.set_fact:
+    xui_inbound_clients_effective: []
+
+- name: Build system integration client (chain / ядро)
+  ansible.builtin.include_tasks: xray_client_build_one.yml
+  vars:
+    xui_build_client_email: "{{ xui_system_client_email }}"
+  when: xui_system_client_enabled | default(true) | bool
+
+- name: Build each user panel client for inbound
+  ansible.builtin.include_tasks: xray_client_build_one.yml
+  loop: "{{ xui_client_users }}"
+  loop_control:
+    loop_var: xui_client_user
+    label: "{{ xui_client_user }}-{{ xui_client_name_suffix }}"
+
+- name: Deduplicate inbound clients by email (keep last)
+  ansible.builtin.set_fact:
+    xui_inbound_clients_effective: >-
+      {{
+        xui_inbound_clients_effective | default([])
+        | groupby('email')
+        | map('last')
+        | map('last')
+        | list
+      }}
+  when: xui_inbound_clients_effective | default([]) | length > 0
+
+- name: Assert all inbound client UUIDs are unique
+  ansible.builtin.assert:
+    that:
+      - >-
+        (xui_inbound_clients_effective | map(attribute='id') | list | unique | length)
+        == (xui_inbound_clients_effective | length)
+    fail_msg: >-
+      Дублирующиеся UUID у клиентов inbound (проверить clients-registry.json):
+      {{ xui_inbound_clients_effective | map(attribute='email') | list }} /
+      {{ xui_inbound_clients_effective | map(attribute='id') | list }}
+
+- name: Set chain client facts from system integration client
+  ansible.builtin.set_fact:
+    xui_client_uuid: >-
+      {{
+        (xui_inbound_clients_effective | default([])
+         | selectattr('email', 'equalto', xui_system_client_email)
+         | map(attribute='id')
+         | list
+         | first)
+        | default(xui_inbound_clients_effective[0].id, true)
+      }}
+    xui_client_email: "{{ xui_system_client_email }}"
+  when:
+    - xui_system_client_enabled | default(true) | bool
+    - xui_inbound_clients_effective | length > 0

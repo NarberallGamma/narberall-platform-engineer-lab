@@ -1,0 +1,43 @@
+---
+- name: Set sysstat HISTORY retention days
+  ansible.builtin.lineinfile:
+    path: /etc/sysstat/sysstat
+    regexp: '^HISTORY='
+    line: "HISTORY={{ host_metrics_sysstat_history_days }}"
+    create: false
+  notify: Restart sysstat collect timer
+
+- name: Ensure sysstat enabled in defaults
+  ansible.builtin.lineinfile:
+    path: /etc/default/sysstat
+    regexp: '^ENABLED='
+    line: 'ENABLED="true"'
+    create: true
+  notify: Restart sysstat collect timer
+
+- name: Ensure sysstat collect timer drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/sysstat-collect.timer.d
+    state: directory
+    mode: "0755"
+
+- name: Deploy sysstat collect interval override
+  ansible.builtin.template:
+    src: sysstat-collect-timer-override.conf.j2
+    dest: /etc/systemd/system/sysstat-collect.timer.d/host-metrics-interval.conf
+    mode: "0644"
+  notify: Restart sysstat collect timer
+
+- name: Enable and start sysstat collect timer
+  ansible.builtin.systemd:
+    name: sysstat-collect.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Enable sysstat summary timer
+  ansible.builtin.systemd:
+    name: sysstat-summary.timer
+    enabled: true
+    state: started
+    daemon_reload: true

@@ -1,0 +1,82 @@
+---
+- name: Build single Xray outbound JSON object
+  ansible.builtin.set_fact:
+    xui_outbound_xray_obj: >-
+      {{
+        (
+          {
+            'tag': xui_outbound_resolved_item.tag,
+            'protocol': 'trojan',
+            'settings': {
+              'servers': [{
+                'address': xui_outbound_resolved_item.address,
+                'port': xui_outbound_resolved_item.port | int,
+                'password': xui_outbound_resolved_item.password
+              }]
+            },
+            'streamSettings': {
+              'network': 'tcp',
+              'security': 'tls',
+              'tlsSettings': {
+                'serverName': xui_outbound_resolved_item.sni
+              },
+              'tcpSettings': {'header': {'type': 'none'}},
+              'sockopt': {
+                'tcpFastOpen': xui_outbound_resolved_item.sockopt_tcp_fast_open | bool,
+                'tcpKeepAliveInterval': xui_outbound_resolved_item.sockopt_tcp_keep_alive_interval | int,
+                'tcpMptcp': xui_outbound_resolved_item.sockopt_tcp_mptcp | bool,
+                'penetrate': xui_outbound_resolved_item.sockopt_penetrate | bool
+              }
+            }
+          }
+        )
+        if (xui_outbound_resolved_item.protocol | default('vless')) == 'trojan'
+        else
+        (
+          {
+            'tag': xui_outbound_resolved_item.tag,
+            'protocol': 'vless',
+            'settings': {
+              'vnext': [{
+                'address': xui_outbound_resolved_item.address,
+                'port': xui_outbound_resolved_item.port | int,
+                'users': [{
+                  'id': xui_outbound_resolved_item.client_uuid,
+                  'encryption': xui_outbound_resolved_item.encryption,
+                  'flow': xui_outbound_resolved_item.flow
+                }]
+              }]
+            },
+            'streamSettings': {
+              'network': 'tcp',
+              'security': 'reality',
+              'realitySettings': (
+                {
+                  'serverName': xui_outbound_resolved_item.sni,
+                  'fingerprint': xui_outbound_resolved_item.fingerprint,
+                  'publicKey': xui_outbound_resolved_item.public_key,
+                  'shortId': xui_outbound_resolved_item.short_id,
+                  'spiderX': xui_outbound_resolved_item.spider_x
+                }
+                | combine(
+                  {'mldsa65Verify': xui_outbound_resolved_item.mldsa65_verify | regex_replace('\s+', '')}
+                  if (xui_outbound_resolved_item.mldsa65_verify | default('') | length > 0)
+                  else {}
+                )
+              ),
+              'tcpSettings': {'header': {'type': 'none'}},
+              'sockopt': {
+                'tcpFastOpen': xui_outbound_resolved_item.sockopt_tcp_fast_open | bool,
+                'tcpKeepAliveInterval': xui_outbound_resolved_item.sockopt_tcp_keep_alive_interval | int,
+                'tcpMptcp': xui_outbound_resolved_item.sockopt_tcp_mptcp | bool,
+                'penetrate': xui_outbound_resolved_item.sockopt_penetrate | bool
+              }
+            }
+          }
+        )
+      }}
+  no_log: true
+
+- name: Append Xray outbound object
+  ansible.builtin.set_fact:
+    xui_outbound_xray_objects: "{{ xui_outbound_xray_objects + [xui_outbound_xray_obj] }}"

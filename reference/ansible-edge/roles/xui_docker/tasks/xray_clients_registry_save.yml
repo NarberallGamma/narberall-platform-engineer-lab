@@ -1,0 +1,9 @@
+---
+- name: Save clients registry artifact
+  ansible.builtin.copy:
+    content: "{{ xui_clients_registry | default({}) | to_nice_json }}"
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_clients_registry_filename }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  when: xui_clients_registry is defined

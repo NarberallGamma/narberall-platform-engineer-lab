@@ -1,0 +1,25 @@
+---
+# Удалить inbound по remark из xui_legacy_inbound_remarks_remove (миграция имён).
+
+- name: Remove legacy inbounds by remark (not on target port — порт мигрирует через sync)
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/inbounds/del/{{ legacy_inbound.id }}"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_post_headers }}"
+    status_code: 200
+  loop: "{{ xui_inbounds_list['json']['obj'] | default([]) }}"
+  loop_control:
+    loop_var: legacy_inbound
+    label: "{{ legacy_inbound.remark | default('inbound') }}"
+  vars:
+    _legacy_remarks: "{{ xui_legacy_inbound_remarks_remove | default([]) }}"
+    _target_port: "{{ xui_inbound_port | default(xui_vless_port) | int }}"
+  when:
+    - _legacy_remarks | length > 0
+    - legacy_inbound.remark in _legacy_remarks
+    - (legacy_inbound.port | default(0) | int) != _target_port
+
+- name: Refresh inbound list after legacy cleanup
+  ansible.builtin.import_tasks: xray_panel_inbounds_list.yml
+  when: xui_legacy_inbound_remarks_remove | default([]) | length > 0

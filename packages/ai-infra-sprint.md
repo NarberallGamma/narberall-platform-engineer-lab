@@ -1,6 +1,5 @@
 # AI Infra Sprint
 
-**Owner:** Work PC  
 **Duration:** 1–2 weeks (typical)
 
 ## Deliverables
@@ -8,6 +7,9 @@
 - Deploy LLM or RAG-oriented stack (API, storage, basic auth at edge)
 - Monitoring and backup baseline
 - Short runbook (deploy, upgrade, restore)
+- Secrets and access as part of the sprint (no long-lived keys in git; Vault / ESO / protected CI when the stack needs them)
+
+Fits a new stack or an existing GPU/VM that needs to become an operable API quickly.
 
 ## Out of scope (default)
 

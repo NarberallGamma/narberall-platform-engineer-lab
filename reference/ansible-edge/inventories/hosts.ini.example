@@ -1,0 +1,11 @@
+# Copy to hosts.ini locally. ansible_host stays out of git.
+
+[xui_main]
+main-eu-1.example.com
+
+[xui_proxy]
+jump-1.example.com
+
+[edge:children]
+xui_main
+xui_proxy

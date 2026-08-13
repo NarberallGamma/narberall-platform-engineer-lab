@@ -1,0 +1,6 @@
+artifacts/
+inventories/hosts.ini
+inventories/host_vars/
+*.retry
+.vault_pass
+.vault_pass.txt

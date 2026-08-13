@@ -1,0 +1,100 @@
+---
+xui_profile: proxy
+xui_docker_image_version: "v3.4.1"
+
+xui_panel_port: 28471
+xui_panel_web_base_path: ""
+xui_panel_username: ""
+xui_panel_listen_ip: ""
+xui_ssl_ipv4: ""
+xui_acme_email: acme@example.com
+
+# Placeholders only. Real dest/SNI stay in private group_vars.
+xui_inbound_reality_dest: "www.example.com:443"
+xui_inbound_reality_sni: "www.example.com"
+xui_inbound_reality_server_names:
+  - "www.example.com"
+
+xui_inbound_reality_fingerprint: firefox
+xui_inbound_reality_max_timediff: 60000
+xui_inbound_ml_kem_enabled: false
+xui_inbound_mldsa65_enabled: false
+xui_inbound_flow: ""
+
+xui_route_suffix: jump
+xui_inbound_remark: vless-proxy-jump
+xui_inbound_tag: inbound-vless-proxy-jump
+xui_inbound_port: 443
+
+xui_client_users:
+  - user-a
+  - user-b
+  - user-c
+
+xui_chain_client_email: "client-main-main-eu-1.example.com"
+
+xui_proxy_legacy_inbound_remarks_remove: []
+
+xui_proxy_routes:
+  - route_suffix: eu-1
+    enabled: true
+    main_artifacts_host: main-eu-1.example.com
+    main_inventory_hostname: main-eu-1.example.com
+    sni: www.example.com
+    encryption: none
+    flow: ""
+    fingerprint: firefox
+    spider_x: "/"
+
+xui_outbounds: []
+
+xui_routing_stale_outbound_tags:
+  - outbound-vless-main
+
+xui_routing_enabled: true
+xui_routing_per_inbound: true
+xui_routing_inbound_tag: inbound-vless-proxy-jump
+xui_routing_outbound_tag: outbound-vless-eu-1
+
+xui_proxy_routing_rules:
+  - inbound_tag: inbound-vless-proxy-jump
+    outbound_tag: outbound-vless-eu-1
+  - inbound_tag: inbound-trojan-proxy-jump
+    outbound_tag: outbound-vless-eu-1
+  - inbound_tag: inbound-shadowsocks-proxy-jump
+    outbound_tag: outbound-vless-eu-1
+
+xui_main_inventory_hostname: main-eu-1.example.com
+xui_main_artifacts_host: main-eu-1.example.com
+xui_main_server_ip: ""
+
+xui_autoconfigure_xray: true
+
+xui_ssh_tunnel_enabled: true
+xui_ssh_tunnel_listen_port: 10443
+xui_ssh_tunnel_target_port: 443
+xui_ssh_tunnel_users:
+  - tunnel-1
+  - tunnel-2
+
+xui_extra_inbounds:
+  - protocol: trojan
+    remark: trojan-proxy-jump
+    tag: inbound-trojan-proxy-jump
+    port: 8443
+    security: tls
+    tls_server_name: "{{ xui_ssl_ipv4_effective }}"
+    users: "{{ xui_client_users }}"
+    route_to_proxy_outbound: true
+
+  - protocol: shadowsocks
+    remark: shadowsocks-proxy-jump
+    tag: inbound-shadowsocks-proxy-jump
+    port: 8388
+    method: "2022-blake3-aes-256-gcm"
+    ss_network: tcp,udp
+    route_to_proxy_outbound: true
+
+xui_scheduled_restart_mode: container
+xui_scheduled_restart_times:
+  - "05:00:00"

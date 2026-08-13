@@ -1,0 +1,26 @@
+# Managed by Ansible (role xui_docker). Do not edit on host.
+services:
+  {{ xui_compose_service_name }}:
+{% if xui_docker_build | bool %}
+    build:
+      context: {{ xui_docker_build_context }}
+      dockerfile: Dockerfile
+{% else %}
+    image: {{ xui_docker_image }}
+{% endif %}
+    container_name: {{ xui_container_name }}
+    env_file:
+      - .env
+    volumes:
+      - {{ xui_db_dir }}:/etc/x-ui
+      - {{ xui_cert_dir }}:/root/cert
+{% if xui_docker_network_mode | default('') | length > 0 %}
+    network_mode: {{ xui_docker_network_mode }}
+{% else %}
+    ports:
+{% for mapping in xui_docker_publish_ports_effective %}
+      - "{{ mapping }}"
+{% endfor %}
+{% endif %}
+    restart: {{ xui_restart_policy }}
+    tty: true

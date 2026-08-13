@@ -1,0 +1,8 @@
+---
+galaxy_info:
+  role_name: xui_docker
+  description: 3X-UI in Docker with Let's Encrypt IP certificate and UFW
+  license: MIT
+  min_ansible_version: "2.14"
+
+dependencies: []

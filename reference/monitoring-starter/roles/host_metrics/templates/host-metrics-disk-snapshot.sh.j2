@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# df/load snapshot for disk occupancy trend (Ansible: host_metrics)
+set -euo pipefail
+
+CSV="{{ host_metrics_disk_csv }}"
+RETENTION_DAYS="{{ host_metrics_disk_snapshot_retention_days }}"
+mkdir -p "$(dirname "${CSV}")"
+
+TS="$(date -Iseconds)"
+LOAD="$(awk '{print $1}' /proc/loadavg)"
+MEM_AVAIL_KB="$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)"
+ROOT_PCT="$(df -P / | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
+DOCKER_PCT=""
+if mountpoint -q /var/lib/docker 2>/dev/null; then
+  DOCKER_PCT="$(df -P /var/lib/docker | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
+elif [ -d /var/lib/docker ]; then
+  DOCKER_PCT="$(df -P /var/lib/docker 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}' || echo "")"
+fi
+
+if [ ! -f "${CSV}" ]; then
+  echo "timestamp,load1,mem_avail_mb,root_used_pct,docker_used_pct" >> "${CSV}"
+fi
+echo "${TS},${LOAD},$((MEM_AVAIL_KB / 1024)),${ROOT_PCT},${DOCKER_PCT}" >> "${CSV}"
+
+find "$(dirname "${CSV}")" -name 'disk-usage.csv.*' -mtime +"${RETENTION_DAYS}" -delete 2>/dev/null || true

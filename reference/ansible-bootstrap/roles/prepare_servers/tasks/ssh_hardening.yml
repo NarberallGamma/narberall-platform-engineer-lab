@@ -1,0 +1,27 @@
+---
+# Key-only login; root SSH disabled; AllowUsers = admin_username.
+# Run separately after the key is verified: --tags ssh_hardening -e enable_ssh_hardening=true
+
+- name: Assert admin_username is set
+  ansible.builtin.assert:
+    that:
+      - admin_username | length > 0
+    fail_msg: "admin_username is empty — SSH hardening needs AllowUsers."
+
+- name: sshd drop-in — keys only, no root, AllowUsers
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/99-prepare-servers-hardening.conf
+    mode: "0644"
+    content: |
+      # Managed by prepare_servers (ssh_hardening)
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      ChallengeResponseAuthentication no
+      PubkeyAuthentication yes
+      PermitRootLogin no
+      AllowUsers {{ admin_username }}
+  notify: restart ssh
+
+- name: Validate sshd configuration
+  ansible.builtin.command: /usr/sbin/sshd -t
+  changed_when: false

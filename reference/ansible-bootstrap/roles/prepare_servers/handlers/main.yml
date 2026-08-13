@@ -1,0 +1,20 @@
+---
+- name: restart ssh
+  ansible.builtin.systemd:
+    name: ssh
+    state: reloaded
+
+- name: restart docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+    daemon_reload: yes
+
+- name: restart containerd stack
+  ansible.builtin.shell: |
+    systemctl stop docker.socket docker 2>/dev/null || true
+    systemctl restart containerd
+    systemctl start docker
+  args:
+    executable: /bin/bash
+  changed_when: true

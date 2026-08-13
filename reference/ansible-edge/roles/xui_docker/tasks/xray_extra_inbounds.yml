@@ -1,0 +1,68 @@
+---
+# Дополнительные inbound'ы Xray рядом с основным VLESS Reality.
+# Secrets хранятся отдельно от clients-registry, потому что Trojan/Shadowsocks используют пароли.
+
+- name: Ensure extra inbound artifacts directory exists
+  ansible.builtin.file:
+    path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_extra_inbounds_artifacts_subdir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+
+- name: Ensure clients links directory exists for extra inbound links
+  ansible.builtin.file:
+    path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_clients_links_subdir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+  when: xui_export_extra_inbound_links | bool
+
+- name: Check extra inbounds registry artifact
+  ansible.builtin.stat:
+    path: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_extra_inbounds_registry_filename }}"
+  register: xui_extra_inbounds_registry_stat
+  delegate_to: localhost
+  become: false
+
+- name: Load extra inbounds registry artifact
+  ansible.builtin.slurp:
+    src: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_extra_inbounds_registry_filename }}"
+  register: xui_extra_inbounds_registry_slurp
+  delegate_to: localhost
+  become: false
+  when: xui_extra_inbounds_registry_stat.stat.exists | bool
+  no_log: true
+
+- name: Parse extra inbounds registry
+  ansible.builtin.set_fact:
+    xui_extra_inbounds_registry: >-
+      {{
+        (xui_extra_inbounds_registry_slurp.content | b64decode | from_json)
+        if (xui_extra_inbounds_registry_stat.stat.exists | bool)
+        else {}
+      }}
+  no_log: true
+
+- name: Init managed extra inbound tags
+  ansible.builtin.set_fact:
+    xui_extra_inbound_managed_tags: []
+
+- name: Configure each extra inbound
+  ansible.builtin.include_tasks: xray_extra_inbound_one.yml
+  loop: "{{ xui_extra_inbounds | default([]) }}"
+  loop_control:
+    loop_var: xui_extra_inbound_item
+    label: "{{ xui_extra_inbound_item.remark | default(xui_extra_inbound_item.protocol ~ '-' ~ xui_profile ~ '-' ~ xui_route_suffix) }}"
+  when: xui_extra_inbound_item.enabled | default(true) | bool
+
+- name: Save extra inbounds registry artifact
+  ansible.builtin.copy:
+    content: "{{ xui_extra_inbounds_registry | default({}) | to_nice_json }}"
+    dest: "{{ xui_artifacts_dir }}/{{ inventory_hostname }}/{{ xui_extra_inbounds_registry_filename }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  no_log: true
+  when: xui_extra_inbounds_registry is defined

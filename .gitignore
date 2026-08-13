@@ -44,6 +44,7 @@ override.tf.json
 *.retry
 .vault_pass
 .vault_pass.txt
+reference/**/artifacts/
 
 # Node / site build
 node_modules/
@@ -76,6 +77,6 @@ tmp/
 *.zip
 !docs/**/*.zip
 
-# Cursor / local agent leftovers (never publish)
+# Editor / local leftovers (never publish)
 .cursor/
 agent-analyzes/

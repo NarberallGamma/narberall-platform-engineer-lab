@@ -1,0 +1,116 @@
+---
+# URL и учётные данные панели, если panel_bootstrap не запускался (--tags xray без panel).
+# xui_panel_url_base задаётся последним: иначе when блока станет false и задачи ниже пропустятся.
+
+- name: Resolve panel context when URL base is missing
+  when: xui_panel_url_base is not defined
+  block:
+    - name: Load panel-access.json artifact
+      ansible.builtin.import_tasks: panel_load_access_artifact.yml
+
+    - name: Discover current panel settings from container
+      ansible.builtin.command: >-
+        docker exec {{ xui_container_name }} /app/x-ui setting -show true
+      register: xui_panel_show_resolve
+      changed_when: false
+      failed_when: false
+
+    - name: Parse port and webBasePath from container
+      ansible.builtin.set_fact:
+        xui_panel_port_resolved: >-
+          {{
+            (xui_panel_show_resolve.stdout | default('')
+             | regex_search('port:\s*(\d+)', '\1')
+             | default([], true) | flatten | first
+             | default(xui_panel_port, true) | string)
+          }}
+        xui_panel_web_base_path_from_container: >-
+          {{
+            (xui_panel_show_resolve.stdout | default('')
+             | regex_search('webBasePath:\s*(\S+)', '\1')
+             | default([], true) | flatten | first
+             | default('', true) | trim)
+          }}
+
+    - name: Choose effective web base path (container → artifact → var)
+      ansible.builtin.set_fact:
+        xui_panel_web_base_path_effective: >-
+          {{
+            (
+              xui_panel_web_base_path_from_container
+              if (xui_panel_web_base_path_from_container | default('') | length > 0)
+              else (
+                xui_panel_access_cached.web_base_path | default('')
+                if (xui_panel_access_cached.web_base_path | default('') | length > 0)
+                else xui_panel_web_base_path | default('')
+              )
+            ) | trim('/') | regex_replace('^panel/?$', '')
+          }}
+
+    - name: Normalize web base path from container or artifact
+      ansible.builtin.import_tasks: panel_normalize_web_base_path.yml
+
+    - name: Set panel username for API login
+      ansible.builtin.set_fact:
+        xui_panel_username_effective: >-
+          {{
+            xui_panel_username
+            if (xui_panel_username | default('') | length > 0)
+            else (xui_panel_access_cached.username | default(''))
+          }}
+      no_log: true
+
+    - name: Set panel password for API login
+      ansible.builtin.set_fact:
+        xui_panel_password_effective: >-
+          {{
+            xui_panel_password
+            if (xui_panel_password | default('') | length > 0)
+            else (xui_panel_access_cached.password | default(''))
+          }}
+      no_log: true
+
+    - name: Build panel URL base (webBasePath; UI и API — …/panel/…)
+      ansible.builtin.set_fact:
+        xui_panel_web_base_path_normalized: "{{ xui_panel_web_base_path_effective }}"
+        xui_panel_url_base: >-
+          https://{{ xui_ssl_ipv4_effective }}:{{ xui_panel_port_resolved }}/{{ xui_panel_web_base_path_effective }}/
+
+    - name: Seed API token from artifact before container fetch
+      ansible.builtin.set_fact:
+        xui_panel_api_token_effective: >-
+          {{
+            (xui_panel_access_cached.api_token | default(''))
+            | regex_replace("^\['?", '')
+            | regex_replace("'?\]$", '')
+            | trim
+          }}
+      when: xui_panel_access_cached.api_token | default('') | length > 0
+      no_log: true
+
+    - name: Fetch and parse panel API token
+      ansible.builtin.import_tasks: panel_fetch_api_token.yml
+
+- name: Sync panel login in container when only xray/autoconfigure tags run
+  ansible.builtin.import_tasks: panel_apply_credentials_cli.yml
+  when:
+    - xui_panel_sync_credentials_from_artifact | default(true) | bool
+    - xui_panel_username_effective | default('') | length > 0
+    - xui_panel_password_effective | default('') | length > 0
+
+- name: Assert panel URL and credentials are available
+  when: xui_panel_url_base is defined
+  ansible.builtin.assert:
+    that:
+      - xui_panel_url_base | length > 0
+      - xui_panel_web_base_path_effective | default('') | length > 0
+      - >-
+        (xui_panel_use_api_token | default(false) | bool)
+        or (
+          (xui_panel_username_effective | default('') | length > 0)
+          and (xui_panel_password_effective | default('') | length > 0)
+        )
+    fail_msg: >-
+      Не удалось определить URL/логин панели. webBasePath — из docker setting -show
+      (не путь …/panel/ в браузере). Задать xui_panel_username, xui_panel_password (-e)
+      или запустить с --tags panel.

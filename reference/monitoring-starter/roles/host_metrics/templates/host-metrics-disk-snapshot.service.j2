@@ -1,0 +1,6 @@
+[Unit]
+Description=Host metrics disk usage snapshot
+
+[Service]
+Type=oneshot
+ExecStart={{ host_metrics_log_dir }}/disk-snapshot.sh

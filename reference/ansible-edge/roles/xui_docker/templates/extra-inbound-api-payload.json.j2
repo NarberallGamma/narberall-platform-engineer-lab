@@ -1,0 +1,54 @@
+{
+  "enable": true,
+  "remark": "{{ xui_extra_inbound_remark }}",
+  "listen": "{{ xui_extra_inbound_listen }}",
+  "port": {{ xui_extra_inbound_port | int }},
+  "protocol": "{{ xui_extra_inbound_protocol }}",
+  "expiryTime": 0,
+  "total": 0,
+  "tag": "{{ xui_extra_inbound_tag }}",
+  "settings": {{ xui_extra_inbound_settings | to_json }},
+  "streamSettings": {
+    "network": "{{ xui_extra_inbound_stream_network }}",
+    "security": "{{ xui_extra_inbound_security }}",
+{% if xui_extra_inbound_security == 'tls' %}
+    "tlsSettings": {
+      "serverName": "{{ xui_extra_inbound_tls_server_name }}",
+      "minVersion": "1.2",
+      "certificates": [
+        {
+          "certificateFile": "{{ xui_extra_inbound_tls_cert_file }}",
+          "keyFile": "{{ xui_extra_inbound_tls_key_file }}"
+        }
+      ]
+    },
+{% endif %}
+    "tcpSettings": {
+      "header": { "type": "none" },
+      "acceptProxyProtocol": false
+    }{% if xui_inbound_sockopt_enabled | bool %},
+{% endif %}
+{% if xui_inbound_sockopt_enabled | bool %}
+    "sockopt": {
+      "mark": {{ xui_inbound_sockopt_mark | int }},
+      "tcpFastOpen": {{ xui_inbound_sockopt_tcp_fast_open | bool | lower }},
+      "tcpKeepAliveInterval": {{ xui_inbound_sockopt_tcp_keep_alive_interval | int }},
+      "tcpKeepAliveIdle": {{ xui_inbound_sockopt_tcp_keep_alive_idle | int }},
+      "tcpMaxSeg": {{ xui_inbound_sockopt_tcp_max_seg | int }},
+      "tcpUserTimeout": {{ xui_inbound_sockopt_tcp_user_timeout | int }},
+      "tcpWindowClamp": {{ xui_inbound_sockopt_tcp_window_clamp | int }},
+      "tcpMptcp": {{ xui_inbound_sockopt_tcp_mptcp | bool | lower }},
+      "penetrate": {{ xui_inbound_sockopt_penetrate | bool | lower }},
+      "domainStrategy": "{{ xui_inbound_sockopt_domain_strategy }}",
+      "tcpcongestion": "{{ xui_inbound_sockopt_tcp_congestion }}",
+      "tproxy": "{{ xui_inbound_sockopt_tproxy }}"
+    }
+{% endif %}
+  },
+  "sniffing": {
+    "enabled": {{ xui_sniffing_enabled | bool | lower }},
+    "destOverride": {{ xui_sniffing_dest_override | to_json }},
+    "metadataOnly": {{ xui_sniffing_metadata_only | bool | lower }},
+    "routeOnly": {{ xui_sniffing_route_only | bool | lower }}
+  }
+}

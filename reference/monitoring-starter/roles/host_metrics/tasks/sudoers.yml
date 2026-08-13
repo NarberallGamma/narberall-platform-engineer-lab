@@ -1,0 +1,7 @@
+---
+- name: Allow deploy user passwordless metrics report
+  ansible.builtin.template:
+    src: host-metrics-sudoers.j2
+    dest: "/etc/sudoers.d/host-metrics-{{ ansible_user_id | default(ansible_user) }}"
+    mode: "0440"
+    validate: "visudo -cf %s"

@@ -1,0 +1,46 @@
+---
+# API token из контейнера (Bearer для /panel/api/*). Не путать с webBasePath.
+
+- name: Fetch API token from container
+  ansible.builtin.command: >-
+    docker exec {{ xui_container_name }} /app/x-ui setting -getApiToken true
+  register: xui_api_token_cmd
+  changed_when: false
+  failed_when: false
+  when: xui_panel_api_token_effective | default('') | length == 0
+
+- name: Parse API token from container output
+  ansible.builtin.set_fact:
+    xui_panel_api_token_effective: >-
+      {{
+        (xui_api_token_cmd.stdout | default('')
+         | regex_search('apiToken:\s*(\S+)', '\1')
+         | default([], true) | flatten | first
+         | default('', true))
+        | regex_replace("^\['?", '')
+        | regex_replace("'?\]$", '')
+        | trim
+      }}
+  when:
+    - xui_panel_api_token_effective | default('') | length == 0
+    - xui_api_token_cmd.stdout is defined
+    - xui_api_token_cmd.stdout | length > 0
+  no_log: true
+
+- name: Use API token from artifact when container parse empty
+  ansible.builtin.set_fact:
+    xui_panel_api_token_effective: >-
+      {{
+        (xui_panel_access_cached.api_token | default(''))
+        | regex_replace("^\['?", '')
+        | regex_replace("'?\]$", '')
+        | trim
+      }}
+  when:
+    - xui_panel_api_token_effective | default('') | length == 0
+    - xui_panel_access_cached.api_token | default('') | length > 0
+  no_log: true
+
+- name: Mark panel API token auth available
+  ansible.builtin.set_fact:
+    xui_panel_use_api_token: "{{ xui_panel_api_token_effective | default('') | length > 0 }}"

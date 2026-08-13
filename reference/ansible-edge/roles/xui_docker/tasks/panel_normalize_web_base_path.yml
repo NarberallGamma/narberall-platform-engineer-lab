@@ -1,0 +1,15 @@
+---
+# Привести webBasePath к строке без []/'' (regex_search и setting -show иногда дают list-like вид)
+- name: Normalize panel web base path for URL and API
+  ansible.builtin.set_fact:
+    xui_panel_web_base_path_effective: >-
+      {{
+        (xui_panel_web_base_path_effective | string)
+        | regex_replace('^\[', '')
+        | regex_replace('\]$', '')
+        | regex_replace("['\"]", '')
+        | trim
+        | regex_replace('^/+', '')
+        | regex_replace('/+$', '')
+        | regex_replace('^panel/?$', '')
+      }}

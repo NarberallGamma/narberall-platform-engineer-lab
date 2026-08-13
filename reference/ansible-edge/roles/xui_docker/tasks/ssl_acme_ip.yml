@@ -1,0 +1,238 @@
+---
+- name: Install packages for acme.sh
+  ansible.builtin.apt:
+    name:
+      - curl
+      - socat
+      - ca-certificates
+      - openssl
+    state: present
+    update_cache: true
+  when: ansible_os_family == 'Debian'
+
+- name: Check existing IP certificate
+  ansible.builtin.stat:
+    path: "{{ xui_cert_ip_dir }}/fullchain.pem"
+  register: xui_cert_fullchain_stat
+
+- name: Check existing IP private key
+  ansible.builtin.stat:
+    path: "{{ xui_cert_ip_dir }}/privkey.pem"
+  register: xui_cert_privkey_stat
+
+- name: Set certificate already present fact
+  ansible.builtin.set_fact:
+    xui_ssl_certs_present: >-
+      {{
+        xui_cert_fullchain_stat.stat.exists | default(false)
+        and xui_cert_privkey_stat.stat.exists | default(false)
+      }}
+
+- name: Check whether IP certificate expires within threshold
+  ansible.builtin.command: >-
+    openssl x509 -in {{ xui_cert_ip_dir }}/fullchain.pem -noout -checkend {{ xui_acme_expiry_threshold_seconds }}
+  register: xui_cert_expiry_check
+  changed_when: false
+  failed_when: false
+  when: xui_ssl_certs_present | bool
+
+- name: Flag certificate for reissue when expired or expiring soon
+  ansible.builtin.set_fact:
+    xui_ssl_force_reissue: true
+  when:
+    - xui_ssl_certs_present | bool
+    - xui_cert_expiry_check.rc | default(0) != 0
+
+- name: Deploy acme pre-hook script (stop nginx before standalone renew)
+  ansible.builtin.template:
+    src: acme-pre-hook.sh.j2
+    dest: "{{ xui_app_base_dir }}/acme-pre-hook.sh"
+    mode: "0755"
+
+- name: Deploy acme post-hook script (start services after renew)
+  ansible.builtin.template:
+    src: acme-post-hook.sh.j2
+    dest: "{{ xui_app_base_dir }}/acme-post-hook.sh"
+    mode: "0755"
+
+- name: Deploy acme reload command script
+  ansible.builtin.template:
+    src: acme-reloadcmd.sh.j2
+    dest: "{{ xui_app_base_dir }}/acme-reloadcmd.sh"
+    mode: "0755"
+
+- name: Install acme.sh
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -fsSL https://get.acme.sh | sh -s email="{{ xui_acme_email }}"
+  args:
+    creates: "{{ xui_acme_install_dir }}/acme.sh"
+    executable: /bin/bash
+  when: not xui_ssl_certs_present or xui_ssl_force_reissue | bool
+
+- name: Issue Let's Encrypt IP certificate (standalone on free port {{ xui_acme_http_port }})
+  when: not xui_ssl_certs_present or xui_ssl_force_reissue | bool
+  block:
+    - name: Stop services that may bind ACME HTTP port
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: stopped
+      loop: "{{ xui_acme_stop_services_before_issue }}"
+      register: xui_acme_stop_results
+      failed_when: false
+
+    - name: Remember services stopped for ACME
+      ansible.builtin.set_fact:
+        xui_acme_services_stopped: >-
+          {{
+            xui_acme_stop_results.results
+            | selectattr('changed', 'equalto', true)
+            | map(attribute='item')
+            | list
+          }}
+
+    - name: Wait for ACME HTTP port to be released
+      ansible.builtin.wait_for:
+        port: "{{ xui_acme_http_port }}"
+        host: "127.0.0.1"
+        state: stopped
+        timeout: 15
+      failed_when: false
+
+    - name: Check ACME HTTP port is free
+      ansible.builtin.shell: |
+        set -euo pipefail
+        if ss -ltn "sport = :{{ xui_acme_http_port }}" | grep -q LISTEN; then
+          ss -ltnp "sport = :{{ xui_acme_http_port }}" || true
+          exit 1
+        fi
+      args:
+        executable: /bin/bash
+      register: xui_acme_port_check
+      changed_when: false
+
+    - name: Fail when ACME HTTP port is still busy
+      ansible.builtin.fail:
+        msg: >-
+          Port {{ xui_acme_http_port }} занят после остановки
+          {{ xui_acme_stop_services_before_issue | join(', ') }}.
+          Вывод ss в stdout задачи «Check ACME HTTP port is free».
+          Добавить unit в xui_acme_stop_services_before_issue или освободить порт вручную.
+      when: xui_acme_port_check.rc != 0
+
+    - name: Set acme.sh default CA
+      ansible.builtin.command: >-
+        {{ xui_acme_install_dir }}/acme.sh --set-default-ca --server letsencrypt --force
+      changed_when: false
+
+    - name: Issue Let's Encrypt IP certificate (standalone)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        DOMAIN_ARGS="-d {{ xui_ssl_ipv4_effective }}"
+        {% if xui_ssl_ipv6 | default('') | length > 0 %}
+        DOMAIN_ARGS="${DOMAIN_ARGS} -d {{ xui_ssl_ipv6 }}"
+        {% endif %}
+        {{ xui_acme_install_dir }}/acme.sh --issue \
+          ${DOMAIN_ARGS} \
+          --standalone \
+          --server letsencrypt \
+          --certificate-profile {{ xui_acme_cert_profile }} \
+          --days {{ xui_acme_cert_days }} \
+          --httpport {{ xui_acme_http_port }} \
+          --force
+      args:
+        executable: /bin/bash
+      async: "{{ xui_acme_issue_timeout }}"
+      poll: "{{ xui_acme_issue_poll }}"
+      register: xui_acme_issue
+
+    - name: Install certificate files to host cert directory
+      ansible.builtin.shell: |
+        set -euo pipefail
+        PRE="{{ xui_app_base_dir }}/acme-pre-hook.sh"
+        POST="{{ xui_app_base_dir }}/acme-post-hook.sh"
+        RELOAD="{{ xui_app_base_dir }}/acme-reloadcmd.sh"
+        {{ xui_acme_install_dir }}/acme.sh --install-cert -d {{ xui_ssl_ipv4_effective }} \
+          --key-file "{{ xui_cert_ip_dir }}/privkey.pem" \
+          --fullchain-file "{{ xui_cert_ip_dir }}/fullchain.pem" \
+          --pre-hook "${PRE}" \
+          --post-hook "${POST}" \
+          --reloadcmd "${RELOAD}"
+        test -f "{{ xui_cert_ip_dir }}/fullchain.pem"
+        test -f "{{ xui_cert_ip_dir }}/privkey.pem"
+      args:
+        executable: /bin/bash
+
+  always:
+    - name: Start services stopped before ACME
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+      loop: "{{ xui_acme_services_stopped | default([]) }}"
+      failed_when: false
+
+- name: Secure certificate file permissions
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ xui_cert_ip_dir }}/privkey.pem", mode: "0600" }
+    - { path: "{{ xui_cert_ip_dir }}/fullchain.pem", mode: "0644" }
+  when: xui_ssl_certs_present or (xui_acme_issue is defined and xui_acme_issue is succeeded)
+
+- name: Register ACME renewal hooks (pre/post/reload for cron renew)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    PRE="{{ xui_app_base_dir }}/acme-pre-hook.sh"
+    POST="{{ xui_app_base_dir }}/acme-post-hook.sh"
+    RELOAD="{{ xui_app_base_dir }}/acme-reloadcmd.sh"
+    test -f "${PRE}" && test -f "${POST}" && test -f "${RELOAD}"
+    test -f "{{ xui_cert_ip_dir }}/fullchain.pem"
+    test -f "{{ xui_cert_ip_dir }}/privkey.pem"
+    {{ xui_acme_install_dir }}/acme.sh --install-cert -d {{ xui_ssl_ipv4_effective }} \
+      --key-file "{{ xui_cert_ip_dir }}/privkey.pem" \
+      --fullchain-file "{{ xui_cert_ip_dir }}/fullchain.pem" \
+      --pre-hook "${PRE}" \
+      --post-hook "${POST}" \
+      --reloadcmd "${RELOAD}"
+  args:
+    executable: /bin/bash
+  register: xui_acme_hooks_register
+  changed_when: xui_acme_hooks_register.rc == 0
+  when: xui_ssl_certs_present | bool
+
+- name: Persist ACME pre-hook in domain config (install-cert may omit Le_PreHook)
+  ansible.builtin.lineinfile:
+    path: "{{ xui_acme_install_dir }}/{{ xui_ssl_ipv4_effective }}_ecc/{{ xui_ssl_ipv4_effective }}.conf"
+    regexp: '^Le_PreHook='
+    line: "Le_PreHook='{{ xui_app_base_dir }}/acme-pre-hook.sh'"
+  when: xui_ssl_certs_present | bool
+
+- name: Persist ACME post-hook in domain config
+  ansible.builtin.lineinfile:
+    path: "{{ xui_acme_install_dir }}/{{ xui_ssl_ipv4_effective }}_ecc/{{ xui_ssl_ipv4_effective }}.conf"
+    regexp: '^Le_PostHook='
+    line: "Le_PostHook='{{ xui_app_base_dir }}/acme-post-hook.sh'"
+  when: xui_ssl_certs_present | bool
+
+- name: Read ACME domain config for hook verification
+  ansible.builtin.slurp:
+    src: "{{ xui_acme_install_dir }}/{{ xui_ssl_ipv4_effective }}_ecc/{{ xui_ssl_ipv4_effective }}.conf"
+  register: xui_acme_domain_conf
+  when: xui_ssl_certs_present | bool
+
+- name: Assert ACME pre-hook is registered for cron renew
+  ansible.builtin.assert:
+    that:
+      - xui_acme_domain_conf.content | b64decode is search('acme-pre-hook.sh')
+      - xui_acme_domain_conf.content | b64decode is search('acme-post-hook.sh')
+      - xui_acme_domain_conf.content | b64decode is search('Le_ReloadCmd=')
+    fail_msg: >-
+      acme.sh не зарегистрировал hooks для {{ xui_ssl_ipv4_effective }}.
+      Cron renew будет падать на занятом порте 80 (nginx).
+  when: xui_ssl_certs_present | bool
+
+- name: Enable acme.sh auto-upgrade
+  ansible.builtin.command: "{{ xui_acme_install_dir }}/acme.sh --upgrade --auto-upgrade"
+  changed_when: false
+  failed_when: false

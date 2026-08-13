@@ -1,7 +1,7 @@
-# Moved: Terraform IaC lives at repo root
+# Moved: Terraform IaC lives under iac/
 
 All Terraform / Terragrunt showcase code lives in:
 
-**[`../../terraform/`](../../terraform/)**
+**[`../../iac/terraform/`](../../iac/terraform/)**
 
-Start with [`../../terraform/platforms/`](../../terraform/platforms/) for provider samples.
+Cloud experience: [`../../iac/cloud/`](../../iac/cloud/)

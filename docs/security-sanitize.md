@@ -4,7 +4,7 @@
 - [ ] No client legal names (use sector + scale)  
 - [ ] No real hostnames, IPs, internal domains  
 - [ ] No ServiceDesk / wiki / Nextcloud URLs from client tenants  
-- [ ] No home LAN details in home-lab docs  
+- [ ] No personal LAN details in lab docs  
 - [ ] Configs are `*.example` only  
 - [ ] Diagrams use generic labels  
 - [ ] `gitleaks` / secret scan clean (when pre-commit enabled)  

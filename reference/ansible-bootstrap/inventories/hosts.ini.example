@@ -1,0 +1,4 @@
+# Copy to hosts.ini locally. ansible_host stays out of git.
+
+[prepare]
+vps-1.example.com

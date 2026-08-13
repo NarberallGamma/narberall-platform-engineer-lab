@@ -1,0 +1,39 @@
+---
+- name: Ensure host-metrics log directory exists
+  ansible.builtin.file:
+    path: "{{ host_metrics_log_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy disk snapshot collector script
+  ansible.builtin.template:
+    src: host-metrics-disk-snapshot.sh.j2
+    dest: "{{ host_metrics_log_dir }}/disk-snapshot.sh"
+    mode: "0755"
+
+- name: Deploy disk snapshot systemd service
+  ansible.builtin.template:
+    src: host-metrics-disk-snapshot.service.j2
+    dest: /etc/systemd/system/host-metrics-disk-snapshot.service
+    mode: "0644"
+
+- name: Deploy disk snapshot systemd timer
+  ansible.builtin.template:
+    src: host-metrics-disk-snapshot.timer.j2
+    dest: /etc/systemd/system/host-metrics-disk-snapshot.timer
+    mode: "0644"
+
+- name: Enable disk snapshot timer
+  ansible.builtin.systemd:
+    name: host-metrics-disk-snapshot.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Deploy logrotate for host-metrics CSV
+  ansible.builtin.template:
+    src: host-metrics-logrotate.j2
+    dest: /etc/logrotate.d/host-metrics
+    mode: "0644"

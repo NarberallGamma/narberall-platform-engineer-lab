@@ -1,10 +1,11 @@
 # Apps
 
-Small sites and applications that support turnkey demos.
+Small applications that support the edge platform and Linux userspace work. No secrets, no real IPs.
 
-| Naming | Owner |
-|--------|-------|
-| `*` (default) | Work PC |
-| `home-*` | Home PC agent (`HOME_SLOT`) |
+| Path | Purpose |
+|------|---------|
+| [`ssh-tunnel-android/`](ssh-tunnel-android/) | Foreground Service: 6 SSH forwards + round-robin balancer |
+| [`ssh-tunnel-docker/`](ssh-tunnel-docker/) | Same pattern in a container (nginx stream) |
+| [`ss-display/`](ss-display/) | SteelSeries OLED example config + systemd user unit |
 
-Each app: own folder + README + no secrets.
+Practice: [`../../practice/home-lab/android-ssh.md`](../../practice/home-lab/android-ssh.md), [`../../practice/home-lab/pet-projects.md`](../../practice/home-lab/pet-projects.md).

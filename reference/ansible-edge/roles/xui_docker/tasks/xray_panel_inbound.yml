@@ -1,0 +1,75 @@
+---
+- name: Render inbound API payload to remote temp file
+  ansible.builtin.template:
+    src: inbound-api-payload.json.j2
+    dest: "/tmp/xui-inbound-{{ inventory_hostname }}-{{ xui_inbound_remark }}.json"
+    mode: "0600"
+  no_log: true
+
+- name: Load inbound API payload
+  ansible.builtin.slurp:
+    src: "/tmp/xui-inbound-{{ inventory_hostname }}-{{ xui_inbound_remark }}.json"
+  register: xui_inbound_payload_slurp
+  no_log: true
+
+- name: Parse inbound API payload object
+  ansible.builtin.set_fact:
+    xui_inbound_api_body_raw: "{{ xui_inbound_payload_slurp.content | b64decode | from_json }}"
+  no_log: true
+
+- name: Stringify settings/streamSettings/sniffing for 3X-UI API
+  ansible.builtin.set_fact:
+    xui_inbound_api_body: >-
+      {{
+        xui_inbound_api_body_raw | combine({
+          'settings': xui_inbound_api_body_raw.settings | to_json,
+          'streamSettings': xui_inbound_api_body_raw.streamSettings | to_json,
+          'sniffing': xui_inbound_api_body_raw.sniffing | to_json
+        })
+      }}
+  no_log: true
+
+- name: Create VLESS Reality inbound via API
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/inbounds/add"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_post_headers }}"
+    body_format: json
+    body: "{{ xui_inbound_api_body }}"
+    status_code: 200
+  register: xui_inbound_add
+  no_log: true
+
+- name: Assert inbound created via API
+  ansible.builtin.assert:
+    that:
+      - xui_inbound_add['json'] is defined
+      - xui_inbound_add['json']['success'] | default(false) | bool
+    fail_msg: >-
+      3X-UI inbounds/add failed: {{ xui_inbound_add['json']['msg'] | default(xui_inbound_add) }}
+
+- name: Refresh inbound list after create
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/inbounds/list"
+    method: GET
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_auth_headers }}"
+    return_content: true
+  register: xui_inbounds_list
+
+- name: Match created inbound for summary
+  ansible.builtin.import_tasks: xray_inbound_match.yml
+
+- name: Build and save inbound summary
+  ansible.builtin.import_tasks: xray_inbound_summary.yml
+
+- name: Restart Xray after inbound create
+  ansible.builtin.uri:
+    url: "{{ xui_panel_url_base }}panel/api/server/restartXrayService"
+    method: POST
+    validate_certs: "{{ xui_panel_validate_certs }}"
+    headers: "{{ xui_panel_post_headers }}"
+    status_code: 200
+  when: not (xui_skip_inbound_restart | default(false) | bool)
+  changed_when: true

@@ -1,0 +1,11 @@
+---
+- name: Prepare servers
+  hosts: prepare
+  gather_facts: true
+  become: true
+
+  vars:
+    prepare_credentials_artifacts_dir: "{{ playbook_dir }}/../artifacts/credentials"
+
+  roles:
+    - role: prepare_servers

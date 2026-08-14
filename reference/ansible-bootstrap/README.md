@@ -17,6 +17,8 @@ SSH harden is a **separate** run after the key is confirmed:
 ./scripts/run_prepare.sh --tags ssh_hardening -e enable_ssh_hardening=true
 ```
 
+VCD / Terraform post-apply (packages, harden, EDR, host metrics) is the same habit with a thinner playbook: [`vcd-post-apply.yml.example`](vcd-post-apply.yml.example). Called from the CI catalog: [`../../iac/ci/`](../../iac/ci/).
+
 ## Keywords
 
-Ansible, apt, Docker CE, sshd, sudo, artifacts
+Ansible, apt, Docker CE, sshd, sudo, artifacts, VCD, post-apply

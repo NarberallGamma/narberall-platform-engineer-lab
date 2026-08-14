@@ -50,6 +50,18 @@ NOVA Cloud class (Kazakhstan). Under the hood: OpenStack Nova / Cinder / Neutron
 | Storage | `vkcs_blockstorage_volume`, `vkcs_compute_volume_attach` | same files |
 | Brownfield | `prevent_destroy`, short `ignore_changes`, import runbook | `vkcloud/brownfield.tf`, `IMPORT.md`, `ESTATE.md` |
 
+## VMware Cloud Director (VCD)
+
+Hosted VCD (cloud.ru VMware). Provider: `vmware/vcd`. Guest init + extra-disk delay. Documentation CIDRs only.
+
+| Area | Resource types | Where |
+|------|----------------|--------|
+| Catalog | org network, storage policy, Ubuntu template as keys | `vmware/variables/` |
+| Compute | `vcd_vapp`, `vcd_vapp_vm`, `vcd_vapp_org_network` | `vmware/vapp.tf`, `vm-database.tf` |
+| Storage | `vcd_vm_internal_disk`, storage profile IOPS | `vmware/modules/vm_linux/` |
+| Guest | customization.initscript, random passwords, SSH | `vmware/guest_init.tf`, `templates/guest_init.sh.tftpl` |
+| Audit | catalogs, Edge, network, IOPS (read-only) | `vmware/audit/` |
+
 ## Proxmox
 
 | Area | Resource types | Where |
@@ -71,3 +83,4 @@ NOVA Cloud class (Kazakhstan). Under the hood: OpenStack Nova / Cinder / Neutron
 | Terragrunt live (AWS account/region/env) | `aws/live/` |
 | Standalone AWS root | `aws/root/` |
 | Brownfield catalog + purpose VMs (vkcs) | `vkcloud/` |
+| VCD greenfield (vapp + guest init) | `vmware/` |

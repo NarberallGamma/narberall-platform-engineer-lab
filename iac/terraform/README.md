@@ -2,7 +2,7 @@
 
 Code proof for [`../cloud/`](../cloud/). Layout matches a real IaC repo: **one folder per cloud**, shared modules, small examples.
 
-Experience and keywords live under [`../cloud/`](../cloud/). This directory is the `.tf` / Terragrunt tree.
+Experience and keywords live under [`../cloud/`](../cloud/). This directory is the `.tf` / Terragrunt tree. CI that applies this tree and then calls Ansible: [`../ci/`](../ci/).
 
 Layout is meant to be **obvious**: one folder per cloud, shared `modules`, `live` / stacks for apply units — not a dump monorepo of unrelated products. Secrets stay out of git (`SANITIZE.md`); production estates use Vault / ESO / protected CI, introduced from scratch when missing.
 
@@ -12,6 +12,7 @@ terraform/
   cloud-ru-huawei/     # Huawei-class stacks + Terragrunt live
   openstack-selectel/
   vkcloud/             # VK Cloud / NOVA Cloud class (OpenStack IaaS, catalog + purpose VMs)
+  vmware/              # VMware Cloud Director (VCD): catalog, guest init, DB-class VM
   proxmox/
   cloudflare/
   modules/             # Shared sbercloud modules (used by cloud-ru-huawei)
@@ -26,6 +27,7 @@ terraform/
 | [`cloud-ru-huawei/`](cloud-ru-huawei/) | Multi-env root + Terragrunt (CCE, RDS, Kafka, OBS) |
 | [`openstack-selectel/`](openstack-selectel/) | OpenStack guests for K8s / GitLab / Postgres |
 | [`vkcloud/`](vkcloud/) | **Legacy as code:** vkcs, catalog maps, purpose-split VMs, import |
+| [`vmware/`](vmware/) | **VCD greenfield:** catalog, guest init, extra disks, audit stack |
 | [`proxmox/`](proxmox/) | Proxmox VE guests |
 | [`cloudflare/`](cloudflare/) | DNS as code |
 | [`modules/`](modules/) | Reusable Huawei-class modules |
@@ -45,17 +47,24 @@ flowchart TB
   Mods --> CRlive
   TF --> OS[openstack-selectel]
   TF --> VK[vkcloud]
+  TF --> VMw[vmware]
   TF --> PX[proxmox]
   TF --> CF[cloudflare]
   Ex[examples] --> Mods
 ```
+
+## Related
+
+- CI catalog (turnkey map + pipelines): [`../ci/`](../ci/)
+- Ansible day-2 (what CI runs after apply): [`../ansible/`](../ansible/)
 
 ## Case studies
 
 - [Greenfield turnkey](../../case-studies/02-cloud-platform-turnkey.md)
 - [Brownfield import](../../case-studies/04-terraform-brownfield-import.md)
 - [Legacy estate as Terraform (VK Cloud)](../../case-studies/05-legacy-estate-as-code.md)
+- [VMware VCD from zero + one-button CI](../../case-studies/06-vmware-vcd-greenfield.md)
 
 ## Keywords
 
-Terraform, Terragrunt, IaC, AWS, Huawei Cloud, cloud.ru, OpenStack, Selectel, VK Cloud, NOVA Cloud, Kazakhstan, vkcs, Proxmox, Cloudflare, Kubernetes, IAM, VPC, modules, live, multi-env, brownfield import, legacy estate, remote state, RDS, Vault, ESO, secrets, audit
+Terraform, Terragrunt, IaC, AWS, Huawei Cloud, cloud.ru, OpenStack, Selectel, VK Cloud, NOVA Cloud, Kazakhstan, vkcs, VMware, VCD, Proxmox, Cloudflare, Kubernetes, IAM, VPC, modules, live, multi-env, brownfield import, legacy estate, remote state, RDS, Vault, ESO, secrets, audit

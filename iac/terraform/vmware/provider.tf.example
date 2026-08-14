@@ -1,0 +1,33 @@
+# VMware Cloud Director. Copy to provider.tf locally (do not commit tokens).
+# Docs: https://registry.terraform.io/providers/vmware/vcd/latest/docs
+
+terraform {
+  backend "s3" {
+    bucket                      = "tfstate-example"
+    key                         = "vmware/deploy/terraform.tfstate"
+    region                      = "example-region"
+    skip_credentials_validation = true
+    skip_metadata_api_check     = true
+    skip_requesting_account_id  = true
+    skip_region_validation      = true
+    skip_s3_checksum            = true
+    endpoints = {
+      s3 = "https://s3.example.com"
+    }
+  }
+}
+
+provider "vcd" {
+  user                 = "none"
+  password             = "none"
+  auth_type            = "api_token_file"
+  api_token_file       = var.api_token_file
+  allow_api_token_file = true
+
+  org = var.org_name
+  vdc = var.org_vdc
+  url = var.vcd_url
+
+  max_retry_timeout    = var.vcd_max_retry_timeout
+  allow_unverified_ssl = var.vcd_allow_unverified_ssl
+}

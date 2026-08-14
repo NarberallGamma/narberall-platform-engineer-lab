@@ -21,6 +21,7 @@ This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terra
 | Engineer reviewing IaC | [`iac/terraform/`](iac/terraform/) |
 | Engineer reviewing legacy-as-code | [`iac/cloud/vk-cloud.md`](iac/cloud/vk-cloud.md) then [`case-studies/05-legacy-estate-as-code.md`](case-studies/05-legacy-estate-as-code.md) |
 | Engineer reviewing Ansible / edge | [`iac/ansible/`](iac/ansible/) then [`reference/ansible-edge/`](reference/ansible-edge/) |
+| Engineer reviewing CI (infra + builds + gates) | [`iac/ci/`](iac/ci/) then [`diagrams/iac/ci-turnkey.md`](diagrams/iac/ci-turnkey.md) |
 | Engineer reviewing OS / hardware depth | [`practice/home-lab/os-workstation.md`](practice/home-lab/os-workstation.md) |
 
 ```text
@@ -28,6 +29,7 @@ iac/
   cloud/        # Experience by platform (keywords + links)
   terraform/    # Code, one folder per cloud
   ansible/      # Day-2 Linux / Xray GitOps → reference/ansible-*
+  ci/           # CI catalog: turnkey map + sanitized pipelines/
 ```
 
 ---
@@ -59,7 +61,9 @@ I regularly stand up infrastructure **from zero** in public clouds and on premis
 
 **VK Cloud note for international readers:** VK Cloud (MCS) is **NOVA Cloud class** (Kazakhstan OpenStack IaaS). Under the hood the resource model is **OpenStack**: Nova compute, Cinder volumes, Neutron networks (VPC-equivalent), Keystone identity. That work is transferable OpenStack experience (NOVA Cloud KZ, Selectel-class, and other OpenStack IaaS). Provider in this lab: `vk-cs/vkcs`.
 
-Also shipped platforms on **AWS**, **Google Cloud**, **Hetzner**, **OpenStack / Selectel**, **VK Cloud (NOVA Cloud class / MCS)**, **VMware**, **Proxmox**, and **bare-metal** servers in previous roles.
+**VMware note for international readers:** cloud.ru VMware is **VMware Cloud Director (VCD)**, a different API from Huawei-class Advanced. Under the hood: org / VDC / Edge / vApp / VM / storage profiles. That work is transferable VCD / vCloud Director experience. Provider in this lab: `vmware/vcd`. Code: [`iac/terraform/vmware/`](iac/terraform/vmware/). One-button host CI: [`iac/ci/`](iac/ci/).
+
+Also shipped platforms on **AWS**, **Google Cloud**, **Hetzner**, **OpenStack / Selectel**, **VK Cloud (NOVA Cloud class / MCS)**, **VMware Cloud Director**, **Proxmox**, and **bare-metal** servers in previous roles.
 
 ```mermaid
 flowchart TB
@@ -71,7 +75,7 @@ flowchart TB
     OS[OpenStack Selectel]
     VK[VK Cloud NOVA-class]
     PX[Proxmox]
-    VM[VMware]
+    VM[VMware VCD]
     BM[Bare metal]
     CF[Cloudflare]
   end
@@ -216,6 +220,8 @@ All cloud write-ups and Terraform live under **[`iac/`](iac/)**.
 | [`iac/cloud/`](iac/cloud/) | Experience by platform, with links into code |
 | [`iac/terraform/README.md`](iac/terraform/README.md) | Code navigation hub |
 | [`iac/ansible/`](iac/ansible/) | Day-2 Ansible map → `reference/ansible-*` |
+| [`iac/ci/`](iac/ci/) | **CI catalog:** turnkey map (Jenkins + GitLab CI, Java builds, gates, MR, revoke) |
+| [`iac/terraform/vmware/`](iac/terraform/vmware/) | **VCD greenfield:** catalog, guest init, DB-class VM, `vmware/vcd` |
 | [`iac/terraform/RESOURCES.md`](iac/terraform/RESOURCES.md) | Clouds × resource types in code |
 | [`iac/terraform/aws/`](iac/terraform/aws/) | AWS root + Terragrunt live (EKS, RDS, ElastiCache) |
 | [`iac/terraform/cloud-ru-huawei/`](iac/terraform/cloud-ru-huawei/) | Huawei-class multi-env root + Terragrunt |
@@ -231,13 +237,17 @@ flowchart TB
     Cloud[cloud/ experience]
     TF[terraform/ code]
     ANS[ansible/ day-2]
+    CI[ci/ one-button]
   end
   Cloud --> TF
   ANS --> RefA[reference/ansible-edge]
+  CI --> TF
+  CI --> ANS
   TF --> AWS[aws]
   TF --> CR[cloud-ru-huawei]
   TF --> OS[openstack-selectel]
   TF --> VK[vkcloud legacy import]
+  TF --> VMw[vmware VCD]
   TF --> PX[proxmox]
   TF --> CF[cloudflare]
   Mods[modules] --> CR
@@ -288,6 +298,7 @@ flowchart LR
 - [Cloud platform turnkey / Terraform from zero](case-studies/02-cloud-platform-turnkey.md)
 - [Brownfield import into Terraform state](case-studies/04-terraform-brownfield-import.md)
 - [Legacy estate as Terraform (VK Cloud / NOVA Cloud class)](case-studies/05-legacy-estate-as-code.md)
+- [VMware VCD from zero + one-button host lifecycle](case-studies/06-vmware-vcd-greenfield.md)
 - [AI / LLM platform](case-studies/01-ai-llm-platform.md)
 - [Document AI pipeline](case-studies/03-document-ai-pipeline.md)
 

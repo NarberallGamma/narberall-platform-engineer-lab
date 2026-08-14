@@ -18,4 +18,5 @@
 ## Proof in this repo
 
 - Case study: `case-studies/02-cloud-platform-turnkey.md`
+- VCD + one-button host CI: `case-studies/06-vmware-vcd-greenfield.md`, `iac/ci/`
 - Code: `iac/terraform/`, `reference/monitoring-starter/`

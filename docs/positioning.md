@@ -9,7 +9,7 @@ Full six-year narrative (domains, JVM, brokers, org): [`experience.md`](experien
 
 ## Scope of ownership
 
-**Greenfield:** empty cloud project or bare metal through IAM, VPC, Kubernetes, CI/CD, apps, and observability.
+**Greenfield:** empty cloud project or bare metal through IAM, VPC, Kubernetes, CI/CD, apps, and observability. New VMs follow a **one-button** path (Terraform / guest init → Ansible → Vault → monitoring → docs); detail: [`../iac/ci/`](../iac/ci/).
 
 **Legacy:** arrive on a hand-built estate, automate it, document it, add monitoring, cut waste, and keep shipping without a reckless rewrite. **Proof in this lab:** [`../case-studies/05-legacy-estate-as-code.md`](../case-studies/05-legacy-estate-as-code.md) (70+ console-built VMs, full network/SG catalog from zero, import, clean plan).
 
@@ -33,7 +33,7 @@ Full six-year narrative (domains, JVM, brokers, org): [`experience.md`](experien
 - Databases under load: long SQL, locks/blocking, replication lag and failover, read/write spread, balancers in front of the data path, **sharding** when one primary is the ceiling. PostgreSQL / RDS-class in public code; same ops pattern in private estates.
 - Messaging and cache on the critical path: **Kafka**, **RabbitMQ**, **NATS**, **Artemis**, **Redis**
 - Application delivery: Java/Kotlin JVM (including Tomcat and dumps), .NET, Go, Python, 1C — plus CI gates (SonarQube, Trivy, OSV-Scanner)
-- CI/CD: **Jenkins** (plugins, Kubernetes workers instead of dedicated VMs) and **GitLab CI + Argo CD** (branch/tag GitOps, auto MR, merge policy)
+- CI/CD: **Jenkins** (plugins, Kubernetes workers instead of dedicated VMs) and **GitLab CI + Argo CD** (branch/tag GitOps, auto MR, merge policy). Full map (create → accompany → build/publish → gates → revoke): [`../iac/ci/`](../iac/ci/)
 
 ## Cloud and compute
 
@@ -41,8 +41,9 @@ See [`iac/cloud/`](../iac/cloud/) for per-platform write-ups and links into Terr
 
 - **cloud.ru / Huawei Cloud** (AWS-shaped resource model; strong transferable AWS practice)
 - **VK Cloud / NOVA Cloud class** (Kazakhstan; OpenStack under the hood: Nova, Cinder, Neutron, Keystone; provider `vkcs`)
+- **VMware Cloud Director** (cloud.ru VMware / VCD; provider `vmware/vcd`; guest init + CI hooks)
 - **AWS**, **Google Cloud**, **Hetzner**
-- **OpenStack / Selectel**, **VMware**, **Proxmox**, **bare metal**
+- **OpenStack / Selectel**, **Proxmox**, **bare metal**
 - **Cloudflare** (DNS as code)
 
 **Education:** B.Sc. in Information Systems and Technologies (09.03.02), The Bonch-Bruevich Saint Petersburg State University of Telecommunications (SPbSUT). Cisco, campus networks and servers in the curriculum; Windows Server practice at IT companies during studies. Detail: [`experience.md#education`](experience.md#education).

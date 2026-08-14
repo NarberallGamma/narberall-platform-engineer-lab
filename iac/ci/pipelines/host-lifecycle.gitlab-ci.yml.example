@@ -1,0 +1,103 @@
+# Sanitized GitLab CI: one pipeline or stage-by-stage.
+# Replace image, runner tags, and Vault address locally. No tenant names here.
+# Hub: ../README.md  Terraform: ../../terraform/  Ansible: ../../ansible/
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+stages:
+  - validate
+  - plan
+  - apply
+  - bootstrap
+  - secrets
+  - observe
+  - docs
+
+variables:
+  TF_ROOT: iac/terraform/vmware
+  ANSIBLE_PLAYBOOK: reference/ansible-bootstrap/vcd-post-apply.yml.example
+
+.tf:
+  image: hashicorp/terraform:1.5
+  cache:
+    key: tf-vmware
+    paths: ["${TF_ROOT}/.terraform"]
+
+validate:
+  extends: .tf
+  stage: validate
+  script:
+    - cd "$TF_ROOT" && terraform init -input=false && terraform validate
+
+plan:
+  extends: .tf
+  stage: plan
+  script:
+    - cd "$TF_ROOT" && terraform plan -input=false -out=tfplan
+  artifacts:
+    paths: ["${TF_ROOT}/tfplan"]
+    expire_in: 1 day
+
+apply:
+  extends: .tf
+  stage: apply
+  resource_group: vmware-apply
+  needs: ["plan"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  script:
+    - cd "$TF_ROOT" && terraform apply -input=false tfplan
+    - terraform output -json > "$CI_PROJECT_DIR/tf-output.json"
+  artifacts:
+    paths: ["tf-output.json"]
+    expire_in: 1 day
+
+wait_ssh:
+  stage: bootstrap
+  needs: ["apply"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  script:
+    - echo "wait until guest SSH answers (private helper; not in this lab)"
+
+ansible_bootstrap:
+  stage: bootstrap
+  needs: ["wait_ssh"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  script:
+    - ansible-playbook "$ANSIBLE_PLAYBOOK" -i inventory/from-tf.yml
+
+vault_write:
+  stage: secrets
+  needs: ["ansible_bootstrap"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  script:
+    - echo "write guest creds to Vault KV (path and token stay in CI variables)"
+
+monitoring:
+  stage: observe
+  needs: ["ansible_bootstrap"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  script:
+    - echo "register node-exporter / host metrics job from tf-output.json"
+
+docs:
+  stage: docs
+  needs: ["apply"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  script:
+    - echo "append inventory + mermaid from tf-output.json"
+    - echo "optional: local LLM rewrite of the runbook (no data leaves the network)"

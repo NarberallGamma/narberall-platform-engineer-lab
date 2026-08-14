@@ -1,0 +1,2 @@
+# Example pubkey only. Replace locally. Never commit a production key.
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA lab-example

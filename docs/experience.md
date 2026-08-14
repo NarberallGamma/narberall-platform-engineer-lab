@@ -184,6 +184,7 @@ That is why hardware/OS depth and Cisco-style incident method in this lab are no
 - **Payments / SBP-class banks**, **blockchain**, **delivery e-commerce**, **Atlassian / Nextcloud**, **Kafka-class and Redis**, **50+ microservices and JVM monoliths**
 - Build/deploy for **Java, Kotlin, .NET, Go, Python, 1C**; gates with **SonarQube, Trivy, OSV-Scanner**
 - **Jenkins** (plugins, workers) including **dedicated-VM agents → Kubernetes**; **GitLab CI + Argo CD** (branch/tag deploys, auto MR, merge on written rules)
+- **CI catalog:** Terraform / guest init → Ansible → Vault → monitoring → docs, plus Java and other builds, publish, Sonar/Trivy/OSV, auto MR, deploy, revoke/cleanup. **Jenkins** (plugins, K8s workers) and **GitLab CI + Argo CD**. Detail: [`../iac/ci/`](../iac/ci/)
 - **Education:** B.Sc. 09.03.02 Information Systems and Technologies, SPbSUT (Bonch-Bruevich); Cisco labs, campus servers/networks; Windows Server practice at IT companies during studies
 
 Cloud, Kubernetes, DBMS, SLA, and security defaults: [root README](../README.md) and [positioning](positioning.md).

@@ -48,9 +48,9 @@ VPC / subnets / routes / security
 
 ## Stack and platforms
 
-Terraform, Terragrunt, remote state (S3/OBS-compatible), Huawei Cloud class / cloud.ru (`sbercloud`, AWS-shaped), AWS, Google Cloud, Hetzner, VMware, Proxmox, bare metal, Linux, Docker/Kubernetes, Ansible for day-2 hosts
+Terraform, Terragrunt, remote state (S3/OBS-compatible), Huawei Cloud class / cloud.ru (`sbercloud`, AWS-shaped), VMware Cloud Director (`vmware/vcd`), AWS, Google Cloud, Hetzner, Proxmox, bare metal, Linux, Docker/Kubernetes, Ansible for day-2 hosts
 
-**Note:** cloud.ru is Huawei Cloud class; day-to-day work maps to AWS skills (VPC, EC2-class compute, EKS-class Kubernetes, RDS, S3).
+**Note:** cloud.ru is Huawei Cloud class; day-to-day work maps to AWS skills (VPC, EC2-class compute, EKS-class Kubernetes, RDS, S3). cloud.ru VMware is a separate VCD API. See [case 06](06-vmware-vcd-greenfield.md).
 
 ## Links
 
@@ -61,3 +61,4 @@ Terraform, Terragrunt, remote state (S3/OBS-compatible), Huawei Cloud class / cl
 - AWS: [`iac/terraform/aws/`](../iac/terraform/aws/)
 - Greenfield example: [`iac/terraform/examples/greenfield-platform/`](../iac/terraform/examples/greenfield-platform/)
 - Day-2 Ansible: [`iac/ansible/`](../iac/ansible/)
+- VCD greenfield + CI: [`06-vmware-vcd-greenfield.md`](06-vmware-vcd-greenfield.md), [`iac/ci/`](../iac/ci/)

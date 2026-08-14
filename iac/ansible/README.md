@@ -45,6 +45,6 @@ flowchart TB
   Prep --> Edge
 ```
 
-Terraform for the same platforms: [`../terraform/`](../terraform/). Cloud experience: [`../cloud/`](../cloud/).
+These roles are the day-2 half of the same delivery as Terraform. **CI is the button** that runs apply, then this map: [`../ci/`](../ci/). Terraform: [`../terraform/`](../terraform/). Cloud experience: [`../cloud/`](../cloud/). VCD hook example: [`../../reference/ansible-bootstrap/vcd-post-apply.yml.example`](../../reference/ansible-bootstrap/vcd-post-apply.yml.example).
 
 **Keywords:** Ansible, GitOps, Docker, day-2 Linux, Xray, 3X-UI, UFW, ACME, systemd, inventory

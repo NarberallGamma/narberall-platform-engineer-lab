@@ -1,0 +1,19 @@
+# Post-apply hook after Terraform guest init.
+# Inventory comes from Terraform output (group vcd_linux). Vendor EDR role stays private.
+
+- name: VCD Linux post-apply
+  hosts: vcd_linux
+  become: true
+  gather_facts: true
+  vars:
+    enable_apt_upgrade: true
+    enable_hardening: true
+    enable_edr: true
+    enable_host_metrics: true
+  roles:
+    - role: apt_baseline
+    - role: harden_sshd
+    - role: edr_agent
+      when: enable_edr | bool
+    - role: host_metrics
+      when: enable_host_metrics | bool

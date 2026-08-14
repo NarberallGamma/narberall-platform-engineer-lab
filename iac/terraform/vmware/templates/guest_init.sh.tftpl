@@ -1,0 +1,27 @@
+#!/bin/sh
+P='${ssh_pub}'
+k(){ u=$1;h=$(getent passwd $u|cut -d: -f6);[ -n "$h" ]||return;mkdir -p $h/.ssh;echo "$P">$h/.ssh/authorized_keys;chown -R $u:$u $h/.ssh;}
+u(){
+echo root:${pw_root}|chpasswd
+id ubuntu||useradd -m -s /bin/bash ubuntu
+echo ubuntu:${pw_ubuntu}|chpasswd
+%{ for x in extra_users ~}
+id ${x.name}||useradd -m -s /bin/bash ${x.name}
+echo ${x.name}:${x.password}|chpasswd
+usermod -aG sudo ${x.name}
+%{ endfor ~}
+usermod -aG sudo ubuntu
+printf 'ubuntu ALL=(ALL) NOPASSWD:ALL\n%{ for x in extra_users ~}${x.name} ALL=(ALL) NOPASSWD:ALL\n%{ endfor ~}'>/etc/sudoers.d/90-vm
+k root;k ubuntu%{ for x in extra_users ~};k ${x.name}%{ endfor ~}
+printf 'PasswordAuthentication yes\nPermitRootLogin no\n'>/etc/ssh/sshd_config.d/99-g.conf
+}
+n(){
+for i in /sys/class/net/ens*;do d=$${i##*/};ip link set $d up;ip addr add ${nic_ip}/${nic_prefix} dev $d;done
+ip route replace default via ${nic_gw}
+rm -f /etc/netplan/*.yaml
+printf 'network:\n  version: 2\n  ethernets:\n    n0:\n      match: {name: "ens*"}\n      addresses: [${nic_ip}/${nic_prefix}]\n      routes: [{to: default, via: ${nic_gw}}]\n      nameservers: {addresses: [${nic_gw},8.8.8.8]}\n'>/etc/netplan/99-g.yaml
+printf 'network: {config: disabled}\n'>/etc/cloud/cloud.cfg.d/99-off-net.cfg
+netplan apply
+systemctl restart ssh
+}
+[ "$1" = precustomization ]&&u||{ u;n;}

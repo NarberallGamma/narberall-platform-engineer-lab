@@ -8,4 +8,6 @@ This lab publishes **curated slices**, not full production Terraform trees (secu
 - Configs: `*.tfvars.example` only
 - Never commit state, `.terraform/`, private keys, or lock files from production
 - Import examples use fake IDs (`vpc-aaaa`, `subnet-bbbb`)
+- VCD: no real org / VDC / Edge names, URNs, MACs, or `token.json` refresh tokens
+- Guest secrets and live initscripts stay under `artifacts/` (not committed)
 - Prefer representative resources over copying entire account/region trees

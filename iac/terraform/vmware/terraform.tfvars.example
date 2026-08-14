@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars (gitignored). Documentation values only.
+
+vcd_url  = "https://vcd.example.com/api"
+org_name = "example-org"
+org_vdc  = "example-vdc"
+
+create_vm = false
+
+ubuntu_iso = {
+  version      = "24.04.3"
+  os_type      = "ubuntu64Guest"
+  catalog_org  = "shared-linux"
+  catalog_name = "Linux"
+  media_name   = "ubuntu-24.04.3-live-server-amd64.iso"
+}
+
+guest_extra_users = ["admin_platform"]

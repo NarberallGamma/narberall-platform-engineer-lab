@@ -1,20 +1,30 @@
-# VMware
+# VMware Cloud Director (cloud.ru VMware / VCD)
 
-**Role:** Platform Engineer. VM estates, networking adjacency, guest Linux for platform services.
+**Class:** VMware Cloud Director. Provider in samples: `vmware/vcd` `~> 3.14`.  
+**Role:** Platform Engineer. **Proof** of greenfield on VCD: empty catalog maps → vApp → Ubuntu guest with extra disks and a working first-boot, written from zero.
+
+**VMware note for international readers:** cloud.ru VMware is **VMware Cloud Director (VCD)**, not the Huawei-class Advanced API and not a vSphere HTML5 click-ops dump. Under the hood: org / VDC / Edge / org networks / vApp / VM / storage profiles. That work transfers to any VCD or vCloud Director estate (hosted or on-prem). Separate from [`cloud-ru-huawei.md`](cloud-ru-huawei.md) (AWS-shaped) and from [`proxmox.md`](proxmox.md).
 
 ## What I owned
 
-- VM layout and guest Linux for platform and app services
-- Networking adjacency to the rest of the platform (load balancers, K8s nodes, data)
-- Operating model: treat VMware as another compute substrate, then IaC and Kubernetes on top
+- Tenant read-only **audit** first (catalogs, templates, Edge, IOPS), then a **deploy** stack
+- Catalog maps: org network, storage policy, Ubuntu template (VM files use keys, not raw URNs)
+- Linux VM from a shared Ubuntu-24.04 template: CPU/RAM, gold OS + data + WAL disks, MANUAL NIC
+- Guest Customization + short initscript: users, random passwords, SSH keys, `PermitRootLogin no`, static netplan on POST
+- Extra disks delayed until customization finishes (`allow_vm_reboot` otherwise leaves `ens*` DOWN)
+- Least privilege: Terraform does **not** create or change Edge NAT / FW / IPsec / routes
+- Same host then enters the [one-button CI](../ci/) path: Ansible, Vault, monitoring, inventory/docs (local LLM for confidential rewrite)
 
-Published Terraform in this lab uses Proxmox and OpenStack as the on-prem / private-cloud code proof. VMware client trees stay private.
+Published here: one DB-class guest. Private trees stay unpublished.
 
-## Related code
+## Terraform in this lab
 
-- Adjacent on-prem samples: [`../terraform/proxmox/`](../terraform/proxmox/), [`../terraform/openstack-selectel/`](../terraform/openstack-selectel/)
-- Delivery story: [turnkey from zero](../../case-studies/02-cloud-platform-turnkey.md)
+| Path | What |
+|------|------|
+| [`../terraform/vmware/`](../terraform/vmware/) | Sanitized root: catalog, guest init, `vm-database.tf`, `modules/vm_linux` |
+| [`../terraform/vmware/audit/`](../terraform/vmware/audit/) | Read-only inventory |
+| [`../ci/`](../ci/) | CI catalog: one-button story + [`../ci/pipelines/`](../ci/pipelines/) |
 
 ## Keywords
 
-VMware, vSphere, Linux, Terraform, Kubernetes, on-prem, platform engineering
+VMware, VCD, vCloud Director, cloud.ru VMware, Terraform, vApp, guest customization, initscript, cloud-init, netplan, IOPS, Ansible, Vault, EDR, CI/CD, GitLab CI

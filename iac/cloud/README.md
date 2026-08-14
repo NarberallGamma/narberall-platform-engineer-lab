@@ -6,6 +6,8 @@ Platforms I have stood up and operated: public cloud, private cloud, and on-prem
 
 **VK Cloud note:** VK Cloud (MCS) is **NOVA Cloud class** (Kazakhstan OpenStack IaaS). Under the hood: **OpenStack** (Nova compute, Cinder volumes, Neutron networks, Keystone). Transferable to NOVA Cloud KZ and other OpenStack IaaS. Provider: `vk-cs/vkcs`.
 
+**VMware note:** cloud.ru VMware is **VMware Cloud Director (VCD)**. Under the hood: org / VDC / Edge / vApp / VM. Transferable to any VCD / vCloud Director estate. Provider: `vmware/vcd`. Not the Huawei-class Advanced API.
+
 ## Map
 
 | Platform | What I owned | Published Terraform |
@@ -17,7 +19,7 @@ Platforms I have stood up and operated: public cloud, private cloud, and on-prem
 | [OpenStack / Selectel](openstack-selectel.md) | Networks, K8s guests, GitLab, Postgres | [`../terraform/openstack-selectel/`](../terraform/openstack-selectel/) |
 | [VK Cloud (NOVA Cloud class)](vk-cloud.md) | **Proof of legacy:** 70+ hand-built VMs + full network/SG catalog from zero, then import | [`../terraform/vkcloud/`](../terraform/vkcloud/) |
 | [Proxmox](proxmox.md) | VE guests for K8s, GitLab, Postgres | [`../terraform/proxmox/`](../terraform/proxmox/) |
-| [VMware](vmware.md) | VM estates, networking adjacency, guest Linux | Narrative (private trees) |
+| [VMware Cloud Director](vmware.md) | **Proof of greenfield VCD:** catalog from zero, guest init, DB-class VM, then CI hooks | [`../terraform/vmware/`](../terraform/vmware/) |
 | [Bare metal](bare-metal.md) | Rack/server Linux, bootstrap, K8s without a hyperscaler | Narrative (private trees) |
 | [Cloudflare](cloudflare.md) | DNS as code alongside compute roots | [`../terraform/cloudflare/`](../terraform/cloudflare/) |
 
@@ -42,6 +44,7 @@ flowchart TB
     TFvk[vkcloud/]
     TFpx[proxmox/]
     TFcf[cloudflare/]
+    TFvm[vmware/]
   end
   CR --> TFcr
   AWS --> TFaws
@@ -49,9 +52,9 @@ flowchart TB
   VK --> TFvk
   PX --> TFpx
   CF --> TFcf
+  VM --> TFvm
   GCP --> Pattern[same ownership pattern]
   HZ --> Pattern
-  VM --> Pattern
   BM --> Pattern
 ```
 
@@ -71,6 +74,6 @@ flowchart TB
 Greenfield: empty project or empty rack → apply.  
 Brownfield: inventory → code → `terraform import` → clean `plan`. Same pattern for accelerating delivery, cutting idle spend, and making ops visible.
 
-See case studies: [turnkey from zero](../../case-studies/02-cloud-platform-turnkey.md), [brownfield import](../../case-studies/04-terraform-brownfield-import.md), [legacy estate as Terraform](../../case-studies/05-legacy-estate-as-code.md).
+See case studies: [turnkey from zero](../../case-studies/02-cloud-platform-turnkey.md), [brownfield import](../../case-studies/04-terraform-brownfield-import.md), [legacy estate as Terraform](../../case-studies/05-legacy-estate-as-code.md), [VMware VCD + one-button CI](../../case-studies/06-vmware-vcd-greenfield.md).
 
-Day-2 hosts (Ansible): [`../ansible/`](../ansible/). Positioning: [`../../docs/positioning.md`](../../docs/positioning.md).
+Day-2 hosts (Ansible): [`../ansible/`](../ansible/). One-button CI: [`../ci/`](../ci/). Positioning: [`../../docs/positioning.md`](../../docs/positioning.md).

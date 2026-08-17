@@ -43,3 +43,4 @@ Terraform, S3-compatible remote state, cloud.ru-class provider, import workflow,
 - Multi-env root pattern: [`iac/terraform/cloud-ru-huawei/stacks/multi-env-root/`](../iac/terraform/cloud-ru-huawei/stacks/multi-env-root/)
 - Related greenfield story: [`02-cloud-platform-turnkey.md`](02-cloud-platform-turnkey.md)
 - Related NOVA Cloud class estate (VK Cloud, purpose-split VMs): [`05-legacy-estate-as-code.md`](05-legacy-estate-as-code.md)
+- Related Huawei compute catalog (split state): [`07-huawei-compute-catalog.md`](07-huawei-compute-catalog.md)

@@ -11,3 +11,4 @@ This lab publishes **curated slices**, not full production Terraform trees (secu
 - VCD: no real org / VDC / Edge names, URNs, MACs, or `token.json` refresh tokens
 - Guest secrets and live initscripts stay under `artifacts/` (not committed)
 - Prefer representative resources over copying entire account/region trees
+- Huawei compute catalog: fake UUIDs, documentation CIDRs (`10.10.x.x`), generic hostnames (`gitlab-dev-01`, `vault-prod-01`). No client project names, no live OBS bucket names, no AK/SK

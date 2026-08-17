@@ -23,9 +23,12 @@
 | [`../terraform/cloud-ru-huawei/`](../terraform/cloud-ru-huawei/) | Cloud folder (stacks + Terragrunt live) |
 | [`../terraform/cloud-ru-huawei/stacks/multi-env-root/`](../terraform/cloud-ru-huawei/stacks/multi-env-root/) | Multi-env root: network, ECS, CCE, RDS, Kafka, OBS |
 | [`../terraform/cloud-ru-huawei/live/`](../terraform/cloud-ru-huawei/live/) | Terragrunt live sample (`env-dev` units) |
+| [`../terraform/cloud-ru-compute/`](../terraform/cloud-ru-compute/) | **Second estate:** compute catalog (CCE, RDS, purpose ECS). Network stays in sibling Terragrunt live |
 | [`../terraform/modules/`](../terraform/modules/) | Reusable `sbercloud` modules consumed by those stacks |
 | [`../terraform/examples/greenfield-platform/`](../terraform/examples/greenfield-platform/) | Minimal module compose |
 | [`../terraform/examples/brownfield-import/`](../terraform/examples/brownfield-import/) | Import checklist |
+
+Inventory and import notes for the compute catalog: [`../terraform/cloud-ru-compute/ESTATE.md`](../terraform/cloud-ru-compute/ESTATE.md), case study [`../../case-studies/07-huawei-compute-catalog.md`](../../case-studies/07-huawei-compute-catalog.md).
 
 Resource types: [`../terraform/RESOURCES.md`](../terraform/RESOURCES.md)
 

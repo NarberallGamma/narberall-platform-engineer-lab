@@ -4,7 +4,7 @@ Prefer SVG/PNG from Excalidraw/draw.io, or Mermaid next to the case / practice p
 
 | Path | Use |
 |------|-----|
-| [`case-studies/`](case-studies/) | Architecture for published case studies (01-06, including legacy-as-code and VCD greenfield) |
+| [`case-studies/`](case-studies/) | Architecture for published case studies (01-07, including legacy-as-code, VCD greenfield, Huawei compute catalog) |
 | [`iac/`](iac/) | CI turnkey (Jenkins + GitLab CI, build/publish/revoke) |
 | [`practice/home-lab/`](practice/home-lab/) | Dual-boot, local AI, Ansible edge, Android SSH |
 

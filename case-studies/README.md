@@ -14,5 +14,6 @@ Ansible / home-lab edge is **not** a client case study; it lives in [`practice/h
 | [`04-terraform-brownfield-import.md`](04-terraform-brownfield-import.md) | Import hand-built cloud into state | [`diagrams/case-studies/04-terraform-brownfield-import.md`](../diagrams/case-studies/04-terraform-brownfield-import.md) |
 | [`05-legacy-estate-as-code.md`](05-legacy-estate-as-code.md) | **Proof of legacy:** 70+ console-built VMs, full network/SG catalog from zero, import, clean plan | [`diagrams/case-studies/05-legacy-estate-as-code.md`](../diagrams/case-studies/05-legacy-estate-as-code.md) |
 | [`06-vmware-vcd-greenfield.md`](06-vmware-vcd-greenfield.md) | **VCD from zero:** catalog, guest init, DB-class VM, one-button CI stages | [`diagrams/case-studies/06-vmware-vcd-greenfield.md`](../diagrams/case-studies/06-vmware-vcd-greenfield.md) |
+| [`07-huawei-compute-catalog.md`](07-huawei-compute-catalog.md) | **Huawei compute catalog:** split state, CCE/RDS/purpose ECS, import then a new Teleport VM | [`diagrams/case-studies/07-huawei-compute-catalog.md`](../diagrams/case-studies/07-huawei-compute-catalog.md) |
 
 Use [`_template.md`](_template.md) for new entries.

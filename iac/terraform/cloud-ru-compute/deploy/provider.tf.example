@@ -1,0 +1,23 @@
+# Copy to provider.tf locally. Do not commit AK/SK or a live backend bucket name.
+
+terraform {
+  backend "s3" {
+    bucket                      = "project-a-terraform-state"
+    key                         = "platform/deploy/terraform.tfstate"
+    region                      = "ru-moscow-1"
+    endpoints                   = { s3 = "https://obs.ru-moscow-1.hc.sbercloud.ru" }
+    use_path_style              = false
+    skip_region_validation      = true
+    skip_credentials_validation = true
+    skip_metadata_api_check     = true
+    skip_requesting_account_id  = true
+    skip_s3_checksum            = true
+  }
+}
+
+provider "sbercloud" {
+  auth_url   = "https://iam.ru-moscow-1.hc.sbercloud.ru/v3"
+  region     = var.region
+  access_key = var.access_key
+  secret_key = var.secret_key
+}

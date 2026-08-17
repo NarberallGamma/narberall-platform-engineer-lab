@@ -12,6 +12,7 @@ Experience: [`../../cloud/cloud-ru-huawei.md`](../../cloud/cloud-ru-huawei.md)
 | Reusable modules | [`../modules/`](../modules/) |
 | Greenfield example | [`../examples/greenfield-platform/`](../examples/greenfield-platform/) |
 | Brownfield import checklist | [`../examples/brownfield-import/`](../examples/brownfield-import/) |
+| Second estate: compute catalog (CCE, RDS, purpose ECS) | [`../cloud-ru-compute/`](../cloud-ru-compute/) |
 
 ```mermaid
 flowchart LR

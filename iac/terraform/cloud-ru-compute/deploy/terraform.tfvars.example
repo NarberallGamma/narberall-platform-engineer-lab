@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars in this directory. Do not commit terraform.tfvars.
+
+access_key = "YOUR_SBERCLOUD_ACCESS_KEY"
+secret_key = "YOUR_SBERCLOUD_SECRET_KEY"
+region     = "ru-moscow-1"
+
+# Remote state (OBS S3 backend) does not read this file.
+# Export AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_DEFAULT_REGION
+# and, for OBS checksum, AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+# plus AWS_RESPONSE_CHECKSUM_VALIDATION=when_required.

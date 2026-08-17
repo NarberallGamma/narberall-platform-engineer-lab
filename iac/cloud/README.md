@@ -12,7 +12,7 @@ Platforms I have stood up and operated: public cloud, private cloud, and on-prem
 
 | Platform | What I owned | Published Terraform |
 |----------|----------------|---------------------|
-| [cloud.ru / Huawei Cloud](cloud-ru-huawei.md) | Greenfield + brownfield: IAM, VPC, ECS, CCE, RDS, Kafka, OBS | [`../terraform/cloud-ru-huawei/`](../terraform/cloud-ru-huawei/) |
+| [cloud.ru / Huawei Cloud](cloud-ru-huawei.md) | Greenfield + brownfield: IAM, VPC, ECS, CCE, RDS, Kafka, OBS. **Second estate:** compute catalog with split state | [`../terraform/cloud-ru-huawei/`](../terraform/cloud-ru-huawei/), [`../terraform/cloud-ru-compute/`](../terraform/cloud-ru-compute/) |
 | [AWS](aws.md) | Multi-account / multi-region: VPC, EC2, EKS, RDS, ElastiCache, IAM, S3, CloudFront | [`../terraform/aws/`](../terraform/aws/) |
 | [Google Cloud](google-cloud.md) | Project/network bootstrap, compute, GKE-class / VM delivery | Narrative (private trees) |
 | [Hetzner](hetzner.md) | Cloud VMs, networking, Linux baseline for app and CI | Narrative (private trees) |
@@ -39,6 +39,7 @@ flowchart TB
   end
   subgraph tf [iac/terraform]
     TFcr[cloud-ru-huawei/]
+    TFcrc[cloud-ru-compute/]
     TFaws[aws/]
     TFos[openstack-selectel/]
     TFvk[vkcloud/]
@@ -47,6 +48,7 @@ flowchart TB
     TFvm[vmware/]
   end
   CR --> TFcr
+  CR --> TFcrc
   AWS --> TFaws
   OS --> TFos
   VK --> TFvk
@@ -74,6 +76,6 @@ flowchart TB
 Greenfield: empty project or empty rack → apply.  
 Brownfield: inventory → code → `terraform import` → clean `plan`. Same pattern for accelerating delivery, cutting idle spend, and making ops visible.
 
-See case studies: [turnkey from zero](../../case-studies/02-cloud-platform-turnkey.md), [brownfield import](../../case-studies/04-terraform-brownfield-import.md), [legacy estate as Terraform](../../case-studies/05-legacy-estate-as-code.md), [VMware VCD + one-button CI](../../case-studies/06-vmware-vcd-greenfield.md).
+See case studies: [turnkey from zero](../../case-studies/02-cloud-platform-turnkey.md), [brownfield import](../../case-studies/04-terraform-brownfield-import.md), [legacy estate as Terraform](../../case-studies/05-legacy-estate-as-code.md), [VMware VCD + one-button CI](../../case-studies/06-vmware-vcd-greenfield.md), [Huawei compute catalog](../../case-studies/07-huawei-compute-catalog.md).
 
 Day-2 hosts (Ansible): [`../ansible/`](../ansible/). One-button CI: [`../ci/`](../ci/). Positioning: [`../../docs/positioning.md`](../../docs/positioning.md).

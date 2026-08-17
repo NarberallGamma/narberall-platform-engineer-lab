@@ -39,7 +39,7 @@ Full six-year narrative (domains, JVM, brokers, org): [`experience.md`](experien
 
 See [`iac/cloud/`](../iac/cloud/) for per-platform write-ups and links into Terraform.
 
-- **cloud.ru / Huawei Cloud** (AWS-shaped resource model; strong transferable AWS practice)
+- **cloud.ru / Huawei Cloud** (AWS-shaped resource model; strong transferable AWS practice). Second estate: [compute catalog](../iac/terraform/cloud-ru-compute/) (CCE, RDS, purpose ECS, split state)
 - **VK Cloud / NOVA Cloud class** (Kazakhstan; OpenStack under the hood: Nova, Cinder, Neutron, Keystone; provider `vkcs`)
 - **VMware Cloud Director** (cloud.ru VMware / VCD; provider `vmware/vcd`; guest init + CI hooks)
 - **AWS**, **Google Cloud**, **Hetzner**

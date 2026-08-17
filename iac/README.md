@@ -35,6 +35,7 @@ flowchart TB
   CI -->|cross-links| ANS
   TF --> AWS[aws/root + aws/live]
   TF --> CR[cloud-ru-huawei/stacks + live]
+  TF --> CRC[cloud-ru-compute]
   TF --> OS[openstack-selectel]
   TF --> VK[vkcloud]
   TF --> VMw[vmware]

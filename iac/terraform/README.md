@@ -10,6 +10,7 @@ Layout is meant to be **obvious**: one folder per cloud, shared `modules`, `live
 terraform/
   aws/                 # AWS root + Terragrunt live
   cloud-ru-huawei/     # Huawei-class stacks + Terragrunt live
+  cloud-ru-compute/    # Huawei-class compute catalog: CCE, RDS, purpose ECS, split state
   openstack-selectel/
   vkcloud/             # VK Cloud / NOVA Cloud class (OpenStack IaaS, catalog + purpose VMs)
   vmware/              # VMware Cloud Director (VCD): catalog, guest init, DB-class VM
@@ -25,6 +26,7 @@ terraform/
 | [`RESOURCES.md`](RESOURCES.md) | Clouds × resource types in code |
 | [`aws/`](aws/) | VPC, EC2, RDS, EKS Terragrunt live |
 | [`cloud-ru-huawei/`](cloud-ru-huawei/) | Multi-env root + Terragrunt (CCE, RDS, Kafka, OBS) |
+| [`cloud-ru-compute/`](cloud-ru-compute/) | **Compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport ECS; network stays in sibling live |
 | [`openstack-selectel/`](openstack-selectel/) | OpenStack guests for K8s / GitLab / Postgres |
 | [`vkcloud/`](vkcloud/) | **Legacy as code:** vkcs, catalog maps, purpose-split VMs, import |
 | [`vmware/`](vmware/) | **VCD greenfield:** catalog, guest init, extra disks, audit stack |
@@ -45,6 +47,9 @@ flowchart TB
   CR --> CRlive[live]
   Mods[modules] --> CRstack
   Mods --> CRlive
+  TF --> CRC[cloud-ru-compute]
+  CRC --> CRCdep[deploy CCE RDS ECS]
+  CRC --> CRCaud[audit]
   TF --> OS[openstack-selectel]
   TF --> VK[vkcloud]
   TF --> VMw[vmware]
@@ -64,7 +69,8 @@ flowchart TB
 - [Brownfield import](../../case-studies/04-terraform-brownfield-import.md)
 - [Legacy estate as Terraform (VK Cloud)](../../case-studies/05-legacy-estate-as-code.md)
 - [VMware VCD from zero + one-button CI](../../case-studies/06-vmware-vcd-greenfield.md)
+- [Huawei-class compute catalog (split state)](../../case-studies/07-huawei-compute-catalog.md)
 
 ## Keywords
 
-Terraform, Terragrunt, IaC, AWS, Huawei Cloud, cloud.ru, OpenStack, Selectel, VK Cloud, NOVA Cloud, Kazakhstan, vkcs, VMware, VCD, Proxmox, Cloudflare, Kubernetes, IAM, VPC, modules, live, multi-env, brownfield import, legacy estate, remote state, RDS, Vault, ESO, secrets, audit
+Terraform, Terragrunt, IaC, AWS, Huawei Cloud, cloud.ru, OpenStack, Selectel, VK Cloud, NOVA Cloud, Kazakhstan, vkcs, VMware, VCD, Proxmox, Cloudflare, Kubernetes, IAM, VPC, modules, live, multi-env, brownfield import, legacy estate, remote state, RDS, CCE, Vault, Teleport, AppSec, ESO, secrets, audit, split state

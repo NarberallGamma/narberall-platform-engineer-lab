@@ -225,6 +225,7 @@ All cloud write-ups and Terraform live under **[`iac/`](iac/)**.
 | [`iac/terraform/RESOURCES.md`](iac/terraform/RESOURCES.md) | Clouds × resource types in code |
 | [`iac/terraform/aws/`](iac/terraform/aws/) | AWS root + Terragrunt live (EKS, RDS, ElastiCache) |
 | [`iac/terraform/cloud-ru-huawei/`](iac/terraform/cloud-ru-huawei/) | Huawei-class multi-env root + Terragrunt |
+| [`iac/terraform/cloud-ru-compute/`](iac/terraform/cloud-ru-compute/) | **Huawei compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport; split state vs sibling live |
 | [`iac/terraform/vkcloud/`](iac/terraform/vkcloud/) | **Legacy as code:** VK Cloud / NOVA Cloud class, vkcs, catalog + purpose-split VMs, import |
 | [`iac/terraform/modules/`](iac/terraform/modules/) | Reusable modules |
 | [`iac/terraform/SANITIZE.md`](iac/terraform/SANITIZE.md) | What never goes into git |
@@ -245,6 +246,7 @@ flowchart TB
   CI --> ANS
   TF --> AWS[aws]
   TF --> CR[cloud-ru-huawei]
+  TF --> CRC[cloud-ru-compute]
   TF --> OS[openstack-selectel]
   TF --> VK[vkcloud legacy import]
   TF --> VMw[vmware VCD]
@@ -299,6 +301,7 @@ flowchart LR
 - [Brownfield import into Terraform state](case-studies/04-terraform-brownfield-import.md)
 - [Legacy estate as Terraform (VK Cloud / NOVA Cloud class)](case-studies/05-legacy-estate-as-code.md)
 - [VMware VCD from zero + one-button host lifecycle](case-studies/06-vmware-vcd-greenfield.md)
+- [Huawei-class compute catalog (split state)](case-studies/07-huawei-compute-catalog.md)
 - [AI / LLM platform](case-studies/01-ai-llm-platform.md)
 - [Document AI pipeline](case-studies/03-document-ai-pipeline.md)
 

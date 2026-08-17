@@ -17,6 +17,8 @@ Experience write-ups: [`../cloud/`](../cloud/).
 | Messaging | `sbercloud_dms_kafka_instance`, topic, user | `dms_kafka.tf` |
 | Object storage | `sbercloud_obs_bucket` | `obs.tf` |
 | Terragrunt live | VPC, subnet, route, SG, compute units | `cloud-ru-huawei/live/` |
+| Compute catalog | CCE x3, RDS PG x3, purpose ECS (GitLab, Vault, AppSec, Teleport, test), EVS, `do_not_import` | `cloud-ru-compute/deploy/` |
+| Audit (read-only) | Same catalog maps, no `resource` | `cloud-ru-compute/audit/` |
 
 ## AWS
 
@@ -83,4 +85,5 @@ Hosted VCD (cloud.ru VMware). Provider: `vmware/vcd`. Guest init + extra-disk de
 | Terragrunt live (AWS account/region/env) | `aws/live/` |
 | Standalone AWS root | `aws/root/` |
 | Brownfield catalog + purpose VMs (vkcs) | `vkcloud/` |
+| Huawei compute catalog (split state, CCE/RDS/ECS) | `cloud-ru-compute/` |
 | VCD greenfield (vapp + guest init) | `vmware/` |

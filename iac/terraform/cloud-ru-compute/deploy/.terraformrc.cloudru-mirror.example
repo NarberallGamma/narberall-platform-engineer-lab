@@ -1,0 +1,13 @@
+# Cloud.ru / SberCloud provider mirror.
+# Copy to .terraformrc in this directory. .terraformrc is local-only.
+# Docs: https://cloud.ru/docs/terraform/ug/topics/guides__configuring-terraform-provider
+
+provider_installation {
+  network_mirror {
+    url     = "https://terraform.cloud.ru/"
+    include = ["registry.terraform.io/*/*"]
+  }
+  direct {
+    exclude = ["registry.terraform.io/*/*"]
+  }
+}

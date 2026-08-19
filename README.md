@@ -224,7 +224,7 @@ All cloud write-ups and Terraform live under **[`iac/`](iac/)**.
 | [`iac/ci/`](iac/ci/) | **CI catalog:** turnkey map (Jenkins + GitLab CI, Java builds, gates, MR, revoke) |
 | [`iac/terraform/vmware/`](iac/terraform/vmware/) | **VCD greenfield:** catalog, guest init, DB-class VM, `vmware/vcd` |
 | [`iac/terraform/RESOURCES.md`](iac/terraform/RESOURCES.md) | Clouds × resource types in code |
-| [`iac/terraform/aws/`](iac/terraform/aws/) | AWS root + Terragrunt live (EKS, RDS, ElastiCache) |
+| [`iac/terraform/aws/`](iac/terraform/aws/) | AWS root + multi-account slice + Terragrunt live |
 | [`iac/terraform/cloud-ru-huawei/`](iac/terraform/cloud-ru-huawei/) | Huawei-class multi-env root + Terragrunt |
 | [`iac/terraform/cloud-ru-compute/`](iac/terraform/cloud-ru-compute/) | **Huawei compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport; split state vs sibling live |
 | [`iac/terraform/vkcloud/`](iac/terraform/vkcloud/) | **Legacy as code:** VK Cloud / NOVA Cloud class, vkcs, catalog + purpose-split VMs, import |

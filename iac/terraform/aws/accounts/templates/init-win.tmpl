@@ -1,0 +1,4 @@
+<powershell>
+net user ${windows_username} ${windows_password} /add
+net localgroup administrators ${windows_username} /add
+</powershell>

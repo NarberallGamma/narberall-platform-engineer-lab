@@ -8,7 +8,7 @@ Layout is meant to be **obvious**: one folder per cloud, shared `modules`, `live
 
 ```text
 terraform/
-  aws/                 # AWS root + Terragrunt live
+  aws/                 # AWS root + multi-account roots + Terragrunt live
   cloud-ru-huawei/     # Huawei-class stacks + Terragrunt live
   cloud-ru-compute/    # Huawei-class compute catalog: CCE, RDS, purpose ECS, split state
   openstack-selectel/
@@ -24,7 +24,7 @@ terraform/
 | Go to | Why |
 |-------|-----|
 | [`RESOURCES.md`](RESOURCES.md) | Clouds × resource types in code |
-| [`aws/`](aws/) | VPC, EC2, RDS, EKS Terragrunt live |
+| [`aws/`](aws/) | Standalone root + multi-account slice + EKS Terragrunt live |
 | [`cloud-ru-huawei/`](cloud-ru-huawei/) | Multi-env root + Terragrunt (CCE, RDS, Kafka, OBS) |
 | [`cloud-ru-compute/`](cloud-ru-compute/) | **Compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport ECS; network stays in sibling live |
 | [`openstack-selectel/`](openstack-selectel/) | OpenStack guests for K8s / GitLab / Postgres |
@@ -41,6 +41,7 @@ flowchart TB
   Cloud[iac/cloud] --> TF[iac/terraform]
   TF --> AWS[aws]
   AWS --> AWSroot[root]
+  AWS --> AWSacc[accounts]
   AWS --> AWSlive[live]
   TF --> CR[cloud-ru-huawei]
   CR --> CRstack[stacks/multi-env-root]

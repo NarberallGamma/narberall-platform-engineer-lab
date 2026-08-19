@@ -21,7 +21,7 @@ VPC / subnets / routes / security
         ├── iac/terraform/modules
         ├── cloud-ru-huawei/stacks/multi-env-root  (dev / preprod / prod)
         ├── cloud-ru-huawei/live                   (Terragrunt, per-unit state)
-        └── aws/root + aws/live
+        └── aws/root + aws/accounts + aws/live
                 │
                 ▼
         remote state (S3-compatible)

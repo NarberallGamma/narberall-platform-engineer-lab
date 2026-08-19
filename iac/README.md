@@ -33,7 +33,7 @@ flowchart TB
   ANS -->|cross-links| RefAns[reference/ansible-edge]
   CI -->|cross-links| TF
   CI -->|cross-links| ANS
-  TF --> AWS[aws/root + aws/live]
+  TF --> AWS[aws/root + aws/accounts + aws/live]
   TF --> CR[cloud-ru-huawei/stacks + live]
   TF --> CRC[cloud-ru-compute]
   TF --> OS[openstack-selectel]

@@ -20,6 +20,7 @@ Curated resource examples from multi-account / multi-region delivery (not a full
 | `iam.tf` | Roles, policies, CI user |
 | `observability.tf` | SNS, EventBridge, DLM |
 
+Multi-account roots (one folder per account + region): [`../accounts/`](../accounts/).  
 Large live layout: [`../live/`](../live/).  
 Experience: [`../../../cloud/aws.md`](../../../cloud/aws.md)  
 Map: [`../../RESOURCES.md`](../../RESOURCES.md)

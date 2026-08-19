@@ -24,14 +24,15 @@ Experience write-ups: [`../cloud/`](../cloud/).
 
 | Area | Resource types | Where |
 |------|----------------|--------|
-| Network | VPC module, IGW, routes, SG, NAT, EIP, peering | `aws/root/` |
-| Compute | `aws_instance`, EBS, volume attach, key pair | `aws/root/compute_*.tf` (GitLab, bastion, proxy, runner, Vault) |
-| Database | `aws_db_instance` (RDS MySQL), EC2+EBS DB pattern | `mysql_rds.tf`, `aws/root/modules/db_instance/` |
+| Network | VPC module, IGW, routes, SG, NAT, EIP, peering | `aws/root/`, `aws/accounts/*/networking.tf` |
+| Compute | `aws_instance`, EBS, volume attach, key pair | `aws/root/compute_*.tf`; `aws/accounts/` (GitLab, proxies, backup+st1, kube workers, Windows, graph) |
+| Database | RDS MySQL; EC2 MySQL primary/replica + binlogs; analytics PG io1 1.3 TiB | `mysql_rds.tf`; `aws/accounts/*/mysql.tf`; `dwh-us-east-2/` |
 | Cache | `aws_elasticache_replication_group` | `elasticache.tf`, `aws/live/` unit |
-| Kubernetes | EKS (+ Karpenter unit placeholder) via Terragrunt | `aws/live/` |
-| IAM | roles, policies, users, attachments | `iam.tf` |
-| Storage / CDN | S3, bucket policy, CloudFront, ACM | `s3.tf`, `cloudfront_acm.tf` |
-| Ops | SNS, EventBridge, DLM snapshots | `observability.tf` |
+| Kubernetes | EKS (+ Karpenter unit placeholder) via Terragrunt; static kube workers | `aws/live/`; `aws/accounts/*/compute.tf` |
+| IAM | roles, policies, users, attachments | `iam.tf`; `accounts/prod-ap-southeast-1/buckets.tf` |
+| Storage / CDN | S3, CloudFront, ACM wildcards | `s3.tf`, `cloudfront_acm.tf`; `accounts/edge-us-east-1/acm.tf` |
+| Edge | WAFv2 IP set + Web ACL (CloudFront scope) | `accounts/edge-us-east-1/waf.tf` |
+| Ops | SNS, EventBridge sensitive-API fan-in, DLM snapshots | `observability.tf`; `accounts/modules/sensitive-events/` |
 
 ## OpenStack / Selectel
 
@@ -86,6 +87,7 @@ Hosted VCD (cloud.ru VMware). Provider: `vmware/vcd`. Guest init + extra-disk de
 | Terragrunt DRY (Huawei-class) | `cloud-ru-huawei/live/` |
 | Terragrunt live (AWS account/region/env) | `aws/live/` |
 | Standalone AWS root | `aws/root/` |
+| Multi-account AWS roots (staging / prod / edge / DWH) | `aws/accounts/` |
 | Brownfield catalog + purpose VMs (vkcs) | `vkcloud/` |
 | Huawei compute catalog (split state, CCE/RDS/ECS) | `cloud-ru-compute/` |
 | VCD greenfield (vapp + guest init) | `vmware/` |

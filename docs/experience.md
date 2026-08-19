@@ -2,7 +2,7 @@
 
 NDA-safe narrative. Client names stay out. Scale and sector stay in. This is the same six years as the cloud and Kubernetes pages — the part hiring usually cannot infer from Terraform alone.
 
-**Same years, buyer language:** stand up and accompany in **days to a couple of weeks**, audit then import, park idle non-prod, planned cloud move without a freeze year, OCR/LLM as a **multiplier** for accounting / analysts / developers. Outcomes: [`for-business.md`](for-business.md). Diagrams: [`../architecture/`](../architecture/).
+**Same years, buyer language:** whatever the infra needs, in **days to a couple of weeks**, **documented**, **minimal windows**, **~99.9% SLA**. Audit then import. Park idle non-prod. OCR/LLM as a **multiplier** for accounting / analysts / developers. Cloud move is one of the things I do quickly when asked. Outcomes: [`for-business.md`](for-business.md). Diagrams: [`../architecture/`](../architecture/). Full domain and stack tables: [root README](../README.md#six-years-domains-apps-brokers-jvm).
 
 **Role on the market:** about **six years** (through 2026). Positioned as a **strong senior in my niches**: platform / cloud / loaded production, CI/CD, day-2 of serious applications — not a generalist who “also clicked AWS once.” AI/LLM delivery is an additional niche on the same ownership pattern.
 
@@ -63,7 +63,27 @@ Same estate class as other **enterprise applications**: not a startup toy stack,
 
 ### Collaboration and internal platforms
 
-Day-2 of **Atlassian** (Jira / Confluence / Bitbucket-class: install, SSO-adjacent, backup, upgrade, “why is it swapping”) and **Nextcloud** (files, sharing, identity, storage growth). These are the systems everyone notices when they are down and nobody budgets as “real production” until they are.
+Day-2 of **Atlassian** (Jira / JSM / Confluence / Bitbucket-class: install, SSO-adjacent, backup, upgrade, “why is it swapping”) and **Nextcloud** (files, sharing, identity, storage growth, OnlyOffice / Mattermost next to it). **1C:Enterprise** (Windows app farm + PostgreSQL), **Teleport**, nginx/WAF, **AD / ADFS**, GitLab, **n8n**. These are the systems everyone notices when they are down and nobody budgets as “real production” until they are.
+
+### Treasury / trade-finance / document platforms
+
+Loaded **Kubernetes** (prod + preprod): **Helm + Argo CD**, **Vault / ESO**, **Kafka + Debezium**, Camunda-class process engines, signing / HSM-adjacent VMs, Istio-class mesh. The bar is the same as payments: **minimal windows**, money and documents in flight.
+
+### Document AI and enterprise capture
+
+OCR and capture (ContentCapture-class) to structured JSON, then LLM extract, handoff to **1C** / ERP. Private GPU API so finance data does not go into a public chat. Cases 01 and 03 in the lab.
+
+### Enterprise ITSM / EDO / CRM
+
+High-load web: document exchange, counterparty monitoring, ITSM, CRM. **ELK / Graylog**, Grafana, Zabbix, Jira Service Desk, Tomcat, SQL from the incident, customer-facing SLA. Same Cisco-style loop.
+
+### Enterprise Java product delivery
+
+Vendor ITSM/BPM-class Java on **Tomcat**, Nginx/IIS, **Patroni + etcd**, Oracle / MSSQL / PostgreSQL / InfluxDB, **Artemis + Kafka**, **Keycloak** (SAML / OIDC / Kerberos / AD). Jenkins, Maven, Nexus / Artifactory. Train client engineers. Heap/thread dumps as in the monolith section.
+
+### Multi-tenant Kubernetes estates
+
+Many client platforms in parallel: **Deckhouse**, vanilla, OpenShift, cloud PaaS. **Helm + werf**, GitLab CI per environment. Compute from **bare metal / Proxmox** to AWS, Selectel, **Yandex Cloud**, **DigitalOcean**, Hetzner. **Supabase**, **Airflow**, **n8n**, **ClickHouse**, MongoDB, MySQL, **Harbor**, Ceph / MinIO in the same day-2 habit. Strict incident SLA: hot-fix and rollback the same day.
 
 ---
 
@@ -73,11 +93,13 @@ I am not claiming to be the author of every business repo. I **owned the path fr
 
 | Runtime | What I did with it |
 |---------|---------------------|
-| **Java** / **Kotlin** | Build, image, deploy; JVM and servlet container under load (below) |
-| **C# / .NET** | Build, publish, Windows or Linux hosts, IIS/Kestrel-class delivery |
+| **Java** / **Kotlin** / **Spring Boot** | Build, image, Helm, deploy; JVM and servlet container under load (below) |
+| **C# / .NET** | Build, publish, Windows or Linux, IIS/Kestrel, Swarm or Kubernetes |
 | **Go** | Small static binaries, the easy deploy — still needs the same secrets, probes, and rollouts |
-| **Python** | Services, jobs, AI-adjacent later; venv/image, not “works on my laptop” |
-| **1C:Enterprise** | RU business stack: environments, publish, and the operational path around it — not a claim to be a 1C functional consultant |
+| **Python** (Django, FastAPI) | Services, jobs, AI-adjacent APIs; venv/image, not “works on my laptop” |
+| **PHP (Laravel)** | Pack and ship prod-ready into the cluster (Helm/werf-class) |
+| **Node.js** | Same GitOps path as the rest of the estate |
+| **1C:Enterprise** | RU business stack: environments, publish, PG next to Windows 1C — not a claim to be a 1C functional consultant |
 
 **CI security gates** I have stood up **from zero** (install, wire into the pipeline, make the gate mean something):
 
@@ -116,10 +138,14 @@ Loaded systems are rarely “the app and Postgres.” The path I kept alive incl
 | Piece | Why it was on my plate |
 |-------|-------------------------|
 | **Apache Kafka** | High-volume events, consumer lag, partitions, retention, “why is prod 400 partitions behind” |
+| **Debezium** | CDC off PostgreSQL / the money path into Kafka |
 | **RabbitMQ** | Classic work queues, DLQ, split-brain and disk alarms |
 | **NATS** | Lighter bus; still needs HA and “who is subscribed” |
 | **Apache ActiveMQ Artemis** | Enterprise JMS-class broker next to Java estates |
 | **Redis** | Cache, sessions, locks, rate limits — treat eviction and persistence as product decisions |
+| **PostgreSQL** (incl. **Patroni + etcd**), MySQL, **MSSQL**, **Oracle**, MongoDB, **ClickHouse**, InfluxDB | Provision, backup, tune, long SQL, locks, replication |
+| **Apache Superset**, **Supabase**, **Airflow**, **n8n**, **NiFi**, Camunda-class | BI, BaaS, jobs, automation, process/document flow |
+| S3 / OBS, **MinIO**, **Ceph**, **Harbor** | Object data, cluster stores, the image path CI promotes |
 
 A broker that is “up” but not draining is an outage. Metrics: lag, unacked, memory, disk, connections — same instinct as DB lock waits.
 
@@ -185,9 +211,10 @@ That is why hardware/OS depth and Cisco-style incident method in this lab are no
 - **De facto lead** when the work needed it (train, delegate, own the result) without requiring the word Lead on the badge
 - Comfortable **under a PM, a CTO, a team lead, or a project-wide tech lead**
 - Comfortable **in a large team** and as the **single platform owner** on one or several products
-- **Payments / SBP-class banks**, **blockchain**, **delivery e-commerce**, **Atlassian / Nextcloud**, **Kafka-class and Redis**, **50+ microservices and JVM monoliths**
-- Build/deploy for **Java, Kotlin, .NET, Go, Python, 1C**; gates with **SonarQube, Trivy, OSV-Scanner**
-- **Jenkins** (plugins, workers) including **dedicated-VM agents → Kubernetes**; **GitLab CI + Argo CD** (branch/tag deploys, auto MR, merge on written rules)
+- **Payments / SBP-class**, **treasury / trade-finance**, **blockchain**, **delivery e-commerce**, **Atlassian / Nextcloud / 1C**, **document AI**, **enterprise ITSM/EDO**, **multi-tenant Deckhouse**
+- Build/deploy for **Java, Kotlin, .NET, Go, Python, PHP, Node, 1C**; gates with **SonarQube, Trivy, OSV-Scanner**
+- **Jenkins** (plugins, workers) including **dedicated-VM agents → Kubernetes**; **GitLab CI + Argo CD**; **Azure DevOps**; **Helm + werf**
+- Data and glue: **Kafka / Debezium / Rabbit / NATS / Artemis / Redis**; **PG/Patroni, MySQL, MSSQL, Oracle, Mongo, ClickHouse**; **Superset, Supabase, Airflow, n8n, NiFi**; **Harbor, MinIO, Ceph**; **Vault, Keycloak, Teleport**
 - **CI catalog:** Terraform / guest init → Ansible → Vault → monitoring → docs, plus Java and other builds, publish, Sonar/Trivy/OSV, auto MR, deploy, revoke/cleanup. **Jenkins** (plugins, K8s workers) and **GitLab CI + Argo CD**. Detail: [`../iac/ci/`](../iac/ci/)
 - **Huawei compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport ECS in a root that catalogs sibling Terragrunt network state. Detail: [`../iac/terraform/cloud-ru-compute/`](../iac/terraform/cloud-ru-compute/)
 - **Payments identity Ansible:** Swarm autodeploy of AM / IG / Redis / Postgres, same roles for Kubernetes. Detail: [`../reference/ansible-payments-idplat/`](../reference/ansible-payments-idplat/)

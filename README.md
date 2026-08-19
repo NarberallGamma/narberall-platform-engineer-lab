@@ -2,7 +2,7 @@
 
 **Platform Engineer. AI and turnkey cloud delivery. Six years, senior in these niches.**
 
-**For business first:** I stand up, accompany, and migrate platforms in **days to a couple of weeks**, not a quarter of workshops. Audit and import cut click-ops. Idle non-prod can **park at night**. OCR/LLM exists to **speed accounting, analysts, and developers**, not to demo a chatbot. Diagrams for managers: [`architecture/`](architecture/). Outcomes: [`docs/for-business.md`](docs/for-business.md). LLMOps: [`architecture/01-llmops.md`](architecture/01-llmops.md).
+**For business first:** I can do **whatever the infra needs** (stand up, accompany, document, incident, cost, identity, data, CI) and I do it **fast**. Baseline in **days to a couple of weeks**, not a quarter of workshops. Everything written down so the next person and audit can follow it. **Minimal change windows**, **~99.9% SLA**. Cloud move is one of the things I also do quickly (people treat it as a year). Idle non-prod can **park at night**. OCR/LLM exists to **speed accounting, analysts, and developers**, not to demo a chatbot. Diagrams: [`architecture/`](architecture/). Outcomes: [`docs/for-business.md`](docs/for-business.md). LLMOps: [`architecture/01-llmops.md`](architecture/01-llmops.md).
 
 I design and ship platforms end to end: cloud project bootstrap (IAM, VPC, networking), compute, managed data, Kubernetes, CI/CD, application and utility code, documentation, and monitoring.
 
@@ -69,7 +69,7 @@ I regularly stand up infrastructure **from zero** in public clouds and on premis
 
 **Selectel note for international readers:** Selectel is one of the largest independent **Russian cloud and datacenter** operators (often listed with Yandex Cloud, VK Cloud, and cloud.ru as a top-tier local IaaS/colo brand). Two products, two APIs: **Selectel Cloud / VPC** is **OpenStack** (Nova / Cinder / Neutron / Keystone; `selectel` + `openstack` providers). **Dedicated** nodes in Selectel DCs run **Proxmox VE** (`telmate/proxmox`). Not a rebrand of AWS or OVH. Code: [`iac/terraform/openstack-selectel/`](iac/terraform/openstack-selectel/), [`iac/terraform/selectel/`](iac/terraform/selectel/). Write-up: [`iac/cloud/selectel.md`](iac/cloud/selectel.md).
 
-Also shipped platforms on **AWS**, **Google Cloud**, **Hetzner**, **OpenStack / Selectel**, **VK Cloud (NOVA Cloud class / MCS)**, **VMware Cloud Director**, **Proxmox**, and **bare-metal** servers in previous roles.
+Also shipped platforms on **AWS**, **Google Cloud**, **Yandex Cloud**, **DigitalOcean**, **Hetzner**, **OpenStack / Selectel**, **VK Cloud (NOVA Cloud class / MCS)**, **VMware Cloud Director**, **Proxmox**, and **bare-metal** servers in previous roles.
 
 ```mermaid
 flowchart TB
@@ -77,6 +77,8 @@ flowchart TB
     CR[cloud.ru Huawei-class]
     AWS[AWS]
     GCP[Google Cloud]
+    YC[Yandex Cloud]
+    DO[DigitalOcean]
     HZ[Hetzner]
     OS[Selectel OpenStack VPC]
     SELD[Selectel dedicated Proxmox]
@@ -104,14 +106,14 @@ That claim has a concrete proof in this lab: a console-built **NOVA Cloud class*
 | Undocumented delivery | Runbooks, diagrams, on-call notes so the next person can ship |
 | Slow release / fragile ops | CI/CD, GitOps: Jenkins and/or GitLab CI + Argo CD, faster path from commit to environment |
 | Cost and waste | Right-size compute, storage, idle environments; **night park / weekday start** on non-prod (Huawei-class / cloud.ru and the same idea on AWS). Review: [`architecture/02-finops-night-park.md`](architecture/02-finops-night-park.md) |
-| Cloud move | Planned **seamless** cutover (example: VK Cloud → Huawei-class Advanced). Both sides already as code. [`architecture/04-seamless-move.md`](architecture/04-seamless-move.md) |
 | Blind production | Metrics, logs, alerts; SLI/SLO-shaped visibility before a full observability stack |
-| Loaded production | High RPS, multi-zone HA, seamless migrations, DBMS under lock and replication pressure |
+| Loaded production | High RPS, multi-zone HA, **minimal windows**, DBMS under lock and replication pressure, **~99.9% SLA** |
+| Cloud move (when asked) | Same platform shape on the next API. I do this **fast**; it is not the whole offer. Example: VK Cloud → Huawei-class Advanced. [`architecture/04-seamless-move.md`](architecture/04-seamless-move.md) |
 | Weak or implicit trust | Hardening, EDR, users/rights, secrets in Vault/ESO from day one — without a separate security backlog |
 | Opaque Git / click-ops | Separate repos (not a dump monorepo), obvious IaC and pipeline layout, branches that match promotion |
 | Incidents | Crisis handling including off-hours: restore service, then encode the fix (see below) |
 
-Speed is part of the offer: baseline automation, monitoring, and documentation in **days-to-weeks**, not a six-month “transformation programme” before anything is safer. Same bar for AI: OCR/LLM is a **process multiplier** (documents, tickets, analysis), not a slide. Managers: [`architecture/00-days-not-months.md`](architecture/00-days-not-months.md).
+Speed is the offer: **whatever the estate needs**, documented, with **short windows** and the SLA kept. Baseline in **days-to-weeks**, not a six-month programme before anything is safer. Same bar for AI: OCR/LLM is a **process multiplier**, not a slide. Managers: [`architecture/00-days-not-months.md`](architecture/00-days-not-months.md).
 
 ### How I work (team, solo, and de facto lead)
 
@@ -125,24 +127,57 @@ A common hiring pattern now is **one platform engineer for a whole product** —
 
 ### Six years: domains, apps, brokers, JVM
 
-Hiring usually cannot infer this from Terraform. The long form is [`docs/experience.md`](docs/experience.md). The short form:
+Hiring usually cannot infer this from Terraform. The long form is [`docs/experience.md`](docs/experience.md). The short form is the stack I actually accompanied (NDA-safe sectors, no employer names).
 
 | Domain | What “accompany” meant |
 |--------|------------------------|
-| Bank / payments (RF) | Large B2B/P2P programmes, infrastructure next to **SBP** (Russia’s Faster Payments System — instant, bank-grade). Cut-offs, HA, audit, a stuck money path is P1 |
-| Blockchain | Large smart-contract / chain-facing products: environments, keys, deploy path (NDA-safe case studies to expand) |
-| Delivery / shops | Food and grocery-class e-commerce: **thousands of users per hour** at peaks; checkout and brokers on the critical path |
-| Collaboration | **Atlassian** (Jira/Confluence/Bitbucket-class) and **Nextcloud**: upgrade, backup, identity, storage — down means the company notices |
+| Bank / payments (RF) | Large B2B/P2P programmes, infrastructure next to **SBP** (Russia’s Faster Payments System: instant, bank-grade). Cut-offs, HA, audit, a stuck money path is P1. **.NET** identity/payment planes on **Docker Swarm then Kubernetes**, Ansible, **NATS then Kafka**, PostgreSQL/MSSQL, **mTLS** and crypto-adjacent modules, closed-loop Linux (Astra-class) and Windows Server. CI: **Azure DevOps** and **Argo CD**. Public slice: [case 08](case-studies/08-payments-swarm-autodeploy.md) |
+| Treasury / trade-finance / documents | Loaded **Kubernetes** (prod + preprod), **Helm + Argo CD**, **Vault / ESO**, **Kafka + Debezium**, Camunda-class BPM, signing / HSM-adjacent VMs, Istio-class mesh, policy gateway. Releases with **minimal windows**. Same ~99.9% bar |
+| Blockchain | Large smart-contract / chain-facing products: node ops (Tron / ETH-class), keys, env isolation, deploy path, lag/catch-up. NDA-safe case studies to expand |
+| Delivery / shops | Food and grocery-class e-commerce: **thousands of users per hour** at peaks. **50+ Spring** services, CCE-class Kubernetes, **Spring Cloud Config + Vault**, managed **Kafka**, RDS PostgreSQL, **Harbor**, WAF/ELB, autostands (**MinIO** in-cluster), **Apache Superset** / BI, **NiFi**, **Jaeger**, **Linkerd**. Checkout and brokers on the critical path |
+| Collaboration / corporate IT | **Atlassian** (Jira / JSM / Confluence / Bitbucket-class), **Nextcloud** (+ OnlyOffice / Mattermost), nginx / WAF, **AD / ADFS / NPS / CA**, **Teleport**, GitLab, **n8n**, **1C:Enterprise** (Windows app + PostgreSQL). Upgrade, backup, identity, storage. Down means the company notices |
+| Document AI / capture | OCR and enterprise capture (ContentCapture-class) into structured JSON, then LLM extract, handoff to **1C** / ERP. Cases [01](case-studies/01-ai-llm-platform.md) and [03](case-studies/03-document-ai-pipeline.md) |
+| Enterprise ITSM / EDO / CRM | High-load web (document exchange, counterparty monitoring, ITSM, CRM). **ELK / Graylog**, Grafana, Zabbix, Jira Service Desk, Tomcat, SQL incident loop, customer-facing SLA |
+| Enterprise Java product delivery | Vendor ITSM/BPM-class Java: **Tomcat**, Nginx/IIS, **Patroni + etcd**, Oracle / MSSQL / PostgreSQL / InfluxDB, **Artemis + Kafka**, **Keycloak** (SAML / OIDC / Kerberos / AD). Jenkins, Maven, Nexus / Artifactory. Train client engineers |
+| Multi-tenant Kubernetes | Many client estates in parallel: **Deckhouse** (and vanilla / OpenShift / cloud PaaS), **Helm + werf**, GitLab CI per env, from **bare metal / Proxmox** to AWS / Selectel / Yandex / DigitalOcean / Hetzner. Strict incident SLA, hot-fix and rollback the same day |
 
-| Runtime / glue | What I owned |
-|----------------|--------------|
-| Java, Kotlin, C#/.NET, Go, Python, **1C:Enterprise** | Build, image/publish, deploy — the path to prod, not a claim I wrote every business line |
+| App runtime | What I owned |
+|-------------|--------------|
+| **Java / Kotlin / Spring Boot** | Build, image, Helm, JVM under load. Path to prod, not every business line |
+| **C# / .NET** (incl. .NET Core) | Build, publish, Swarm/K8s or IIS/Kestrel. Payments identity and enterprise APIs |
+| **Go** | Small static binaries: same secrets, probes, rollouts |
+| **Python** (Django, FastAPI) | Services, jobs, AI-adjacent APIs; image, not “works on my laptop” |
+| **PHP (Laravel)** | Pack and ship prod-ready into the cluster (Helm/werf-class) |
+| **Node.js** | Same GitOps path as the rest of the estate |
+| **1C:Enterprise** | Environments, publish, PG next to Windows 1C. Not a functional-consultant claim |
+
+| CI / GitOps | What I owned |
+|-------------|--------------|
 | **Jenkins** | Plugins, workers; **moved dedicated-VM workers onto Kubernetes** so builds scale and snowflake boxes die |
-| **GitLab CI + Argo CD** | Even more of the work: **seamless** deploys by **branch and tag**, **auto MRs**, merge when the written rules pass |
-| **SonarQube**, **Trivy**, **OSV-Scanner** | Stood up **from zero** and wired as CI gates that people actually use |
-| Kafka, RabbitMQ, NATS, **Artemis**, Redis | Lag, DLQ, disk, eviction — a broker that is “up” but not draining is an outage |
+| **GitLab CI + Argo CD** | Most of the recent work: **seamless** deploys by **branch and tag**, **auto MRs**, merge when the written rules pass. GitLab as a product: runners, backups, tune |
+| **Azure DevOps + Argo CD** | Closed-loop / payments estates where Azure DevOps was already the build plane |
+| **Helm + werf** | Multi-env package and deliver; GitOps, not a Friday YAML copy |
+| **Maven, Nexus, Artifactory** | Java artefact path next to Jenkins/GitLab |
+| **SonarQube, Trivy, OSV-Scanner** | Stood up **from zero** and wired as gates people actually use |
+
+| Data / brokers / analytics | What I owned |
+|---------------------------|--------------|
+| **Kafka**, RabbitMQ, **NATS**, **Artemis**, **Debezium** | Lag, DLQ, disk, CDC. A broker that is “up” but not draining is an outage |
+| **Redis** | Cache, sessions, locks, eviction as a product decision |
+| **PostgreSQL** (incl. **Patroni + etcd**), MySQL, **MSSQL**, **Oracle**, MongoDB, **ClickHouse**, InfluxDB | Provision, backup, tune under load, long SQL, locks, replication |
+| **Apache Superset**, **Supabase**, **Airflow**, **n8n**, **NiFi**, Camunda-class BPM | BI, BaaS, jobs, automation, document/process flow. Day-2, not a click-demo |
 | **50+ microservices** | Release graph, base images, traces, secrets/promotion so fifty pipelines stay shippable |
-| Heavy JVM **monoliths** (few backends) | **Tomcat**/servlet + JVM: thread pools vs JDBC, **heap dumps**, **thread dumps**, GC logs — restarting the pod is not a strategy |
+| Heavy JVM **monoliths** (few backends) | **Tomcat**/servlet + JVM: thread pools vs JDBC, **heap dumps**, **thread dumps**, GC logs. Restarting the pod is not a strategy |
+
+| Observability / storage / identity | What I owned |
+|-----------------------------------|--------------|
+| Prometheus, Grafana, **Loki**, **ELK**, **Graylog**, Zabbix, **Jaeger**, VictoriaMetrics-class | Alerts that on-call can act on; traces across 50 services |
+| S3 / OBS, **MinIO**, **Ceph**, NFS | App data and infra backup. Cloud object stores and on-box/cluster stores |
+| **Harbor**, GitLab / Docker registry | Images that CI actually promotes |
+| **Vault / ESO**, **Keycloak**, AD / ADFS, SAML / OIDC / Kerberos, **Teleport** | Secrets and who can reach what. Introduce Vault if missing |
+| Cloudflare, CoreDNS, unbound | Public DNS and in-cluster / local resolvers |
+| Staff / site VPN (OpenVPN / Pritunl-class) | Reachability for admins and sites, not a public evasion how-to |
+| AppSec-adjacent in the estate | Nessus, DefectDojo, Semgrep, ZAP, Dependency-Track: I accompany the VMs and the pipeline, not a claim I am the AppSec lead |
 
 Same ~99.9% SLA and Cisco-style incident loop as below. Same security defaults as [secrets and layout](#security-secrets-and-how-the-code-is-organized).
 
@@ -326,4 +361,4 @@ LLMOps first (process speed), then cloud:
 
 ## Positioning
 
-> Six years, senior in platform niches. **Business first:** days to a usable platform, lower idle bill, OCR/LLM that shortens real work. Turnkey cloud and AI: greenfield or loaded legacy. De facto lead (train/delegate) under PMs, CTOs, and project-wide tech leads; also a teammate under a dedicated lead; also the single owner on concurrent products. Bank/SBP-class payments, blockchain, delivery e-commerce, Atlassian/Nextcloud. Java/.NET/Go/Kotlin/Python/1C delivery plus SonarQube/Trivy/OSV gates. **Jenkins** (plugins, VM workers → Kubernetes) and **GitLab CI + Argo CD** (branch/tag deploys, auto MR, merge rules). Kafka/Rabbit/NATS/Artemis/Redis. 50+ microservices and JVM/Tomcat monoliths (heap and thread dumps). Secure by default (hardening, EDR, Vault / ESO). ~99.9% SLA, seamless migrations, multi-zone HA, Cisco-style 7-step incidents. **B.Sc. Information Systems and Technologies (09.03.02), SPbSUT (Bonch-Bruevich)**; Cisco and Windows Server practice during the degree. Hardware/OS depth in the home lab. Detail: [`docs/experience.md`](docs/experience.md).
+> Six years, senior in platform niches. **Business first:** whatever the infra needs, **fast**, fully documented, **minimal windows**, **~99.9% SLA**. Turnkey cloud and AI: greenfield or loaded legacy. De facto lead (train/delegate) under PMs, CTOs, and project-wide tech leads; also a teammate under a dedicated lead; also the single owner on concurrent products. Bank/SBP-class payments, treasury/trade-finance, blockchain, delivery e-commerce, Atlassian/Nextcloud/1C, document AI, multi-tenant Deckhouse estates. Java/Kotlin/.NET/Go/Python/PHP/Node/1C plus SonarQube/Trivy/OSV. **Jenkins** (VM workers → Kubernetes), **GitLab CI + Argo CD**, Azure DevOps, Helm/werf. Kafka/Debezium/Rabbit/NATS/Artemis/Redis. PG/Patroni, MySQL, MSSQL, Oracle, Mongo, ClickHouse. Superset, Supabase, Airflow, n8n, NiFi. Harbor, MinIO, Ceph, Vault, Keycloak, Teleport. 50+ microservices and JVM/Tomcat monoliths. Secure by default (hardening, EDR, Vault / ESO). Multi-zone HA, Cisco-style 7-step incidents. **B.Sc. Information Systems and Technologies (09.03.02), SPbSUT (Bonch-Bruevich)**; Cisco and Windows Server practice during the degree. Hardware/OS depth in the home lab. Detail: [`docs/experience.md`](docs/experience.md).

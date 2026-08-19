@@ -1,6 +1,6 @@
 # Positioning
 
-**Business filter:** days to a usable platform, lower idle bill (night park on non-prod), OCR/LLM that shortens real document work. Buyer page: [`for-business.md`](for-business.md). Manager diagrams: [`../architecture/`](../architecture/). Existing cloud notes and case bodies stay as they are.
+**Business filter:** whatever the infra needs, **fast**, written down, **minimal windows**, **~99.9% SLA**. Lower idle bill (night park on non-prod). OCR/LLM that shortens real document work. Cloud move is one fast skill, not the headline. Buyer page: [`for-business.md`](for-business.md). Manager diagrams: [`../architecture/`](../architecture/). Existing cloud notes and case bodies stay as they are.
 
 ## Role
 
@@ -27,15 +27,15 @@ Full six-year narrative (domains, JVM, brokers, org): [`experience.md`](experien
 
 **How I work:** I have shipped in a **large team with a dedicated lead** — that is a normal and welcome mode. On later engagements I **trained people and delegated** as a de facto lead (badge optional) while reporting **directly** to PMs, CTOs / technical directors, team leads, and **tech leads of the whole project**. I also own a whole platform as the **single engineer**, often across **more than one project at once**, and stay reachable on those threads. Solo delivery means full ownership and responsiveness, not a preference against teams.
 
-**Domains (six years, NDA-safe):** large **bank / SBP-class** payments (RF Faster Payments, B2B/P2P); **blockchain / smart-contract** programmes; **delivery e-commerce** (food, grocery — thousands of users per hour at peaks); **Atlassian** and **Nextcloud**; LLM/OCR platforms as the same ownership pattern. Runtime path: Java, Kotlin, C#/.NET, Go, Python, 1C:Enterprise. CI: **Jenkins** (plugins, workers, dedicated VMs → Kubernetes) and, more of the recent work, **GitLab CI + Argo CD** (seamless branch/tag deploys, automatic MRs, merge on written parameters). Gates from zero: **SonarQube**, **Trivy**, **OSV-Scanner**. Glue: Kafka, RabbitMQ, NATS, Artemis, Redis. Estates: **50+ microservices** and heavy **JVM/Tomcat monoliths** (heap dumps, thread dumps, GC). Detail: [`experience.md`](experience.md).
+**Domains (six years, NDA-safe):** large **bank / SBP-class** payments (RF Faster Payments, B2B/P2P, Swarm then Kubernetes, mTLS); **treasury / trade-finance / documents** (Helm, Argo CD, Vault/ESO, Kafka/Debezium); **blockchain / smart-contract** programmes; **delivery e-commerce** (food, grocery, thousands of users per hour, 50+ Spring, Superset, NiFi); **Atlassian**, **Nextcloud**, **1C**; enterprise **ITSM / EDO / CRM**; multi-tenant **Deckhouse** estates; LLM/OCR / enterprise capture. Runtime path: Java, Kotlin, C#/.NET, Go, Python (Django/FastAPI), PHP (Laravel), Node.js, 1C:Enterprise. CI: **Jenkins** (plugins, workers, dedicated VMs → Kubernetes), **GitLab CI + Argo CD**, **Azure DevOps**, **Helm + werf**. Gates from zero: **SonarQube**, **Trivy**, **OSV-Scanner**. Glue: Kafka, Debezium, RabbitMQ, NATS, Artemis, Redis. Data: PG/Patroni, MySQL, MSSQL, Oracle, Mongo, ClickHouse. Platforms: Superset, Supabase, Airflow, n8n, NiFi, Harbor, MinIO, Ceph, Keycloak, Teleport. Estates: **50+ microservices** and heavy **JVM/Tomcat monoliths** (heap dumps, thread dumps, GC). Tables: [root README](../README.md#six-years-domains-apps-brokers-jvm). Detail: [`experience.md`](experience.md).
 
 ## Kubernetes and data
 
 - Clusters: **OpenShift**, **Deckhouse**, vanilla Kubernetes, and cloud PaaS (EKS / CCE / GKE-class)
 - Databases under load: long SQL, locks/blocking, replication lag and failover, read/write spread, balancers in front of the data path, **sharding** when one primary is the ceiling. PostgreSQL / RDS-class in public code; same ops pattern in private estates.
-- Messaging and cache on the critical path: **Kafka**, **RabbitMQ**, **NATS**, **Artemis**, **Redis**
-- Application delivery: Java/Kotlin JVM (including Tomcat and dumps), .NET, Go, Python, 1C — plus CI gates (SonarQube, Trivy, OSV-Scanner)
-- CI/CD: **Jenkins** (plugins, Kubernetes workers instead of dedicated VMs) and **GitLab CI + Argo CD** (branch/tag GitOps, auto MR, merge policy). Full map (create → accompany → build/publish → gates → revoke): [`../iac/ci/`](../iac/ci/)
+- Messaging and cache on the critical path: **Kafka**, **Debezium**, **RabbitMQ**, **NATS**, **Artemis**, **Redis**
+- Application delivery: Java/Kotlin JVM (including Tomcat and dumps), .NET, Go, Python, PHP, Node, 1C — plus CI gates (SonarQube, Trivy, OSV-Scanner)
+- CI/CD: **Jenkins** (plugins, Kubernetes workers instead of dedicated VMs), **GitLab CI + Argo CD**, **Azure DevOps**, **Helm + werf**. Full map (create → accompany → build/publish → gates → revoke): [`../iac/ci/`](../iac/ci/)
 
 ## Cloud and compute
 
@@ -44,7 +44,7 @@ See [`iac/cloud/`](../iac/cloud/) for per-platform write-ups and links into Terr
 - **cloud.ru / Huawei Cloud** (AWS-shaped resource model; strong transferable AWS practice). Second estate: [compute catalog](../iac/terraform/cloud-ru-compute/) (CCE, RDS, purpose ECS, split state)
 - **VK Cloud / NOVA Cloud class** (Kazakhstan; OpenStack under the hood: Nova, Cinder, Neutron, Keystone; provider `vkcs`)
 - **VMware Cloud Director** (cloud.ru VMware / VCD; provider `vmware/vcd`; guest init + CI hooks)
-- **AWS**, **Google Cloud**, **Hetzner**
+- **AWS**, **Google Cloud**, **Yandex Cloud**, **DigitalOcean**, **Hetzner**
 - **Selectel** (top-tier RU cloud/DC: OpenStack VPC **and** dedicated Proxmox)
 - **OpenStack / Selectel Cloud**, **Proxmox**, **bare metal**
 - **Cloudflare** (DNS as code)

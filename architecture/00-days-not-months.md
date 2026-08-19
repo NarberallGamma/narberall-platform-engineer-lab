@@ -1,6 +1,6 @@
 # Days, not months
 
-**Business:** a new environment or a captured legacy estate should be **operable in days to a couple of weeks**. A six-month "transformation programme" before the first safer deploy is a cost, not a virtue.
+**Business:** whatever the infra needs (stand up, accompany, document) should be **operable in days to a couple of weeks**, with **short change windows** and the **SLA kept**. A six-month "transformation programme" before the first safer deploy is a cost, not a virtue. Cloud move is optional and fast when asked; it is not this page.
 
 ```mermaid
 flowchart LR

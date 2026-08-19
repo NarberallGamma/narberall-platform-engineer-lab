@@ -9,7 +9,7 @@
 - Delivery into GKE-class clusters or VM workloads
 - Same greenfield sequence as other clouds: access → network → compute/data → Kubernetes → CI/CD
 
-Published Terraform in this lab is concentrated on Huawei-class and AWS samples (same ownership pattern). Full GCP trees stay private.
+Published Terraform in this lab is concentrated on Huawei-class, AWS, Selectel, and VK Cloud samples (same ownership pattern). No leftover client GCP `.tf` tree to publish. See [`../terraform/COVERAGE.md`](../terraform/COVERAGE.md).
 
 ## Related code
 

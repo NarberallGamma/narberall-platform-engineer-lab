@@ -37,6 +37,7 @@ flowchart TB
   TF --> CR[cloud-ru-huawei/stacks + live]
   TF --> CRC[cloud-ru-compute]
   TF --> OS[openstack-selectel]
+  TF --> SEL[selectel/proxmox-dc]
   TF --> VK[vkcloud]
   TF --> VMw[vmware]
   TF --> PX[proxmox]

@@ -34,13 +34,17 @@ Experience write-ups: [`../cloud/`](../cloud/).
 | Edge | WAFv2 IP set + Web ACL (CloudFront scope) | `accounts/edge-us-east-1/waf.tf` |
 | Ops | SNS, EventBridge sensitive-API fan-in, DLM snapshots | `observability.tf`; `accounts/modules/sensitive-events/` |
 
-## OpenStack / Selectel
+## Selectel (OpenStack VPC + dedicated Proxmox)
+
+Selectel is a top-tier RU cloud/DC operator. VPC is OpenStack. Dedicated HVs run Proxmox. See [`../cloud/selectel.md`](../cloud/selectel.md) and [`COVERAGE.md`](COVERAGE.md).
 
 | Area | Resource types | Where |
 |------|----------------|--------|
-| Network | network, subnet, floating IP, security group + rule | `openstack-selectel/` |
-| Compute | instances (bastion, kube, GitLab, Postgres, runner, Vault, Redis, monitor, proxy), server group | `kube.tf`, `purpose.tf` |
-| Storage | block volumes + attach | `volumes_sg.tf` |
+| VPC network | Neutron network/subnet, external data, floating IP, SG | `openstack-selectel/network*.tf` |
+| VPC compute | Image-boot + volume-boot instances, AZ `ru-3a`/`ru-3b`, server groups | `kube.tf`, `purpose.tf`, `volume_boot_kube.tf` |
+| VPC storage | Cinder `fast.*` / `universal.*`, root/data/WAL, etcd disk | `postgres_ha.tf`, `volume_boot_kube.tf` |
+| VPC edge | Dual-NIC GitLab | `gitlab_dualnic.tf` |
+| Dedicated | `proxmox_vm_qemu` role-split kube pools, Ceph OSDs, VPN, GitLab | `selectel/proxmox-dc/` |
 
 ## VK Cloud / NOVA Cloud class (OpenStack IaaS)
 
@@ -70,6 +74,7 @@ Hosted VCD (cloud.ru VMware). Provider: `vmware/vcd`. Guest init + extra-disk de
 | Area | Resource types | Where |
 |------|----------------|--------|
 | Guests | `proxmox_vm_qemu` masters/workers/GitLab/Postgres/runners/Vault/monitor | `proxmox/` |
+| Selectel DC | Role-split kube, Ceph, search, dual-NIC VPN/GitLab | `selectel/proxmox-dc/` |
 
 ## Cloudflare
 
@@ -88,6 +93,8 @@ Hosted VCD (cloud.ru VMware). Provider: `vmware/vcd`. Guest init + extra-disk de
 | Terragrunt live (AWS account/region/env) | `aws/live/` |
 | Standalone AWS root | `aws/root/` |
 | Multi-account AWS roots (staging / prod / edge / DWH) | `aws/accounts/` |
+| Selectel Cloud (OpenStack VPC) | `openstack-selectel/` |
+| Selectel dedicated Proxmox | `selectel/proxmox-dc/` |
 | Brownfield catalog + purpose VMs (vkcs) | `vkcloud/` |
 | Huawei compute catalog (split state, CCE/RDS/ECS) | `cloud-ru-compute/` |
 | VCD greenfield (vapp + guest init) | `vmware/` |

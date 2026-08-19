@@ -8,7 +8,7 @@
 - Linux baseline (SSH, disk, bootstrap) for app and CI machines
 - Path from empty project to running workloads without a large hyperscaler control plane
 
-Published Terraform samples in this lab cover Huawei-class, AWS, OpenStack, and Proxmox. Hetzner delivery used the same IaC and Linux operating model; client trees stay private.
+Published Terraform samples in this lab cover Huawei-class, AWS, Selectel, and Proxmox. Hetzner delivery used the same IaC and Linux operating model; no leftover client `.tf` tree to publish. See [`../terraform/COVERAGE.md`](../terraform/COVERAGE.md).
 
 ## Related code
 

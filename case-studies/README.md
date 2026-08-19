@@ -16,5 +16,6 @@ Home-lab edge (Xray / VPS) is **not** a client case study; it lives in [`practic
 | [`06-vmware-vcd-greenfield.md`](06-vmware-vcd-greenfield.md) | **VCD from zero:** catalog, guest init, DB-class VM, one-button CI stages | [`diagrams/case-studies/06-vmware-vcd-greenfield.md`](../diagrams/case-studies/06-vmware-vcd-greenfield.md) |
 | [`07-huawei-compute-catalog.md`](07-huawei-compute-catalog.md) | **Huawei compute catalog:** split state, CCE/RDS/purpose ECS, import then a new Teleport VM | [`diagrams/case-studies/07-huawei-compute-catalog.md`](../diagrams/case-studies/07-huawei-compute-catalog.md) |
 | [`08-payments-swarm-autodeploy.md`](08-payments-swarm-autodeploy.md) | **SBP-class identity autodeploy:** Swarm first, same roles for Kubernetes | [`diagrams/case-studies/08-payments-swarm-autodeploy.md`](../diagrams/case-studies/08-payments-swarm-autodeploy.md) |
+| [`09-selectel-vpc-and-dedicated.md`](09-selectel-vpc-and-dedicated.md) | **Selectel:** OpenStack VPC + dedicated Proxmox on the same RU cloud/DC | [`diagrams/case-studies/09-selectel-vpc-and-dedicated.md`](../diagrams/case-studies/09-selectel-vpc-and-dedicated.md) |
 
 Use [`_template.md`](_template.md) for new entries.

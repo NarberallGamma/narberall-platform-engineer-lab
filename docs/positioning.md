@@ -43,7 +43,8 @@ See [`iac/cloud/`](../iac/cloud/) for per-platform write-ups and links into Terr
 - **VK Cloud / NOVA Cloud class** (Kazakhstan; OpenStack under the hood: Nova, Cinder, Neutron, Keystone; provider `vkcs`)
 - **VMware Cloud Director** (cloud.ru VMware / VCD; provider `vmware/vcd`; guest init + CI hooks)
 - **AWS**, **Google Cloud**, **Hetzner**
-- **OpenStack / Selectel**, **Proxmox**, **bare metal**
+- **Selectel** (top-tier RU cloud/DC: OpenStack VPC **and** dedicated Proxmox)
+- **OpenStack / Selectel Cloud**, **Proxmox**, **bare metal**
 - **Cloudflare** (DNS as code)
 
 **Education:** B.Sc. in Information Systems and Technologies (09.03.02), The Bonch-Bruevich Saint Petersburg State University of Telecommunications (SPbSUT). Cisco, campus networks and servers in the curriculum; Windows Server practice at IT companies during studies. Detail: [`experience.md#education`](experience.md#education).

@@ -11,7 +11,8 @@ terraform/
   aws/                 # AWS root + multi-account roots + Terragrunt live
   cloud-ru-huawei/     # Huawei-class stacks + Terragrunt live
   cloud-ru-compute/    # Huawei-class compute catalog: CCE, RDS, purpose ECS, split state
-  openstack-selectel/
+  openstack-selectel/  # Selectel Cloud / OpenStack VPC
+  selectel/            # Hub + dedicated Proxmox on Selectel HVs
   vkcloud/             # VK Cloud / NOVA Cloud class (OpenStack IaaS, catalog + purpose VMs)
   vmware/              # VMware Cloud Director (VCD): catalog, guest init, DB-class VM
   proxmox/
@@ -24,10 +25,12 @@ terraform/
 | Go to | Why |
 |-------|-----|
 | [`RESOURCES.md`](RESOURCES.md) | Clouds × resource types in code |
+| [`COVERAGE.md`](COVERAGE.md) | Published vs private: what is in git per cloud |
 | [`aws/`](aws/) | Standalone root + multi-account slice + EKS Terragrunt live |
+| [`selectel/`](selectel/) | Selectel hub: dedicated Proxmox DC + pointer to OpenStack VPC |
 | [`cloud-ru-huawei/`](cloud-ru-huawei/) | Multi-env root + Terragrunt (CCE, RDS, Kafka, OBS) |
 | [`cloud-ru-compute/`](cloud-ru-compute/) | **Compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport ECS; network stays in sibling live |
-| [`openstack-selectel/`](openstack-selectel/) | OpenStack guests for K8s / GitLab / Postgres |
+| [`openstack-selectel/`](openstack-selectel/) | Selectel Cloud VPC: volume-boot, AZ, Postgres WAL, kube etcd |
 | [`vkcloud/`](vkcloud/) | **Legacy as code:** vkcs, catalog maps, purpose-split VMs, import |
 | [`vmware/`](vmware/) | **VCD greenfield:** catalog, guest init, extra disks, audit stack |
 | [`proxmox/`](proxmox/) | Proxmox VE guests |
@@ -52,6 +55,7 @@ flowchart TB
   CRC --> CRCdep[deploy CCE RDS ECS]
   CRC --> CRCaud[audit]
   TF --> OS[openstack-selectel]
+  TF --> SEL[selectel/proxmox-dc]
   TF --> VK[vkcloud]
   TF --> VMw[vmware]
   TF --> PX[proxmox]
@@ -72,6 +76,7 @@ flowchart TB
 - [VMware VCD from zero + one-button CI](../../case-studies/06-vmware-vcd-greenfield.md)
 - [Huawei-class compute catalog (split state)](../../case-studies/07-huawei-compute-catalog.md)
 - [SBP-class identity autodeploy (Ansible)](../../case-studies/08-payments-swarm-autodeploy.md)
+- [Selectel VPC + dedicated Proxmox](../../case-studies/09-selectel-vpc-and-dedicated.md)
 
 ## Keywords
 

@@ -64,6 +64,8 @@ I regularly stand up infrastructure **from zero** in public clouds and on premis
 
 **VMware note for international readers:** cloud.ru VMware is **VMware Cloud Director (VCD)**, a different API from Huawei-class Advanced. Under the hood: org / VDC / Edge / vApp / VM / storage profiles. That work is transferable VCD / vCloud Director experience. Provider in this lab: `vmware/vcd`. Code: [`iac/terraform/vmware/`](iac/terraform/vmware/). One-button host CI: [`iac/ci/`](iac/ci/).
 
+**Selectel note for international readers:** Selectel is one of the largest independent **Russian cloud and datacenter** operators (often listed with Yandex Cloud, VK Cloud, and cloud.ru as a top-tier local IaaS/colo brand). Two products, two APIs: **Selectel Cloud / VPC** is **OpenStack** (Nova / Cinder / Neutron / Keystone; `selectel` + `openstack` providers). **Dedicated** nodes in Selectel DCs run **Proxmox VE** (`telmate/proxmox`). Not a rebrand of AWS or OVH. Code: [`iac/terraform/openstack-selectel/`](iac/terraform/openstack-selectel/), [`iac/terraform/selectel/`](iac/terraform/selectel/). Write-up: [`iac/cloud/selectel.md`](iac/cloud/selectel.md).
+
 Also shipped platforms on **AWS**, **Google Cloud**, **Hetzner**, **OpenStack / Selectel**, **VK Cloud (NOVA Cloud class / MCS)**, **VMware Cloud Director**, **Proxmox**, and **bare-metal** servers in previous roles.
 
 ```mermaid
@@ -73,7 +75,8 @@ flowchart TB
     AWS[AWS]
     GCP[Google Cloud]
     HZ[Hetzner]
-    OS[OpenStack Selectel]
+    OS[Selectel OpenStack VPC]
+    SELD[Selectel dedicated Proxmox]
     VK[VK Cloud NOVA-class]
     PX[Proxmox]
     VM[VMware VCD]
@@ -228,6 +231,8 @@ All cloud write-ups and Terraform live under **[`iac/`](iac/)**.
 | [`iac/terraform/cloud-ru-huawei/`](iac/terraform/cloud-ru-huawei/) | Huawei-class multi-env root + Terragrunt |
 | [`iac/terraform/cloud-ru-compute/`](iac/terraform/cloud-ru-compute/) | **Huawei compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport; split state vs sibling live |
 | [`iac/terraform/vkcloud/`](iac/terraform/vkcloud/) | **Legacy as code:** VK Cloud / NOVA Cloud class, vkcs, catalog + purpose-split VMs, import |
+| [`iac/terraform/selectel/`](iac/terraform/selectel/) | **Selectel:** OpenStack VPC + dedicated Proxmox on RU cloud/DC |
+| [`iac/terraform/COVERAGE.md`](iac/terraform/COVERAGE.md) | Published vs private Terraform per cloud |
 | [`iac/terraform/modules/`](iac/terraform/modules/) | Reusable modules |
 | [`iac/terraform/SANITIZE.md`](iac/terraform/SANITIZE.md) | What never goes into git |
 
@@ -249,6 +254,7 @@ flowchart TB
   TF --> CR[cloud-ru-huawei]
   TF --> CRC[cloud-ru-compute]
   TF --> OS[openstack-selectel]
+  TF --> SEL[selectel/proxmox-dc]
   TF --> VK[vkcloud legacy import]
   TF --> VMw[vmware VCD]
   TF --> PX[proxmox]

@@ -7,6 +7,16 @@ variable "server_image_name" {
   default = "Ubuntu 22.04 LTS 64-bit"
 }
 
+variable "external_network_name" {
+  type    = string
+  default = "external"
+}
+
+variable "gitlab_external_ip" {
+  type    = string
+  default = "203.0.113.30"
+}
+
 provider "selectel" {
   auth_url    = var.os_auth_url
   auth_region = var.os_region

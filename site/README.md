@@ -5,7 +5,7 @@
 ## Required sections
 
 1. Hero  -  Platform Engineer · AI & turnkey
-2. Case studies (8)  -  deep links into `/case-studies` on GitHub (include legacy-as-code / VK Cloud, VCD greenfield, Huawei compute catalog, payments identity Swarm)
+2. Case studies (9)  -  deep links into `/case-studies` on GitHub (include legacy-as-code / VK Cloud, VCD greenfield, Huawei compute catalog, payments identity Swarm, Selectel VPC + dedicated)
 3. Packages  -  AI Infra / Cloud Foundation / Full Turnkey
 4. Practice  -  workstation MCP + home lab cards
 5. Code  -  links into `/iac` and `/reference`

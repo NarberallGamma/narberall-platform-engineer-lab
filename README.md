@@ -169,10 +169,16 @@ Hiring usually cannot infer this from Terraform. The long form is [`docs/experie
 | **50+ microservices** | Release graph, base images, traces, secrets/promotion so fifty pipelines stay shippable |
 | Heavy JVM **monoliths** (few backends) | **Tomcat**/servlet + JVM: thread pools vs JDBC, **heap dumps**, **thread dumps**, GC logs. Restarting the pod is not a strategy |
 
-| Observability / storage / identity | What I owned |
-|-----------------------------------|--------------|
-| Prometheus, Grafana, **Loki**, **ELK**, **Graylog**, Zabbix, **Jaeger**, VictoriaMetrics-class | Alerts that on-call can act on; traces across 50 services |
-| S3 / OBS, **MinIO**, **Ceph**, NFS | App data and infra backup. Cloud object stores and on-box/cluster stores |
+| Observability / SRE | What I owned |
+|---------------------|--------------|
+| **Metrics** | **Prometheus** + **Alertmanager**, **Grafana** (dashboards, alert rules, contact points), **VictoriaMetrics**-class. **kube-state-metrics**, node-exporter, Pushgateway, **Blackbox**, cloud-provider exporters (CloudEye-class / CloudWatch-class). On-call alerts that fire on SLI, not on noise |
+| **Logs** | **OpenObserve** (HA ingest, retention, object-store backend) + **OpenTelemetry Collector** on the nodes. **Loki** + Promtail / Vector / Fluent Bit. **ELK / OpenSearch**: Elasticsearch, **Logstash**, Kibana, Filebeat. **Graylog**. Same habit: collect, retain, give L2 a saved query, not a grep on the box |
+| **Traces** | **Jaeger**, Zipkin-class, **OpenTelemetry**. Correlation across 50+ services so “user cannot pay” is not fifty log greps |
+| **SRE loop** | Stand the stack up from zero, wire exporters, tune retention, page the right people, write the runbook. Incident: metrics + logs + traces first, then the lasting fix. Host-only starter (sysstat / vnstat) when a full stack is not there yet |
+
+| Storage / identity | What I owned |
+|--------------------|--------------|
+| S3 / OBS, **MinIO**, **Ceph**, NFS | App data and infra backup. Cloud object stores and on-box/cluster stores. Log backends land here too (OpenObserve / Loki / ELK) |
 | **Harbor**, GitLab / Docker registry | Images that CI actually promotes |
 | **Vault / ESO**, **Keycloak**, AD / ADFS, SAML / OIDC / Kerberos, **Teleport** | Secrets and who can reach what. Introduce Vault if missing |
 | Cloudflare, CoreDNS, unbound | Public DNS and in-cluster / local resolvers |
@@ -361,4 +367,4 @@ LLMOps first (process speed), then cloud:
 
 ## Positioning
 
-> Six years, senior in platform niches. **Business first:** whatever the infra needs, **fast**, fully documented, **minimal windows**, **~99.9% SLA**. Turnkey cloud and AI: greenfield or loaded legacy. De facto lead (train/delegate) under PMs, CTOs, and project-wide tech leads; also a teammate under a dedicated lead; also the single owner on concurrent products. Bank/SBP-class payments, treasury/trade-finance, blockchain, delivery e-commerce, Atlassian/Nextcloud/1C, document AI, multi-tenant Deckhouse estates. Java/Kotlin/.NET/Go/Python/PHP/Node/1C plus SonarQube/Trivy/OSV. **Jenkins** (VM workers → Kubernetes), **GitLab CI + Argo CD**, Azure DevOps, Helm/werf. Kafka/Debezium/Rabbit/NATS/Artemis/Redis. PG/Patroni, MySQL, MSSQL, Oracle, Mongo, ClickHouse. Superset, Supabase, Airflow, n8n, NiFi. Harbor, MinIO, Ceph, Vault, Keycloak, Teleport. 50+ microservices and JVM/Tomcat monoliths. Secure by default (hardening, EDR, Vault / ESO). Multi-zone HA, Cisco-style 7-step incidents. **B.Sc. Information Systems and Technologies (09.03.02), SPbSUT (Bonch-Bruevich)**; Cisco and Windows Server practice during the degree. Hardware/OS depth in the home lab. Detail: [`docs/experience.md`](docs/experience.md).
+> Six years, senior in platform niches. **Business first:** whatever the infra needs, **fast**, fully documented, **minimal windows**, **~99.9% SLA**. Turnkey cloud and AI: greenfield or loaded legacy. De facto lead (train/delegate) under PMs, CTOs, and project-wide tech leads; also a teammate under a dedicated lead; also the single owner on concurrent products. Bank/SBP-class payments, treasury/trade-finance, blockchain, delivery e-commerce, Atlassian/Nextcloud/1C, document AI, multi-tenant Deckhouse estates. Java/Kotlin/.NET/Go/Python/PHP/Node/1C plus SonarQube/Trivy/OSV. **Jenkins** (VM workers → Kubernetes), **GitLab CI + Argo CD**, Azure DevOps, Helm/werf. Kafka/Debezium/Rabbit/NATS/Artemis/Redis. PG/Patroni, MySQL, MSSQL, Oracle, Mongo, ClickHouse. Superset, Supabase, Airflow, n8n, NiFi. Harbor, MinIO, Ceph, Vault, Keycloak, Teleport. Observability/SRE: Prometheus, Alertmanager, Grafana, OpenObserve, Loki, ELK/Logstash, Graylog, Jaeger, OTel. 50+ microservices and JVM/Tomcat monoliths. Secure by default (hardening, EDR, Vault / ESO). Multi-zone HA, Cisco-style 7-step incidents. **B.Sc. Information Systems and Technologies (09.03.02), SPbSUT (Bonch-Bruevich)**; Cisco and Windows Server practice during the degree. Hardware/OS depth in the home lab. Detail: [`docs/experience.md`](docs/experience.md).

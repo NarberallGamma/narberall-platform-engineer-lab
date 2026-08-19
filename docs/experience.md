@@ -149,6 +149,10 @@ Loaded systems are rarely “the app and Postgres.” The path I kept alive incl
 
 A broker that is “up” but not draining is an outage. Metrics: lag, unacked, memory, disk, connections — same instinct as DB lock waits.
 
+### Observability and SRE
+
+The stack is not “we installed Grafana.” I stand up the path and keep it useful on call: **Prometheus + Alertmanager**, **Grafana** (dashboards and alert rules), **VictoriaMetrics**-class, exporters (node, kube-state, blackbox, cloud-provider). Logs: **OpenObserve** + **OpenTelemetry Collector**, **Loki** (Promtail / Vector / Fluent Bit), **ELK / OpenSearch** (Elasticsearch, **Logstash**, Kibana, Filebeat), **Graylog**. Traces: **Jaeger**, Zipkin-class, OTel. Retention, object-store backends, saved queries for L2, pages that match SLI. Same Cisco-style loop: gather metrics/logs/traces, isolate the layer, fix, document.
+
 ---
 
 ## Shape of the estates: 50+ services vs heavy JVM monoliths
@@ -215,6 +219,7 @@ That is why hardware/OS depth and Cisco-style incident method in this lab are no
 - Build/deploy for **Java, Kotlin, .NET, Go, Python, PHP, Node, 1C**; gates with **SonarQube, Trivy, OSV-Scanner**
 - **Jenkins** (plugins, workers) including **dedicated-VM agents → Kubernetes**; **GitLab CI + Argo CD**; **Azure DevOps**; **Helm + werf**
 - Data and glue: **Kafka / Debezium / Rabbit / NATS / Artemis / Redis**; **PG/Patroni, MySQL, MSSQL, Oracle, Mongo, ClickHouse**; **Superset, Supabase, Airflow, n8n, NiFi**; **Harbor, MinIO, Ceph**; **Vault, Keycloak, Teleport**
+- Observability / SRE: **Prometheus, Alertmanager, Grafana**, **OpenObserve + OTel Collector**, **Loki**, **ELK / Logstash / Kibana**, **Graylog**, **Jaeger**
 - **CI catalog:** Terraform / guest init → Ansible → Vault → monitoring → docs, plus Java and other builds, publish, Sonar/Trivy/OSV, auto MR, deploy, revoke/cleanup. **Jenkins** (plugins, K8s workers) and **GitLab CI + Argo CD**. Detail: [`../iac/ci/`](../iac/ci/)
 - **Huawei compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport ECS in a root that catalogs sibling Terragrunt network state. Detail: [`../iac/terraform/cloud-ru-compute/`](../iac/terraform/cloud-ru-compute/)
 - **Payments identity Ansible:** Swarm autodeploy of AM / IG / Redis / Postgres, same roles for Kubernetes. Detail: [`../reference/ansible-payments-idplat/`](../reference/ansible-payments-idplat/)

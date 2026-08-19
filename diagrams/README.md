@@ -1,5 +1,7 @@
 # Diagrams
 
+**Managers first:** short architecture reviews (days, LLMOps, FinOps, reuse, cloud move) live under [`../architecture/`](../architecture/). Case mermaid in this folder stays the long-form source. More diagrams can be added later without moving these files.
+
 Prefer SVG/PNG from Excalidraw/draw.io, or Mermaid next to the case / practice page.
 
 | Path | Use |

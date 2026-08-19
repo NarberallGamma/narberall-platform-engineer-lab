@@ -2,6 +2,8 @@
 
 **Duration:** scoped per MVP
 
+**Business:** one owner who stands up, accompanies, and can migrate. Days-to-weeks for the baseline, then the product path. [`../docs/for-business.md`](../docs/for-business.md).
+
 ## Deliverables
 
 - Application or site + utilities as needed

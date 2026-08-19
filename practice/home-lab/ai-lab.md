@@ -1,5 +1,7 @@
 # Local AI lab
 
+**Business:** a private GPU API so document and analysis work stays off public chats. Hardware list below is unchanged. Manager page: [`../../architecture/01-llmops.md`](../../architecture/01-llmops.md).
+
 **Role:** GPU workstation for inference, LoRA training, and API-backed generation. Local when it fits VRAM; MCP/API when the model does not.
 
 ## Hardware (generic)

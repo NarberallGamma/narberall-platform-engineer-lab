@@ -4,6 +4,8 @@
 **Context:** Internal / enterprise AI platform (GPU VM → OpenAI-compatible API)  
 **Role:** Platform Engineer (sole owner)
 
+**Why business pays:** a private OpenAI-compatible API so accounting, analysts, and developers stop pasting tenant data into a public chat. Throughput, not a demo. Manager page: [`../architecture/01-llmops.md`](../architecture/01-llmops.md). Lists below are unchanged; results still to fill.
+
 ## Challenge
 
 Stand up production-usable LLM inference with HTTPS API, ops automation, and capacity tuning.

@@ -1,5 +1,7 @@
 # Proxmox
 
+**Business:** guests as code so a new GitLab/Postgres/k8s node is days, not a rebuild. Selectel dedicated uses the same VE class. Owned-list below stays.
+
 **Role:** Platform Engineer. Proxmox VE guests for Kubernetes, GitLab, and Postgres.
 
 ## What I owned

@@ -2,6 +2,8 @@
 
 Sanitized GPU compose and training presets. Narrative: [`../../practice/home-lab/ai-lab.md`](../../practice/home-lab/ai-lab.md).
 
+**Business:** these kits are how a private API appears in **minutes** on a GPU box that already exists. Process speed (OCR, local chat, image jobs), not a slide. Manager page: [`../../architecture/01-llmops.md`](../../architecture/01-llmops.md). Kits below stay.
+
 | Path | Purpose |
 |------|---------|
 | [`llm-compose-kit/`](llm-compose-kit/) | Ollama + optional WebUI, NVIDIA reservation |

@@ -1,5 +1,7 @@
 # Ansible (day-2)
 
+**Business first:** hosts become inventory and a runbook in **days**, not a rebuild quarter. More Ansible slices will land later; this map stays. Buyer page: [`../../docs/for-business.md`](../../docs/for-business.md).
+
 Linux and edge delivery as Ansible: the same GitOps habit as Terraform, on hosts instead of cloud APIs. Used on greenfield VPS fleets and on **legacy** hosts that must become inventory + roles without a rebuild. Failover paths (jump, alternate region, SSH backup channel) are part of keeping production reachable when a primary path fails. Host bootstrap includes named admin users, SSH keys, and optional sshd harden. OS/user hardening is part of the first run, not a later ticket.
 
 A second, larger tree is **application autodeploy**: an SBP-class payments identity plane on Docker Swarm, with the same roles later pointed at Kubernetes.

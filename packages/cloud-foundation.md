@@ -2,6 +2,8 @@
 
 **Duration:** depends on footprint (typical multi-day to multi-week)
 
+**Business:** IAM, network, CI, and monitoring in **days to a couple of weeks**. Night park for idle non-prod is in scope when the estate is cloud.ru / Huawei-class or AWS-shaped. [`../architecture/00-days-not-months.md`](../architecture/00-days-not-months.md).
+
 ## Deliverables
 
 - IaC baseline (network, IAM, compute patterns) — greenfield apply or brownfield import

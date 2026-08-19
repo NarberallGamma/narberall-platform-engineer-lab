@@ -1,5 +1,7 @@
 # Terraform modules (library)
 
+**Time-to-value:** after inputs exist, a VPC + compute apply is **minutes**, not a second project. Same modules, next env is parameters. Honest table: [`../../../architecture/03-reuse-modules.md`](../../../architecture/03-reuse-modules.md). The module list below is unchanged.
+
 Reusable modules for Huawei Cloud class / cloud.ru platforms (`sbercloud` provider).  
 AWS-shaped building blocks (VPC, subnet, EIP, compute, security groups).  
 Consumed by [`../cloud-ru-huawei/`](../cloud-ru-huawei/).

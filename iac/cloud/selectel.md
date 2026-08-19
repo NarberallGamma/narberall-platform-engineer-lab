@@ -1,5 +1,7 @@
 # Selectel
 
+**Business:** one RU cloud/DC brand, two APIs, one owner: VPC in days, dedicated Proxmox without mixing the stories. International note below is unchanged.
+
 **Role:** Platform Engineer. Two Selectel delivery modes: OpenStack VPC and dedicated Proxmox hypervisors in Selectel datacenters.
 
 **Selectel note for international readers:** Selectel is one of the largest independent **Russian cloud and datacenter** operators. On the RU IaaS/colo market it is routinely grouped with Yandex Cloud, VK Cloud, and cloud.ru as a top-tier local provider (own DCs, cloud servers, object storage, dedicated, and colo). It is **not** a legal rebrand of AWS, OVH, or Rackspace.

@@ -1,5 +1,7 @@
 # OpenStack / Selectel Cloud (VPC)
 
+**Business:** volume-boot VPC in days (AZ, WAL, etcd disk). Dedicated Proxmox is a sibling story, not this page. Existing VPC note below stays.
+
 **Role:** Platform Engineer. Selectel Cloud VPC: OpenStack networking and volume-boot guests for Kubernetes, GitLab, and Postgres.
 
 This page is the **VPC** slice. Selectel as a market and the dedicated/Proxmox mode: [`selectel.md`](selectel.md).

@@ -2,6 +2,8 @@
 
 **Duration:** 1–2 weeks (typical)
 
+**Business:** private LLM/OCR so finance, analysts, and developers finish document loops faster. Not a chatbot demo. [`../architecture/01-llmops.md`](../architecture/01-llmops.md).
+
 ## Deliverables
 
 - Deploy LLM or RAG-oriented stack (API, storage, basic auth at edge)

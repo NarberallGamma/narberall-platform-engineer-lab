@@ -2,6 +2,8 @@
 
 **Platform Engineer. AI and turnkey cloud delivery. Six years, senior in these niches.**
 
+**For business first:** I stand up, accompany, and migrate platforms in **days to a couple of weeks**, not a quarter of workshops. Audit and import cut click-ops. Idle non-prod can **park at night**. OCR/LLM exists to **speed accounting, analysts, and developers**, not to demo a chatbot. Diagrams for managers: [`architecture/`](architecture/). Outcomes: [`docs/for-business.md`](docs/for-business.md). LLMOps: [`architecture/01-llmops.md`](architecture/01-llmops.md).
+
 I design and ship platforms end to end: cloud project bootstrap (IAM, VPC, networking), compute, managed data, Kubernetes, CI/CD, application and utility code, documentation, and monitoring.
 
 The same ownership covers **greenfield** (empty cloud or rack → production) and **legacy** (hand-built estates → IaC, runbooks, monitoring, cheaper to run). A large share of that work was **loaded production**: high RPS, large user bases, **~99.9% annual SLA**, multi-zone HA, and changes that must not take the product down. Security is in the first delivery (hardening, EDR, least privilege, Vault / ESO, CI gates), not a later project. IaC and pipelines are split and laid out so developers, on-call, and **audit** can follow them. I ship in a **team with a lead** and as the **single platform owner** on one or several concurrent projects (reachable). On later engagements I **trained people and delegated** as a de facto lead while reporting to PMs, CTOs, and project-wide tech leads. About **six years** of that pattern: bank/SBP-class payments, blockchain, delivery e-commerce, 50+ microservice estates and heavy JVM monoliths. Full narrative: [`docs/experience.md`](docs/experience.md).
@@ -17,6 +19,7 @@ This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terra
 
 | You are… | Open |
 |-----------|------|
+| Founder / PM / international buyer | [`docs/for-business.md`](docs/for-business.md) then [`architecture/`](architecture/) |
 | Hiring manager / lead | [`docs/experience.md`](docs/experience.md) (including [education](docs/experience.md#education)) then [`iac/cloud/`](iac/cloud/) then [case studies](#case-studies-iac-related) |
 | Engineer reviewing IaC | [`iac/terraform/`](iac/terraform/) |
 | Engineer reviewing legacy-as-code | [`iac/cloud/vk-cloud.md`](iac/cloud/vk-cloud.md) then [`case-studies/05-legacy-estate-as-code.md`](case-studies/05-legacy-estate-as-code.md) |
@@ -100,14 +103,15 @@ That claim has a concrete proof in this lab: a console-built **NOVA Cloud class*
 | Hand-built cloud / VMs / clusters | IaC (or import into state), inventory, no more click-ops as source of truth. **Proof:** 70+ VMs + networks/SG catalog, [case 05](case-studies/05-legacy-estate-as-code.md) |
 | Undocumented delivery | Runbooks, diagrams, on-call notes so the next person can ship |
 | Slow release / fragile ops | CI/CD, GitOps: Jenkins and/or GitLab CI + Argo CD, faster path from commit to environment |
-| Cost and waste | Right-size compute, storage, idle environments; cut obvious cloud spend |
+| Cost and waste | Right-size compute, storage, idle environments; **night park / weekday start** on non-prod (Huawei-class / cloud.ru and the same idea on AWS). Review: [`architecture/02-finops-night-park.md`](architecture/02-finops-night-park.md) |
+| Cloud move | Planned **seamless** cutover (example: VK Cloud → Huawei-class Advanced). Both sides already as code. [`architecture/04-seamless-move.md`](architecture/04-seamless-move.md) |
 | Blind production | Metrics, logs, alerts; SLI/SLO-shaped visibility before a full observability stack |
 | Loaded production | High RPS, multi-zone HA, seamless migrations, DBMS under lock and replication pressure |
 | Weak or implicit trust | Hardening, EDR, users/rights, secrets in Vault/ESO from day one — without a separate security backlog |
 | Opaque Git / click-ops | Separate repos (not a dump monorepo), obvious IaC and pipeline layout, branches that match promotion |
 | Incidents | Crisis handling including off-hours: restore service, then encode the fix (see below) |
 
-Speed is part of the offer: baseline automation, monitoring, and documentation in days-to-weeks, not a six-month “transformation programme” before anything is safer.
+Speed is part of the offer: baseline automation, monitoring, and documentation in **days-to-weeks**, not a six-month “transformation programme” before anything is safer. Same bar for AI: OCR/LLM is a **process multiplier** (documents, tickets, analysis), not a slide. Managers: [`architecture/00-days-not-months.md`](architecture/00-days-not-months.md).
 
 ### How I work (team, solo, and de facto lead)
 
@@ -291,6 +295,8 @@ flowchart LR
 
 | Path | What |
 |------|------|
+| [`architecture/`](architecture/) | **Manager diagrams** (days, LLMOps, FinOps, reuse, cloud move). Existing case mermaid stays under `diagrams/` |
+| [`docs/for-business.md`](docs/for-business.md) | Days / cheaper / simpler, in buyer language |
 | [`iac/`](iac/) | **IaC hub:** cloud experience + Terraform / Terragrunt + Ansible map |
 | [`case-studies/`](case-studies/) | Problem → architecture → result |
 | [`packages/`](packages/) | Fixed-scope offers |
@@ -304,17 +310,20 @@ flowchart LR
 
 ## Case studies (IaC-related)
 
+LLMOps first (process speed), then cloud:
+
+- [AI / LLM platform](case-studies/01-ai-llm-platform.md)
+- [Document AI / OCR pipeline](case-studies/03-document-ai-pipeline.md)
 - [Cloud platform turnkey / Terraform from zero](case-studies/02-cloud-platform-turnkey.md)
 - [Brownfield import into Terraform state](case-studies/04-terraform-brownfield-import.md)
 - [Legacy estate as Terraform (VK Cloud / NOVA Cloud class)](case-studies/05-legacy-estate-as-code.md)
 - [VMware VCD from zero + one-button host lifecycle](case-studies/06-vmware-vcd-greenfield.md)
 - [Huawei-class compute catalog (split state)](case-studies/07-huawei-compute-catalog.md)
 - [SBP-class identity autodeploy (Swarm, then Kubernetes)](case-studies/08-payments-swarm-autodeploy.md)
-- [AI / LLM platform](case-studies/01-ai-llm-platform.md)
-- [Document AI pipeline](case-studies/03-document-ai-pipeline.md)
+- [Selectel VPC + dedicated Proxmox](case-studies/09-selectel-vpc-and-dedicated.md)
 
 ---
 
 ## Positioning
 
-> Six years, senior in platform niches. Turnkey cloud and AI: greenfield or loaded legacy. De facto lead (train/delegate) under PMs, CTOs, and project-wide tech leads; also a teammate under a dedicated lead; also the single owner on concurrent products. Bank/SBP-class payments, blockchain, delivery e-commerce, Atlassian/Nextcloud. Java/.NET/Go/Kotlin/Python/1C delivery plus SonarQube/Trivy/OSV gates. **Jenkins** (plugins, VM workers → Kubernetes) and **GitLab CI + Argo CD** (branch/tag deploys, auto MR, merge rules). Kafka/Rabbit/NATS/Artemis/Redis. 50+ microservices and JVM/Tomcat monoliths (heap and thread dumps). Secure by default (hardening, EDR, Vault / ESO). ~99.9% SLA, seamless migrations, multi-zone HA, Cisco-style 7-step incidents. **B.Sc. Information Systems and Technologies (09.03.02), SPbSUT (Bonch-Bruevich)**; Cisco and Windows Server practice during the degree. Hardware/OS depth in the home lab. Detail: [`docs/experience.md`](docs/experience.md).
+> Six years, senior in platform niches. **Business first:** days to a usable platform, lower idle bill, OCR/LLM that shortens real work. Turnkey cloud and AI: greenfield or loaded legacy. De facto lead (train/delegate) under PMs, CTOs, and project-wide tech leads; also a teammate under a dedicated lead; also the single owner on concurrent products. Bank/SBP-class payments, blockchain, delivery e-commerce, Atlassian/Nextcloud. Java/.NET/Go/Kotlin/Python/1C delivery plus SonarQube/Trivy/OSV gates. **Jenkins** (plugins, VM workers → Kubernetes) and **GitLab CI + Argo CD** (branch/tag deploys, auto MR, merge rules). Kafka/Rabbit/NATS/Artemis/Redis. 50+ microservices and JVM/Tomcat monoliths (heap and thread dumps). Secure by default (hardening, EDR, Vault / ESO). ~99.9% SLA, seamless migrations, multi-zone HA, Cisco-style 7-step incidents. **B.Sc. Information Systems and Technologies (09.03.02), SPbSUT (Bonch-Bruevich)**; Cisco and Windows Server practice during the degree. Hardware/OS depth in the home lab. Detail: [`docs/experience.md`](docs/experience.md).

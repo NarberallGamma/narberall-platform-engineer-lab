@@ -1,5 +1,7 @@
 # Positioning
 
+**Business filter:** days to a usable platform, lower idle bill (night park on non-prod), OCR/LLM that shortens real document work. Buyer page: [`for-business.md`](for-business.md). Manager diagrams: [`../architecture/`](../architecture/). Existing cloud notes and case bodies stay as they are.
+
 ## Role
 
 **Platform Engineer · AI & Cloud Infrastructure**  

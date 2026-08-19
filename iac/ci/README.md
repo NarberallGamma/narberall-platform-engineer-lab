@@ -1,5 +1,7 @@
 # CI
 
+**Business first:** a named pipeline is the **button** (create, accompany, revoke). Hours after runners exist, not a meeting. Manager view: [`../../architecture/00-days-not-months.md`](../../architecture/00-days-not-months.md). Existing catalog below stays.
+
 This directory is the **CI catalog** for the lab: how delivery is wired end to end. Not a dump of private `.gitlab-ci.yml` or Jenkinsfile trees.
 
 The habit is the same on old repos and new ones: **infrastructure, builds, publishes, deploys, updates, revoke, and cleanup are pipelines**. Stages are named, logged, and split so a lead or an auditor can see what ran. YAML (or a Jenkinsfile) in git is the source of truth, not a tribal checklist and not a green tick in a screenshot.

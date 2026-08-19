@@ -1,5 +1,7 @@
 # VMware Cloud Director (cloud.ru VMware / VCD)
 
+**Business:** empty catalog to a working first-boot in days. Different API from Huawei-class Advanced. International VCD note below stays.
+
 **Class:** VMware Cloud Director. Provider in samples: `vmware/vcd` `~> 3.14`.  
 **Role:** Platform Engineer. **Proof** of greenfield on VCD: empty catalog maps → vApp → Ubuntu guest with extra disks and a working first-boot, written from zero.
 

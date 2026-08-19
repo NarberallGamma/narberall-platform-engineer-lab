@@ -1,5 +1,7 @@
 # cloud.ru / Huawei Cloud
 
+**Business:** AWS-shaped platform in days; non-prod can **park at night**. Planned target for a seamless VK → Advanced move. Foreign-reader class note below is unchanged.
+
 **Class:** Huawei Cloud (AWS-shaped). Provider in samples: `sbercloud`.  
 **Role:** Platform Engineer, end-to-end ownership (greenfield and brownfield).
 

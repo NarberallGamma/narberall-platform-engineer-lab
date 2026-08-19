@@ -1,5 +1,7 @@
 # Terraform / Terragrunt
 
+**Business first:** reusable units so the next env is a **parameter change**. Honest time-to-value: [`../../architecture/03-reuse-modules.md`](../../architecture/03-reuse-modules.md). Night park example: [`examples/night-park/`](examples/night-park/). Existing folders and `RESOURCES.md` stay as they are.
+
 Code proof for [`../cloud/`](../cloud/). Layout matches a real IaC repo: **one folder per cloud**, shared modules, small examples.
 
 Experience and keywords live under [`../cloud/`](../cloud/). This directory is the `.tf` / Terragrunt tree. CI that applies this tree and then calls Ansible: [`../ci/`](../ci/).
@@ -19,7 +21,7 @@ terraform/
   cloudflare/
   modules/             # Shared sbercloud modules (used by cloud-ru-huawei)
   examples/            # Greenfield compose + brownfield import
-  ai-stack/            # Placeholder for GPU/LLM-oriented baseline
+  ai-stack/            # LLMOps map (compose + cases + Karpenter). Extra GPU compose can land later.
 ```
 
 | Go to | Why |

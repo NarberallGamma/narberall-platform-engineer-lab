@@ -1,5 +1,7 @@
 # AWS
 
+**Business:** multi-account / multi-region as code so the next env is days, not a new project. Idle non-prod can follow the same night-park idea as Huawei-class. Existing owned-list below stays.
+
 **Role:** Platform Engineer on multi-account / multi-region platforms.
 
 ## What I owned

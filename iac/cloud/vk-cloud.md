@@ -1,5 +1,7 @@
 # VK Cloud (NOVA Cloud class)
 
+**Business:** 70+ hand-built VMs became Terraform so click-ops stopped. **Planned** seamless move to Huawei-class Advanced (both sides already in this lab). Class notes below stay.
+
 **Class:** NOVA Cloud (Kazakhstan). Under the hood: OpenStack (Nova / Cinder / Neutron / Keystone). Provider in samples: `vk-cs/vkcs`.  
 **Role:** Platform Engineer. **Proof** of the [legacy claim](../../README.md#greenfield-and-legacy): I arrived on a **hand-built** VK Cloud (MCS) project (no Terraform), described the whole layout from zero, and imported live compute.
 

@@ -4,6 +4,8 @@
 **Context:** Enterprise document processing (OCR → structured JSON → LLM)  
 **Role:** Platform Engineer + integration owner
 
+**Why business pays:** OCR + LLM **multiplies** invoice, contract, and ticket loops. Accounting and analysts stop retyping PDFs. Not a chatbot slide. Manager page: [`../architecture/01-llmops.md`](../architecture/01-llmops.md). Existing stub sections stay.
+
 ## Challenge
 
 Reliable PDF/image capture to structured fields with API handoff to ERP-class systems.

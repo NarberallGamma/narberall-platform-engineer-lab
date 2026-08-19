@@ -1,5 +1,7 @@
 # Bare metal
 
+**Business:** rack to a reachable platform in days, same one-button habit as cloud. Owned-list below stays.
+
 **Role:** Platform Engineer. Rack/server Linux, bootstrap, Kubernetes and app platforms without a hyperscaler.
 
 ## What I owned

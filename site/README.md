@@ -2,9 +2,11 @@
 
 **Status:** scaffold later (Astro or Next static)
 
+Hero copy should lead with **days / cheaper / simpler** ([`../docs/for-business.md`](../docs/for-business.md)), then the six-year senior line already on GitHub. Do not drop existing case or education bullets when the site is built.
+
 ## Required sections
 
-1. Hero  -  Platform Engineer · AI & turnkey
+1. Hero  -  Platform Engineer · AI & turnkey · days to a usable platform
 2. Case studies (9)  -  deep links into `/case-studies` on GitHub (include legacy-as-code / VK Cloud, VCD greenfield, Huawei compute catalog, payments identity Swarm, Selectel VPC + dedicated)
 3. Packages  -  AI Infra / Cloud Foundation / Full Turnkey
 4. Practice  -  workstation MCP + home lab cards

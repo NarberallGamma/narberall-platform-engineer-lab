@@ -1,5 +1,7 @@
 # Google Cloud
 
+**Business:** same ownership pattern as AWS/Huawei (project, network, GKE-class). Published live tree is AWS; this page stays narrative. Existing list below stays.
+
 **Role:** Platform Engineer. Project and network bootstrap through compute and delivery into GKE-class / VM workloads.
 
 ## What I owned

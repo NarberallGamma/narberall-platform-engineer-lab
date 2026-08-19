@@ -2,6 +2,8 @@
 
 NDA-safe narrative. Client names stay out. Scale and sector stay in. This is the same six years as the cloud and Kubernetes pages — the part hiring usually cannot infer from Terraform alone.
 
+**Same years, buyer language:** stand up and accompany in **days to a couple of weeks**, audit then import, park idle non-prod, planned cloud move without a freeze year, OCR/LLM as a **multiplier** for accounting / analysts / developers. Outcomes: [`for-business.md`](for-business.md). Diagrams: [`../architecture/`](../architecture/).
+
 **Role on the market:** about **six years** (through 2026). Positioned as a **strong senior in my niches**: platform / cloud / loaded production, CI/CD, day-2 of serious applications — not a generalist who “also clicked AWS once.” AI/LLM delivery is an additional niche on the same ownership pattern.
 
 Client trees and bank internals are not in this public lab. What follows is the shape of the work.

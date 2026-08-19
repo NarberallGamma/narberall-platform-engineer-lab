@@ -1,0 +1,17 @@
+# Non-prod only. Documentation timezone Europe/Moscow.
+timezone: Europe/Moscow
+park:
+  days: [Sat, Sun]
+  stop: "21:00"
+  start: "08:00"
+weekday_nights:
+  stop: "22:00"
+  start: "07:30"
+targets:
+  - name: env-dev-workers
+    kind: cce-node-pool
+  - name: env-stage-ecs
+    kind: ecs
+exclude:
+  - name: env-prod
+    reason: production stays up

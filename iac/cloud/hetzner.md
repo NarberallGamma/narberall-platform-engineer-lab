@@ -1,5 +1,7 @@
 # Hetzner
 
+**Business:** cheap, fast VMs as a real env, not a weekend toy. Narrative only; no leftover client `.tf` here.
+
 **Role:** Platform Engineer. Cloud VMs, networking, Linux baseline for application and CI hosts.
 
 ## What I owned

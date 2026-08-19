@@ -1,5 +1,7 @@
 # Cloud experience
 
+**Business first:** class of cloud (Huawei / AWS-shaped, OpenStack, VCD, Selectel) is how a buyer maps the skill. The buying question is still **calendar and bill**. Outcomes: [`../../docs/for-business.md`](../../docs/for-business.md). Foreign-reader notes below are unchanged.
+
 Platforms I have stood up and operated: public cloud, private cloud, and on-prem. Each page is NDA-safe (sector and scale, not client names) and links to the Terraform that proves the same shape of work.
 
 **cloud.ru note:** cloud.ru (and similar RU hyperscalers in this lab) is **Huawei Cloud class**. The resource model maps to **AWS** (VPC, ECS/EC2-class compute, CCE/EKS-class Kubernetes, RDS, OBS/S3, DMS/Kafka-class). That delivery is transferable AWS-shaped experience.

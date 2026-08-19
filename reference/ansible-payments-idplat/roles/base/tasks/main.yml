@@ -1,0 +1,9 @@
+---
+# tasks file for base
+
+- name: "{{ role_name }} -> Install Python packages"
+  ansible.builtin.pip:
+    name: "{{ base_pip_packages }}"
+    state: present
+    extra_args: "{{ base_pip_extra_args }}"
+  when: prepare_only is not defined or not (prepare_only | bool)

@@ -1,0 +1,10 @@
+---
+- name: Run postgres
+  hosts: swarm_manager
+  gather_facts: true
+
+  roles:
+    - role: network
+      tags: ["network"]
+    - role: idplat_postgres
+      tags: ["idplat_postgres"]

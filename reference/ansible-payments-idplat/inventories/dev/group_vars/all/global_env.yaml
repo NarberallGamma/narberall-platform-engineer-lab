@@ -1,0 +1,19 @@
+# common
+docker_stack_name: idplat_dev # name of docker stack
+docker_service_logging_driver: json-file # journald is not available for Docker on Windows/WSL2; in this case set to json-file
+docker_service_logging_driver_json_file_max_size: 1024m  # https://docs.docker.com/config/containers/logging/json-file/#options
+docker_service_logging_driver_json_file_max_file: 3  # https://docs.docker.com/config/containers/logging/json-file/#options
+docker_service_placement_constraints: []
+#docker_service_etc_hosts: '{ "{{ idplat_public_hostname }}": "{{ dbserver_host }}" }'  # dict of hostname-to-IP mappings, where each hostname is a key in the dictionary. An entry with the IP and hostname is created in /etc/hosts inside service containers
+output_dir: "/tmp/{{ docker_stack_name }}" # base work directory on the target host (can be absolute path or relative to user home directory)
+
+# репозиторий docker образов сервисов
+docker_image_registry: registry.example.com:5000
+# (прокси-)репозиторий docker образов с внешних источников (Docker Hub)
+# необходим для возможности использовать официальные образы сторонних сервисов, например, Consul, Redis / KeyDB
+docker_image_proxy: registry.example.com:5000
+
+default_loglevel: "Information" # default log level
+default_request_response_loglevel: "Debug" # default log level for RequestLogger / ResponseLogger
+root_cert: cert.pem # CA bundle (base64, pem) for all services except cryptoservice
+prepare_only: false # if true just render all configs but not deploy

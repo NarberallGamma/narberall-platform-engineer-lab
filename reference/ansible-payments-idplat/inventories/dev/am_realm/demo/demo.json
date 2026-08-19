@@ -1,0 +1,92 @@
+// конфигурация настроек из раздела settings в статике
+{
+    // Конфигурация настроек аутентификации
+    "AuthenticationConfiguration": {
+        "RevokeSessionsOnCredentialChange": false,
+        "RequireAuthenticatedUserForSignOutMessage": true,
+        "LoginFailureLockoutEnabled": true,
+        "LoginFailureLockoutCount": 6,
+        "LoginFailureLockoutDuration": 6,
+        "InvalidAttemptsCountAttributeName": "badpwdcount",
+        "InvalidAttemptTimestampAttributeName": "badpasswordtime",
+        "LoginFailureLockoutMessage": "Your account is locked!",
+        "AuthenticationSessionThrottlingEnabled": true,
+        "AuthenticationSessionThrottlingInterval": 60,
+        "AuthenticationSessionThrottlingAttempts": 10,
+        "AuthenticationSessionThrottlingLockoutDuration": 60,
+        "EnableSignOutPrompt": true,
+        "SssoSessionDuration": 60
+    },
+    "Services": {
+        //Конфигурация сервиса аутентификации
+        "VerificationCodes": {
+            "ChannelService": "email",
+            "AllowFallbackIfServiceUnavailable": true,
+            "VerificationTokenLifetime": 360,
+            "MaxInvalidCodeAttempts": 2,
+            "CodeLength": 8
+        },
+        //Конфигурация сервиса сброса паролей
+        "PasswordReset": {
+            "Enabled": true,
+            "ForceReset": true,
+            "PasswordGeneratorType": "Idplat.AccessManager.Passwords.Services.Default.DefaultPasswordGenerator, Idplat.AccessManager.Passwords, Version=2.3.0.0, Culture=neutral, PublicKeyToken=null",
+            "MessageTemplate": "Dear {UserName}, thank you for your registration. Your password is: {Password}!"
+        }
+    },
+    //Конфигурация кабинета самообслуживания
+    "SelfServiceSettings": {
+        "Enabled": true,
+        "ApplicationName": "Access Manager",
+        "AllowedReturnUris": [ "https://example.com" ],
+        "AllowedFeatures": [ "Account", "Profile", "Security", "Applications" ],
+
+          "PhoneService": {
+            "MessagingService": "Sms",
+            "MessageTemplate": "Enter the code {VerificationCode}",
+            "ResendDelay": 30
+          },
+
+          "EmailService": {
+            "MessagingService": "Smtp",
+            "MessageTemplate": "Enter the code {VerificationCode}",
+            "ResendDelay": 30
+          },
+
+        "ProfileService": {
+          "AttributeMapping": {
+              "middleName": "patronymic"
+           },
+
+          "FieldProtection": {
+                "phoneNumber": "None",
+                "email": "None",
+                "firstName": "None",
+                "lastName": "None",
+                "middleName": "None"
+          },
+
+          "EmailDomainChangePolicy": "None"
+
+        },
+
+        "RequiredVerified2Fa" :  true,
+        "SuppressLogoutPrompt": true,
+        "AuthTimeThreshold": 60,
+        "AllowRefreshSession": true,
+        "SessionLifeTime": 180
+    },
+// Конфигурация парольной политики
+    "PasswordPolicy": {
+        "Enabled": true,
+        "AllowBlacklistedPasswords": true,
+        "IsAutoGenerateEmptyPasswords": true,
+        "MaxPasswordLength": 16,
+        "MinPasswordLength": 10,
+        "PasswordCharacterGroups": [
+            "1234567890",
+            "abc"
+        ],
+        "MinPasswordScore": 4
+    }
+}

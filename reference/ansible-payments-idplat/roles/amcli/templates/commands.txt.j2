@@ -1,0 +1,45 @@
+{%- if (am_first_deploy | bool) or (am_update_migrations | bool) %}
+dbup
+
+{% endif %}
+
+{%- if (am_first_deploy | bool) %}
+install {{ am_admin }} {{ am_admin_pwd }} {{ am_admin_email }} {{ am_cert_fingerprint.stdout }}
+settings --issUri https://{{ idplat_public_hostname }}/{{ am_application }} --issEmail admin@example.com
+
+{% for dir_realm_am in found_dir_realm_am.files -%}
+{%- set realm_name = dir_realm_am.path | basename %}
+
+realm add {{ realm_name }}
+{% set identity_dir = dir_realm_am.path %}
+{% for file in lookup('fileglob', identity_dir ~ '/*User.yml', wantlist=True) %}
+identity /app/customfile/{{ file | basename }} -r {{ realm_name }} -op sync -t User -with All
+{% endfor %}
+{% for file in lookup('fileglob', identity_dir ~ '/*Role.yml', wantlist=True) %}
+identity /app/customfile/{{ file | basename }} -r {{ realm_name }} -op sync -t Role -with All
+{% endfor %}
+{% for file in lookup('fileglob', identity_dir ~ '/*Group.yml', wantlist=True) %}
+identity /app/customfile/{{ file | basename }} -r {{ realm_name }} -op sync -t Group -with All
+{% endfor %}
+{% for file in lookup('fileglob', identity_dir ~ '/*App.yml', wantlist=True) %}
+applications /app/customfile/{{ file | basename }} -r {{ realm_name }} -op sync
+{% endfor %}
+{% endfor %}
+
+{%- endif %}
+
+{%- if ((ig_enable_demo_oidc | default('', false)) | bool) or ((ig_enable_demo_jwt | default('', false)) | bool) %}
+realm add yarp
+identity /app/customfile/yarp_User.yml -r yarp -op sync -t User -with All
+{% if ((ig_enable_demo_oidc | default('', false)) | bool) %}
+applications /app/customfile/yarp_Oidc_App.yml -r yarp -op sync
+{% endif %}
+{% if ((ig_enable_demo_jwt | default('', false)) | bool) %}
+applications /app/customfile/yarp_Jwt_App.yml -r yarp -op sync
+{% endif %}
+{%- endif %}
+
+{%- if (am_update_plugins | bool) %}
+
+installplugins /app/plugins
+{%- endif %}

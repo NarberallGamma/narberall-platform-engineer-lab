@@ -11,7 +11,7 @@ Experience write-ups: [`../cloud/`](../cloud/).
 | Area | Resource types (examples in repo) | Where |
 |------|-----------------------------------|--------|
 | Network | `sbercloud_vpc`, subnet, route, route table, EIP, peering, VIP, security group + rules | `modules/`, `cloud-ru-huawei/stacks/multi-env-root/` |
-| Compute | `sbercloud_compute_instance`, server group | `cloud-ru-huawei/stacks/multi-env-root/ecs_*.tf` |
+| Compute | `sbercloud_compute_instance`, server group | `cloud-ru-huawei/stacks/multi-env-root/ecs_*.tf` (platform + purpose: GitLab, Vault, runner, Redis, monitor) |
 | Kubernetes | `sbercloud_cce_cluster`, `sbercloud_cce_node_pool` | `cloud-ru-huawei/stacks/multi-env-root/cce_*.tf` |
 | Database | `sbercloud_rds_instance`, `sbercloud_rds_pg_account`, `sbercloud_rds_pg_database` | `rds_prod.tf`, `rds_databases.tf` |
 | Messaging | `sbercloud_dms_kafka_instance`, topic, user | `dms_kafka.tf` |
@@ -25,7 +25,7 @@ Experience write-ups: [`../cloud/`](../cloud/).
 | Area | Resource types | Where |
 |------|----------------|--------|
 | Network | VPC module, IGW, routes, SG, NAT, EIP, peering | `aws/root/` |
-| Compute | `aws_instance`, EBS, volume attach, key pair | `aws/root/` |
+| Compute | `aws_instance`, EBS, volume attach, key pair | `aws/root/compute_*.tf` (GitLab, bastion, proxy, runner, Vault) |
 | Database | `aws_db_instance` (RDS MySQL), EC2+EBS DB pattern | `mysql_rds.tf`, `aws/root/modules/db_instance/` |
 | Cache | `aws_elasticache_replication_group` | `elasticache.tf`, `aws/live/` unit |
 | Kubernetes | EKS (+ Karpenter unit placeholder) via Terragrunt | `aws/live/` |
@@ -38,7 +38,7 @@ Experience write-ups: [`../cloud/`](../cloud/).
 | Area | Resource types | Where |
 |------|----------------|--------|
 | Network | network, subnet, floating IP, security group + rule | `openstack-selectel/` |
-| Compute | instances (bastion, kube, GitLab, Postgres), server group | `kube.tf` |
+| Compute | instances (bastion, kube, GitLab, Postgres, runner, Vault, Redis, monitor, proxy), server group | `kube.tf`, `purpose.tf` |
 | Storage | block volumes + attach | `volumes_sg.tf` |
 
 ## VK Cloud / NOVA Cloud class (OpenStack IaaS)
@@ -48,7 +48,7 @@ NOVA Cloud class (Kazakhstan). Under the hood: OpenStack Nova / Cinder / Neutron
 | Area | Resource types | Where |
 |------|----------------|--------|
 | Catalog | networks, flavors, AZ, SG, volume types, key pairs as keys | `vkcloud/variables/` |
-| Compute | `vkcs_compute_instance` (purpose-split `vm-*.tf`) | `vkcloud/vm-collaboration.tf`, `vm-identity.tf`, `vm-llm.tf`, `vm-database.tf` |
+| Compute | `vkcs_compute_instance` (purpose-split `vm-*.tf` + module) | `vkcloud/vm-*.tf`, `modules/compute_instance/`, `live/sec-monitor/` |
 | Storage | `vkcs_blockstorage_volume`, `vkcs_compute_volume_attach` | same files |
 | Brownfield | `prevent_destroy`, short `ignore_changes`, import runbook | `vkcloud/brownfield.tf`, `IMPORT.md`, `ESTATE.md` |
 
@@ -68,13 +68,15 @@ Hosted VCD (cloud.ru VMware). Provider: `vmware/vcd`. Guest init + extra-disk de
 
 | Area | Resource types | Where |
 |------|----------------|--------|
-| Guests | `proxmox_vm_qemu` masters/workers/GitLab/Postgres | `proxmox/` |
+| Guests | `proxmox_vm_qemu` masters/workers/GitLab/Postgres/runners/Vault/monitor | `proxmox/` |
 
 ## Cloudflare
 
 | Area | Resource types | Where |
 |------|----------------|--------|
-| DNS | zone, records | `cloudflare/` |
+| DNS | 3 zones, A/CNAME/MX/TXT/CAA | `cloudflare/zones.tf`, `records_*.tf` |
+| Edge | page rules, zone settings | `cloudflare/page_rules.tf` |
+| Access | Zero Trust apps + policies | `cloudflare/access.tf` |
 
 ## Layout styles
 

@@ -1,0 +1,7 @@
+---
+Yarp:
+  Options:
+    UseHealthCheckEndpoint: {{ ig.UseHealthCheckEndpoint | bool | lower }}
+    HealthCheckEndpoint:
+      RequestTracing:
+        Enable: {{ ig.HealthCheckEndpoint_RequestTracing | bool | lower }}

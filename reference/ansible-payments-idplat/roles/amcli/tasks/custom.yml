@@ -1,0 +1,34 @@
+###### AM first deploy ###############################
+
+- name: "{{ am_service_name }} -> Prepare to configure am"
+  block:
+
+#    - name: Add all plugins
+#      copy:
+#        dest: "{{ output_dir }}/{{ amcli_name }}/plugins/"
+#        src: "{{ item }}"
+#        mode: 0644
+#      loop: "{{ amcli_plugins_files.plugins }}"
+      
+    - name: "{{ am_service_name }} -> Get am sign certificate fingerprint"
+      shell: >
+        set -o pipefail &&
+        openssl pkcs12 -in '{{ inventory_dir }}/certs/{{ am_cert_path }}'
+        $(test $(openssl version | cut -d ' ' -f 2 | cut -d '.' -f 1) -lt 3 && echo -n '' || echo -n '-legacy')
+        -nokeys -passin pass:{{ am_cert_pass | quote }} 2>/dev/null |
+        openssl x509 -noout -fingerprint -sha1 |
+        egrep -o '=.+$' |
+        tr -d ':='
+      args:
+        executable: /bin/bash
+      delegate_to: localhost
+      changed_when: false
+      register: am_cert_fingerprint
+
+    # Формирования спика для 
+    - name: "List directories in {{ am_realms_folder }}" 
+      find:
+        paths: "{{ am_realms_folder }}"
+        file_type: directory
+      register: found_dir_realm_am
+      delegate_to: localhost

@@ -1,0 +1,8 @@
+idplat_am_image: idplat.am.core:5.2.1-v5.2.1-1.0.0.24282119918
+idplat_cli_am_image: idplat.am.core:5.2.1-v5.2.1-1.0.0.24282119918
+idplat_ansibledeploy_image: idplat.platform:0.0.1.115602-deploy-240815
+idplat_postgres_image: idplat.postgres:16.3-alpine3.20
+redis_base_image: idplat.redis:7.2.0-v11
+keydb_image: idplat.keydb:x86_64_v6.3.2
+idplat_ig_image: identity-gateway:5.4.0.0-master-240925.118700
+idplat_igint_image: identity-gateway:5.4.0.0-master-240925.118700

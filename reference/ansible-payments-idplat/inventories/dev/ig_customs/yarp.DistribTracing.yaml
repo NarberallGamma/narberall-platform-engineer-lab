@@ -1,0 +1,29 @@
+Yarp:
+  DistribTracing:
+    Enable: true
+    Exporter:
+      Type: Otlp
+      Options:
+        Endpoint: http://otel.example.com:4317/
+    Tags:
+      StatusCodeCustomName:
+        Exp: StatusCode()
+#  DistribTracing:
+#    Enable: true
+#    Exporter:
+#      Type: Zipkin
+#      Options:
+#        Endpoint: http://otel.example.com:9411/api/v2/spans
+#    Tags:
+#      StatusCodeCustomName:
+#        Exp: StatusCode()
+#  DistribTracing:
+#    Enable: true
+#    Exporter:
+#      Type: Jaeger
+#      Options:
+#        Endpoint: http://otel.example.com:14268/api/traces
+#        Protocol: HttpBinaryThrift
+#    Tags:
+#      StatusCodeCustomName:
+#        Exp: StatusCode()

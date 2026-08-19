@@ -1,0 +1,52 @@
+---
+# deploy tasks file
+
+# deploy service
+
+- name: "{{ docker_service.name }} -> Render docker compose template"
+  ansible.builtin.template:
+    src: deploy.yml.j2
+    dest: "{{ docker_service.output_dir }}/deploy_{{ docker_service.name }}.yml"
+    mode: u=rw,g=r,o=r
+
+- name: "{{ docker_service.name }} -> Ensure script file is absent if not prepare only"
+  ansible.builtin.file:
+    path: "{{ docker_service.output_dir }}/deploy_{{ docker_service.name }}.sh"
+    state: absent
+  when: not (docker_service.prepare_only | bool)
+
+- name: "{{ docker_service.name }} -> Render script template if prepare only"
+  ansible.builtin.template:
+    src: deploy.sh.j2
+    dest: "{{ docker_service.output_dir }}/deploy_{{ docker_service.name }}.sh"
+    mode: u=rwx,g=rx,o=rx
+  when: docker_service.prepare_only | bool
+
+- name: "{{ docker_service.name }} -> Deploy service from compose file"
+  when: not (docker_service.prepare_only | bool)
+  block:
+
+    - name: "{{ docker_service.name }} -> Deploy service from compose file"
+      community.docker.docker_stack:
+        with_registry_auth: true
+        state: present
+        name: "{{ docker_service.stack }}"
+        compose:
+          - "{{ docker_service.output_dir }}/deploy_{{ docker_service.name }}.yml"
+      register: tmp_docker_service_docker_stack_result
+
+  always:
+
+    - name: "{{ docker_service.name }} -> Show deploy service results"
+      ansible.builtin.debug:
+        msg: "{{ ( ( ((tmp_docker_service_docker_stack_result.msg | default('', true) | length) > 0 and
+                      (tmp_docker_service_docker_stack_result.stderr | default('', true) | length) == 0) |
+                     ternary([(tmp_docker_service_docker_stack_result.msg | default('', true))], []) ) +
+                   ( ((tmp_docker_service_docker_stack_result.stderr | default('', true) | length) > 0) |
+                     ternary([tmp_docker_service_docker_stack_result.stderr], []) ) +
+                   ( ((tmp_docker_service_docker_stack_result.stdout | default('', true) | length) > 0) |
+                     ternary([tmp_docker_service_docker_stack_result.stdout], []) )
+                 ) | join('\n') | regex_replace('\n$') | split('\n') }}"
+      when: tmp_docker_service_docker_stack_result.skipped is not defined or not tmp_docker_service_docker_stack_result.skipped
+      changed_when: tmp_docker_service_docker_stack_result.changed is defined and tmp_docker_service_docker_stack_result.changed
+      failed_when: tmp_docker_service_docker_stack_result.failed is defined and tmp_docker_service_docker_stack_result.failed

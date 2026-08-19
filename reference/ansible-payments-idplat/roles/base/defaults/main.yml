@@ -1,0 +1,17 @@
+---
+# defaults file for base
+
+base_pip_packages_common:
+  - passlib  # for community.general.htpasswd Ansible module
+base_pip_packages_docker:
+  - docker  # for community.docker.docker_network, community.docker.docker_container Ansible modules
+  - jsondiff  # for community.docker.docker_stack Ansible module
+  - pyyaml  # for community.docker.docker_stack Ansible module
+base_pip_packages_k8s:
+  - kubernetes  # for kubernetes.core.k8s Ansible module
+  - pyyaml  # for kubernetes.core.k8s Ansible module
+  - jsonpatch  # for kubernetes.core.k8s Ansible module
+  - openshift 
+base_pip_packages: "{{ base_pip_packages_common + ((deploy_to_k8s | default(false, true) | bool) |
+                                                   ternary(base_pip_packages_k8s, base_pip_packages_docker)) }}"
+base_pip_extra_args: ''

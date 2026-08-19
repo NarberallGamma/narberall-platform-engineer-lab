@@ -1,0 +1,18 @@
+---
+idplat_postgres_user_am: "{{ am_db_user }}"
+idplat_postgres_user_am_pass: "{{ am_db_passwd | to_json }}"
+idplat_postgres_db_am: "{{ am_db_name }}"
+
+# parent role overrides:
+idplat_postgres_image: idplat.postgres:16.3-alpine3.20
+idplat_postgres_env:
+  POSTGRES_USER: user
+  POSTGRES_PASSWORD: password1
+  POSTGRES_DB: db1
+idplat_postgres_healthcheck_disable: true  # !!!
+idplat_postgres_port: 5432
+idplat_postgres_secrets:
+  /docker-entrypoint-initdb.d:
+    - source: init-user-db.sh.j2  # file name only or full path to file
+      target: init-user-db.sh  # optional; target file will appear in container with that name
+      mode: '0777'  # optional, default is value of docker_service_secrets_default_mode

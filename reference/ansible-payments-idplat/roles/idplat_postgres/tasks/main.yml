@@ -1,0 +1,94 @@
+---
+# tasks file
+
+- name: "{{ overrides_from_child_role.name |
+            default(lookup('vars', role_name + '_' + 'name', default=''), true) |
+            default(role_name, true) }} -> Initialize main vars"
+  set_fact:
+    "{{ 'parent_role_for' + '_' + role_name }}": "{{ lookup('vars', 'parent_role_for' + '_' + role_name, default='docker_service') }}"
+    "{{ role_name + '_' + 'prepare_only' }}": "{% if overrides_from_child_role.prepare_only is defined -%}
+                                                 {{ overrides_from_child_role.prepare_only }}
+                                               {%- elif (lookup('vars', role_name + '_' + 'prepare_only', default='not_defined') |
+                                                         string) != 'not_defined' -%}
+                                                 {{ lookup('vars', role_name + '_' + 'prepare_only') }}
+                                               {%- else -%}
+                                                 {{ prepare_only | default(false, true) }}
+                                               {%- endif %}"
+    "{{ role_name + '_' + 'dump_vars' }}": "{% if overrides_from_child_role.dump_vars is defined -%}
+                                              {{ overrides_from_child_role.dump_vars }}
+                                            {%- elif (lookup('vars', role_name + '_' + 'dump_vars', default='not_defined') |
+                                                      string) != 'not_defined' -%}
+                                              {{ lookup('vars', role_name + '_' + 'dump_vars') }}
+                                            {%- else -%}
+                                              {{ dump_vars | default(false, true) }}
+                                            {%- endif %}"
+    "{{ role_name + '_' + 'name' }}": "{{ overrides_from_child_role.name |
+                                          default(lookup('vars', role_name + '_' + 'name', default=''), true) |
+                                          default(role_name, true) }}"
+    "{{ role_name + '_' + 'stack' }}": "{{ overrides_from_child_role.stack |
+                                           default(lookup('vars', role_name + '_' + 'stack', default=''), true) |
+                                           default(docker_stack_name, true) }}"
+    "{{ role_name }}": {}
+
+- name: "{{ lookup('vars', role_name + '_' + 'name') }} -> Initialize output dir value"
+  set_fact:
+    "{{ role_name + '_' + 'output_dir' }}": "{{ overrides_from_child_role.output_dir |
+                                                default(lookup('vars', role_name + '_' + 'output_dir', default=''), true) |
+                                                default(([(output_dir | default(lookup('vars', role_name + '_' + 'stack', default=''), true)
+                                                                      | default(docker_stack_name, true)),
+                                                          lookup('vars', role_name + '_' + 'name')] | path_join), true) }}"
+
+- name: "{{ lookup('vars', role_name + '_' + 'name') }} -> Create output dir"
+  file:
+    path: "{{ lookup('vars', role_name + '_' + 'output_dir') }}"
+    state: directory
+    mode: 0755
+
+- name: "{{ lookup('vars', role_name + '_' + 'name') }} -> Create defaults dict with all variables with prefix '{{ role_name + '_' }}' without this prefix"
+  set_fact:
+    "{{ role_name }}": "{{ lookup('vars', role_name) |
+                           combine({ (item | regex_replace('^' + role_name + '_')): lookup('vars', item) }, recursive=True, list_merge='replace') }}"
+  loop: "{{  lookup('varnames', '^' + role_name + '_.+') | split(',') }}"
+
+- name: "{{ lookup('vars', role_name + '_' + 'name') }} -> Combine defaults dict with overrides"
+  set_fact:
+    "{{ role_name }}": "{{ lookup('vars', role_name) |
+                           combine(overrides_from_child_role | default({}, true), recursive=True, list_merge='replace') }}"
+
+- name: "{{ lookup('vars', role_name + '_' + 'name') }} -> Ensure role variables dict file is absent if not dump vars"
+  file:
+    path: "{{ lookup('vars', role_name + '_' + 'output_dir') }}/vars_{{ role_name }}.yaml"
+    state: absent
+  when: not (lookup('vars', role_name + '_' + 'dump_vars') | bool)
+
+- name: "{{ lookup('vars', role_name + '_' + 'name') }} -> Dump to file role variables dict"
+  copy:
+    content: "{{ lookup('vars', role_name) | to_nice_yaml(width=5000) }}"
+    dest: "{{ lookup('vars', role_name + '_' + 'output_dir') }}/vars_{{ role_name }}.yaml"
+    mode: 0644
+  when: lookup('vars', role_name + '_' + 'dump_vars') | bool
+
+- name: "{{ lookup('vars', role_name + '_' + 'name') }} -> Run custom tasks (if exist)"
+  include_tasks: "{{ run_custom_tasks_item }}"
+  loop: "{{ query('fileglob', 'tasks/custom*.y*ml') | sort }}"
+  loop_control:
+    loop_var: run_custom_tasks_item
+
+- name: "{{ lookup('vars', role_name + '_' + 'name') }} -> (After custom tasks) Dump to file role variables dict"
+  copy:
+    content: "{{ lookup('vars', role_name) | to_nice_yaml(width=5000) }}"
+    dest: "{{ lookup('vars', role_name + '_' + 'output_dir') }}/vars_{{ role_name }}.yaml"
+    mode: 0644
+  when: lookup('vars', role_name + '_' + 'dump_vars') | bool
+
+- name: "{{ lookup('vars', role_name + '_' + 'name') }} -> Set overrides for parent role"
+  set_fact:
+    overrides_for_parent_role: "{{ lookup('vars', role_name) }}"
+
+- name: "{{ lookup('vars', role_name + '_' + 'name') }} -> Run parent role: '{{ lookup('vars', 'parent_role_for' + '_' + role_name) }}'"
+  include_role:
+    name: "{{ lookup('vars', 'parent_role_for' + '_' + role_name) }}"
+  vars:
+    overrides_from_child_role: "{{ overrides_for_parent_role }}"
+  when: (lookup('vars', 'parent_role_for' + '_' + role_name) | length) > 0
+     and lookup('vars', 'parent_role_for' + '_' + role_name) != role_name

@@ -8,14 +8,14 @@ No client names, no real UUIDs, no production hostnames. Private tree is larger.
 
 | Item | In the private estate (described from zero) | Published here |
 |------|---------------------------------------------|----------------|
-| Nova compute | **70+** instances brought into Terraform (managed DBaaS members excluded) | 4 representative VMs |
+| Nova compute | **70+** instances brought into Terraform (managed DBaaS members excluded) | 4 imported purpose VMs + 1 greenfield sec-monitor module |
 | Cinder volumes + attaches | **100+** volumes, **30+** attaches | boot + data disks on those 4 |
 | Terraform addresses in state | **200+** (instance + volume + attach), imported | same resource types, curated |
 | Networks (VPC-equivalent) | **all** project networks in a catalog (about 16, including empty Neutron duplicates renamed in console) | 4 catalog keys |
 | Subnets | **all** project subnets (100+) | documentation CIDRs only |
 | Security groups | **all** project SGs as keys (names + UUIDs) | 3 catalog keys |
 | Flavors / AZ / volume types | full maps used by every VM file | subset of public catalog names |
-| Purpose files in private root | about **15** `vm-*.tf` | 4 files (collaboration, identity, llm, database) |
+| Purpose files in private root | about **15** `vm-*.tf` | 5 files (collaboration, identity, llm, database, sec-monitor) |
 | `terraform plan` | **No changes** after import (no apply) | pattern only; this slice is not wired to a live project |
 
 The networks, SGs, and VPC-equivalent were **already there** (console). The work was to write the catalog so VM code never hardcodes UUIDs, then import compute. Not a greenfield `apply` of empty VPCs.
@@ -57,6 +57,9 @@ vkcloud/
   vm-identity.tf           # Windows DC sample
   vm-llm.tf                # GPU inference sample
   vm-database.tf           # self-managed DB sample
+  vm-sec-monitor.tf        # greenfield module (metrics / security)
+  modules/compute_instance/
+  live/sec-monitor/        # Terragrunt unit
   variables/               # child-module maps (fake UUIDs)
   IMPORT.md                # import addresses with fake IDs
   provider.tf.example      # backend + provider (copy locally)

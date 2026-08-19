@@ -4,7 +4,7 @@ NDA-safe narratives. Each links to diagrams and related code under `iac/` and `r
 
 The same engineer owns **greenfield** platforms and **legacy** estates (import, runbooks, monitoring, incidents). About **six years**, senior in platform niches: bank/SBP-class, blockchain, delivery e-commerce, Atlassian/Nextcloud, 50+ microservices and JVM monoliths, **Jenkins** and **GitLab CI + Argo CD** — [`docs/experience.md`](../docs/experience.md). Delivery in a large team with a lead, as a de facto lead (train/delegate), and as the single owner on concurrent projects (reachable). Loaded production: high RPS, **~99.9% SLA**, seamless migrations, multi-zone HA. Kubernetes across OpenShift / Deckhouse / vanilla / cloud PaaS. DBMS under load (long SQL, locks, replication, sharding). Crisis work: off-hours restore, connectivity when a path is blocked, Cisco-style 7-step. Security from day one: hardening, EDR, Vault / ESO, SonarQube/Trivy/OSV; repos and pipelines laid out for developers, on-call, and audit.
 
-Ansible / home-lab edge is **not** a client case study; it lives in [`practice/home-lab/edge-platform.md`](../practice/home-lab/edge-platform.md) and [`iac/ansible/`](../iac/ansible/).
+Home-lab edge (Xray / VPS) is **not** a client case study; it lives in [`practice/home-lab/edge-platform.md`](../practice/home-lab/edge-platform.md). Payments identity autodeploy is case **08**.
 
 | ID | Topic | Diagram |
 |----|-------|---------|
@@ -15,5 +15,6 @@ Ansible / home-lab edge is **not** a client case study; it lives in [`practice/h
 | [`05-legacy-estate-as-code.md`](05-legacy-estate-as-code.md) | **Proof of legacy:** 70+ console-built VMs, full network/SG catalog from zero, import, clean plan | [`diagrams/case-studies/05-legacy-estate-as-code.md`](../diagrams/case-studies/05-legacy-estate-as-code.md) |
 | [`06-vmware-vcd-greenfield.md`](06-vmware-vcd-greenfield.md) | **VCD from zero:** catalog, guest init, DB-class VM, one-button CI stages | [`diagrams/case-studies/06-vmware-vcd-greenfield.md`](../diagrams/case-studies/06-vmware-vcd-greenfield.md) |
 | [`07-huawei-compute-catalog.md`](07-huawei-compute-catalog.md) | **Huawei compute catalog:** split state, CCE/RDS/purpose ECS, import then a new Teleport VM | [`diagrams/case-studies/07-huawei-compute-catalog.md`](../diagrams/case-studies/07-huawei-compute-catalog.md) |
+| [`08-payments-swarm-autodeploy.md`](08-payments-swarm-autodeploy.md) | **SBP-class identity autodeploy:** Swarm first, same roles for Kubernetes | [`diagrams/case-studies/08-payments-swarm-autodeploy.md`](../diagrams/case-studies/08-payments-swarm-autodeploy.md) |
 
 Use [`_template.md`](_template.md) for new entries.

@@ -1,0 +1,116 @@
+---
+# prepare tasks file
+
+# prepare docker secrets info
+
+- name: "{{ docker_service.name }} -> Initialize tmp vars"
+  ansible.builtin.set_fact:
+    tmp_docker_service_secrets_zip: []
+    tmp_docker_service_secrets_prelist: []
+    tmp_docker_service_remote_secrets_data: {}
+    tmp_docker_service_secrets_hash: {}
+    tmp_docker_service_secrets_list: []
+
+- name: "{{ docker_service.name }} -> Set docker secrets pre-list"
+  ansible.builtin.set_fact:
+    tmp_docker_service_secrets_zip: "{{ tmp_docker_service_secrets_zip +
+                                        (item.value | default([], true) | select | unique | zip_longest([],
+                                          fillvalue=(item.key | string | trim |
+                                                     regex_replace('\\s*\\/+\\s*', '/') |
+                                                     regex_replace('\\/+', '/') |
+                                                     regex_replace('\\/$') |
+                                                     default('/', true))) | list) }}"
+  loop: "{{ (docker_service.secrets | default({}, true) | dict2items) +
+            (docker_service.extra_secrets | default({}, true) | dict2items) }}"
+  when: (item.value | default([], true) | select | length) > 0
+
+- name: "{{ docker_service.name }} -> Set docker secrets list"
+  ansible.builtin.set_fact:
+    tmp_docker_service_secrets_prelist: "{{ tmp_docker_service_secrets_prelist +
+                                            [{'source': item0_source,
+                                              'targetpath': item[1],
+                                              'target': item0_target,
+                                              'uid': item0_uid,
+                                              'gid': item0_gid,
+                                              'mode': item0_mode,
+                                              'output_dir': item0_output_dir,
+                                              'remote_src': item0_remote_src,
+                                              'alias': item0_alias}] }}"
+  vars:
+    item0_source: "{{ (item[0] is string) | ternary(item[0], (item[0].source | default('', true))) | trim |
+                      regex_replace('\\s*\\/+\\s*', '/') | regex_replace('\\/+', '/') | regex_replace('^\\/$') }}"
+    item0_target_from_source: "{{ item0_source | basename | regex_replace('\\.j2$', ignorecase=True) }}"
+    item0_target_from_dict: "{{ item[0].target | default('', true) | trim |
+                                regex_replace('\\s*\\/+\\s*', '/') | regex_replace('\\/+', '/') | regex_replace('^\\/') }}"
+    item0_target: "{% if (item0_target_from_dict | length) > 0 and (item0_target_from_dict[-1] != '/') %}{{ item0_target_from_dict
+                   }}{% else %}{{ [item0_target_from_dict, item0_target_from_source] | path_join }}{% endif %}"
+    item0_uid: "{% if (item[0].uid | default('') | string | trim) == '0' or
+                      (item[0].uid | default('', true) | string | trim | length) > 0 %}{{ item[0].uid | string | trim
+                }}{% else %}{{ docker_service.secrets_default_uid }}{% endif %}"
+    item0_gid: "{% if (item[0].gid | default('') | string | trim) == '0' or
+                      (item[0].gid | default('', true) | string | trim | length) > 0 %}{{ item[0].gid | string | trim
+                }}{% else %}{{ docker_service.secrets_default_gid }}{% endif %}"
+    item0_mode: "{{ item[0].mode | default(docker_service.secrets_default_mode) }}"
+    item0_output_dir: "{{ item[0].output_dir | default('', true) | trim |
+                          regex_replace('\\s*\\/+\\s*', '/') | regex_replace('\\/+', '/') | regex_replace('^\\/') | regex_replace('\\/$') |
+                          default(docker_service.secrets_default_output_dir, true) }}"
+    item0_remote_src: "{{ item[0].remote_src | default(false, true) }}"
+    item0_alias: "{{ ([item[1], item0_target] | path_join | regex_replace('^\\/') |
+                      replace('/', '-') | regex_replace('[^A-Za-z0-9_\\-]', '_'))[-1::-1][:64][-1::-1] |
+                     regex_replace('^[0-9_\\-]', 'Z') }}"
+  loop: "{{ tmp_docker_service_secrets_zip }}"
+  when: (item0_target_from_source | replace('.', '') | length) > 0
+
+# gather docker secrets hashes
+
+- name: "{{ docker_service.name }} -> Fetch base64- encoded remote docker secrets data"
+  ansible.builtin.slurp:
+    src: "{{ [docker_service.output_dir, item.output_dir, item.source] | path_join }}"
+  loop: "{{ tmp_docker_service_secrets_prelist }}"
+  when: (item.remote_src | bool)
+  register: tmp_docker_service_remote_secrets_data
+
+- name: "{{ docker_service.name }} -> Compute remote docker secrets hashes"
+  ansible.builtin.set_fact:
+    tmp_docker_service_secrets_hash: "{{ tmp_docker_service_secrets_hash |
+                                         combine({item.item.alias: (item.content | hash('md5'))}, recursive=True, list_merge='replace') }}"
+  loop: "{{ tmp_docker_service_remote_secrets_data.results | default([], true) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.content is defined
+
+- name: "{{ docker_service.name }} -> Compute local docker secrets hashes"
+  ansible.builtin.set_fact:
+    tmp_docker_service_secrets_hash: "{{ tmp_docker_service_secrets_hash |
+                                         combine({item.alias: item_source_hash}, recursive=True, list_merge='replace') }}"
+  vars:
+    item_source_hash: "{% if (item.source | basename | regex_findall('\\.j2$', ignorecase=True) | length) > 0
+                         %}{{ lookup('template', item.source, convert_data=False) | hash('md5')
+                       }}{% else %}{{ lookup('file', item.source) | b64encode | hash('md5') }}{% endif %}"
+  loop: "{{ tmp_docker_service_secrets_prelist }}"
+  when: not (item.remote_src | bool)
+
+- name: "{{ docker_service.name }} -> Show docker secrets hashes"
+  ansible.builtin.debug:
+    var: tmp_docker_service_secrets_hash
+
+# combine docker secrets info with hashes
+
+- name: "{{ docker_service.name }} -> Set docker secrets list"
+  ansible.builtin.set_fact:
+    tmp_docker_service_secrets_list: "{{ tmp_docker_service_secrets_list +
+                                         [item | combine({'name': (docker_service.stack + '_' + docker_service.name + '-' +
+                                                                   tmp_docker_service_secrets_hash[item.alias])[:64]},
+                                                         recursive=True, list_merge='replace')] }}"
+  loop: "{{ tmp_docker_service_secrets_prelist }}"
+
+- name: "{{ docker_service.name }} -> Show docker secrets list"
+  ansible.builtin.debug:
+    var: tmp_docker_service_secrets_list
+
+# combine variables dict with custom overrides
+
+- name: "{{ docker_service.name }} -> Combine variables dict with custom overrides"
+  ansible.builtin.set_fact:
+    docker_service: "{{ docker_service |
+                        combine({'secrets_list': tmp_docker_service_secrets_list}, recursive=True, list_merge='replace') }}"

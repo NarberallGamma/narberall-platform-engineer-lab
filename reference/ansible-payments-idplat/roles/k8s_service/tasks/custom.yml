@@ -1,0 +1,11 @@
+---
+# custom tasks file
+
+- name: "{{ k8s_service.name }} -> Check required variable values"
+  ansible.builtin.import_tasks: require.yml
+
+- name: "{{ k8s_service.name }} -> Prepare k8s secrets info"
+  ansible.builtin.import_tasks: prepare.yml
+
+- name: "{{ k8s_service.name }} -> Deploy service"
+  ansible.builtin.import_tasks: deploy.yml

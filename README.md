@@ -21,6 +21,7 @@ This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terra
 | Engineer reviewing IaC | [`iac/terraform/`](iac/terraform/) |
 | Engineer reviewing legacy-as-code | [`iac/cloud/vk-cloud.md`](iac/cloud/vk-cloud.md) then [`case-studies/05-legacy-estate-as-code.md`](case-studies/05-legacy-estate-as-code.md) |
 | Engineer reviewing Ansible / edge | [`iac/ansible/`](iac/ansible/) then [`reference/ansible-edge/`](reference/ansible-edge/) |
+| Engineer reviewing payments identity Ansible | [`reference/ansible-payments-idplat/`](reference/ansible-payments-idplat/) then [case 08](case-studies/08-payments-swarm-autodeploy.md) |
 | Engineer reviewing CI (infra + builds + gates) | [`iac/ci/`](iac/ci/) then [`diagrams/iac/ci-turnkey.md`](diagrams/iac/ci-turnkey.md) |
 | Engineer reviewing OS / hardware depth | [`practice/home-lab/os-workstation.md`](practice/home-lab/os-workstation.md) |
 
@@ -28,7 +29,7 @@ This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terra
 iac/
   cloud/        # Experience by platform (keywords + links)
   terraform/    # Code, one folder per cloud
-  ansible/      # Day-2 Linux / Xray GitOps → reference/ansible-*
+  ansible/      # Day-2 Linux / Xray / payments identity → reference/ansible-*
   ci/           # CI catalog: turnkey map + sanitized pipelines/
 ```
 
@@ -81,7 +82,7 @@ flowchart TB
   end
   clouds --> Own[End-to-end ownership]
   Own --> IaC[iac/cloud + iac/terraform]
-  Own --> ANS[iac/ansible + reference/ansible-edge]
+  Own --> ANS[iac/ansible + reference/ansible-edge + payments-idplat]
   Own --> K8s[Kubernetes CI CD]
 ```
 
@@ -302,6 +303,7 @@ flowchart LR
 - [Legacy estate as Terraform (VK Cloud / NOVA Cloud class)](case-studies/05-legacy-estate-as-code.md)
 - [VMware VCD from zero + one-button host lifecycle](case-studies/06-vmware-vcd-greenfield.md)
 - [Huawei-class compute catalog (split state)](case-studies/07-huawei-compute-catalog.md)
+- [SBP-class identity autodeploy (Swarm, then Kubernetes)](case-studies/08-payments-swarm-autodeploy.md)
 - [AI / LLM platform](case-studies/01-ai-llm-platform.md)
 - [Document AI pipeline](case-studies/03-document-ai-pipeline.md)
 

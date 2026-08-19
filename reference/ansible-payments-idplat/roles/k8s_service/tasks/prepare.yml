@@ -1,0 +1,154 @@
+---
+# prepare tasks file
+
+# prepare k8s secrets info
+
+- name: "{{ k8s_service.name }} -> Initialize tmp vars"
+  ansible.builtin.set_fact:
+    tmp_k8s_service_secrets_zip: []
+    tmp_k8s_service_secrets_prelist: []
+    tmp_k8s_service_remote_secrets_data: {}
+    tmp_k8s_service_remote_secrets_stat: {}
+    tmp_k8s_service_secrets_content_is_base64: {}
+    tmp_k8s_service_secrets_content: {}
+    tmp_k8s_service_secrets_list: []
+
+- name: "{{ k8s_service.name }} -> Set k8s secrets pre-list"
+  ansible.builtin.set_fact:
+    tmp_k8s_service_secrets_zip: "{{ tmp_k8s_service_secrets_zip +
+                                     (item.value | default([], true) | select | unique | zip_longest([],
+                                       fillvalue=(item.key | string | trim |
+                                                  regex_replace('\\s*\\/+\\s*', '/') |
+                                                  regex_replace('\\/+', '/') |
+                                                  regex_replace('\\/$') |
+                                                  default('/', true))) | list) }}"
+  loop: "{{ (k8s_service.secrets | default({}, true) | dict2items) +
+            (k8s_service.extra_secrets | default({}, true) | dict2items) }}"
+  when: (item.value | default([], true) | select | length) > 0
+
+- name: "{{ k8s_service.name }} -> Set k8s secrets list"
+  ansible.builtin.set_fact:
+    tmp_k8s_service_secrets_prelist: "{{ tmp_k8s_service_secrets_prelist +
+                                         [{'source': item0_source,
+                                           'targetpath': item[1],
+                                           'target': item0_target,
+                                           'uid': item0_uid,
+                                           'gid': item0_gid,
+                                           'mode': item0_mode,
+                                           'output_dir': item0_output_dir,
+                                           'remote_src': item0_remote_src,
+                                           'alias': item0_alias,
+                                           'name': item0_name}] }}"
+  vars:
+    item0_source: "{{ (item[0] is string) | ternary(item[0], (item[0].source | default('', true))) | trim |
+                      regex_replace('\\s*\\/+\\s*', '/') | regex_replace('\\/+', '/') | regex_replace('^\\/$') }}"
+    item0_target_from_source: "{{ item0_source | basename | regex_replace('\\.j2$', ignorecase=True) }}"
+    item0_target_from_dict: "{{ item[0].target | default('', true) | trim |
+                                regex_replace('\\s*\\/+\\s*', '/') | regex_replace('\\/+', '/') | regex_replace('^\\/') }}"
+    item0_target: "{% if (item0_target_from_dict | length) > 0 and (item0_target_from_dict[-1] != '/') %}{{ item0_target_from_dict
+                   }}{% else %}{{ [item0_target_from_dict, item0_target_from_source] | path_join }}{% endif %}"
+    item0_uid: "{% if (item[0].uid | default('') | string | trim) == '0' or
+                      (item[0].uid | default('', true) | string | trim | length) > 0 %}{{ item[0].uid | string | trim
+                }}{% else %}{{ k8s_service.secrets_default_uid }}{% endif %}"
+    item0_gid: "{% if (item[0].gid | default('') | string | trim) == '0' or
+                      (item[0].gid | default('', true) | string | trim | length) > 0 %}{{ item[0].gid | string | trim
+                }}{% else %}{{ k8s_service.secrets_default_gid }}{% endif %}"
+    item0_mode: "{{ item[0].mode | default(k8s_service.secrets_default_mode) }}"
+    item0_output_dir: "{{ item[0].output_dir | default('', true) | trim |
+                          regex_replace('\\s*\\/+\\s*', '/') | regex_replace('\\/+', '/') | regex_replace('^\\/') | regex_replace('\\/$') |
+                          default(k8s_service.secrets_default_output_dir, true) }}"
+    item0_remote_src: "{{ item[0].remote_src | default(false, true) }}"
+    item0_alias: "{{ ([item[1], item0_target] | path_join | lower | regex_replace('^\\/') |
+                      regex_replace('[^-a-z0-9]', '-'))[-1::-1][:63][-1::-1] |
+                     regex_replace('^[-0-9]', 'z') | regex_replace('-$', 'z') }}"
+    item0_name: "{{ k8s_service.name + '-' + item0_alias[-1::-1][: 63 - (k8s_service.name | length) - 1][-1::-1] }}"
+  loop: "{{ tmp_k8s_service_secrets_zip }}"
+  when: (item0_target_from_source | replace('.', '') | length) > 0
+
+- name: "{{ k8s_service.name }} -> Show k8s secrets list"
+  ansible.builtin.debug:
+    var: tmp_k8s_service_secrets_prelist
+
+# gather k8s secrets content
+
+- name: "{{ k8s_service.name }} -> Fetch base64- encoded remote k8s secrets data"
+  ansible.builtin.slurp:
+    src: "{{ [k8s_service.output_dir, item.output_dir, item.source] | path_join }}"
+  loop: "{{ tmp_k8s_service_secrets_prelist }}"
+  when: (item.remote_src | bool)
+  register: tmp_k8s_service_remote_secrets_data
+  no_log: true
+
+- name: "{{ k8s_service.name }} -> Gather remote k8s secrets stat"
+  ansible.builtin.stat:
+    get_checksum: false
+    get_mime: true
+    path: "{{ [k8s_service.output_dir, item.output_dir, item.source] | path_join }}"
+  loop: "{{ tmp_k8s_service_secrets_prelist }}"
+  when: (item.remote_src | bool)
+  register: tmp_k8s_service_remote_secrets_stat
+
+- name: "{{ k8s_service.name }} -> Check which of remote k8s secrets treats as binary"
+  ansible.builtin.set_fact:
+    tmp_k8s_service_secrets_content_is_base64: "{{ tmp_k8s_service_secrets_content_is_base64 |
+                                                   combine({item.item.alias: item_source_content_is_base64}, recursive=True, list_merge='replace') }}"
+  vars:
+    item_source_content_is_base64: "{{ (item.stat.charset | regex_findall('binary', ignorecase=True) | length) > 0 or
+                                       ((item.item.target | splitext)[1] | lower |
+                                        regex_replace('^\\.')) in k8s_service.secrets_remote_file_extra_target_extensions_to_treat_as_binary }}"
+  loop: "{{ tmp_k8s_service_remote_secrets_stat.results | default([], true) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stat is defined
+  no_log: true
+
+- name: "{{ k8s_service.name }} -> Gather remote k8s secrets content"
+  ansible.builtin.set_fact:
+    tmp_k8s_service_secrets_content: "{{ tmp_k8s_service_secrets_content |
+                                         combine({item.item.alias: item_source_content}, recursive=True, list_merge='replace') }}"
+  vars:
+    item_source_content: "{{ tmp_k8s_service_secrets_content_is_base64[item.item.alias] | ternary(item.content, item.content | b64decode) }}"
+  loop: "{{ tmp_k8s_service_remote_secrets_data.results | default([], true) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.content is defined
+  no_log: true
+
+- name: "{{ k8s_service.name }} -> Gather local k8s secrets content"
+  ansible.builtin.set_fact:
+    tmp_k8s_service_secrets_content: "{{ tmp_k8s_service_secrets_content |
+                                         combine({item.alias: item_source_content}, recursive=True, list_merge='replace') }}"
+    tmp_k8s_service_secrets_content_is_base64: "{{ tmp_k8s_service_secrets_content_is_base64 |
+                                                   combine({item.alias: item_source_content_is_base64}, recursive=True, list_merge='replace') }}"
+  vars:
+    item_source_content: "{% if (item.source | basename | regex_findall('\\.j2$', ignorecase=True) | length) > 0
+                            %}{{ lookup('template', item.source, convert_data=False) | string
+                          }}{% elif ((item.target | splitext)[1] | lower |
+                                     regex_replace('^\\.')) in k8s_service.secrets_local_file_extra_target_extensions_to_treat_as_not_binary
+                            %}{{ lookup('file', item.source) | string
+                          }}{% else %}{{ lookup('file', item.source) | b64encode }}{% endif %}"
+    item_source_content_is_base64: "{{ not ((item.source | basename | regex_findall('\\.j2$', ignorecase=True) | length) > 0) and
+                                       ((item.target | splitext)[1] | lower |
+                                        regex_replace('^\\.')) not in k8s_service.secrets_local_file_extra_target_extensions_to_treat_as_not_binary }}"
+  loop: "{{ tmp_k8s_service_secrets_prelist }}"
+  when: not (item.remote_src | bool)
+  no_log: true
+
+# combine k8s secrets info with contents
+
+- name: "{{ k8s_service.name }} -> Combine k8s secrets list with contents"
+  ansible.builtin.set_fact:
+    tmp_k8s_service_secrets_list: "{{ tmp_k8s_service_secrets_list +
+                                      [item | combine({'content': tmp_k8s_service_secrets_content[item.alias],
+                                                       'content_is_base64': tmp_k8s_service_secrets_content_is_base64[item.alias]},
+                                                      recursive=True, list_merge='replace')] }}"
+  loop: "{{ tmp_k8s_service_secrets_prelist }}"
+  no_log: true
+
+# combine variables dict with custom overrides
+
+- name: "{{ k8s_service.name }} -> Combine variables dict with custom overrides"
+  ansible.builtin.set_fact:
+    k8s_service: "{{ k8s_service |
+                     combine({'secrets_list': tmp_k8s_service_secrets_list}, recursive=True, list_merge='replace') }}"
+  no_log: true

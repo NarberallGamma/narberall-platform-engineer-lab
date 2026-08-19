@@ -1,0 +1,203 @@
+---
+# defaults file for k8s_service
+
+parent_role_for_k8s_service: ''
+
+k8s_service_output_dir: "{{ [output_dir | default(k8s_service_namespace, true),
+                             k8s_service_name] | path_join }}"  # role working directory
+k8s_service_prepare_only: "{{ prepare_only | default(false, true) }}"  # if true, just prepare all stuff but not run
+k8s_service_dump_vars: "{{ dump_vars | default(false, true) }}"  # if true, dump role vars to vars_<role_name>.yaml file
+k8s_service_name: "{{ role_name }}"
+k8s_service_namespace: "{{ k8s_namespace_name |
+                           default(docker_stack_name | lower | regex_replace('[^a-z0-9]', '-'), true) }}"  # must be defined
+k8s_service_dc_id: "{{ dc_id | default(1, true) }}"  # datacenter id
+k8s_service_kubeconfig: ''  # path to kubeconfig file. If not provided, client will attempt to load configuration from ~/.kube/config
+# https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#registry-secret-existing-credentials
+k8s_service_dockerconfigjson_create: false  # if true, kubectl must be installed on managed host
+k8s_service_dockerconfigjson_secret_name: registry-credentials
+k8s_service_dockerconfigjson_path: ~/.docker/config.json  # <path/to/.docker/config.json> with credentials for k8s_service_image_registry
+
+# https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/
+
+k8s_service_image: ''  # must be defined
+k8s_service_image_registry: "{{ docker_image_registry | default(docker_image_proxy, true) | default('', true) }}"
+k8s_service_image_pull_policy: ''  # Always / Never / IfNotPresent
+k8s_service_read_only: true
+k8s_service_automount_serviceaccount_token: false
+k8s_service_serviceaccount_name: ''  # https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+k8s_service_enable_service_links: true  # if true, information about services will be injected into pod's environment variables
+k8s_service_hostname: "{{ overrides_from_child_role.name | default(k8s_service_name, true) }}"
+k8s_service_restart_policy: Always  # Always / OnFailure / Never
+k8s_service_user: '9000:9000'  # uid / uid:gid
+k8s_service_working_dir: ''  # default working directory within a container
+k8s_service_stop_grace_period: 30s
+k8s_service_cap_add: []  # list of linux capability constants without CAP_ prefix
+k8s_service_cap_drop: []  # https://man7.org/linux/man-pages/man7/capabilities.7.html
+k8s_service_fsgroup_enable: false
+k8s_service_fsgroup: "{{ overrides_from_child_role.fsgroup |
+                         default((overrides_from_child_role.user | default(k8s_service_user) | string | trim | split(':'))[1]) |
+                         default(overrides_from_child_role.secrets_default_gid) | default(k8s_service_secrets_default_gid) }}"
+k8s_service_fsgroup_change_policy: OnRootMismatch  # Always / OnRootMismatch
+k8s_service_sysctls: {}  # dict or list of namespaced kernel parameters (sysctls) for the pod
+                         # https://docs.docker.com/engine/reference/commandline/run/#sysctl
+k8s_service_etc_hosts: {}  # dict of hostname-to-IP mappings, where each hostname is a key in the dictionary
+                           # entry with the IP and hostname is created in /etc/hosts inside containers
+k8s_service_entrypoint: ''  # string or list
+k8s_service_command: ''  # string or list
+k8s_service_ingress: false # on/off ingress
+k8s_service_env:
+  COMPlus_EnableDiagnostics: 0
+  ASPNETCORE_URLS: "http://+:{{ overrides_from_child_role.port0 | default(overrides_from_child_role.port) |
+                                default(k8s_service_port0, true) | default(k8s_service_port, true) | default(5000, true) }}"
+  http_proxy: "{{ overrides_from_child_role.http_proxy | default(k8s_service_http_proxy, true) | default('', true) }}"
+  https_proxy: "{{ overrides_from_child_role.https_proxy | default(k8s_service_https_proxy, true) | default('', true) }}"
+  no_proxy: "{{ overrides_from_child_role.no_proxy | default(k8s_service_no_proxy, true) | default('', true) }}"
+  DC_ID: "{{ overrides_from_child_role.dc_id | default(k8s_service_dc_id, true) }}"
+k8s_service_env_field_ref:
+  K8S_POD_NAME: metadata.name
+  K8S_POD_NAMESPACE: metadata.namespace
+  K8S_POD_LABELS_APP: metadata.labels['app']
+  K8S_POD_SERVICE_ACCOUNT: spec.serviceAccountName
+  K8S_POD_IP: status.podIP
+  K8S_POD_IPS: status.podIPs
+  K8S_NODE_NAME: spec.nodeName
+  K8S_NODE_IP: status.hostIP
+k8s_service_ports:  # list of published:target[/protocol] strings; protocol is optional, default is tcp
+  - "{{ overrides_from_child_role.published_port0 |
+        default(overrides_from_child_role.published_port, true) |
+        default(k8s_service_published_port0, true) |
+        default(k8s_service_published_port, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port0 | default(overrides_from_child_role.port) |
+                                default(k8s_service_port0, true) | default(k8s_service_port, true) | default(5000, true) }}"
+  - "{{ overrides_from_child_role.published_port1 |
+        default(k8s_service_published_port1, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port1 | default(k8s_service_port1, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.published_port2 |
+        default(k8s_service_published_port2, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port2 | default(k8s_service_port2, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.published_port3 |
+        default(k8s_service_published_port3, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port3 | default(k8s_service_port3, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.published_port4 |
+        default(k8s_service_published_port4, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port4 | default(k8s_service_port4, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.published_port5 |
+        default(k8s_service_published_port5, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port5 | default(k8s_service_port5, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.published_port6 |
+        default(k8s_service_published_port6, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port6 | default(k8s_service_port6, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.published_port7 |
+        default(k8s_service_published_port7, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port7 | default(k8s_service_port7, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.published_port8 |
+        default(k8s_service_published_port8, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port8 | default(k8s_service_port8, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.published_port9 |
+        default(k8s_service_published_port9, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port9 | default(k8s_service_port9, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.https_published_port0 |
+        default(overrides_from_child_role.https_published_port, true) |
+        default(k8s_service_https_published_port0, true) |
+        default(k8s_service_https_published_port, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port0 | default(overrides_from_child_role.https_port) |
+                                default(k8s_service_https_port0, true) | default(k8s_service_https_port, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.https_published_port1 |
+        default(k8s_service_https_published_port1, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port1 | default(k8s_service_https_port1, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.https_published_port2 |
+        default(k8s_service_https_published_port2, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port2 | default(k8s_service_https_port2, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.https_published_port3 |
+        default(k8s_service_https_published_port3, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port3 | default(k8s_service_https_port3, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.https_published_port4 |
+        default(k8s_service_https_published_port4, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port4 | default(k8s_service_https_port4, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.https_published_port5 |
+        default(k8s_service_https_published_port5, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port5 | default(k8s_service_https_port5, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.https_published_port6 |
+        default(k8s_service_https_published_port6, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port6 | default(k8s_service_https_port6, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.https_published_port7 |
+        default(k8s_service_https_published_port7, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port7 | default(k8s_service_https_port7, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.https_published_port8 |
+        default(k8s_service_https_published_port8, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port8 | default(k8s_service_https_port8, true) | default(-1, true) }}"
+  - "{{ overrides_from_child_role.https_published_port9 |
+        default(k8s_service_https_published_port9, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port9 | default(k8s_service_https_port9, true) | default(-1, true) }}"
+k8s_service_healthcheck_disable: false
+k8s_service_healthcheck_test_cmd_shell: "wget -qO- -Y off http://127.0.0.1:{{
+                                           overrides_from_child_role.port0 |
+                                           default(overrides_from_child_role.port, true) |
+                                           default(k8s_service_port0, true) |
+                                           default(k8s_service_port, true) |
+                                           default(5000, true)
+                                         }}/health | tr -d '\\r\\n' | grep -Eisq '^\\{\\s*\"status\"\\s*:\\s*\"(Healthy|pass|Degraded|warn)\"' || exit 1"
+                               #  }}/health | grep -Eizsq '^\\{\\s*\"status\"\\s*:\\s*\"(Healthy|pass|Degraded|warn)\"' || exit 1"  # no -z option on alpine
+k8s_service_healthcheck_interval: 5s
+k8s_service_healthcheck_timeout: 15s
+k8s_service_healthcheck_retries: 3
+k8s_service_healthcheck_start_period: 60s
+k8s_service_replicas: 1
+k8s_service_revisionhistory_limit: 5
+k8s_service_strategy_type: RollingUpdate  # RollingUpdate / Recreate
+k8s_service_strategy_rollingupdate_maxsurge: 1
+k8s_service_strategy_rollingupdate_maxunavailable: 0
+k8s_service_reservations_mem: 100M
+k8s_service_reservations_cpu: '0.1'
+k8s_service_limits_mem: 500M
+k8s_service_limits_cpu: ''
+# https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+k8s_service_node_affinity_required_nodeselectorterms: []
+k8s_service_node_affinity_preferred: []
+k8s_service_pod_affinity_required: []
+k8s_service_pod_affinity_preferred: []
+k8s_service_pod_antiaffinity_required: []
+k8s_service_pod_antiaffinity_preferred: []
+k8s_service_nodename: ''  # if not empty, the scheduler simply schedules this pod onto that node
+k8s_service_nodeselector: {}  # https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes/
+k8s_service_tolerations: []  # https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+k8s_service_topologyspreadconstraints: []  # https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+k8s_service_localtime_enabled: true
+k8s_service_volumes_emptydir_medium: Memory  # empty string (node's default medium) or Memory
+k8s_service_default_volumes:
+  - "{% if (overrides_from_child_role.localtime_enabled | default(k8s_service_localtime_enabled) | bool) %}/etc/localtime:/etc/localtime:ro{% endif %}"
+  - "{% if (overrides_from_child_role.read_only | default(k8s_service_read_only) | bool) %}{'type': 'tmpfs', 'target': '/tmp'}{% endif %}"
+  - "{% if (overrides_from_child_role.read_only | default(k8s_service_read_only) | bool) %}{'type': 'tmpfs', 'target': '/run'}{% endif %}"
+k8s_service_volumes: []
+k8s_service_volumes_pvc: []  # list of claimName:mountPath[:ro|:rw|:ro:subPath|:rw:subPath] strings
+k8s_service_secrets_default_uid: 9000
+k8s_service_secrets_default_gid: 9000
+k8s_service_secrets_default_mode: '0440'  # string with octal notation value
+k8s_service_secrets_default_output_dir: ''  # output dir for secret within k8s_service_output_dir
+k8s_service_secrets_remote_file_extra_target_extensions_to_treat_as_binary: ['crt', 'cer', 'pem', 'key', 'creds', 'dat']
+k8s_service_secrets_local_file_extra_target_extensions_to_treat_as_not_binary: ['xml', 'json', 'cnf', 'conf', 'config', 'yml', 'yaml', 'csv', 'avsc', 'js']
+k8s_service_secrets: {}
+k8s_service_extra_secrets: {}
+# example dict:
+# k8s_service_secrets:
+#   /app:  # key is a path in container
+#     # value is a list of simple or/and extended mode file items
+#     - NLog.config  # simple mode with static file; this file from {{ role_path }}/files/ folder will appear in container with original file name
+#     - appsettings.json.j2  # simple mode with j2-template; this template from {{ role_path }}/templates/ folder will be rendered with name without .j2
+#     - "{{ inventory_dir }}/certs/localhost.pfx"  # simple mode with full path to file
+#     # extended mode
+#     - source: usersettings.json.j2  # file name only or full path to file
+#       target: usersettings.Production.json  # optional; target file will appear in container with that name
+#       uid: 9000  # optional, default is value of k8s_service_secrets_default_uid
+#       gid: 9000  # optional, default is value of k8s_service_secrets_default_gid
+#       mode: '0440'  # optional, default is value of k8s_service_secrets_default_mode
+#       output_dir: ''  # optional, default is value of k8s_service_secrets_default_output_dir
+#       remote_src: false  # optional; if true, source file (not j2-template) will be gathered from remote output_dir + source file
+k8s_service_is_statefulset: false
+k8s_service_minReadySeconds: 10 # Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available
+k8s_service_manifests:
+  - secrets.yml.j2
+  - service.yml.j2
+  - "{{ (overrides_from_child_role.is_statefulset | default(k8s_service_is_statefulset) | bool) | ternary('statefulset.yml.j2', 'deployment.yml.j2') }}"
+#k8s_service_extra_manifests: [ 'ingresses.yml.j2' ]
+k8s_service_extra_manifests: [ "{{ (overrides_from_child_role.ingress | default(k8s_service_ingress) | bool) | ternary('ingresses.yml.j2', '' ) }}" ]

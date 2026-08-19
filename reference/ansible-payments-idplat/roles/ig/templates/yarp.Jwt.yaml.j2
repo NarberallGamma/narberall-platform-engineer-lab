@@ -1,0 +1,35 @@
+---
+Yarp:
+  Routes:
+    JwtBearerService:
+      Match:
+        Path: /auth/jwtBearer
+      ClusterId: JwtBearerCluster
+      AuthorizationPolicy: JwtBearerPolicy
+
+  Clusters:
+    JwtBearerCluster:
+      Destinations:
+        destination1:
+          Address: http://JwtBearerCluster/
+      Metadata:
+        StubMode.StatusCode: '200'
+        StubMode.BodyExp: UserInfo()
+        Tracing.Enable: true
+
+  Authorization:
+    Policies:
+      JwtBearerPolicy:
+        Schemes:
+          - JwtBearerScheme
+    Schemes:
+      JwtBearerScheme:
+        Type: JwtBearer
+        Options:
+          Authority: https://{{ idplat_public_hostname }}:{%- if ig_enable_ReverseAccess is defined and ig_enable_ReverseAccess == true %}{{ igext_https_published_port }}{%-else%}{{ ig_https_published_port }}{%-endif%}/{{ am_application }}/yarp
+          Audience: aud
+          RequireHttpsMetadata: true
+          IncludeErrorDetails: true
+          Challenge: Bearer
+          HttpClient:
+            DangerousAcceptAnyServerCertificate: 'true'

@@ -1,0 +1,472 @@
+# deployment
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ k8s_service.name }}
+  labels:
+    app: {{ k8s_service.name }}
+spec:
+  replicas: {{ k8s_service.replicas }}
+  revisionHistoryLimit: {{ k8s_service.revisionhistory_limit }}
+  selector:
+    matchLabels:
+      app: {{ k8s_service.name }}
+  strategy:
+    type: {{ k8s_service.strategy_type }}
+    {%- if (k8s_service.strategy_type | string | lower) == 'rollingupdate' %}
+
+    rollingUpdate:
+      maxSurge: {{ k8s_service.strategy_rollingupdate_maxsurge }}
+      maxUnavailable: {{ k8s_service.strategy_rollingupdate_maxunavailable }}
+    {%- endif %}
+
+  template:
+    metadata:
+      labels:
+        app: {{ k8s_service.name }}
+    spec:
+      automountServiceAccountToken: {{ k8s_service.automount_serviceaccount_token | bool | lower }}
+      {%- if (k8s_service.serviceaccount_name | default('', true) | string | length) > 0 %}
+
+      serviceAccountName: {{ k8s_service.serviceaccount_name }}
+      {%- endif %}
+
+      enableServiceLinks: {{ k8s_service.enable_service_links | bool | lower }}
+      {%- for item in (k8s_service.etc_hosts | default({}, true) | dict2items)
+          if (item.key | string | length) > 0 and item.value is not none and (item.value | string | length) > 0 %}
+      {%- if loop.first %}
+
+      hostAliases:
+      {%- endif %}
+
+        - ip: {{ item.value }}
+          hostnames:
+            - {{ item.key }}
+      {%- endfor %}
+
+      hostname: {{ k8s_service.hostname }}
+      imagePullSecrets:
+        - name: {{ k8s_service.dockerconfigjson_secret_name }}
+      {%- if (k8s_service.restart_policy | default('', true) | string | length) > 0 %}
+
+      restartPolicy: {{ k8s_service.restart_policy }}
+      {%- endif %}
+
+      terminationGracePeriodSeconds: {{ k8s_service.stop_grace_period | string | lower |
+                                        regex_findall('-?[0-9]+[a-z]+') | join(' ') |
+                                        community.general.to_seconds | int }}
+      {%- if (k8s_service.fsgroup_enable | bool) or
+             (k8s_service.sysctls | default({}, true) | select | unique | length) > 0 %}
+
+      securityContext:
+        {%- if (k8s_service.fsgroup_enable | bool) %}
+
+        fsGroup: {{ k8s_service.fsgroup }}
+        fsGroupChangePolicy: {{ k8s_service.fsgroup_change_policy }}
+        
+        {%- if (k8s_service.user | string | trim ) == '0' or
+                   (k8s_service.user | default('', true) | string | trim | length) > 0 %}
+
+        runAsUser: {{ (k8s_service.user | string | split(':'))[0] | trim }}
+        {%- endif %}
+        {%- if ((k8s_service.user | string | split(':'))[1] | default('', true) | trim | length) > 0 %}
+
+        runAsGroup: {{ (k8s_service.user | string | split(':'))[1] | trim }}
+        {%- endif %}
+
+
+        {%- endif %}
+        {%- if k8s_service.sysctls is mapping %}
+        {%- for item in (k8s_service.sysctls | dict2items)
+            if (item.key | string | length) > 0 and item.value is not none and (item.value | string | length) > 0 %}
+        {%- if loop.first %}
+
+        sysctls:
+        {%- endif %}
+
+          - name: {{ item.key }}
+            value: {{ item.value }}
+        {%- endfor %}
+        {%- else %}
+        {%- for item in (k8s_service.sysctls | default([], true) | select | unique) %}
+        {%- if loop.first %}
+
+        sysctls:
+        {%- endif %}
+
+          - name: {{ (item | string | split('='))[0] | trim }}
+            value: {{ (item | string | split('='))[1] | trim }}
+        {%- endfor %}
+        {%- endif %}
+      {%- endif %}
+      {%- if (k8s_service.node_affinity_required_nodeselectorterms | default([], true) | select | unique | length) > 0 or
+             (k8s_service.node_affinity_preferred | default([], true) | select | unique | length) > 0 or
+             (k8s_service.pod_affinity_required | default([], true) | select | unique | length) > 0 or
+             (k8s_service.pod_affinity_preferred | default([], true) | select | unique | length) > 0 or
+             (k8s_service.pod_antiaffinity_required | default([], true) | select | unique | length) > 0 or
+             (k8s_service.pod_antiaffinity_preferred | default([], true) | select | unique | length) > 0 %}
+
+      affinity:
+        {%- if (k8s_service.node_affinity_required_nodeselectorterms | default([], true) | select | unique | length) > 0 or
+               (k8s_service.node_affinity_preferred | default([], true) | select | unique | length) > 0 %}
+
+        nodeAffinity:
+          {%- for item in (k8s_service.node_affinity_required_nodeselectorterms | default([], true) | select | unique) %}
+          {%- if loop.first %}
+
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+          {%- endif %}
+
+              - {{ item | to_json }}
+          {%- endfor %}
+          {%- for item in (k8s_service.node_affinity_preferred | default([], true) | select | unique) %}
+          {%- if loop.first %}
+
+          preferredDuringSchedulingIgnoredDuringExecution:
+          {%- endif %}
+
+            - {{ item | to_json }}
+          {%- endfor %}
+        {%- endif %}
+        {%- if (k8s_service.pod_affinity_required | default([], true) | select | unique | length) > 0 or
+               (k8s_service.pod_affinity_preferred | default([], true) | select | unique | length) > 0 %}
+
+        podAffinity:
+          {%- for item in (k8s_service.pod_affinity_required | default([], true) | select | unique) %}
+          {%- if loop.first %}
+
+          requiredDuringSchedulingIgnoredDuringExecution:
+          {%- endif %}
+
+            - {{ item | to_json }}
+          {%- endfor %}
+          {%- for item in (k8s_service.pod_affinity_preferred | default([], true) | select | unique) %}
+          {%- if loop.first %}
+
+          preferredDuringSchedulingIgnoredDuringExecution:
+          {%- endif %}
+
+            - {{ item | to_json }}
+          {%- endfor %}
+        {%- endif %}
+        {%- if (k8s_service.pod_antiaffinity_required | default([], true) | select | unique | length) > 0 or
+               (k8s_service.pod_antiaffinity_preferred | default([], true) | select | unique | length) > 0 %}
+
+        podAntiAffinity:
+          {%- for item in (k8s_service.pod_antiaffinity_required | default([], true) | select | unique) %}
+          {%- if loop.first %}
+
+          requiredDuringSchedulingIgnoredDuringExecution:
+          {%- endif %}
+
+            - {{ item | to_json }}
+          {%- endfor %}
+          {%- for item in (k8s_service.pod_antiaffinity_preferred | default([], true) | select | unique) %}
+          {%- if loop.first %}
+
+          preferredDuringSchedulingIgnoredDuringExecution:
+          {%- endif %}
+
+            - {{ item | to_json }}
+          {%- endfor %}
+        {%- endif %}
+      {%- endif %}
+      {%- if (k8s_service.nodename | default('', true) | string | length) > 0 %}
+
+      nodeName: {{ k8s_service.nodename }}
+      {%- endif %}
+      {%- for item in (k8s_service.nodeselector | dict2items)
+          if (item.key | string | length) > 0 and item.value is not none and (item.value | string | length) > 0 %}
+      {%- if loop.first %}
+
+      nodeSelector:
+      {%- endif %}
+
+        {{ item.key }}: {{ (item.value is string) | ternary(item.value, item.value | to_json) }}
+      {%- endfor %}
+      {%- for item in (k8s_service.tolerations | default([], true) | select | unique) %}
+      {%- if loop.first %}
+
+      tolerations:
+      {%- endif %}
+
+        - {{ item | to_json }}
+      {%- endfor %}
+      {%- for item in (k8s_service.topologyspreadconstraints | default([], true) | select | unique) %}
+      {%- if loop.first %}
+
+      topologySpreadConstraints:
+      {%- endif %}
+
+        - {{ item | to_json }}
+      {%- endfor %}
+      {%- if (k8s_service.secrets_list | default([], true) | select | unique | length) > 0 or
+             (((k8s_service.default_volumes | default([], true)) +
+               (k8s_service.volumes | default([], true))) | select | unique | length) > 0 or
+             (k8s_service.volumes_pvc | default([], true) | select | unique | length) > 0 %}
+
+      volumes:
+        {%- for item in (k8s_service.secrets_list | default([], true) | unique)
+            if item is mapping and (item.source | default('', true) | string | length) > 0 %}
+
+        - name: {{ item.alias }}
+          secret:
+            secretName: {{ item.name }}
+            defaultMode: {{ item.mode }}
+        {%- endfor %}
+        {%- for item in (((k8s_service.default_volumes | default([], true)) +
+                          (k8s_service.volumes | default([], true))) | select | unique) %}
+        {%- if item is string  %}
+
+        - name: {{ ((item | split(':'))[1] | lower | regex_replace('^\\/') |
+                    regex_replace('[^-a-z0-9]', '-'))[-1::-1][:63][-1::-1] |
+                   regex_replace('^[-0-9]', 'z') | regex_replace('-$', 'z') }}
+          hostPath:
+            path: {{ (item | split(':'))[0] }}
+        {%- elif (item.type | default('', true) | string | lower) == 'bind' %}
+
+        - name: {{ (item.target | string | lower | regex_replace('^\\/') |
+                    regex_replace('[^-a-z0-9]', '-'))[-1::-1][:63][-1::-1] |
+                   regex_replace('^[-0-9]', 'z') | regex_replace('-$', 'z') }}
+          hostPath:
+            path: {{ item.source }}
+        {%- elif (item.type | default('', true) | string | lower) == 'tmpfs' %}
+
+        - name: {{ (item.target | string | lower | regex_replace('^\\/') |
+                    regex_replace('[^-a-z0-9]', '-'))[-1::-1][:63][-1::-1] |
+                   regex_replace('^[-0-9]', 'z') | regex_replace('-$', 'z') }}
+          emptyDir:
+            medium: {{ k8s_service.volumes_emptydir_medium }}
+        {%- endif %}
+        {%- endfor %}
+        {%- for item in (k8s_service.volumes_pvc | default([], true) | select | unique) %}
+
+        - name: {{ ((item | string | split(':'))[1] | lower | regex_replace('^\\/') |
+                    regex_replace('[^-a-z0-9]', '-'))[-1::-1][:63][-1::-1] |
+                   regex_replace('^[-0-9]', 'z') | regex_replace('-$', 'z') }}
+          persistentVolumeClaim:
+            claimName: {{ (item | string | split(':'))[0] }}
+        {%- endfor %}
+      {%- endif %}
+
+      # initContainers: []
+      containers:
+        - name: {{ k8s_service.name }}
+          image: {{ [(k8s_service.image_registry | default('', true)), k8s_service.image] | path_join }}
+          {%- if (k8s_service.image_pull_policy | default('', true) | string | length) > 0 %}
+
+          imagePullPolicy: {{ k8s_service.image_pull_policy }}
+          {%- endif %}
+
+          securityContext:
+            {%- if (k8s_service.cap_add | default([], true) | select | unique | length) > 0 or
+                   (k8s_service.cap_drop | default([], true) | select | unique | length) > 0 %}
+
+            capabilities:
+              {%- for item in (k8s_service.cap_add | default([], true) | select | unique) %}
+              {%- if loop.first %}
+
+              add:
+              {%- endif %}
+
+                - {{ item }}
+              {%- endfor %}
+              {%- for item in (k8s_service.cap_drop | default([], true) | select | unique) %}
+              {%- if loop.first %}
+
+              drop:
+              {%- endif %}
+
+                - {{ item }}
+              {%- endfor %}
+            {%- endif %}
+
+            readOnlyRootFilesystem: {{ k8s_service.read_only | bool | lower }}
+            {%- if (k8s_service.user | string | trim ) == '0' or
+                   (k8s_service.user | default('', true) | string | trim | length) > 0 %}
+
+            runAsUser: {{ (k8s_service.user | string | split(':'))[0] | trim }}
+            {%- endif %}
+            {%- if ((k8s_service.user | string | split(':'))[1] | default('', true) | trim | length) > 0 %}
+
+            runAsGroup: {{ (k8s_service.user | string | split(':'))[1] | trim }}
+            {%- endif %}
+          {%- if (k8s_service.working_dir | default('', true) | string | length) > 0 %}
+
+          workingDir: {{ k8s_service.working_dir }}
+          {%- endif %}
+          {%- if k8s_service.entrypoint is string and (k8s_service.entrypoint | length) > 0 %}
+
+          command:
+            - {{ k8s_service.entrypoint }}
+          {%- else %}
+          {%- for item in (k8s_service.entrypoint | default([], true))
+              if item is not none and (item | string | length) > 0 %}
+          {%- if loop.first %}
+
+          command:
+          {%- endif %}
+
+            - {{ item }}
+          {%- endfor %}
+          {%- endif %}
+          {%- if k8s_service.command is string and (k8s_service.command | length) > 0 %}
+
+          args:
+            - {{ k8s_service.command }}
+          {%- else %}
+          {%- for item in (k8s_service.command | default([], true))
+              if item is not none and (item | string | length) > 0 %}
+          {%- if loop.first %}
+
+          args:
+          {%- endif %}
+
+            - {{ item }}
+          {%- endfor %}
+          {%- endif %}
+          {%- if (((k8s_service.env.keys() | list) + (k8s_service.env_field_ref.keys() | list)) | select | unique | length) > 0 and
+                 (((k8s_service.env.values() | list) + (k8s_service.env_field_ref.values() | list)) | select | unique | length) > 0 %}
+
+          env:
+            {%- for item in (k8s_service.env | default({}, true) | dict2items)
+                if (item.key | string | length) > 0 and item.value is not none and (item.value | string | length) > 0 %}
+
+            - name: {{ item.key }}
+              value: {{ (((item.value | string | lower) == 'true') or ((item.value | string | lower) == 'false') or (item.value is number) or
+                         (item.value | int | string) == (item.value | string) or (item.value | float | string) == (item.value | string)) |
+                        ternary('"' + (item.value | string | lower) + '"', item.value) }}
+            {%- endfor %}
+            {%- for item in (k8s_service.env_field_ref | default({}, true) | dict2items)
+                if (item.key | string | length) > 0 and item.value is not none and (item.value | string | length) > 0 %}
+
+            - name: {{ item.key }}
+              valueFrom:
+                fieldRef:
+                  fieldPath: {{ item.value }}
+            {%- endfor %}
+          {%- endif %}
+          {%- if not (k8s_service.healthcheck_disable | bool) %}
+
+          startupProbe:
+            exec:
+              command: ["/bin/sh", "-c", {{ k8s_service.healthcheck_test_cmd_shell | to_json }}]
+            periodSeconds: {{ k8s_service.healthcheck_interval | string | lower |
+                              regex_findall('-?[0-9]+[a-z]+') | join(' ') |
+                              community.general.to_seconds | int }}
+            timeoutSeconds: {{ k8s_service.healthcheck_timeout | string | lower |
+                               regex_findall('-?[0-9]+[a-z]+') | join(' ') |
+                               community.general.to_seconds | int }}
+            failureThreshold: {{ (k8s_service.healthcheck_start_period | string | lower |
+                                  regex_findall('-?[0-9]+[a-z]+') | join(' ') |
+                                  community.general.to_seconds | int) //
+                                 (k8s_service.healthcheck_interval | string | lower |
+                                  regex_findall('-?[0-9]+[a-z]+') | join(' ') |
+                                  community.general.to_seconds | int) }}
+            initialDelaySeconds: {{ k8s_service.healthcheck_interval | string | lower |
+                                    regex_findall('-?[0-9]+[a-z]+') | join(' ') |
+                                    community.general.to_seconds | int }}
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", {{ k8s_service.healthcheck_test_cmd_shell | to_json }}]
+            periodSeconds: {{ k8s_service.healthcheck_interval | string | lower |
+                              regex_findall('-?[0-9]+[a-z]+') | join(' ') |
+                              community.general.to_seconds | int }}
+            timeoutSeconds: {{ k8s_service.healthcheck_timeout | string | lower |
+                               regex_findall('-?[0-9]+[a-z]+') | join(' ') |
+                               community.general.to_seconds | int }}
+            failureThreshold: {{ k8s_service.healthcheck_retries }}
+            initialDelaySeconds: {{ k8s_service.healthcheck_interval | string | lower |
+                                    regex_findall('-?[0-9]+[a-z]+') | join(' ') |
+                                    community.general.to_seconds | int }}
+          {%- endif %}
+          {%- if (k8s_service.reservations_mem | default('', true) | string | trim | length) > 0 or
+                 (k8s_service.reservations_cpu | default('', true) | string | trim | length) > 0 or
+                 (k8s_service.limits_mem | default('', true) | string | trim | length) > 0 or
+                 (k8s_service.limits_cpu | default('', true) | string | trim | length) > 0 %}
+
+          resources:
+            {%- if (k8s_service.reservations_mem | default('', true) | string | trim | length) > 0 or
+                   (k8s_service.reservations_cpu | default('', true) | string | trim | length) > 0 %}
+
+            requests:
+              {%- if (k8s_service.reservations_mem | default('', true) | string | trim | length) > 0 %}
+
+              memory: {{ k8s_service.reservations_mem | string | trim | upper }}
+              {%- endif %}
+              {%- if (k8s_service.reservations_cpu | default('', true) | string | trim | length) > 0 %}
+
+              cpu: "{{ k8s_service.reservations_cpu | string | trim }}"
+              {%- endif %}
+            {%- endif %}
+            {%- if (k8s_service.limits_mem | default('', true) | string | trim | length) > 0 or
+                   (k8s_service.limits_cpu | default('', true) | string | trim | length) > 0 %}
+
+            limits:
+              {%- if (k8s_service.limits_mem | default('', true) | string | trim | length) > 0 %}
+
+              memory: {{ k8s_service.limits_mem | string | trim | upper }}
+              {%- endif %}
+              {%- if (k8s_service.limits_cpu | default('', true) | string | trim | length) > 0 %}
+
+              cpu: "{{ k8s_service.limits_cpu | string | trim }}"
+              {%- endif %}
+            {%- endif %}
+          {%- endif %}
+          {%- if (k8s_service.secrets_list | default([], true) | select | unique | length) > 0 or
+                 (((k8s_service.default_volumes | default([], true)) +
+                   (k8s_service.volumes | default([], true))) | select | unique | length) > 0 or
+                 (k8s_service.volumes_pvc | default([], true) | select | unique | length) > 0 %}
+
+          volumeMounts:
+            {%- for item in (k8s_service.secrets_list | default([], true) | unique)
+                if item is mapping and (item.source | default('', true) | string | length) > 0 %}
+
+            - name: {{ item.alias }}
+              subPath: {{ item.alias }}
+              mountPath: {{ [item.targetpath, item.target] | path_join }}
+            {%- endfor %}
+            {%- for item in (((k8s_service.default_volumes | default([], true)) +
+                              (k8s_service.volumes | default([], true))) | select | unique) %}
+            {%- if item is string  %}
+
+            - name: {{ ((item | split(':'))[1] | lower | regex_replace('^\\/') |
+                        regex_replace('[^-a-z0-9]', '-'))[-1::-1][:63][-1::-1] |
+                       regex_replace('^[-0-9]', 'z') | regex_replace('-$', 'z') }}
+              mountPath: {{ (item | split(':'))[1] }}
+              {%- if ((item | split(':'))[2] | default('', true)) == 'ro' %}
+
+              readOnly: true
+              {%- endif %}
+            {%- elif (item.type | default('', true) | string | lower) in ['bind', 'tmpfs'] %}
+
+            - name: {{ (item.target | string | lower | regex_replace('^\\/') |
+                        regex_replace('[^-a-z0-9]', '-'))[-1::-1][:63][-1::-1] |
+                       regex_replace('^[-0-9]', 'z') | regex_replace('-$', 'z') }}
+              mountPath: {{ item.target }}
+              {%- if (item.read_only | default(false, true) | bool) %}
+
+              readOnly: true
+              {%- endif %}
+            {%- endif %}
+            {%- endfor %}
+            {%- for item in (k8s_service.volumes_pvc | default([], true) | select | unique) %}
+
+            - name: {{ ((item | string | split(':'))[1] | lower | regex_replace('^\\/') |
+                        regex_replace('[^-a-z0-9]', '-'))[-1::-1][:63][-1::-1] |
+                       regex_replace('^[-0-9]', 'z') | regex_replace('-$', 'z') }}
+              {%- if ((item | string | split(':'))[3] | default('', true) | length) > 0 %}
+
+              subPath: {{ (item | string | split(':'))[3] }}
+              {%- endif %}
+
+              mountPath: {{ (item | string | split(':'))[1] }}
+              {%- if ((item | string | split(':'))[2] | default('', true)) == 'ro' %}
+
+              readOnly: true
+              {%- endif %}
+            {%- endfor %}
+          {%- endif %}

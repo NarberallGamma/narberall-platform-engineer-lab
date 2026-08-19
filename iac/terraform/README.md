@@ -31,7 +31,7 @@ terraform/
 | [`vkcloud/`](vkcloud/) | **Legacy as code:** vkcs, catalog maps, purpose-split VMs, import |
 | [`vmware/`](vmware/) | **VCD greenfield:** catalog, guest init, extra disks, audit stack |
 | [`proxmox/`](proxmox/) | Proxmox VE guests |
-| [`cloudflare/`](cloudflare/) | DNS as code |
+| [`cloudflare/`](cloudflare/) | DNS + mail + page rules + Access |
 | [`modules/`](modules/) | Reusable Huawei-class modules |
 | [`examples/`](examples/) | Small entry points |
 | [`SANITIZE.md`](SANITIZE.md) | What never goes into git |
@@ -70,6 +70,7 @@ flowchart TB
 - [Legacy estate as Terraform (VK Cloud)](../../case-studies/05-legacy-estate-as-code.md)
 - [VMware VCD from zero + one-button CI](../../case-studies/06-vmware-vcd-greenfield.md)
 - [Huawei-class compute catalog (split state)](../../case-studies/07-huawei-compute-catalog.md)
+- [SBP-class identity autodeploy (Ansible)](../../case-studies/08-payments-swarm-autodeploy.md)
 
 ## Keywords
 

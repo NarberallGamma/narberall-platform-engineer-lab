@@ -1,0 +1,334 @@
+{
+  "Logging": {
+    "includeScopes": true,
+    "LogLevel": {
+      "Default": "{{ am.loglevel }}",
+      "CorrelationId.CorrelationIdMiddleware": "Warning",
+      "System": "Warning",
+      "Microsoft": "Warning",
+      "App.Metrics": "Warning",
+      "Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware": "Warning",
+      "Microsoft.AspNetCore.Hosting.Diagnostics": "Warning"
+    }
+  },
+
+  "AllowedHosts": "*",
+  "AccessManager": {
+
+    {%- if am_UseProfiler is defined %}
+    "UseProfiler": {{ am.UseProfiler | bool | lower }},
+    {%- endif %}
+
+    "AdminUIDisabled": {{ am_AdminUIDisabled | bool | lower}},
+    "BasePath": "/{{ am.application }}",
+
+    {%- if am_Swagger_enable is defined %}
+
+    "Swagger": {{ am_Swagger_enable | bool | lower }},
+    {%- endif %}
+    
+    {%- if am_STSUri is defined %}
+
+    "STSUri": "{{ am_STSUri }}",
+    {%- endif %}
+
+    {%- if am_DevelopMode is defined %}
+
+    "DevelopMode": {{ am_DevelopMode | bool | lower }},
+    {%- endif %}
+
+    {%- if am_HideAmVersion is defined %}
+
+    "HideAmVersion": {{ am_HideAmVersion | bool | lower }},
+    {%- endif %}
+
+    {%- if am_EnableCacheSignatureProviders is defined %}
+
+    "EnableCacheSignatureProviders": {{ am_EnableCacheSignatureProviders | bool | lower }},
+    {%- endif %}
+
+    {%- if am_AntiForgeryTokenEnabled is defined %}
+
+    "AntiForgeryTokenEnabled": {{ am_AntiForgeryTokenEnabled | bool | lower }},
+    {%- endif %}
+
+    {%- if am_ContentSecurityPolicy is defined %}
+
+    "ContentSecurityPolicy": "{{ am_ContentSecurityPolicy }}",
+    {%- endif %}
+
+    {%- if am_ContentSecurityPolicySpa is defined %}
+
+    "ContentSecurityPolicySpa": "{{ am_ContentSecurityPolicySpa }}",
+    {%- endif %}
+
+    {%- if am_AssemblyResolving is defined %}
+
+    "AssemblyResolving": {{ am_AssemblyResolving | to_json }},
+    {%- endif %}
+
+    {%- if am_Copyright is defined %}
+
+    "Copyright": "{{ am_Copyright }}",
+    {%- endif %}
+
+    {%- if am_LowercaseUrls is defined %}
+
+    "LowercaseUrls": {{ am_LowercaseUrls | bool | lower }},
+    {%- endif %}
+
+    {%- if am_LowercaseQueryStrings is defined %}
+
+    "LowercaseQueryStrings": {{ am_LowercaseQueryStrings | bool | lower }},
+    {%- endif %}
+
+    "Authentication": {
+      "AllowClientCredentialsGrant": {{ am_AllowClientCredentialsGrant | bool | lower }},
+
+      {%- if am_LocalIdp is defined %}
+
+      "LocalIdp": "{{ am_LocalIdp }}",
+      {%- endif %}
+
+      "SignInMessageThreshold": {{ am_SignInMessageThreshold }},
+      "SsoSessionExpiredInterval": {{ am_SsoSessionExpiredInterval }},
+      "DisableNegoAuthentication": {{ am_DisableNegoAuthentication | bool | lower }}
+    },
+    "Data": {
+      "EnableMigrations": {{ am_EnableMigrations | bool | lower }},
+      "DatabaseType": "{% if (idplat_rdbms_name is defined and (idplat_rdbms_name == 'postgres')) or (idplat_postgres_install | bool) %}PostgreSQL
+                        {%- else -%}
+                        SQL Server
+                        {%- endif -%}",
+      "OpenSync": {{ am_OpenSync | bool | lower }},
+      "ConnectionString": {
+        "idplat.am_configuration": {{ am_configuration_connection_string | to_json }}
+        }
+    },
+    {%- if am_Extensions_RestorePackages is defined or am_Extensions_StorageFolder is defined or am_Extensions_ResolveInCurrentDomain is defined %}
+
+    "Extensions": {
+      {%- if am_Extensions_RestorePackages is defined %}
+
+      "RestorePackages": "{{ am_Extensions_RestorePackages }}"
+      {%- endif %}
+      {%- if am_Extensions_StorageFolder is defined %}
+      {%- if am_Extensions_RestorePackages is defined %}, {% endif %}
+
+      "StorageFolder": {{ am_Extensions_StorageFolder }}
+      {%- endif %}
+      {%- if am_Extensions_ResolveInCurrentDomain is defined %}
+      {%- if am_Extensions_RestorePackages is defined or am_Extensions_StorageFolder is defined %}, {% endif %}
+
+      "ResolveInCurrentDomain": {{ am_Extensions_ResolveInCurrentDomain | bool | lower }}
+      {%- endif %}
+
+    },
+    {%- endif %}
+    {%- if am_AntiForgery_HeaderName is defined or am_AntiForgery_MessageStorageOptions is defined or am_AntiForgery_ServerLifeTime is defined %}
+
+    "AntiForgery": {
+      {%- if am_AntiForgery_HeaderName is defined %}
+
+      "HeaderName": "{{ am_AntiForgery_HeaderName }}"
+      {%- endif %}
+      {%- if am_AntiForgery_MessageStorageOptions is defined %}
+      {%- if am_AntiForgery_HeaderName is defined %}, {% endif %}
+
+      "MessageStorageOptions": "{{ am_AntiForgery_MessageStorageOptions }}"
+      {%- endif %}
+      {%- if am_AntiForgery_ServerLifeTime is defined %}
+      {%- if am_AntiForgery_MessageStorageOptions is defined or am_AntiForgery_HeaderName is defined %}, {% endif %}
+
+      "ServerLifeTime": "{{ am_AntiForgery_ServerLifeTime }}"
+      {%- endif %}
+
+    },
+    {%- endif %}
+
+    "DataProtection": {
+      {%- if am_DataProtection_Certificate is defined %}
+
+      "Certificate": "{{ am_DataProtection_Certificate }}",
+      {%- endif %}
+      {%- if am_DataProtection_ApplicationName is defined %}
+
+      "ApplicationName": "{{ am_DataProtection_ApplicationName }}",
+      {%- endif %}
+
+      "KeyStoragePath": "{{ am_DataProtection_KeyStoragePath }}"
+    },
+    "X509StoreExt":[
+      {%- for item in am_X509StoreExt %}
+
+      {
+        "Path": "{{ item.split(':')[0] | trim }}", 
+        "Password": "{{ item.split(':')[1] | trim }}"
+      }{{ "," if not loop.last }}
+      {%- endfor %}
+
+    ],
+    "Jobs": {
+      {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined or am_Jobs_AgentSettings_QueuePollInterval is defined or am_Jobs_AgentSettings_SchedulerPollInterval is defined or am_Jobs_AgentSettings_RetryDelaySeconds is defined or am_Jobs_AgentSettings_JobInitializationTimeout is defined or am_Jobs_AgentSettings_AgentCheckInterval is defined or am_Jobs_AgentSettings_AgentInactiveTimeout is defined or am_Jobs_AgentSettings_BadJobExceptionThreshold is defined or am_Jobs_AgentSettings_MaxProcessor is defined or am_Jobs_AgentSettings_LogSuccessfulJobs is defined or am_Jobs_AgentSettings_StartDelay is defined or am_Jobs_AgentSettings_ShutdownTimeout is defined %}
+
+      "AgentSettings": {
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined %}
+
+        "MaxQueueCheckInterval": {{ am_Jobs_AgentSettings_MaxQueueCheckInterval }}
+        {%- endif %}
+        {%- if am_Jobs_AgentSettings_QueuePollInterval is defined %}
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined %}, {% endif %}
+
+        "QueuePollInterval": {{ am_Jobs_AgentSettings_QueuePollInterval }}
+        {%- endif %}
+        {%- if am_Jobs_AgentSettings_SchedulerPollInterval is defined %}
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined or am_Jobs_AgentSettings_QueuePollInterval is defined %}, {% endif %}
+
+        "SchedulerPollInterval": {{ am_Jobs_AgentSettings_SchedulerPollInterval }}
+        {%- endif %}
+        {%- if am_Jobs_AgentSettings_RetryDelaySeconds is defined %}
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined or am_Jobs_AgentSettings_QueuePollInterval is defined or am_Jobs_AgentSettings_SchedulerPollInterval is defined %}, {% endif %}
+
+        "RetryDelaySeconds": {{ am_Jobs_AgentSettings_RetryDelaySeconds }}
+        {%- endif %}
+        {%- if am_Jobs_AgentSettings_JobInitializationTimeout is defined %}
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined or am_Jobs_AgentSettings_QueuePollInterval is defined or am_Jobs_AgentSettings_SchedulerPollInterval is defined or am_Jobs_AgentSettings_RetryDelaySeconds is defined %}, {% endif %}
+
+        "JobInitializationTimeout": {{ am_Jobs_AgentSettings_JobInitializationTimeout }}
+        {%- endif %}
+        {%- if am_Jobs_AgentSettings_AgentCheckInterval is defined %}
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined or am_Jobs_AgentSettings_QueuePollInterval is defined or am_Jobs_AgentSettings_SchedulerPollInterval is defined or am_Jobs_AgentSettings_RetryDelaySeconds is defined or am_Jobs_AgentSettings_JobInitializationTimeout is defined %}, {% endif %}
+
+        "AgentCheckInterval": {{ am_Jobs_AgentSettings_AgentCheckInterval }}
+        {%- endif %}
+        {%- if am_Jobs_AgentSettings_AgentInactiveTimeout is defined %}
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined or am_Jobs_AgentSettings_QueuePollInterval is defined or am_Jobs_AgentSettings_SchedulerPollInterval is defined or am_Jobs_AgentSettings_RetryDelaySeconds is defined or am_Jobs_AgentSettings_JobInitializationTimeout is defined or am_Jobs_AgentSettings_AgentCheckInterval is defined %}, {% endif %}
+
+        "AgentInactiveTimeout": {{ am_Jobs_AgentSettings_AgentInactiveTimeout }}
+        {%- endif %}
+        {%- if am_Jobs_AgentSettings_BadJobExceptionThreshold is defined %}
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined or am_Jobs_AgentSettings_QueuePollInterval is defined or am_Jobs_AgentSettings_SchedulerPollInterval is defined or am_Jobs_AgentSettings_RetryDelaySeconds is defined or am_Jobs_AgentSettings_JobInitializationTimeout is defined or am_Jobs_AgentSettings_AgentCheckInterval is defined or am_Jobs_AgentSettings_AgentInactiveTimeout is defined %}, {% endif %}
+
+        "BadJobExceptionThreshold": {{ am_Jobs_AgentSettings_BadJobExceptionThreshold }}
+        {%- endif %}
+        {%- if am_Jobs_AgentSettings_MaxProcessor is defined %}
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined or am_Jobs_AgentSettings_QueuePollInterval is defined or am_Jobs_AgentSettings_SchedulerPollInterval is defined or am_Jobs_AgentSettings_RetryDelaySeconds is defined or am_Jobs_AgentSettings_JobInitializationTimeout is defined or am_Jobs_AgentSettings_AgentCheckInterval is defined or am_Jobs_AgentSettings_AgentInactiveTimeout is defined or am_Jobs_AgentSettings_BadJobExceptionThreshold is defined %}, {% endif %}
+
+        "MaxProcessor": {{ am_Jobs_AgentSettings_MaxProcessor }}
+        {%- endif %}
+        {%- if am_Jobs_AgentSettings_LogSuccessfulJobs is defined %}
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined or am_Jobs_AgentSettings_QueuePollInterval is defined or am_Jobs_AgentSettings_SchedulerPollInterval is defined or am_Jobs_AgentSettings_RetryDelaySeconds is defined or am_Jobs_AgentSettings_JobInitializationTimeout is defined or am_Jobs_AgentSettings_AgentCheckInterval is defined or am_Jobs_AgentSettings_AgentInactiveTimeout is defined or am_Jobs_AgentSettings_BadJobExceptionThreshold is defined or am_Jobs_AgentSettings_MaxProcessor is defined %}, {% endif %}
+
+        "LogSuccessfulJobs": {{ am_Jobs_AgentSettings_LogSuccessfulJobs | bool | lower }}
+        {%- endif %}
+        {%- if am_Jobs_AgentSettings_StartDelay is defined %}
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined or am_Jobs_AgentSettings_QueuePollInterval is defined or am_Jobs_AgentSettings_SchedulerPollInterval is defined or am_Jobs_AgentSettings_RetryDelaySeconds is defined or am_Jobs_AgentSettings_JobInitializationTimeout is defined or am_Jobs_AgentSettings_AgentCheckInterval is defined or am_Jobs_AgentSettings_AgentInactiveTimeout is defined or am_Jobs_AgentSettings_BadJobExceptionThreshold is defined or am_Jobs_AgentSettings_MaxProcessor is defined or am_Jobs_AgentSettings_LogSuccessfulJobs is defined %}, {% endif %}
+
+        "StartDelay": {{ am_Jobs_AgentSettings_StartDelay }}
+        {%- endif %}
+        {%- if am_Jobs_AgentSettings_ShutdownTimeout is defined %}
+        {%- if am_Jobs_AgentSettings_MaxQueueCheckInterval is defined or am_Jobs_AgentSettings_QueuePollInterval is defined or am_Jobs_AgentSettings_SchedulerPollInterval is defined or am_Jobs_AgentSettings_RetryDelaySeconds is defined or am_Jobs_AgentSettings_JobInitializationTimeout is defined or am_Jobs_AgentSettings_AgentCheckInterval is defined or am_Jobs_AgentSettings_AgentInactiveTimeout is defined or am_Jobs_AgentSettings_BadJobExceptionThreshold is defined or am_Jobs_AgentSettings_MaxProcessor is defined or am_Jobs_AgentSettings_LogSuccessfulJobs is defined or am_Jobs_AgentSettings_StartDelay is defined %}, {% endif %}
+
+        "ShutdownTimeout": {{ am_Jobs_AgentSettings_ShutdownTimeout }}
+        {%- endif %}
+
+      },
+      {%- endif %}
+
+      "UseBackgroundJobAgent": {{ am_Jobs_UseBackgroundJobAgent | bool | lower }}
+    },
+    {%- if am_RequestContext_CorrelationIdHeader is defined or am_RequestContext_XForwardedForAllowedSubnets is defined or am_RequestContext_XForwardedForMode is defined or am_RequestContext_EnableAutoGenerateCorrelationId is defined %}
+
+    "RequestContext":{
+      {%- if am_RequestContext_CorrelationIdHeader is defined %}
+
+      "CorrelationIdHeader": "{{ am_RequestContext_CorrelationIdHeader }}"
+      {%- endif %}
+      {%- if am_RequestContext_XForwardedForAllowedSubnets is defined %}
+      {%- if am_RequestContext_CorrelationIdHeader is defined %}, {% endif %}
+
+      "XForwardedForAllowedSubnets": {{ am_RequestContext_XForwardedForAllowedSubnets | to_json }}
+      {%- endif %}
+      {%- if am_RequestContext_XForwardedForMode is defined %}
+      {%- if am_RequestContext_CorrelationIdHeader is defined or am_RequestContext_XForwardedForAllowedSubnets is defined %}, {% endif %}
+
+      "XForwardedForMode": {{ am_RequestContext_XForwardedForMode }}
+      {%- endif %}
+      {%- if am_RequestContext_EnableAutoGenerateCorrelationId is defined %}
+      {%- if am_RequestContext_CorrelationIdHeader is defined or am_RequestContext_XForwardedForAllowedSubnets is defined or am_RequestContext_XForwardedForMode is defined %}, {% endif %}
+
+      "EnableAutoGenerateCorrelationId": {{ am_RequestContext_EnableAutoGenerateCorrelationId | bool | lower }}
+      {%- endif %}
+
+    },
+    {%- endif %}
+    {%- if am_Experimental_ChildRealmAMRoles is defined or am_Experimental_RootCombineStore is defined %}
+
+    "Experimental": {
+      {%- if am_Experimental_ChildRealmAMRoles is defined %}
+
+      "ChildRealmAMRoles": {{ am_Experimental_ChildRealmAMRoles | bool | lower }}
+      {%- endif %}
+      {%- if am_Experimental_RootCombineStore is defined %}
+      {%- if am_Experimental_ChildRealmAMRoles is defined %}, {% endif %}
+
+      "RootCombineStore": {{ am_Experimental_RootCombineStore | bool | lower }}
+      {%- endif %}
+
+    },
+    {%- endif %}
+    {%- if am_Legacy_SerilogAuditToPredconfigured is defined %}
+
+    "Legacy": {
+      "SerilogAuditToPredconfigured": {{ am_Legacy_SerilogAuditToPredconfigured | bool | lower }}
+    },
+    {%- endif %}
+
+    "Audit": {
+        "UseInternalLogger": {{ am_Audit_UseInternalLogger | bool | lower }}
+    }
+  },
+  "Serilog": {
+    "Using": [
+      "Serilog.Sinks.Async",
+      "Serilog.Sinks.Console"
+    ],
+    "MinimumLevel": "Information",
+    "WriteTo": [
+        {
+          "Name": "Async",
+          "Args": {
+            "Configure": [
+              {
+                "Name": "Console",
+                "Args": {
+                  "outputTemplate": "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} {Level:u4} {CorrelationId} {SourceContext} {Message:l}{NewLine}{Exception}{NewLine}"
+                }
+              }
+            ]
+          }
+        }
+    ],
+    "Enrich": [
+      "FromLogContext",
+      "WithMachineName",
+      "WithThreadId"
+    ]
+  },
+  "Kestrel": {
+    "Endpoints": {
+      "NamedEndpoint": {
+        "Url": "https://0.0.0.0:{{ am_port }}"
+      },
+      "Api": {
+        "Url": "https://0.0.0.0:{{ am_api_port }}"
+      }
+    },
+    "Certificates": {
+      "Default": {
+        "Path": "{{ am_hosting_cert }}",
+        "Password": {{ am_hosting_cert_passwd | to_json }}
+      }
+    }
+  }
+}

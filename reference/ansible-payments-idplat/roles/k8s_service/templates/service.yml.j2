@@ -1,0 +1,60 @@
+# service
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ k8s_service.name }}
+spec:
+  selector:
+    app: {{ k8s_service.name }}
+  {%- for item in (k8s_service.ports | default([], true) | unique)
+        if (item | string | regex_findall('^.*:[1-9]+[0-9]*') | length) > 0 %}
+  {%- if loop.first %}
+
+  ports:
+  {%- endif %}
+
+    - name: {{ k8s_service.name }}-{{ ( (item | split(':'))[1] | split('/') )[0] }}
+      protocol: {{ (item | lower | split('/'))[1] | default('TCP', true) | upper }}
+      port: {{ ( (item | split(':'))[1] | split('/') )[0] }}
+      targetPort: {{ ( (item | split(':'))[1] | split('/') )[0] }}
+      {%- if (item | string | regex_findall('^[1-9]+[0-9]*:.*') | length) > 0 %}
+
+      nodePort: {{ (item | split(':'))[0] }}
+      {%- endif %}
+  {%- endfor %}
+  {%- if (k8s_service.ports | default([], true) | unique | map('regex_findall', '^[1-9]+[0-9]*:[1-9]+[0-9]*') | list | length) > 0  %}
+
+  type: NodePort
+  {%- endif %}
+
+{%- if (k8s_service.headless_mode | default(false) | bool) %}
+
+# Headless service
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ k8s_service.name }}-internal
+spec:
+  selector:
+    app: {{ k8s_service.name }}
+{%- for item in (k8s_service.ports | default([], true) | unique)
+        if (item | string | regex_findall('^.*:[1-9]+[0-9]*') | length) > 0 %}
+  {%- if loop.first %}
+
+  ports:
+  {%- endif %}
+
+    - name: {{ k8s_service.name }}-{{ ( (item | split(':'))[1] | split('/') )[0] }}
+      port: {{ ( (item | split(':'))[1] | split('/') )[0] }}
+
+  {%- endfor %}
+  {%- if (k8s_service.ports | default([], true) | unique | map('regex_findall', '^[1-9]+[0-9]*:[1-9]+[0-9]*') | list | length) > 0  %}
+
+  clusterIP: None
+  {%- endif %}
+
+{%- endif %}

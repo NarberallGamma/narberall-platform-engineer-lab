@@ -1,0 +1,78 @@
+//лдап каталог + виндовые модули
+{
+    //Конфигурация плагинов
+    "Plugins": {
+        //Модули аутентификации
+        "IAuthenticationModule": 
+		[
+            //WindowsLoginModule
+            {
+                "Name": "WindowsLoginModule_Static",
+                "PluginName": "WindowsLoginModule",
+                "Configuration": {
+                    "DomainName": "Static",
+                    "SkipForHosts": [
+                        "static1",
+                        "static2"
+                    ]
+                }
+            },
+			//KerberosAuthModule
+			{
+				"Name":"winmodule_static",
+				"PluginName": "NegotiateLoginModule",
+				"Configuration":
+					{
+						"DomainName":"CORP",
+						"SkipForHosts":[],
+						"SkipOnError":false,
+						"OAuthCustomGrant":"",
+						"SaveDomainName":false
+					}
+			}
+			
+        ],
+        // Хранилища пользователей
+        "IIdentityStore": [
+			//LDAP CATALOG
+			{
+                    "Name": "LDAP catalog",
+                    "PluginName": "LdapIdentityStore",
+                    "Configuration": 
+					{
+                      "UserName": "svc_idstore_bind",
+                      "Password": "CHANGE_ME",
+                      "Domain": "CORP.EXAMPLE.COM",
+                      "DomainPath": "CORP.EXAMPLE.COM",
+                      "BaseDN": "DC=corp,DC=example,DC=com",
+                      "UsersContainer": "DC=corp,DC=example,DC=com",
+                      "GroupsContainer": "DC=corp,DC=example,DC=com",
+                      "LdapAuthenticationType": 0,
+                      "SecureConnectionType": 0,
+                      "UserAttributeMap": [],
+                      "GroupAttributeMap": [],
+                      "Timeout": 0,
+                      "ReferralChasingMode": 0,
+                      "UseExpandAttributeCache": false,
+                      "ExpandAttributeCacheLifetime": "00:00:00",
+                      "MembershipAttributeMap": [],
+                      "RoleAttributeMap": [],
+                      "RoleGrantAttributeMap": []
+                    }
+            }
+        ],
+    },
+    //Конфигурация потоков аутентификации
+    "AuthFlows": 
+	{
+        "Default": 
+		{
+            "Steps": 
+			[
+                {
+                    "ModuleName": "WindowsLoginModule_Static"
+                }
+            ]
+        }
+    }
+}

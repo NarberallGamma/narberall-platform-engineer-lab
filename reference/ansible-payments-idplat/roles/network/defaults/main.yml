@@ -1,0 +1,5 @@
+---
+# defaults file for network
+
+network_name: "{{ docker_stack_name | default('', true) }}"  # must be defined
+network_encrypted: false  # if true, encrypted docker network will be created (if does not exist)

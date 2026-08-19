@@ -11,7 +11,7 @@
 
 | Path | What |
 |------|------|
-| [`../terraform/cloudflare/`](../terraform/cloudflare/) | Zone + records sample |
+| [`../terraform/cloudflare/`](../terraform/cloudflare/) | 3 zones, app/mail records, page rules, Access apps |
 
 Resource types: [`../terraform/RESOURCES.md`](../terraform/RESOURCES.md)
 

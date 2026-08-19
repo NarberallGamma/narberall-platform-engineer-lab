@@ -1,0 +1,127 @@
+//локал стор + модули авторизации которые добавлены во флоу + настроойка каналов доставки
+{
+    //Конфигурация плагинов
+    "Plugins": 
+	{
+        //Модули аутентификации
+        "IAuthenticationModule": [
+            //DataStoreLoginModule
+            {
+                "Name": "DataStoreLoginModule_Static",
+                "PluginName": "DataStoreLoginModule",
+                "Configuration": {
+                    "AllowUserJwtAssertion": true
+                }
+            },
+            //OathModule
+            {
+                "Name": "OathModule_Static",
+                "PluginName": "OathModule",
+                "Configuration": {
+                    "ForceTwoFactorAuth": true,
+                    "ApplicationName": "Static application",
+                    "SkipAuthMethods": [
+                        "static_method1",
+                        "static_method2"
+                    ]
+                }
+            },
+            //OneTimePasswordModule
+            {
+                "Name": "OneTimePasswordModule_Static",
+                "PluginName": "OneTimePasswordModule",
+                "Configuration": 
+				{
+                    "MessageContent": "Static content",
+                    "MessageSubject": "Static subject",
+                    "EnableSmsChannel": true,
+                    "EnableSmtpChannel": true
+                }
+            }
+        ],
+        // Каналы доставки
+        "IMessagingChannel": [
+            //FileMessagingChannel
+            {
+                "Name": "FileMessagingChannel_Static",
+                "PluginName": "FileMessagingChannel",
+                "Configuration": {
+                    "FilePath": ".\\Path_to_file\\Static",
+                    "MessagingServices": [
+                        "Static1",
+                        "Static2",
+                        "email"
+                    ]
+                }
+            },
+            //SmtpMessagingChannel
+            {
+                "Name": "SmtpMessagingChannel_Static",
+                "PluginName": "SmtpMessagingChannel",
+                "Configuration": {
+                    "Host": "static.ru",
+                    "Port": 25,
+                    "From": "mail@static.ru",
+                    "User": "test",
+                    "Password": "CHANGE_ME"
+                }
+            },
+            //SmppMessagingChannel
+            {
+                "Name": "SmppMessagingChannel_Static",
+                "PluginName": "SmppMessagingChannel",
+                "Configuration": {
+                    "Server": "1.1.1.1",
+                    "Port": 23,
+                    "ServiceType": "servicetype_statyc",
+                    "SenderName": "SerderName_static",
+                    "SystemId": "systemID_static",
+                    "Password": "password_static",
+                    "DataEncoding": 1,
+                    "SubmitDataEncoding": 1,
+                    "MessageDataEncoding": 1,
+                    "SourceTon": 1,
+                    "SourceNpi": 1,
+                    "MultiConnection": false,
+                    "RecoveryConnectionTimeout": 10000,
+                    "AttemptToConnectInterval": 5000,
+                    "PhoneKeyName": "msisdnnumber"
+                }
+            },
+            //NatsMessagingChannel
+            {
+                "Name": "NatsMessagingChannel_Static",
+                "PluginName": "NatsMessagingChannel",
+                "Configuration": {
+                    "MessagingServices": [
+                        "sms",
+                        "email"
+                    ],
+                    "NatsServices": [
+                        "1.1.1.1:11111"
+                    ],
+                    "CredFile": "QmFnIEF0dHJpYnV0ZXMNCiAgICBsb2NhbEtleUlEOiA5OCAzNSBCNiBGOCBDNiA0OCBDNyBEQyA3NSBDRCBFOCBBMiA3RiAyNCBCQSA1QSAwOSBGQyAzRSBFRiANCiAgICBmcmllbmRseU5hbWU6IEVDQy1jZXJ0LXRlc3QtZnJpZW5kbHluYW1lDQpzdWJqZWN0PUMgPSBVUywgQ04gPSBFQ0MtY2VydC10ZXN0DQoNCmlzc3Vlcj1DID0gVVMsIENOID0gRUNDLWNlcnQtdGVzdA0KDQotLS0tLUJFR0lOIENFUlRJRklDQVRFLS0tLS0NCk1JSUJ6RENDQVM0Q0ZCa25BcUcxV3FkdzNabXMrT2hldEdtMVlNV1lNQW9HQ0NxR1NNNDlCQU1FTUNVeEN6QUoNCkJnTlZCQVlUQWxWVE1SWXdGQVlEVlFRRERBMUZRME10WTJWeWRDMTBaWE4wTUI0WERUSXdNRGt5TVRFd05UUXcNCk4xb1hEVEl4TURreU1URXdOVFF3TjFvd0pURUxNQWtHQTFVRUJoTUNWVk14RmpBVUJnTlZCQU1NRFVWRFF5MWoNClpYSjBMWFJsYzNRd2dac3dFQVlIS29aSXpqMENBUVlGSzRFRUFDTURnWVlBQkFCSTFJTk9YbDI5Z1o1QTJSMmYNCkRJd2hweGxBZUp4TndaMEZPdE55YTFvZis2djFkSmZwVVVSOEFUSEorWkdMVUJWM0lYbTFtL0NIT2hEQ3kzK3QNCjN5Z1RDd0VRZkR6QUZ1bEsyc240RmtqVzBaMXdBSzZRTndZQjhKTE1sTG5sTlluSVBwZitJdUpPOFV0VWs1ZU8NCjRHa3FzdzJhbkdDcnkvRWoxdDZrRkwzV0hhZWJHakFLQmdncWhrak9QUVFEQkFPQml3QXdnWWNDUWdEZlcrOXMNCnRxTTF6NkdlWW5qRkhxdjJCTzJiTmZhVEFaSjVKK2hpWW9ybWprd1k1K0EyNkpNK1JWV2JWc0J1QW5jNHh3MUcNCmZaaVhSeEpLNXhERWJlbTk3QUpCR01VbWZKTlJuQ0V1Q3J1WmF2QmV0aE1ISzdXZDVpSVppaDJBWlJ5SGpXV2INCktZOVlyeHNlbmh3NzkrRWMvL0pVNGd3UGJmb3cvTERKZWJsMCtwWWVDSWs9DQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tDQo="
+                }
+            }
+        ]
+    },
+    //Конфигурация потоков аутентификации
+    "AuthFlows": 
+		{
+			"Default": 
+			{
+				"Steps": 
+				[
+					{
+						"ModuleName": "DataStoreLoginModule_Static"
+					},
+					{
+						"ModuleName": "OathModule_Static"
+					},
+					{
+						"ModuleName": "OneTimePasswordModule_Static"
+					}
+				]
+			}
+		}
+}

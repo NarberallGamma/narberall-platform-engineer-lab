@@ -7,7 +7,11 @@ Curated resource examples from multi-account / multi-region delivery (not a full
 | `networking.tf` | VPC module, SG, IGW, routes |
 | `nat_keypair.tf` | NAT gateway, EIP, key pair |
 | `peering.tf` | VPC peering + routes |
-| `compute_gitlab.tf` | EC2 + EIP |
+| `compute_gitlab.tf` | GitLab EC2 + EIP + data disk |
+| `compute_bastion.tf` | Public bastion + EIP |
+| `compute_proxy.tf` | Edge proxy + EIP |
+| `compute_runner.tf` | CI runner + data disk |
+| `compute_vault.tf` | Vault + encrypted data disk |
 | `db.tf` / `modules/db_instance` | EC2-based DB + EBS |
 | `mysql_rds.tf` | RDS MySQL HA |
 | `elasticache.tf` | Redis replication group |

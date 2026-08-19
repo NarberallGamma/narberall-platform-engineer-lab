@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+	CREATE USER {{ idplat_postgres_user_am }} WITH PASSWORD '{{ idplat_postgres_user_am_pass }}';
+	CREATE DATABASE {{ idplat_postgres_db_am }};
+	GRANT ALL PRIVILEGES ON DATABASE {{ idplat_postgres_db_am }} TO {{ idplat_postgres_user_am }};
+	ALTER DATABASE {{ idplat_postgres_db_am }} OWNER TO {{ idplat_postgres_user_am }};
+EOSQL

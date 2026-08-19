@@ -4,6 +4,7 @@
 |------|-----------|
 | `network.tf` | Network, subnet, image data |
 | `kube.tf` | Bastion, kube masters/workers, GitLab, Postgres VMs |
+| `purpose.tf` | Runner, Vault, Redis, monitor, proxy |
 | `volumes_sg.tf` | Block volumes, attach, server group, SG, floating IP |
 | `providers.tf` / `backend.tf` / `versions.tf` | Provider + state |
 

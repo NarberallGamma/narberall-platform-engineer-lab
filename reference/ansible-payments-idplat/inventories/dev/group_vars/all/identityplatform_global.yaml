@@ -1,0 +1,101 @@
+idplat_public_hostname: "idplat.dev.example.com" # публичный адрес Identity platform
+
+idplat_postgres_install: true # Если производится установка postgres через роль
+idplat_postgres_published_port: 62101
+
+idplat_rdbms_name: postgres # Allowed: postgres/mssql/mysql; тип субд на которой развернуты базы
+idplat_rdbms_hostname: "host.docker.internal" # настройка подключений к БД
+#idplat_rdbms_port: '7777' # порт БД, указать если отличается от порта базы по умолчанию
+
+amcli_placement_constraints: [ "node.labels.idplat == amcli" ] # Расположение куда примонтирован volume с плагинами для AM
+amcli_volumes_custom_plugins: "/mnt/nfs/share/idplat_dev/am_plugins" # Мапинг расположения плагинов AM
+
+# deploydocs
+deploydocs_published_port: 62100 # Внешний порт для документации
+
+#IGEXT
+igext_published_port: 62500 # Внешний порт для Igext
+igext_https_published_port: 62501 # Внешний порт https для Igext
+
+#IG
+ig_customs_folder: "{{ inventory_dir }}/ig_customs/" # Директория с настройками для IG
+ig_enable_demo_oidc: true #Включение/отключение демонстрационного маршрута со схемой OIDC (если переменной нет, используется по умолчанию false) Применяется только вместе с am_first_deploy=true
+ig_enable_demo_jwt: true #Включение/отключение демонстрационного маршрута со схемой JWT (если переменной нет, используется по умолчанию false) Применяется только вместе с am_first_deploy=true
+ig_dataProtection_key: key-405899ac-5a3e-4b11-9cfa-ab236a0ae3d0.xml
+ig_published_port: 62510 # Внешний порт для Ig
+ig_https_published_port: 62511 # Внешний порт https для Ig
+ig_enable_ReverseAccess: true # Деплой IG в режиме ReverseAccess , при котором разворачивается 2 экземпляра IG. (При включении необходимо добавить в inventiry файлы настсроек ReverseAccess )
+ig_caching_provider: redis  # InMemory / Redis (разворачивается redis из деплоя, только для целей тестирования, для prod необходима внешняя настройка redis)
+
+#Redis (только для тестирования)
+redis_default_user: default  # Имя для пользователя Redis
+redis_default_passwd: CHANGE_ME  # comment this line or set empty string if no password
+
+# AM
+#обязательные
+am_db_name: "{{ docker_stack_name }}_am_config" # База данных AM
+am_first_deploy: true # AM initial setup flag !!! Нельзя включать опцию при уже установенном AM !!!
+am_deploy_debug: true # Включение/отключние debug режима дляпервоначальной инициализации AM и обновления плагинов AM, при включенном Debug сервисный контейнер не удаляется
+am_update_plugins: true # Установка обновления плагинов AM
+am_update_migrations: true # Запускает служебный контейнер для выполнения миграции
+# AM external port
+am_published_port: 62443 # comment this line if need to disable this external port
+# AM external api port
+am_api_published_port: 62543 # comment this line if need to disable this external port
+am_application: am #am app name basepath
+#am_clients_realm_agent_fi: identityplatform #default realm name
+am_cert_path: "am-sign.pfx" #Access Manager. Certificate signing tokens.
+am_AdminUIDisabled: false # Отключаем UI у Access Manager. В данном режиме настройка AM проходит только через файл статической конфигурации и утилиту CLI, а также через сервисный API
+am_dataProtection_key: key-3e6f3c01-9f39-4656-b0ca-436cd18e0b8c.xml  #xml file containing DataProtectionKey - применяется для шифрования чувствительной информации
+am_realms_folder: "{{ inventory_dir }}/am_realm/" # Дирректория с настройками Realm в AM
+am_Extensions_RestorePackages: "false" 
+am_Extensions_StorageFolder: "null" # Определяет папку для инсталляции пакетов. Если задана папка, АМ переходит в режим работы FileSystemReadOnly, в этом режиме АМ при старте выполняет загрузку nuget-пакетов из указанной папки. Если задано значение null, АМ переходит в режим работы DataBaseReadOnly. В данном режиме nuget-пакеты загружаются из административного интерфейса АМ.
+am_AssemblyResolving: {"":""} # Используется для совместимости библиотек AM SDK внутри кастомных плагинов, собранных с более ранними версиями SDK (до переименования имён сборок). Необходим для совместимости новых версий AM со старыми плагинами (нагетами).
+
+#Необязательные
+#am_UseProfiler: false #Включает/отключает работу профайлера. Профайлер используется для диагностики проблем с Access Manager.
+#am_Swagger_enable: false
+#am_STSUri: "" # Адрес STS сервиса для Access Manager. STS сервис расширяет функционал AM и предоставляет поддержку протокола WS-Trust версии 1.4.
+#am_DevelopMode: false # Если флаг установлен, АМ работает в режиме разработчика, который используется для разработки UI или модулей аутентификации для АМ.
+#am_HideAmVersion: false # Включает/отключает отображение версии АМ в UI
+#am_EnableCacheSignatureProviders: true # Включает/отключает кэш ключей для проверки JWT в OIDC. При большом количестве клиентов, отправляющих client credentials, подписанных уникальными ключами, все ключи кэшируются, что может привести к росту оперативной памяти. Использовать кэш только там, где кол-во ключей верификации JWT ограничено.
+#am_AntiForgeryTokenEnabled: true # Если включено, АМ генерирует и проверяет Antiforgery заголовок.
+#am_ContentSecurityPolicy: "" # Шаблон значения заголовка Content-Security-Policy, возвращаемого в ответе от AM.
+#am_ContentSecurityPolicySpa: "" # Шаблон значения заголовка Content-Security-Policy, использующийся при загрузке манифеста SPA
+#am_Copyright: "Copyright &copy" # Строка копирайта для отображения в UI
+#am_LowercaseUrls: false # Требует от роутинга принудительно понижать регистр символов URLs в запросе для совместимости.
+#am_LowercaseQueryStrings: false # Требует от роутинга принудительно понижать регистр символов URLs в запросе для совместимости.
+  #//Настройка аутентификации
+#am_LocalIdp: "idplat.am" # При локальной аутентификации AM возвращает в параметре ""idp"" у id_token.
+  #//Настройка расширений
+#am_Extensions_ResolveInCurrentDomain: true # Возможность поиска типа в сборках уже загруженных в домен приложения без учета версии. Если не включен режим поиск типов происходит только в сборках пакета.
+  #// Antiforgery токен
+#am_AntiForgery_HeaderName: "X-AF" # Задает имя HTTP-заголовка, в котором UI-приложение будет присылать на АМ antiforgery токен.
+#am_AntiForgery_MessageStorageOptions: ""
+#am_AntiForgery_ServerLifeTime: 00:00:00 # Время жизни cookie LoginMessage
+  #//Конфигурация DataProtection Key
+#am_DataProtection_Certificate: ""
+#am_DataProtection_ApplicationName: "test"
+  #// Настройка планировщика
+#am_Jobs_AgentSettings_MaxQueueCheckInterval: 300000 # Максимальное время проверки очереди задач (мс)
+#am_Jobs_AgentSettings_QueuePollInterval: 15 # Период опроса очереди задач (сек)
+#am_Jobs_AgentSettings_SchedulerPollInterval: 30 # Период опроса расписаний (сек)
+#am_Jobs_AgentSettings_RetryDelaySeconds: 20 # Таймаут повтора невыполненной задачи (сек)
+#am_Jobs_AgentSettings_JobInitializationTimeout: 1 # Таймаут при выполнении задачи (мин)
+#am_Jobs_AgentSettings_AgentCheckInterval: 1 # Период проверки работающих агентов (мин)
+#am_Jobs_AgentSettings_AgentInactiveTimeout: 5 # Максимальное время не активности агента (мин)
+#am_Jobs_AgentSettings_BadJobExceptionThreshold: 40 # Кол-во повторов выполнения задачи
+#am_Jobs_AgentSettings_MaxProcessor: 24 # Максимальное кол-во внутренних потоков обработки задач
+#am_Jobs_AgentSettings_LogSuccessfulJobs: true # Лог успешности выполнения задач
+#am_Jobs_AgentSettings_StartDelay: 10000 # Задержка старта сервиса (мс)
+#am_Jobs_AgentSettings_ShutdownTimeout: 10000 # Максимальное ожидание остановки сервиса (мс)
+  #// Настройка контекста
+#am_RequestContext_CorrelationIdHeader: "X-Correlation-Id" # Название заголовка в запросе, содержащего Correlation ID
+#am_RequestContext_XForwardedForAllowedSubnets: [] # Список подсетей, для которых разрешено использование заголовка X-Forwarded-For. Если в значении этого заголовка присутствует IP-адрес, подходящий под требования к подсетям, описанным в данном массиве, использование X-Forwarded-For разрешено. Пример: "127.0.0.1/24"
+#am_RequestContext_XForwardedForMode: 0 # 0 - Разрешить любой адрес из заголовка X-Forwarded-For 1 - Разрешить адрес из заголовка X-Forwarded-For, только если он содержится в списam_Extensions_ResolveInCurrentDomainке подсетей из списка XForwardedForMode 2 - Игнорировать заголовок X-Forwarded-For
+#am_RequestContext_EnableAutoGenerateCorrelationId: true # Если true, генерирует новый CorrelationId в запросе, если в соответствующем заголовке его значение отсутствует. >=4.3
+  #// Включение экспериментальных опций
+#am_Experimental_ChildRealmAMRoles: true # Задает возможность администратора на уровне области безопасности (Realm). При включенном режиме появляется возможность давать пользователям права администратора не на весь Access Manager, а на выбранный Realm. Внутри рилма доступны все настройки (пользователи, группы, роли, приложения, парольная политика, аутентификационные потоки и т.д.)
+#am_Experimental_RootCombineStore: true # Возможность использования хранилища пользователя отличного от внутреннего для корневого Realm. По-умолчанию пользователи корневого Realm находятся во внутренней базе AM. Данная настройка позволяет подключать внешнее хранилища пользователей для корневого Realm, например AD иди внешняя база данных. Подключение внешнего стора только через статическую конфигурацию.
+  #// Опции, необходимые для обеспечения обратной совместимости
+#am_Legacy_SerilogAuditToPredconfigured: false

@@ -1,0 +1,17 @@
+{
+  "Endpoints": {
+    "Http": {
+      "Url": "http://+:{{ ig.port }}"
+    },
+    "Https": {
+      "Url": "https://+:{{ ig.https_port }}"
+    }
+  },
+  
+  "Certificates": {
+    "Default": {
+      "Path": "{{ ig.ssl_cert }}",
+      "Password": {{ ig.ssl_cert_passwd | to_json }}
+    }
+  }
+}

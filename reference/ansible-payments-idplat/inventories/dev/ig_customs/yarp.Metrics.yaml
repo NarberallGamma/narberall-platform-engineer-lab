@@ -1,0 +1,43 @@
+---
+Yarp:
+#  Metrics:
+#    Enable: true
+#    Exporter:
+#      Type: Prometheus
+#      Options:
+#        Endpoint: http://10.0.9.101:3000/
+#    Tags:
+#      Path:
+#        Exp: Path()
+#      StatusCode:
+#        Exp: StatusCode()
+#      RouteId:
+#        Exp: RouteId()
+  Metrics:
+    Enable: true
+    Path: /yarp/metrics
+#    Exporter:
+#      Type: Otlp
+#      Options:
+#        Endpoint: http://otel:4317
+    Tags:
+      Path:
+        Exp: Path()
+      StatusCode:
+        Exp: StatusCode()
+  Routes:
+    name_rote_for_nameclusterig_metric:
+      ClusterId: nameclusterig_metric
+      Match:
+        Path: "/metric/{**any}"
+      Metadata:
+        RouteId:
+          Exp: RouteId()
+  Clusters:
+    nameclusterig_metric:
+      Destinations:
+        namedestinationig_metric:
+          Address: http://nameclusterig_metric/
+      Metadata:
+        StubMode.StatusCode: 200
+        Metrics.Tags.DestinationAddress.Exp: DestinationAddress()

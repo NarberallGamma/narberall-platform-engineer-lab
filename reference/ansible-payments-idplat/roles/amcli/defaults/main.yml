@@ -1,0 +1,55 @@
+---
+# defaults file for amcli
+
+parent_role_for_amcli: am
+amcli_restart_policy_condition: on-failure
+amcli_check: false
+amcli_healthcheck_disable: true  # !!!
+
+amcli_entrypoint: ["sh", "-c", "dotnet /app/AccessManager.CLI.dll /app/commands.txt"]
+#amcli_entrypoint: ["sh", "-c", "sleep 9999"]
+amcli_image: "{{ idplat_cli_am_image }}"
+
+# parent role overrides:
+amcli_published_port: -1
+amcli_published_port1: -1
+amcli_https_published_port: -1
+amcli_realms_Extensions: ["yml"] 
+#amcli_custom_plugins_Extensions: ["nupkg"]
+amcli_placement_constraints: [ "node.labels.idplat == amcli" ]
+
+amcli_volumes:
+#  - "{{ output_dir }}/{{ amcli_name }}/plugins/:/app/plugins"
+  - "{{ amcli_volumes_custom_plugins }}:/app/plugins"
+
+#amcli_plugins_files:
+#  plugins: "{{
+#                        (((amcli_custom_plugins_folder | default('', true) | length) > 0) |
+#                        ternary([amcli_custom_plugins_folder | default('', true)], []) |
+#                        product(['*.'] | product(amcli_custom_plugins_Extensions |
+#                                                  default(['*'], true) | select | unique) | map('join')) |
+#                        map('path_join') | map('fileglob') | list | flatten | sort | select | unique) }}"
+
+amcli_secrets:
+  /app/RealmsConfiguration:
+  /app:
+    - "{{ inventory_dir }}/certs/{{ root_cert }}"
+    - "{{ inventory_dir }}/certs/{{ am_cert_path }}"
+    - "{{ inventory_dir }}/certs/{{ am_dataProtection_key }}"
+    - roles/amcli/templates/commands.txt.j2
+    - roles/am/templates/appsettings.json.j2
+  /app/customfile: "{{
+    [
+    (ig_enable_demo_oidc | default(false) or ig_enable_demo_jwt | default(false)) | ternary('yarp_User.yml.j2', None),
+    (ig_enable_demo_oidc | default('', false) | ternary('yarp_Oidc_App.yml.j2', None)),
+    (ig_enable_demo_jwt | default('', false) | ternary('yarp_Jwt_App.yml.j2', None))
+    ] +
+    (((am_realms_folder | default('', true) | length) > 0) |
+    ternary([am_realms_folder | default('', true)], []) |
+    product(['**/*'] | product(amcli_realms_Extensions |
+                                  default(['*'], true) | select | unique) | map('join')) |
+    map('path_join') | map('fileglob') | list | flatten | sort | select | unique)
+    }}"
+
+
+

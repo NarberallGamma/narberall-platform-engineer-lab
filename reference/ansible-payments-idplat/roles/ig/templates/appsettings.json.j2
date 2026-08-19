@@ -1,0 +1,26 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "{{ ig.loglevel }}"
+    }
+  },
+  "DataProtection": {
+    "KeyStoragePath": "/app/keys/",
+    "ApplicationName": "IdentityGateway"
+  },
+  "Caching": {
+    {%- if (ig.caching_provider | string | lower) == 'redis' %}
+
+    "Provider": "Redis",
+    "Options": {
+      "Configuration": {{ ig.caching_redis_configuration | to_json }},
+      "InstanceName": "{{ ig.caching_redis_instanceName }}"
+      }
+    {%- else %}
+
+    "Provider": "InMemory"
+    {%- endif %}
+  
+  },
+  "AllowedHosts": "*"
+}

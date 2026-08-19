@@ -1,0 +1,17 @@
+---
+# custom tasks file
+
+- name: "{{ docker_service.name }} -> Check required variable values"
+  ansible.builtin.import_tasks: require.yml
+
+- name: "{{ docker_service.name }} -> Prepare docker secrets info"
+  ansible.builtin.import_tasks: prepare.yml
+
+- name: "{{ docker_service.name }} -> Copy required files and render templates"
+  ansible.builtin.import_tasks: render.yml
+
+- name: "{{ docker_service.name }} -> Deploy service"
+  ansible.builtin.import_tasks: deploy.yml
+
+- name: "{{ docker_service.name }} -> Check deployed service"
+  ansible.builtin.import_tasks: check.yml

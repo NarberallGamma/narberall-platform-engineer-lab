@@ -1,0 +1,11 @@
+Kind: Role
+Items:
+- Description: testovai Role description2
+  PublicName: testrole2
+  Enabled: True
+  CreatedDate: 08/28/2024 15:57:12
+  ExpirationDate:
+  Id: ef2d58b7-f9f5-4527-b3b5-b1da00d5770a
+  Relationships:
+  - Type: Grant2
+    Group: testgroup2

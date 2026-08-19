@@ -1,0 +1,18 @@
+---
+# require tasks file
+
+# check required variable values
+
+- name: "{{ docker_service.name }} -> Check if <role_name>_stack is defined and non-empty string"
+  ansible.builtin.assert:
+    that: docker_service.stack is defined and
+          docker_service.stack is string and (docker_service.stack | length) > 0
+    fail_msg: "<role_name>_stack must be defined and non-empty string"
+    quiet: true
+
+- name: "{{ docker_service.name }} -> Check if <role_name>_image is defined and non-empty string"
+  ansible.builtin.assert:
+    that: docker_service.image is defined and
+          docker_service.image is string and (docker_service.image | length) > 0
+    fail_msg: "<role_name>_image must be defined and non-empty string"
+    quiet: true

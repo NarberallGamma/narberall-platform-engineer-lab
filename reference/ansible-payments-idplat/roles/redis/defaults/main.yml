@@ -1,0 +1,88 @@
+---
+# defaults file for redis
+
+redis_loglevel: notice  # warning | notice | verbose | debug
+redis_databases: 16  # number of databases
+redis_save_1: 900  # save the DB to disk after these seconds if at least 1 key changed
+redis_save_100: 300  # save the DB to disk after these seconds if at least 100 key changed
+redis_save_10000: 60  # save the DB to disk after these seconds if at least 10000 key changed
+redis_stop_writes_on_bgsave_error: "yes"  # stop accepting writes if the latest background save failed
+redis_data_volume_basepath: ''  # external folder for data; if empty string, 'save ""' and 'appendonly no' will be applied
+redis_repl_diskless_sync: "yes"  # replication SYNC strategy: disk or socket
+redis_repl_diskless_sync_delay: 5  # in seconds
+redis_repl_diskless_load: disabled  # disabled | on-empty-db | swapdb
+redis_repl_ping_replica_period: 10  # replicas send PINGs to server in a predefined interval, in seconds
+redis_repl_timeout: 60  # must be greater than redis_repl_ping_replica_period
+redis_min_replicas_to_write: 0  # master stops accepting writes if there are less than N replicas connected,
+redis_min_replicas_max_lag: 10  # having a lag less or equal than M seconds
+redis_admin_user: redis_admin  # superadmin user
+redis_admin_user_passwd: "b9564c661c69de801c1d578d55f49c82db751f13aa1c3624c0a3b9292d64b35c"  # superadmin password
+redis_replica_user: redis_replica  # replica authenticate user
+redis_replica_user_passwd: "5f9e8bfdc518d2c3b656d8ece6c471839d07c78fb778fb2ddb9dbc33c446d792"  # replica authenticate password
+redis_ping_user: redis_ping  # ping command authenticate user
+redis_ping_user_passwd: "266f7538ddd7bd3e92f8c407f53c96de422740ee44d0c4d077280336428ca83a"  # ping command authenticate password
+redis_default_user: default  # default user
+redis_default_passwd: ''  # default password
+redis_acl_users:  # https://redis.io/topics/acl
+  - "{% if (overrides_from_child_role.default_user | default(redis_default_user) | default('default', true) | lower) != 'default'
+     %}default reset{% endif %}"
+  - "{{ overrides_from_child_role.default_user | default(redis_default_user) | default('default', true)
+     }} +@all -@dangerous ~* &* on {% if (overrides_from_child_role.default_passwd | default(redis_default_passwd) | default('', true) | string | length) > 0
+     %}>{{ overrides_from_child_role.default_passwd | default(redis_default_passwd) }}{% else %}nopass{% endif %}"
+redis_maxclients: 10000  # max number of connected clients
+redis_appendonly: "yes"  # enable the Append Only File
+redis_cluster_enabled: "no"  # enable the cluster support
+redis_cluster_node_timeout: 15000  # cluster node timeout, in milliseconds
+redis_cluster_replica_validity_factor: 10  # large value may allow replicas with too old data to failover a master,
+                                           # while a too small value may prevent the cluster from being able to elect a replica at all
+redis_cluster_migration_barrier: 1  # replicas migrate to orphaned masters only if there are still at least a
+                                    # given number of other working replicas for their old master
+redis_cluster_allow_replica_migration: "yes"  # allow replica migration to orphaned masters
+redis_cluster_require_full_coverage: "yes"  # if no, continue to accept queries for the part of the key space that is still covered
+redis_cluster_replica_no_failover: "no"  # if yes, prevent replicas from trying to failover its master during master failures
+redis_cluster_allow_reads_when_down: "no"  # if yes, allow nodes to serve read traffic while the cluster is in a down state
+# need to adjust in case of external access over NAT and when cluster enabled:
+redis_cluster_announce_ip: "tasks.{{ overrides_from_child_role.name | default(redis_name, true) | default('redis', true) }}"  # "{{ inventory_hostname }}"
+redis_cluster_announce_port: "{{ overrides_from_child_role.port | default(redis_port, true) }}"  # "{{ redis_published_port }}"
+redis_cluster_announce_bus_port: "{{ overrides_from_child_role.port1 | default(redis_port1, true) }}"  # "{{ redis_published_port1 }}"  # !!! see redis_port1
+redis_slowlog_log_slower_than: 10000  # log queries that exceeded a specified execution time, in microseconds
+redis_slowlog_max_len: 128  # slowlog length limit
+redis_activerehashing: "yes"  # active rehashing uses 1 millisecond every 100 milliseconds of CPU time
+# next variables used if redis_image_is_keydb_image = true
+redis_image_is_keydb_image: false
+redis_keydb_server_threads: 2  # number of worker threads serving requests
+redis_keydb_active_replica: "no"  # https://docs.keydb.dev/docs/active-rep
+redis_keydb_multi_master: "no"  # https://docs.keydb.dev/docs/multi-master
+redis_keydb_replica_weighting_factor: 2  # replica weighting factor of 2 means we treat a replica as the equivalent of two normal clients
+redis_keydb_active_client_balancing: "yes"  # should KeyDB make active attempts at balancing clients across threads?
+
+# parent role overrides:
+redis_image: "{% if (overrides_from_child_role.image_is_keydb_image | default(redis_image_is_keydb_image) | bool)
+                %}{{ keydb_image }}{%
+              else %}{{ redis_base_image }}{% endif %}"
+redis_image_registry: "{{ docker_image_proxy }}"
+redis_command: "{% if (overrides_from_child_role.image_is_keydb_image | default(redis_image_is_keydb_image) | bool)
+                  %}keydb-server{% else %}redis-server{% endif %} /tmp/redis.conf"
+redis_port: 6379  # internal port to accept connections
+redis_port1: "{{ (overrides_from_child_role.port |
+                  default(redis_port, true) | int) + 10000 }}"  # cluster bus port when cluster enabled; # !!! cannot be configured in Redis 6.2
+redis_healthcheck_test_cmd_shell: "REDISCLI_AUTH={{ overrides_from_child_role.ping_user_passwd | default(redis_ping_user_passwd, true)
+                                   }} {% if (overrides_from_child_role.image_is_keydb_image |
+                                             default(redis_image_is_keydb_image) | bool) %}keydb-cli{% else %}redis-cli{% endif
+                                   %} -h 127.0.0.1 -p {{ overrides_from_child_role.port | default(redis_port, true)
+                                   }} -e --user {{ overrides_from_child_role.ping_user | default(redis_ping_user, true)
+                                   }} ping | grep -isq 'PONG' || exit 1"
+redis_limits_mem: ''  # no limit memory
+redis_limits_cpu: ''  # no limit cpu
+redis_volumes:
+  - "{% if (overrides_from_child_role.data_volume_basepath | default(redis_data_volume_basepath) | length) > 0
+       %}{{ [(overrides_from_child_role.data_volume_basepath | default(redis_data_volume_basepath)),
+             (overrides_from_child_role.name | default(redis_name, true))] | path_join }}{% raw %}{{ .Task.Slot }}{% endraw %}:/data{%
+     else %}{'type': 'tmpfs', 'target': '/data'}{% endif %}"
+redis_secrets_default_uid: 999
+redis_secrets_default_gid: "{% if (overrides_from_child_role.image_is_keydb_image | default(redis_image_is_keydb_image) | bool)
+                              %}999{% else %}1000{% endif %}"
+redis_secrets_default_mode: "0660"  # string with octal notation value
+redis_secrets:
+  /tmp:
+    - redis.conf.j2

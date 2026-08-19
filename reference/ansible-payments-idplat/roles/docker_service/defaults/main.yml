@@ -1,0 +1,191 @@
+---
+# defaults file for docker_service
+
+parent_role_for_docker_service: ''
+
+docker_service_output_dir: "{{ [output_dir | default(docker_service_stack, true),
+                                docker_service_name] | path_join }}"  # role working directory
+docker_service_prepare_only: "{{ prepare_only | default(false, true) }}"  # if true, just prepare all stuff but not run
+docker_service_dump_vars: "{{ dump_vars | default(false, true) }}"  # if true, dump role vars to vars_<role_name>.yaml file
+docker_service_name: "{{ role_name }}"
+docker_service_stack: "{{ docker_stack_name }}"  # must be defined
+docker_service_check: false  # if true, run check role for deployed service
+docker_service_dc_id: "{{ dc_id | default(1, true) }}"  # datacenter id
+
+# https://docs.docker.com/compose/compose-file/compose-file-v3/
+
+docker_service_image: ''  # must be defined
+docker_service_image_registry: "{{ docker_image_registry | default(docker_image_proxy, true) | default('', true) }}"
+docker_service_read_only: true
+docker_service_hostname: "{{ overrides_from_child_role.name | default(docker_service_name, true) }}{% raw %}{{ .Task.Slot }}{% endraw %}"
+docker_service_user: ''  # user / user:group / uid / uid:gid / user:gid / uid:group
+docker_service_working_dir: ''  # default working directory within a container
+docker_service_stop_grace_period: 30s
+docker_service_stop_signal: ''  # SIG<NAME> or an unsigned number
+docker_service_cap_add: []  # list of linux capability constants without CAP_ prefix
+docker_service_cap_drop: []  # https://man7.org/linux/man-pages/man7/capabilities.7.html
+docker_service_sysctls: {}  # dict or list of namespaced kernel parameters (sysctls) for the container
+                            # https://docs.docker.com/engine/reference/commandline/run/#sysctl
+docker_service_etc_hosts: {}  # dict of hostname-to-IP mappings, where each hostname is a key in the dictionary
+                              # entry with the IP and hostname is created in /etc/hosts inside service containers
+docker_service_entrypoint: ''  # string or list
+docker_service_command: ''  # string or list
+docker_service_env:
+  COMPlus_EnableDiagnostics: 0
+  ASPNETCORE_URLS: "http://+:{{ overrides_from_child_role.port0 | default(overrides_from_child_role.port) |
+                                default(docker_service_port0, true) | default(docker_service_port, true) | default(5000, true) }}"
+  http_proxy: "{{ overrides_from_child_role.http_proxy | default(docker_service_http_proxy, true) | default('', true) }}"
+  https_proxy: "{{ overrides_from_child_role.https_proxy | default(docker_service_https_proxy, true) | default('', true) }}"
+  no_proxy: "{{ overrides_from_child_role.no_proxy | default(docker_service_no_proxy, true) | default('', true) }}"
+  DC_ID: "{{ overrides_from_child_role.dc_id | default(docker_service_dc_id, true) }}"
+  DOCKER_SERVICE_ID: "{% raw %}'{{ .Service.ID }}'{% endraw %}"
+  DOCKER_SERVICE_NAME: "{% raw %}'{{ .Service.Name }}'{% endraw %}"
+  DOCKER_SERVICE_IMAGE: "{% raw %}'{{ index .Service.Labels \"com.docker.stack.image\"}}'{% endraw %}"
+  DOCKER_SERVICE_STACK: "{% raw %}'{{ index .Service.Labels \"com.docker.stack.namespace\"}}'{% endraw %}"
+  DOCKER_NODE_ID: "{% raw %}'{{ .Node.ID }}'{% endraw %}"
+  DOCKER_NODE_HOSTNAME: "{% raw %}'{{ .Node.Hostname }}'{% endraw %}"
+  DOCKER_NODE_PLATFORM_ARCHITECTURE: "{% raw %}'{{ .Node.Platform.Architecture }}'{% endraw %}"
+  DOCKER_NODE_PLATFORM_OS: "{% raw %}'{{ .Node.Platform.OS }}'{% endraw %}"
+  DOCKER_TASK_ID: "{% raw %}'{{ .Task.ID }}'{% endraw %}"
+  DOCKER_TASK_NAME: "{% raw %}'{{ .Task.Name }}'{% endraw %}"
+  DOCKER_TASK_SLOT: "{% raw %}'{{ .Task.Slot }}'{% endraw %}"
+docker_service_ports:  # list of published:target[/protocol] strings; protocol is optional, default is tcp
+  - "{{ overrides_from_child_role.published_port0 |
+        default(overrides_from_child_role.published_port, true) |
+        default(docker_service_published_port0, true) |
+        default(docker_service_published_port, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port0 | default(overrides_from_child_role.port) |
+                                default(docker_service_port0, true) | default(docker_service_port, true) | default(5000, true) }}"
+  - "{{ overrides_from_child_role.published_port1 |
+        default(docker_service_published_port1, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port1 | default(docker_service_port1, true) | default(5001, true) }}"
+  - "{{ overrides_from_child_role.published_port2 |
+        default(docker_service_published_port2, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port2 | default(docker_service_port2, true) | default(5002, true) }}"
+  - "{{ overrides_from_child_role.published_port3 |
+        default(docker_service_published_port3, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port3 | default(docker_service_port3, true) | default(5003, true) }}"
+  - "{{ overrides_from_child_role.published_port4 |
+        default(docker_service_published_port4, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port4 | default(docker_service_port4, true) | default(5004, true) }}"
+  - "{{ overrides_from_child_role.published_port5 |
+        default(docker_service_published_port5, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port5 | default(docker_service_port5, true) | default(5005, true) }}"
+  - "{{ overrides_from_child_role.published_port6 |
+        default(docker_service_published_port6, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port6 | default(docker_service_port6, true) | default(5006, true) }}"
+  - "{{ overrides_from_child_role.published_port7 |
+        default(docker_service_published_port7, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port7 | default(docker_service_port7, true) | default(5007, true) }}"
+  - "{{ overrides_from_child_role.published_port8 |
+        default(docker_service_published_port8, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port8 | default(docker_service_port8, true) | default(5008, true) }}"
+  - "{{ overrides_from_child_role.published_port9 |
+        default(docker_service_published_port9, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.port9 | default(docker_service_port9, true) | default(5009, true) }}"
+  - "{{ overrides_from_child_role.https_published_port0 |
+        default(overrides_from_child_role.https_published_port, true) |
+        default(docker_service_https_published_port0, true) |
+        default(docker_service_https_published_port, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port0 | default(overrides_from_child_role.https_port) |
+                                default(docker_service_https_port0, true) | default(docker_service_https_port, true) | default(5300, true) }}"
+  - "{{ overrides_from_child_role.https_published_port1 |
+        default(docker_service_https_published_port1, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port1 | default(docker_service_https_port1, true) | default(5301, true) }}"
+  - "{{ overrides_from_child_role.https_published_port2 |
+        default(docker_service_https_published_port2, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port2 | default(docker_service_https_port2, true) | default(5302, true) }}"
+  - "{{ overrides_from_child_role.https_published_port3 |
+        default(docker_service_https_published_port3, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port3 | default(docker_service_https_port3, true) | default(5303, true) }}"
+  - "{{ overrides_from_child_role.https_published_port4 |
+        default(docker_service_https_published_port4, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port4 | default(docker_service_https_port4, true) | default(5304, true) }}"
+  - "{{ overrides_from_child_role.https_published_port5 |
+        default(docker_service_https_published_port5, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port5 | default(docker_service_https_port5, true) | default(5305, true) }}"
+  - "{{ overrides_from_child_role.https_published_port6 |
+        default(docker_service_https_published_port6, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port6 | default(docker_service_https_port6, true) | default(5306, true) }}"
+  - "{{ overrides_from_child_role.https_published_port7 |
+        default(docker_service_https_published_port7, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port7 | default(docker_service_https_port7, true) | default(5307, true) }}"
+  - "{{ overrides_from_child_role.https_published_port8 |
+        default(docker_service_https_published_port8, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port8 | default(docker_service_https_port8, true) | default(5308, true) }}"
+  - "{{ overrides_from_child_role.https_published_port9 |
+        default(docker_service_https_published_port9, true) |
+        default(-1, true) }}:{{ overrides_from_child_role.https_port9 | default(docker_service_https_port9, true) | default(5309, true) }}"
+docker_service_network: "{{ network_name | default(overrides_from_child_role.stack, true) | default(docker_service_stack, true) }}"
+docker_service_networks:  # list or dict with aliases
+  - "{{ overrides_from_child_role.network | default(docker_service_network, true) }}"
+docker_service_healthcheck_disable: false
+docker_service_healthcheck_test_cmd_shell: "wget -qO- -Y off http://127.0.0.1:{{
+                                              overrides_from_child_role.port0 |
+                                              default(overrides_from_child_role.port, true) |
+                                              default(docker_service_port0, true) |
+                                              default(docker_service_port, true) |
+                                              default(5000, true)
+                                            }}/health | tr -d '\\r\\n' | grep -Eisq '^\\{\\s*\"status\"\\s*:\\s*\"(Healthy|pass|Degraded|warn)\"' || exit 1"
+                               #  }}/health | grep -Eizsq '^\\{\\s*\"status\"\\s*:\\s*\"(Healthy|pass|Degraded|warn)\"' || exit 1"  # no -z option on alpine
+docker_service_healthcheck_interval: 5s
+docker_service_healthcheck_timeout: 15s
+docker_service_healthcheck_retries: 3
+docker_service_healthcheck_start_period: 60s
+docker_service_deploy_mode: replicated  # replicated / global
+docker_service_replicas: 1
+docker_service_endpoint_mode: vip  # vip / dnsrr
+docker_service_restart_policy_condition: any  # any / on-failure / none
+docker_service_restart_policy_delay: 10s
+docker_service_restart_policy_max_attempts: 10
+docker_service_restart_policy_window: 60s
+docker_service_update_config_parallelism: 1
+docker_service_update_config_delay: 10s
+docker_service_update_config_failure_action: rollback  # rollback / continue / pause
+docker_service_update_config_monitor: 10s
+docker_service_update_config_max_failure_ratio: 0
+docker_service_update_config_order: start-first  # start-first / stop-first
+docker_service_rollback_config_parallelism: 1
+docker_service_rollback_config_delay: 1s
+docker_service_rollback_config_failure_action: continue  # continue / pause
+docker_service_rollback_config_monitor: 5s
+docker_service_rollback_config_max_failure_ratio: 0
+docker_service_rollback_config_order: start-first  # start-first / stop-first
+docker_service_reservations_mem: 100M
+docker_service_reservations_cpu: '0.1'
+docker_service_limits_mem: 500M
+docker_service_limits_cpu: ''
+docker_service_placement_constraints: []
+docker_service_placement_preferences: []
+docker_service_placement_max_replicas_per_node: -1
+docker_service_deploy_labels:  [ 'io.portainer.accesscontrol.public' ] # list of key=value or key (if value is empty) strings
+docker_service_logging_driver: journald  # journald / json-file; journald is not available for Docker on Windows/WSL2
+docker_service_logging_driver_json_file_max_size: 1024m  # https://docs.docker.com/config/containers/logging/json-file/#options
+docker_service_logging_driver_json_file_max_file: 3  # https://docs.docker.com/config/containers/logging/json-file/#options
+docker_service_localtime_enabled: true
+docker_service_default_volumes:
+  - "{% if (overrides_from_child_role.localtime_enabled | default(docker_service_localtime_enabled) | bool) %}/etc/localtime:/etc/localtime:ro{% endif %}"
+  - "{% if (overrides_from_child_role.read_only | default(docker_service_read_only) | bool) %}{'type': 'tmpfs', 'target': '/tmp'}{% endif %}"
+  - "{% if (overrides_from_child_role.read_only | default(docker_service_read_only) | bool) %}{'type': 'tmpfs', 'target': '/run'}{% endif %}"
+docker_service_volumes: []
+docker_service_secrets_default_uid: 9000
+docker_service_secrets_default_gid: 9000
+docker_service_secrets_default_mode: '0440'  # string with octal notation value
+docker_service_secrets_default_output_dir: ''  # output dir for secret within docker_service_output_dir
+docker_service_secrets: {}
+docker_service_extra_secrets: {}
+# example dict:
+# docker_service_secrets:
+#   /app:  # key is a path in container
+#     # value is a list of simple or/and extended mode file items
+#     - NLog.config  # simple mode with static file; this file from {{ role_path }}/files/ folder will appear in container with original file name
+#     - appsettings.json.j2  # simple mode with j2-template; this template from {{ role_path }}/templates/ folder will be rendered with name without .j2
+#     - "{{ inventory_dir }}/certs/localhost.pfx"  # simple mode with full path to file
+#     # extended mode
+#     - source: usersettings.json.j2  # file name only or full path to file
+#       target: usersettings.Production.json  # optional; target file will appear in container with that name
+#       uid: 9000  # optional, default is value of docker_service_secrets_default_uid
+#       gid: 9000  # optional, default is value of docker_service_secrets_default_gid
+#       mode: '0440'  # optional, default is value of docker_service_secrets_default_mode
+#       output_dir: ''  # optional, default is value of docker_service_secrets_default_output_dir
+#       remote_src: false  # optional; if true, source file (not j2-template) will be gathered from remote output_dir + source file

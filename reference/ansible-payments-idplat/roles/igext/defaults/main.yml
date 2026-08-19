@@ -1,0 +1,42 @@
+---
+# defaults file for ig
+#igext_loglevel: "{{ default_loglevel | default('Information', true) }}"
+igext_loglevel: "Debug"
+
+  ## работает на версии => identity-gateway:5.4.0.0-master-240925.118700
+igext_UseHealthCheckEndpoint: true
+igext_HealthCheckEndpoint_RequestTracing: false ## false выключение логирования запросов на helth
+
+# parent role overrides:
+igext_port: 5000
+igext_https_port: 5001
+igext_healthcheck_disable: false
+igext_healthcheck_test_cmd_shell: "wget -qO- -Y off http://127.0.0.1:{{ igext_port }}/health || exit 1"
+igext_image: "{{ idplat_ig_image }}"
+igext_env:
+  CONFIG_FILES: /app/configs/*.*
+  PURE_YARP: 1
+  SSL_CERT_DIR: /app/bundle
+  DOTNET_SYSTEM_NET_HTTP_ENABLEACTIVITYPROPAGATION: 0
+  ASPNETCORE_URLS: http://*:5000;https://*:5001
+igext_secrets:
+  /app:
+    - appsettings.json.j2
+    - hosting.json.j2
+    - nlog.config
+    - "{{ inventory_dir }}/certs/{{ igext_ssl_cert }}"
+  /app/bundle:
+    - "{{ inventory_dir }}/certs/{{ root_cert }}"
+  /app/keys:
+    - "{{ inventory_dir }}/certs/{{ ig_dataProtection_key }}"
+  /app/configs: "{{ 
+    [
+    'yarp.Options.yaml.j2'
+    ] +
+    (((ig_customs_folder | default('', true) | length) > 0) | 
+    ternary([ig_customs_folder | default('', true)], []) | 
+    product(['*.'] | product(ig_customs_Extensions 
+                                  | default(['*'], true) | select | unique) | map('join')) | 
+    map('path_join') | map('fileglob') | list | flatten | sort | 
+    select('match', '.*igext.*') | select | unique)
+    }}"

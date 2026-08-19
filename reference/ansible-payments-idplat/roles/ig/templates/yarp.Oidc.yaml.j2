@@ -1,0 +1,61 @@
+---
+Yarp:
+  Clusters:
+    OpenIdConnectCluster:
+      Destinations:
+        destination1:
+          Address: http://OpenIdConnectCluster/
+      Metadata:
+        StubMode.StatusCode: '200'
+        StubMode.BodyExp: UserInfo()
+        Tracing.Enable: true
+
+
+  Authorization:
+    Policies:
+      OpenIdConnectPolicy:
+        Schemes:
+          - OpenIdConnectScheme
+    Schemes:
+      cookie:
+        Type: Cookie
+        Options:
+          SessionStoreType: Cookie
+          Cookie:
+            Path: /
+            Name: users-service-session
+          ExpireTimeSpan: '00:00:30'
+          SlidingExpiration: true
+      OpenIdConnectScheme:
+        Type: OpenIdConnect
+        Options:
+          SignInScheme: cookie
+          Authority: https://{{ idplat_public_hostname }}:{%- if ig_enable_ReverseAccess is defined and ig_enable_ReverseAccess == true %}{{ igext_https_published_port }}{%-else%}{{ ig_https_published_port }}{%-endif%}/{{ am_application }}/yarp
+          ClientId: openid
+          ClientSecret: 123456
+          ResponseType: code
+          ResponseMode: query
+          CallbackPath: /auth/oidc/signin-oidc
+          disableCsrfCheck: true
+          SaveIdToken: true
+          SaveTokens: true
+          RemoteSignOutPath: /ig/RemoteSignOutPath
+          SignOutPath: /ig/SignOutPath
+          SignedOutCallbackPath: /openId/callback
+          BackchannelLogOutPath: /oidc/BackchannelLogout
+          UseTokenLifetime: false
+          SignedOutRedirectUri: http://ya.ru
+          UsePkce: false
+          RespectHostHeader: false
+          Tracing:
+            Enable: true
+          HttpClient:
+            DangerousAcceptAnyServerCertificate: true
+
+
+  Routes:
+    OpenIdConnectService:
+      Match:
+        Path: /auth/oidc
+      ClusterId: OpenIdConnectCluster
+      AuthorizationPolicy: OpenIdConnectPolicy

@@ -1,0 +1,9 @@
+---
+Relay:
+  UseRelayMode: true
+  Handler: reverse-access
+  ClientCertificate: /app/configs/ra.pfx
+  CertificatePassword: '123456'
+  Host: igext:5001
+  DangerousAcceptAnyServerCertificate: true
+  ConnectionLifetime: 1

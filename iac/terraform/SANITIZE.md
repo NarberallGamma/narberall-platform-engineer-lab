@@ -12,3 +12,5 @@ This lab publishes **curated slices**, not full production Terraform trees (secu
 - Guest secrets and live initscripts stay under `artifacts/` (not committed)
 - Prefer representative resources over copying entire account/region trees
 - Huawei compute catalog: fake UUIDs, documentation CIDRs (`10.10.x.x`), generic hostnames (`gitlab-dev-01`, `vault-prod-01`). No client project names, no live OBS bucket names, no AK/SK
+- Cloudflare: documentation IPs only (`203.0.113.0/24`, `198.51.100.0/24`). No live zone IDs or account IDs
+- Ansible payments identity: no PFX/PEM, no live `passwd.yaml`, no employer brand or AD DNS

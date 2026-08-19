@@ -1,0 +1,14 @@
+---
+# check tasks file
+
+# check deployed service
+
+- name: "{{ docker_service.name }} -> Run check role for '{{ docker_service.stack }}_{{ docker_service.name }}' service"
+  ansible.builtin.include_role:
+    name: check
+  vars:
+    check_output_dir: "{{ docker_service.output_dir | dirname }}"
+    check_enabled: "{{ docker_service.check }}"
+    check_service_name: "{{ docker_service.stack }}_{{ docker_service.name }}"
+    check_service_replicas: "{{ docker_service.replicas }}"
+  when: (docker_service.check | bool) and not (docker_service.prepare_only | bool)

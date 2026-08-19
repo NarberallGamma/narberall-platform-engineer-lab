@@ -1,0 +1,62 @@
+---
+# defaults file for ig
+#ig_loglevel: "{{ default_loglevel | default('Information', true) }}"
+ig_loglevel: "Debug"
+ig_ssl_cert: "ig-hosting.pfx"  # SSL port binding cert
+ig_ssl_cert_passwd: 123456  # SSL pwd
+
+  ## работает на версии => identity-gateway:5.4.0.0-master-240925.118700
+ig_UseHealthCheckEndpoint: true
+ig_HealthCheckEndpoint_RequestTracing: false ## false выключение логирования запросов на helth
+ig_caching_redis_server: "{{ redis_server | default((redis_name | default('redis', true)) + ':' + (redis_port | default(6379, true) | string), true) }}"
+ig_caching_redis_user: "{{ redis_default_user | default('', true) }}"  # because of keyword 'user' is not supported
+ig_caching_redis_passwd: "{{ redis_default_passwd | default('', true) }}"
+ig_caching_redis_clientName: "{{ docker_stack_name }}_{{ ig_name | default('ig', true) }}"
+ig_caching_redis_instanceName: "{{ ig_caching_redis_clientName }}"
+ig_caching_redis_configuration: "{{ ig_caching_redis_server
+                                 }}{% if (ig_caching_redis_user | length) > 0
+                                     and (ig_caching_redis_user | lower) != 'default'
+                                 %},user={{ ig_caching_redis_user
+                                 }}{% endif %}{% if (ig_caching_redis_passwd | length) > 0
+                                 %},password={{ ig_caching_redis_passwd
+                                 }}{% endif %},name={{ ig_caching_redis_clientName }}"
+
+# parent role overrides:
+ig_port: 5000
+ig_https_port: 5001
+ig_healthcheck_disable: false
+ig_healthcheck_test_cmd_shell: "wget -qO- -Y off http://127.0.0.1:{{ ig_port }}/health || exit 1"
+ig_limits_mem: 1000M  # limit memory
+ig_image: "{{ idplat_igint_image }}"
+ig_env:
+  CONFIG_FILES: /app/configs/*.*
+  PURE_YARP: 1
+  SSL_CERT_DIR: /app/bundle
+  DOTNET_SYSTEM_NET_HTTP_ENABLEACTIVITYPROPAGATION: 0
+  ASPNETCORE_URLS: http://*:5000;https://*:5001
+ig_secrets:
+  /app:
+    - "{{ inventory_dir }}/certs/{{ ig_ssl_cert }}"
+  /app/bundle:
+    - "{{ inventory_dir }}/certs/{{ root_cert }}"
+  /app/keys:
+    - "{{ inventory_dir }}/certs/{{ ig_dataProtection_key }}"
+  /app/configs: "{{ 
+    [
+    'yarp.Clusters.yaml.j2',
+    'yarp.Routes.yaml.j2',
+    'yarp.Options.yaml.j2',
+    'yarp.Am.yaml.j2',
+    'appsettings.json.j2',
+    'hosting.json.j2',
+    'nlog.config',
+    (ig_enable_demo_oidc | default('', false) | ternary('yarp.Oidc.yaml.j2', None)),
+    (ig_enable_demo_jwt | default('', false) | ternary('yarp.Jwt.yaml.j2', None))
+    ] +
+    (((ig_customs_folder | default('', true) | length) > 0) |
+    ternary([ig_customs_folder | default('', true)], []) |
+    product(['*.'] | product(ig_customs_Extensions |
+                                  default(['*'], true) | select | unique) | map('join')) |
+    map('path_join') | map('fileglob') | list | flatten | sort |
+    reject('match', '.*igext.*') | select | unique)
+    }}"

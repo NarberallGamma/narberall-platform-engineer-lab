@@ -1,0 +1,15 @@
+Kind: Group
+Items:
+- Name: testgroup2
+  Description: Description of group.
+  ParentGroup:
+  Path: /testgroup2
+  Enabled: False
+  CreatedDate: 08/28/2024 15:58:27
+  ExpirationDate:
+  Id: e5bfb7a0-8255-4403-95e7-b1da00d5cfcf
+  Relationships:
+  - Type: GroupMembership
+    User: Testuser2
+  - Type: Grant2
+    Role: testrole2

@@ -1,0 +1,8 @@
+hosts.ini
+group_vars/all/passwd.yaml
+certs/*.pfx
+certs/*.pem
+certs/*.crt
+certs/*.key
+certs/*.xml
+.DS_Store

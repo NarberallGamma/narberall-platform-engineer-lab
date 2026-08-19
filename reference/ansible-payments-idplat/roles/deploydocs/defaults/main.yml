@@ -1,0 +1,12 @@
+---
+# defaults file for deploydocs
+
+# parent role overrides:
+deploydocs_image: "{{ idplat_ansibledeploy_image }}"
+deploydocs_name: deploydocs-identityplatform
+deploydocs_port: 80
+deploydocs_volumes:
+  - "{% if (overrides_from_child_role.read_only |
+            default(deploydocs_read_only) |
+            default(docker_service_read_only) |
+            default(true) | bool) %}{'type': 'tmpfs', 'target': '/var/cache/nginx'}{% endif %}"

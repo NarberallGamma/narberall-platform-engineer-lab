@@ -1,0 +1,18 @@
+---
+# require tasks file
+
+# check required variable values
+
+- name: "{{ k8s_service.name }} -> Check if <role_name>_namespace is defined and proper string"
+  ansible.builtin.assert:
+    that: k8s_service.namespace is defined and
+          k8s_service.namespace is string and (k8s_service.namespace | regex_findall('^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$') | length) > 0
+    fail_msg: "<role_name>_namespace must consist of lower case alphanumeric characters or '-'"
+    quiet: true
+
+- name: "{{ k8s_service.name }} -> Check if <role_name>_image is defined and non-empty string"
+  ansible.builtin.assert:
+    that: k8s_service.image is defined and
+          k8s_service.image is string and (k8s_service.image | length) > 0
+    fail_msg: "<role_name>_image must be defined and non-empty string"
+    quiet: true

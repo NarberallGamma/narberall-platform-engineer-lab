@@ -1,0 +1,17 @@
+Kind: User
+Items:
+- ExternalId: testexternalID2
+  FirstName: Testusergivenname2
+  LastName: Familiatest2
+  Email: testuser@test.ru
+  Description:
+  DisplayName:
+  $Password: User1
+  MobilePhoneNumber: 9992001122
+  Login: Testuser2
+  Enabled: True
+  CreatedDate: 08/28/2024 15:56:26
+  ExpirationDate:
+  Relationships:
+  - Type: GroupMembership
+    Group: testgroup2

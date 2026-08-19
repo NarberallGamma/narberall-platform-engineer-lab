@@ -1,0 +1,72 @@
+- DisplayName: openid
+  ClientId: openid
+  Settings:
+    ClientUri:
+    LogoUri:
+    RequireConsent: true
+    AllowRememberConsent: true
+    Flow: AuthorizationCode
+    AllowClientCredentialsOnly: true
+    RedirectUris:
+    - http://{{ idplat_public_hostname }}:{{ igext_published_port }}/auth/oidc/signin-oidc
+    - https://{{ idplat_public_hostname }}:{{ igext_https_published_port }}/auth/oidc/signin-oidc
+    - http://{{ idplat_public_hostname }}:{{ ig_published_port }}/auth/oidc/signin-oidc
+    - https://{{ idplat_public_hostname }}:{{ ig_https_published_port }}/auth/oidc/signin-oidc
+    PostLogoutRedirectUris:
+    - http://{{ idplat_public_hostname }}:{{ igext_published_port }}/openId/callback
+    - https://{{ idplat_public_hostname }}:{{ igext_https_published_port }}/openId/callback
+    - http://{{ idplat_public_hostname }}:{{ ig_published_port }}/openId/callback
+    - https://{{ idplat_public_hostname }}:{{ ig_https_published_port }}/openId/callback
+    FrontChannelLogoutUris:
+    - http://{{ idplat_public_hostname }}:{{ igext_published_port }}/ig/RemoteSignOutPath
+    - http://{{ idplat_public_hostname }}:{{ igext_https_published_port }}/ig/RemoteSignOutPath
+    - http://{{ idplat_public_hostname }}:{{ ig_published_port }}/ig/RemoteSignOutPath
+    - http://{{ idplat_public_hostname }}:{{ ig_https_published_port }}/ig/RemoteSignOutPath
+    BackChannelLogoutUris:
+    - http://{{ idplat_public_hostname }}:{{ igext_published_port }}/oidc/BackchannelLogout
+    - https://{{ idplat_public_hostname }}:{{ igext_https_published_port }}/oidc/BackchannelLogout
+    - http://{{ idplat_public_hostname }}:{{ ig_published_port }}/oidc/BackchannelLogout
+    - https://{{ idplat_public_hostname }}:{{ ig_https_published_port }}/oidc/BackchannelLogout
+    RequireSignOutPrompt: false
+    AllowAccessToAllScopes: true
+    AllowedScopes: []
+    IdentityTokenLifetime: 300
+    AccessTokenLifetime: 3600
+    AuthorizationCodeLifetime: 300
+    AbsoluteRefreshTokenLifetime: 2592000
+    SlidingRefreshTokenLifetime: 1296000
+    RefreshTokenUsage: OneTimeOnly
+    UpdateAccessTokenClaimsOnRefresh: false
+    RefreshTokenExpiration: Absolute
+    AccessTokenType: Jwt
+    IdentityProviderRestrictions: []
+    IncludeJwtId: false
+    Claims: []
+    AlwaysSendClientClaims: false
+    PrefixClientClaims: true
+    AllowAccessToAllCustomGrantTypes: false
+    AllowedCustomGrantTypes: []
+    AllowedCorsOrigins: []
+    AllowAccessTokensViaBrowser: true
+    AllowedApiResources: []
+    UserClaims: []
+    AuthFlow: Default
+    JWKSUri:
+    TlsClientCertificateBoundAccessTokens: false
+    TokenEndpointAuthSigningAlg: PS256
+    RequestObjectAllowedInterval: 3600
+    RequestObjectSignedAlg: none
+    RequestObjectEncryptionAlg:
+    RequestObjectEncryptionEncValues:
+    IdentityTokenSignedResponseAlg: RS256
+    IdentityTokenEncryptionAlg:
+    IdentityTokenEncryptionEncValues:
+    RequirePkce: false
+    UserInfoSignedResponseAlg: none
+    ProtectAgainstReplayAttack: true
+  Secrets:
+  - Description: 123456
+    Value: 123456
+    Expiration: 9999-12-31T23:59:59.9999999
+    Type: SecretHash
+  Enabled: true

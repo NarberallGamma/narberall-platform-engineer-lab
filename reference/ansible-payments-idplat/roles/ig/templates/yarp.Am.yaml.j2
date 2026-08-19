@@ -1,0 +1,16 @@
+---
+Yarp:
+  Clusters:
+    amCluster:
+      Destinations:
+        destination1:
+          Address: https://am:{{ am_port | default(5025, true) }}/
+      Metadata:
+        Tracing.Enable: true
+  Routes:
+    amRoute:
+      Match:
+        Path: "/{{ am_application }}/{**any}"
+      ClusterId: amCluster
+      Transforms:
+        - RequestHeaderOriginalHost: true

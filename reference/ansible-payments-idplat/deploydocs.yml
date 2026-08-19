@@ -1,0 +1,10 @@
+---
+- name: Run deploydocs
+  hosts: swarm_manager
+  gather_facts: true
+
+  roles:
+    - role: network
+      tags: ["network"]
+    - role: deploydocs
+      tags: ["deploydocs"]

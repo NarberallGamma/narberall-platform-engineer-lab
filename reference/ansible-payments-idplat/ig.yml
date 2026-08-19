@@ -1,0 +1,10 @@
+---
+- name: Run deploy ig
+  hosts: swarm_manager
+  gather_facts: true
+
+  roles:
+    - role: network
+      tags: ["network"]
+    - role: ig
+      tags: ["ig"]

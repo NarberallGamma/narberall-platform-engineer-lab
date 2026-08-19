@@ -1,0 +1,7 @@
+---
+Yarp:
+  Options:
+    UseHealthCheckEndpoint: {{ igext.UseHealthCheckEndpoint | bool | lower }}
+    HealthCheckEndpoint:
+      RequestTracing: 
+        Enable: {{ igext.HealthCheckEndpoint_RequestTracing | bool | lower }}

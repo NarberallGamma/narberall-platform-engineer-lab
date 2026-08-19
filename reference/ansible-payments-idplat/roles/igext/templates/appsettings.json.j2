@@ -1,0 +1,20 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "{{ igext.loglevel }}",
+      "Microsoft.AspNetCore.Hosting.Diagnostics": "Warning",
+      "Microsoft.AspNetCore.Routing.EndpointMiddleware": "Warning",
+      "Yarp.ReverseProxy.Forwarder.HttpForwarder": "Warning"
+    }
+  },
+  "DataProtection": {
+    "KeyStoragePath": "/app/keys/",
+    "ApplicationName": "IdentityGateway"
+  },
+  "AllowedHosts": "*",
+  "ForwardedHeaders": {
+    "KnownProxies": [
+      "127.0.0.1"
+    ]
+  }
+}

@@ -1,0 +1,121 @@
+---
+
+#am_entrypoint: 'cat appsettings.json'
+#Необязательные
+#am_UseProfiler: false #Включает/отключает работу профайлера. Профайлер используется для диагностики проблем с Access Manager.
+#am_Swagger_enable: false
+#am_STSUri: "" # Адрес STS сервиса для Access Manager. STS сервис расширяет функционал AM и предоставляет поддержку протокола WS-Trust версии 1.4.
+#am_DevelopMode: false # Если флаг установлен, АМ работает в режиме разработчика, который используется для разработки UI или модулей аутентификации для АМ.
+#am_HideAmVersion: false # Включает/отключает отображение версии АМ в UI
+#am_EnableCacheSignatureProviders: true # Включает/отключает кэш ключей для проверки JWT в OIDC. При большом количестве клиентов, отправляющих client credentials, подписанных уникальными ключами, все ключи кэшируются, что может привести к росту оперативной памяти. Использовать кэш только там, где кол-во ключей верификации JWT ограничено.
+#am_AntiForgeryTokenEnabled: true # Если включено, АМ генерирует и проверяет Antiforgery заголовок.
+#am_ContentSecurityPolicy: "" # Шаблон значения заголовка Content-Security-Policy, возвращаемого в ответе от AM.
+#am_ContentSecurityPolicySpa: "" # Шаблон значения заголовка Content-Security-Policy, использующийся при загрузке манифеста SPA
+#am_AssemblyResolving: "" # Используется для совместимости библиотек AM SDK внутри кастомных плагинов, собранных с более ранними версиями SDK (до переименования имён сборок). Необходим для совместимости новых версий AM со старыми плагинами (нагетами).
+#am_Copyright: "Copyright &copy" # Строка копирайта для отображения в UI
+#am_LowercaseUrls: false # Требует от роутинга принудительно понижать регистр символов URLs в запросе для совместимости.
+#am_LowercaseQueryStrings: false # Требует от роутинга принудительно понижать регистр символов URLs в запросе для совместимости.
+  #//Настройка аутентификации
+#am_LocalIdp: "idplat.am" # При локальной аутентификации AM возвращает в параметре ""idp"" у id_token.
+  #//Настройка расширений
+am_Extensions_RestorePackages: "false" 
+am_Extensions_StorageFolder: "null" # Определяет папку для инсталляции пакетов. Если задана папка, АМ переходит в режим работы FileSystemReadOnly, в этом режиме АМ при старте выполняет загрузку nuget-пакетов из указанной папки. Если задано значение null, АМ переходит в режим работы DataBaseReadOnly. В данном режиме nuget-пакеты загружаются из административного интерфейса АМ.
+#am_Extensions_ResolveInCurrentDomain: true # Возможность поиска типа в сборках уже загруженных в домен приложения без учета версии. Если не включен режим поиск типов происходит только в сборках пакета.
+  #// Antiforgery токен
+#am_AntiForgery_HeaderName: "X-AF" # Задает имя HTTP-заголовка, в котором UI-приложение будет присылать на АМ antiforgery токен.
+#am_AntiForgery_MessageStorageOptions: ""
+#am_AntiForgery_ServerLifeTime: 00:00:00 # Время жизни cookie LoginMessage
+  #//Конфигурация DataProtection Key
+#am_DataProtection_Certificate: ""
+#am_DataProtection_ApplicationName: "test"
+  #// Настройка планировщика
+#am_Jobs_AgentSettings_MaxQueueCheckInterval: 300000 # Максимальное время проверки очереди задач (мс)
+#am_Jobs_AgentSettings_QueuePollInterval: 15 # Период опроса очереди задач (сек)
+#am_Jobs_AgentSettings_SchedulerPollInterval: 30 # Период опроса расписаний (сек)
+#am_Jobs_AgentSettings_RetryDelaySeconds: 20 # Таймаут повтора невыполненной задачи (сек)
+#am_Jobs_AgentSettings_JobInitializationTimeout: 1 # Таймаут при выполнении задачи (мин)
+#am_Jobs_AgentSettings_AgentCheckInterval: 1 # Период проверки работающих агентов (мин)
+#am_Jobs_AgentSettings_AgentInactiveTimeout: 5 # Максимальное время не активности агента (мин)
+#am_Jobs_AgentSettings_BadJobExceptionThreshold: 40 # Кол-во повторов выполнения задачи
+#am_Jobs_AgentSettings_MaxProcessor: 24 # Максимальное кол-во внутренних потоков обработки задач
+#am_Jobs_AgentSettings_LogSuccessfulJobs: true # Лог успешности выполнения задач
+#am_Jobs_AgentSettings_StartDelay: 10000 # Задержка старта сервиса (мс)
+#am_Jobs_AgentSettings_ShutdownTimeout: 10000 # Максимальное ожидание остановки сервиса (мс)
+  #// Настройка контекста
+#am_RequestContext_CorrelationIdHeader: "X-Correlation-Id" # Название заголовка в запросе, содержащего Correlation ID
+#am_RequestContext_XForwardedForAllowedSubnets: [] # Список подсетей, для которых разрешено использование заголовка X-Forwarded-For. Если в значении этого заголовка присутствует IP-адрес, подходящий под требования к подсетям, описанным в данном массиве, использование X-Forwarded-For разрешено. Пример: "127.0.0.1/24"
+#am_RequestContext_XForwardedForMode: 0 # 0 - Разрешить любой адрес из заголовка X-Forwarded-For 1 - Разрешить адрес из заголовка X-Forwarded-For, только если он содержится в списam_Extensions_ResolveInCurrentDomainке подсетей из списка XForwardedForMode 2 - Игнорировать заголовок X-Forwarded-For
+#am_RequestContext_EnableAutoGenerateCorrelationId: true # Если true, генерирует новый CorrelationId в запросе, если в соответствующем заголовке его значение отсутствует. >=4.3
+  #// Включение экспериментальных опций
+#am_Experimental_ChildRealmAMRoles: true # Задает возможность администратора на уровне области безопасности (Realm). При включенном режиме появляется возможность давать пользователям права администратора не на весь Access Manager, а на выбранный Realm. Внутри рилма доступны все настройки (пользователи, группы, роли, приложения, парольная политика, аутентификационные потоки и т.д.)
+#am_Experimental_RootCombineStore: true # Возможность использования хранилища пользователя отличного от внутреннего для корневого Realm. По-умолчанию пользователи корневого Realm находятся во внутренней базе AM. Данная настройка позволяет подключать внешнее хранилища пользователей для корневого Realm, например AD иди внешняя база данных. Подключение внешнего стора только через статическую конфигурацию.
+  #// Опции, необходимые для обеспечения обратной совместимости
+#am_Legacy_SerilogAuditToPredconfigured: false
+
+# Обязательные 
+am_AdminUIDisabled: false # Отключаем UI у Access Manager. В данном режиме настройка AM проходит только через файл статической конфигурации и утилиту CLI, а также через сервисный API
+am_application: am # AccessManager BasePath
+  #//Настройка аутентификации
+am_AllowClientCredentialsGrant: false # Вызов сервисного API с access_token, который получен по Client Credentials grant на корневом Realm.
+am_SignInMessageThreshold: 1 # Число установленных cookies AccessManager.LoginMessage.xxxx при входе на Login page.
+am_SsoSessionExpiredInterval: 30 # Интервал проверки истекших SSO-сессий в секундах. Истекшие сессии периодически удаляются из базы данных, чтобы предотвратить бесконтрольный рост таблицы БД.
+am_DisableNegoAuthentication: true # Если true, поддержка Negotiate-аутентификации отключена. Если false, AM поддерживает схему аутентификации Negotiate (Kerberos/NTLM v2.). При использовании IIS необходимо убедиться, что Windows-аутентификация разрешена для данного веб-сайта. Negotiate поддерживается только для протокола HTTP/2 ( в настройках эндпоинта kestrel Protocols должен быть Http1)
+  #//База данных
+am_EnableMigrations: false # Определяет, поддерживает ли AM автоматическую миграцию БД. Поддерживает базы данных MSSQL и MySQL.
+am_OpenSync: true # Определяет режим соединения с базой данных true - асинхронное соединение false - синхронное соединение
+  #//Конфигурация аудита
+am_Audit_UseInternalLogger: true # Определяет канал записи данных аудита.
+  #//Конфигурация DataProtection Key
+am_DataProtection_KeyStoragePath: "keys" # Путь к папке с конфигурацией ключей Data Protection. Если значение null - ключ каждый раз генерируется при старте. Data Protection определяет ключ, которым шифруются данные в базе данных. Если AM работает в кластере, у всех экземпляров кластера должен быть один ключ.Ключом шифруется чувствительная информация перед занесением в базу данных, например: Данные cookie Настройки плагинов (например, пароль для AD пользователя). Для формирования data protection key используйте утилиту CLI.
+  #// Настройка планировщика
+am_Jobs_UseBackgroundJobAgent: true # Включает/отключает внутренний планировщик. Должно всегда быть true, потому что внешнего Job Agent не существует. Через данный сервис в кластере производится сброс кеша. Планировщик выполняет следующие задачи:Удаляет из БД неактуальную информацию (токены, SSO-сессии, коды верификации с истекшим сроком действия) Отправляет нотификации пользователю Сбрасывает кэш у экземпляра AM при изменении настроек в другом узле кластера.
+am_X509StoreExt:
+  - "{{ am_cert_path }}:{{ am_cert_pass }}"
+
+# defaults file for am
+am_loglevel: "{{ default_loglevel | default('Information', true) }}"
+am_healthcheck_disable: false
+am_healthcheck_test_cmd_shell: "wget -qO- -Y off --no-check-certificate https://127.0.0.1:{{ am_api_port }}/{{ am_application }}/health | grep -siq '\"Healthy\"' || exit 1"
+am_port: 5025
+am_published_port: ''
+am_api_port: 5005
+am_https_port: "{{ am_api_port }}"
+am_api_published_port: ''
+am_https_published_port: "{{ am_api_published_port }}"
+am_ca_bundle: "{{ root_cert }}"
+am_hosting_cert: "am-hosting.pfx" # Access Manager. Сертификат длѝ биндинга https
+am_service_name: am
+am_redirect_uris: #settings realm identities - application - openID connect client - am redirect URIs
+  - "https://{{ idplat_public_hostname }}/account/signin-oidc"
+am_post_logout_redirect_uris: #settings realm identities - application - openID connect client - post logout redirect URIs
+  - "https://{{ idplat_public_hostname }}/logout/callback"
+am_back_channel_logout_uris: #settings realm identities - application - openID connect client - back channel logout URIs
+  - "https://{{ idplat_public_hostname }}/account/backchannel_logout"
+am_user_claims:
+  - family_name
+  - given_name
+  - middle_name
+  - first_name
+am_custom_realms_Extensions: ["json"]
+
+# parent role overrides:
+am_image: "{{ idplat_am_image }}"
+am_env:
+  SSL_CERT_DIR: /app/bundle
+  DOTNET_USE_POLLING_FILE_WATCHER: 1 #inotify
+am_secrets:
+  /app/bundle:
+    - "{{ inventory_dir }}/certs/{{ am_ca_bundle }}"
+  /app:
+    - "{{ inventory_dir }}/certs/{{ am_hosting_cert }}"
+    - "{{ inventory_dir }}/certs/{{ am_cert_path }}"
+    - appsettings.json.j2
+  /app/RealmsConfiguration: "{{
+    (((am_realms_folder | default('', true) | length) > 0) |
+    ternary([am_realms_folder | default('', true)], []) |
+    product(['**/*'] | product(am_custom_realms_Extensions |
+                                  default(['*'], true) | select | unique) | map('join')) |
+    map('path_join') | map('fileglob') | list | flatten | sort | select | unique)
+    }}"
+  /app/keys:
+    - "{{ inventory_dir }}/certs/{{ am_dataProtection_key }}"

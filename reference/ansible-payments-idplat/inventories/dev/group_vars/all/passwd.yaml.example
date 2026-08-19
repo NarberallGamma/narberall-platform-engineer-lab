@@ -1,0 +1,12 @@
+am_db_user: "sqluser"
+am_db_passwd: CHANGE_ME
+am_cert_pass: CHANGE_ME
+am_cert_es_pass: CHANGE_ME
+am_hosting_cert_passwd: CHANGE_ME
+am_admin: admin
+am_admin_pwd: CHANGE_ME
+am_admin_email: admin@example.com
+am_clients_realm_secrets_hash_value: CHANGE_ME_BASE64
+am_clients_realm_secrets_trusted_certificate_value: CHANGE_ME_BASE64
+igext_ssl_cert: "ig-hosting.pfx"
+igext_ssl_cert_passwd: CHANGE_ME

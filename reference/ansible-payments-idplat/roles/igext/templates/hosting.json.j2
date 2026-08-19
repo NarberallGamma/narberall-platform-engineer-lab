@@ -1,0 +1,17 @@
+{
+  "Endpoints": {
+    "Http": {
+      "Url": "http://+:{{ igext.port }}"
+    },
+    "Https": {
+      "Url": "https://+:{{ igext.https_port }}"
+    }
+  },
+  
+  "Certificates": {
+    "Default": {
+      "Path": "{{ igext.ssl_cert }}",
+      "Password": {{ igext.ssl_cert_passwd | to_json }}
+    }
+  }
+}

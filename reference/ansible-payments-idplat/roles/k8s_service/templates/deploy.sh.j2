@@ -1,0 +1,11 @@
+#!/bin/sh
+
+NAMESPACE_NAME={{ k8s_service.namespace }}
+
+kubectl create ns $NAMESPACE_NAME{{ ((k8s_service.kubeconfig | default('', true) | string | trim | length) > 0) |
+                                    ternary(' --kubeconfig=' + (k8s_service.kubeconfig | string | trim | replace('~', '${HOME}')), '') }}
+kubectl apply -n $NAMESPACE_NAME{{ ((k8s_service.kubeconfig | default('', true) | string | trim | length) > 0) |
+                                   ternary(' --kubeconfig=' + (k8s_service.kubeconfig | string | trim | replace('~', '${HOME}')), '') }} \
+  {{ ['-f ' + k8s_service.name + '_'] |
+     product(((k8s_service.manifests | default([], true)) + (k8s_service.extra_manifests | default([], true))) |
+             select | unique | map('basename') | map('regex_replace', '\\.j2$', ignorecase=True)) | map('join') | join(' ') }}

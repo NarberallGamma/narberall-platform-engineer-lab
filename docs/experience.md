@@ -43,6 +43,8 @@ What that class of work actually demands:
 
 B2B and P2P platforms in this era were the same idea: counterparties, ledgers, and SLAs, not a brochure site.
 
+Identity in front of that class of estate is also coded: Access Manager + Identity Gateway (YARP) + Redis + Postgres as Ansible, Docker Swarm first, same roles later for Kubernetes. Public tree: [`../reference/ansible-payments-idplat/`](../reference/ansible-payments-idplat/), [case 08](../case-studies/08-payments-swarm-autodeploy.md).
+
 ### Blockchain and smart-contract programmes
 
 Accompanied **large blockchain / smart-contract** products: nodes, keys, environments, deploy path, the unglamorous part that keeps a chain-facing app alive. Contract-level write-ups stay NDA-safe and will be expanded in case studies without vendor theatre. The platform job is the same: environments that cannot drift, secrets that cannot leak, releases that cannot “try again on mainnet.”
@@ -186,6 +188,7 @@ That is why hardware/OS depth and Cisco-style incident method in this lab are no
 - **Jenkins** (plugins, workers) including **dedicated-VM agents → Kubernetes**; **GitLab CI + Argo CD** (branch/tag deploys, auto MR, merge on written rules)
 - **CI catalog:** Terraform / guest init → Ansible → Vault → monitoring → docs, plus Java and other builds, publish, Sonar/Trivy/OSV, auto MR, deploy, revoke/cleanup. **Jenkins** (plugins, K8s workers) and **GitLab CI + Argo CD**. Detail: [`../iac/ci/`](../iac/ci/)
 - **Huawei compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport ECS in a root that catalogs sibling Terragrunt network state. Detail: [`../iac/terraform/cloud-ru-compute/`](../iac/terraform/cloud-ru-compute/)
+- **Payments identity Ansible:** Swarm autodeploy of AM / IG / Redis / Postgres, same roles for Kubernetes. Detail: [`../reference/ansible-payments-idplat/`](../reference/ansible-payments-idplat/)
 - **Education:** B.Sc. 09.03.02 Information Systems and Technologies, SPbSUT (Bonch-Bruevich); Cisco labs, campus servers/networks; Windows Server practice at IT companies during studies
 
 Cloud, Kubernetes, DBMS, SLA, and security defaults: [root README](../README.md) and [positioning](positioning.md).

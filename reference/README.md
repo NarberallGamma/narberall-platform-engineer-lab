@@ -6,6 +6,7 @@ Sanitized **proof of code** for automation described in [`../practice/`](../prac
 |------|----------------|---------------|
 | [`ansible-bootstrap/`](ansible-bootstrap/) | `prepare_servers`: apt, admin user `platform`, Docker CE from download.docker.com, sshd harden | [Edge platform](../practice/home-lab/edge-platform.md) |
 | [`ansible-edge/`](ansible-edge/) | Full `xui_docker` role: Compose, ACME, panel API, Xray inbound/routing, socat, `USR1` | [Edge platform](../practice/home-lab/edge-platform.md) |
+| [`ansible-payments-idplat/`](ansible-payments-idplat/) | SBP-class identity autodeploy: AM, IG (YARP), Redis, Postgres; Swarm then Kubernetes | [Case 08](../case-studies/08-payments-swarm-autodeploy.md) |
 | [`monitoring-starter/`](monitoring-starter/) | `host_metrics`: sysstat, vnstat, disk CSV, report script | [Edge platform](../practice/home-lab/edge-platform.md) |
 | [`utilities/ansible-runner/`](utilities/ansible-runner/) | Alpine runner image + build script | [Edge platform](../practice/home-lab/edge-platform.md), [MCP toolchain](../practice/workstation/mcp-ops-toolchain.md) |
 | [`utilities/snap-pair/`](utilities/snap-pair/) | Paired snapper + ESP rsync | [OS workstation](../practice/home-lab/os-workstation.md) |

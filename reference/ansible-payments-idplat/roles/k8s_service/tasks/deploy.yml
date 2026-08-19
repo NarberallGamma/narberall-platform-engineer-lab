@@ -1,0 +1,118 @@
+---
+# deploy tasks file
+
+# deploy service
+
+- name: "{{ k8s_service.name }} -> Render objects definition templates"
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "{{ k8s_service.output_dir }}/{{ k8s_service.name }}_{{ item | basename | regex_replace('\\.j2$', ignorecase=True) }}"
+    mode: u=rw,g=r,o=r
+  loop: "{{ ((k8s_service.manifests | default([], true)) + (k8s_service.extra_manifests | default([], true))) | select | unique }}"
+
+- name: "{{ k8s_service.name }} -> Ensure script file is absent if not prepare only"
+  ansible.builtin.file:
+    path: "{{ k8s_service.output_dir }}/deploy_{{ k8s_service.name }}.sh"
+    state: absent
+  when: not (k8s_service.prepare_only | bool)
+
+- name: "{{ k8s_service.name }} -> Render script template if prepare only"
+  ansible.builtin.template:
+    src: deploy.sh.j2
+    dest: "{{ k8s_service.output_dir }}/deploy_{{ k8s_service.name }}.sh"
+    mode: u=rwx,g=rx,o=rx
+  when: k8s_service.prepare_only | bool
+
+- name: "{{ k8s_service.name }} -> Create k8s namespace"
+  when: not (k8s_service.prepare_only | bool)
+  block:
+
+    - name: "{{ k8s_service.name }} -> Create k8s namespace"
+      kubernetes.core.k8s:
+        api_version: v1
+        # continue_on_error: false  # kubernetes.core >= 2.0.0
+        kind: Namespace
+        kubeconfig: "{{ k8s_service.kubeconfig }}"
+        name: "{{ k8s_service.namespace }}"
+        state: present
+      register: tmp_k8s_service_k8s_result
+
+  always:
+
+    - name: "{{ k8s_service.name }} -> Show create namespace result"
+      ansible.builtin.debug:
+        msg: "{{ ((tmp_k8s_service_k8s_result.msg | default('', true) | length) > 0) |
+                 ternary(tmp_k8s_service_k8s_result.msg | default('', true),
+                         tmp_k8s_service_k8s_result | default({}, true)) }}"
+                         # | ansible.utils.remove_keys(target=['diff', 'data', 'annotations', 'managedFields'])) }}"  # ansible.utils >= 2.5.0
+      when: tmp_k8s_service_k8s_result.skipped is not defined or not tmp_k8s_service_k8s_result.skipped
+      changed_when: tmp_k8s_service_k8s_result.changed is defined and tmp_k8s_service_k8s_result.changed
+      failed_when: tmp_k8s_service_k8s_result.failed is defined and tmp_k8s_service_k8s_result.failed
+
+- name: "{{ k8s_service.name }} -> Create kubernetes.io/dockerconfigjson secret"
+  when: not (k8s_service.prepare_only | bool) and
+        (k8s_service.dockerconfigjson_create | bool) and
+        (k8s_service.dockerconfigjson_path | default('', true) | length) > 0
+  block:
+
+    - name: "{{ k8s_service.name }} -> Create kubernetes.io/dockerconfigjson secret"
+      ansible.builtin.shell: >
+        set -o pipefail &&
+        kubectl create secret generic {{ k8s_service.dockerconfigjson_secret_name }} --type=kubernetes.io/dockerconfigjson
+        --from-file=.dockerconfigjson={{ k8s_service.dockerconfigjson_path | string | trim | replace('~', '${HOME}') }}
+        -n {{ k8s_service.namespace }} --dry-run=client --output=yaml --save-config | kubectl apply -f -
+      args:
+        executable: /bin/bash
+      changed_when: false
+      register: tmp_k8s_service_shell_result
+
+  always:
+
+    - name: "{{ k8s_service.name }} -> Show create kubernetes.io/dockerconfigjson secret result"
+      ansible.builtin.debug:
+        msg: "{{ ( ( ((tmp_k8s_service_shell_result.msg | default('', true) | length) > 0 and
+                      (tmp_k8s_service_shell_result.stderr | default('', true) | length) == 0) |
+                     ternary([(tmp_k8s_service_shell_result.msg | default('', true))], []) ) +
+                   ( ((tmp_k8s_service_shell_result.stderr | default('', true) | length) > 0) |
+                     ternary([tmp_k8s_service_shell_result.stderr], []) ) +
+                   ( ((tmp_k8s_service_shell_result.stdout | default('', true) | length) > 0) |
+                     ternary([tmp_k8s_service_shell_result.stdout], []) )
+                 ) | join('\n') | regex_replace('\n$') | split('\n') }}"
+      when: tmp_k8s_service_shell_result.skipped is not defined or not tmp_k8s_service_shell_result.skipped
+      changed_when: tmp_k8s_service_shell_result.changed is defined and tmp_k8s_service_shell_result.changed
+      failed_when: tmp_k8s_service_shell_result.failed is defined and tmp_k8s_service_shell_result.failed
+
+- name: "{{ k8s_service.name }} -> Apply objects definition to k8s"
+  when: not (k8s_service.prepare_only | bool)
+  block:
+
+    - name: "{{ k8s_service.name }} -> Apply objects definition to k8s"
+      kubernetes.core.k8s:
+        apply: true
+        # continue_on_error: false  # kubernetes.core >= 2.0.0
+        # force: true
+        kubeconfig: "{{ k8s_service.kubeconfig }}"
+        namespace: "{{ k8s_service.namespace }}"
+        src: "{{ k8s_service.output_dir }}/{{ k8s_service.name }}_{{ item | basename | regex_replace('\\.j2$', ignorecase=True) }}"
+        state: present
+        # wait: true
+        # wait_condition:
+        #   reason: NewReplicaSetAvailable
+        #   status: "True"
+        #   type: Progressing
+        # wait_sleep: 5
+        # wait_timeout: 120
+      loop: "{{ ((k8s_service.manifests | default([], true)) + (k8s_service.extra_manifests | default([], true))) | select | unique }}"
+      register: tmp_k8s_service_k8s_result
+
+  always:
+
+    - name: "{{ k8s_service.name }} -> Show apply results"
+      ansible.builtin.debug:
+        msg: "{{ ((tmp_k8s_service_k8s_result.msg | default('', true) | length) > 0) |
+                 ternary(tmp_k8s_service_k8s_result.msg | default('', true),
+                         tmp_k8s_service_k8s_result.result.results | default([], true)) }}"
+                         # | ansible.utils.remove_keys(target=['diff', 'data', 'annotations', 'managedFields'])) }}"  # ansible.utils >= 2.5.0
+      when: tmp_k8s_service_k8s_result.skipped is not defined or not tmp_k8s_service_k8s_result.skipped
+      changed_when: tmp_k8s_service_k8s_result.changed is defined and tmp_k8s_service_k8s_result.changed
+      failed_when: tmp_k8s_service_k8s_result.failed is defined and tmp_k8s_service_k8s_result.failed

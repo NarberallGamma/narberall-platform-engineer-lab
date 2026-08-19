@@ -1,0 +1,317 @@
+---
+version: "3.8"
+services:
+  {{ docker_service.name }}:
+    image: {{ [(docker_service.image_registry | default('', true)), docker_service.image] | path_join }}
+    read_only: {{ docker_service.read_only | bool | lower }}
+    {%- if (docker_service.hostname | default('', true) | string | length) > 0 %}
+
+    hostname: {{ docker_service.hostname }}
+    {%- endif %}
+
+    stop_grace_period: {{ docker_service.stop_grace_period }}
+    {%- if (docker_service.stop_signal | string | trim ) == '0' or
+           (docker_service.stop_signal | default('', true) | string | trim | length) > 0 %}
+
+    stop_signal: {{ docker_service.stop_signal | string | trim }}
+    {%- endif %}
+    {%- if (docker_service.user | string | trim ) == '0' or
+           (docker_service.user | default('', true) | string | trim | length) > 0 %}
+
+    user: "{{ docker_service.user | string | trim }}"
+    {%- endif %}
+    {%- if (docker_service.working_dir | default('', true) | string | length) > 0 %}
+
+    working_dir: {{ docker_service.working_dir }}
+    {%- endif %}
+    {%- for item in (docker_service.cap_add | default([], true) | select | unique) %}
+    {%- if loop.first %}
+
+    cap_add:
+    {%- endif %}
+
+      - {{ item }}
+    {%- endfor %}
+    {%- for item in (docker_service.cap_drop | default([], true) | select | unique) %}
+    {%- if loop.first %}
+
+    cap_drop:
+    {%- endif %}
+
+      - {{ item }}
+    {%- endfor %}
+    {%- if docker_service.sysctls is mapping %}
+    {%- for item in (docker_service.sysctls | dict2items)
+        if (item.key | string | length) > 0 and item.value is not none and (item.value | string | length) > 0 %}
+    {%- if loop.first %}
+
+    sysctls:
+    {%- endif %}
+
+      {{ item.key }}: {{ item.value }}
+    {%- endfor %}
+    {%- else %}
+    {%- for item in (docker_service.sysctls | default([], true) | select | unique) %}
+    {%- if loop.first %}
+
+    sysctls:
+    {%- endif %}
+
+      - {{ item }}
+    {%- endfor %}
+    {%- endif %}
+    {%- for item in (docker_service.etc_hosts | default({}, true) | dict2items)
+        if (item.key | string | length) > 0 and item.value is not none and (item.value | string | length) > 0 %}
+    {%- if loop.first %}
+
+    extra_hosts:
+    {%- endif %}
+
+      - {{ item.key }}:{{ item.value }}
+    {%- endfor %}
+    {%- if docker_service.entrypoint is string and (docker_service.entrypoint | length) > 0 %}
+
+    entrypoint: {{ docker_service.entrypoint }}
+    {%- else %}
+    {%- for item in (docker_service.entrypoint | default([], true))
+        if item is not none and (item | string | length) > 0 %}
+    {%- if loop.first %}
+
+    entrypoint:
+    {%- endif %}
+
+      - {{ item }}
+    {%- endfor %}
+    {%- endif %}
+    {%- if docker_service.command is string and (docker_service.command | length) > 0 %}
+
+    command: {{ docker_service.command }}
+    {%- else %}
+    {%- for item in (docker_service.command | default([], true))
+        if item is not none and (item | string | length) > 0 %}
+    {%- if loop.first %}
+
+    command:
+    {%- endif %}
+
+      - {{ item }}
+    {%- endfor %}
+    {%- endif %}
+    {%- for item in (docker_service.env | default({}, true) | dict2items)
+        if (item.key | string | length) > 0 and item.value is not none and (item.value | string | length) > 0 %}
+    {%- if loop.first %}
+
+    environment:
+    {%- endif %}
+
+      {{ item.key }}: {{ (((item.value | string | lower) == 'true') or ((item.value | string | lower) == 'false')) |
+                         ternary('"' + (item.value | string | lower) + '"', item.value) }}
+    {%- endfor %}
+    {%- for item in (docker_service.ports | default([], true) | unique)
+        if (item | string | regex_findall('^[1-9]+[0-9]*:[1-9]+[0-9]*') | length) > 0 %}
+    {%- if loop.first %}
+
+    ports:
+    {%- endif %}
+
+      - target: {{ ( (item | split(':'))[1] | split('/') )[0] }}
+        published: {{ (item | split(':'))[0] }}
+        protocol: {{ (item | lower | split('/'))[1] | default('tcp', true) }}
+        mode: ingress
+    {%- endfor %}
+    {%- if docker_service.networks is mapping %}
+    {%- for network in (docker_service.networks | dict2items)
+        if (network.key | string | length) > 0 %}
+    {%- if loop.first %}
+
+    networks:
+    {%- endif %}
+      {%- for item in (network.value | default({}, true) | dict2items)
+          if (item.key | string | length) > 0 and item.value is not none and (item.value | string | length) > 0 %}
+      {%- if loop.first %}
+
+      {{ network.key }}:
+      {%- endif %}
+
+        {{ item.key }}: {{ (item.value is string) | ternary(item.value, item.value | default([], true) | select | unique | to_json) }}
+      {%- else %}
+
+      {{ network.key }}: {}
+      {%- endfor %}
+    {%- endfor %}
+    {%- else %}
+    {%- for item in (docker_service.networks | default([], true) | unique)
+        if item is not none and (item | string | length) > 0 %}
+    {%- if loop.first %}
+
+    networks:
+    {%- endif %}
+
+      - {{ item }}
+    {%- endfor %}
+    {%- endif %}
+
+    healthcheck:
+      {%- if (docker_service.healthcheck_disable | bool) %}
+
+      disable: true
+      {%- else %}
+
+      test: ["CMD-SHELL", {{ docker_service.healthcheck_test_cmd_shell | to_json }}]
+      interval: {{ docker_service.healthcheck_interval }}
+      timeout: {{ docker_service.healthcheck_timeout }}
+      retries: {{ docker_service.healthcheck_retries }}
+      start_period: {{ docker_service.healthcheck_start_period }}
+      {%- endif %}
+
+    deploy:
+      mode: {{ docker_service.deploy_mode }}
+      {%- if (docker_service.deploy_mode | string | lower) != 'global' %}
+
+      replicas: {{ docker_service.replicas }}
+      {%- endif %}
+
+      endpoint_mode: {{ docker_service.endpoint_mode }}
+      restart_policy:
+        condition: {{ docker_service.restart_policy_condition }}
+        delay: {{ docker_service.restart_policy_delay }}
+        max_attempts: {{ docker_service.restart_policy_max_attempts }}
+        window: {{ docker_service.restart_policy_window }}
+      update_config:
+        parallelism: {{ docker_service.update_config_parallelism }}
+        delay: {{ docker_service.update_config_delay }}
+        failure_action: {{ docker_service.update_config_failure_action }}
+        monitor: {{ docker_service.update_config_monitor }}
+        max_failure_ratio: {{ docker_service.update_config_max_failure_ratio }}
+        order: {{ docker_service.update_config_order }}
+      rollback_config:
+        parallelism: {{ docker_service.rollback_config_parallelism }}
+        delay: {{ docker_service.rollback_config_delay }}
+        failure_action: {{ docker_service.rollback_config_failure_action }}
+        monitor: {{ docker_service.rollback_config_monitor }}
+        max_failure_ratio: {{ docker_service.rollback_config_max_failure_ratio }}
+        order: {{ docker_service.rollback_config_order }}
+      {%- if (docker_service.reservations_mem | default('', true) | string | trim | length) > 0 or
+             (docker_service.reservations_cpu | default('', true) | string | trim | length) > 0 or
+             (docker_service.limits_mem | default('', true) | string | trim | length) > 0 or
+             (docker_service.limits_cpu | default('', true) | string | trim | length) > 0 %}
+
+      resources:
+        {%- if (docker_service.reservations_mem | default('', true) | string | trim | length) > 0 or
+               (docker_service.reservations_cpu | default('', true) | string | trim | length) > 0 %}
+
+        reservations:
+          {%- if (docker_service.reservations_mem | default('', true) | string | trim | length) > 0 %}
+
+          memory: {{ docker_service.reservations_mem | string | trim }}
+          {%- endif %}
+          {%- if (docker_service.reservations_cpu | default('', true) | string | trim | length) > 0 %}
+
+          cpus: "{{ docker_service.reservations_cpu | string | trim }}"
+          {%- endif %}
+        {%- endif %}
+        {%- if (docker_service.limits_mem | default('', true) | string | trim | length) > 0 or
+               (docker_service.limits_cpu | default('', true) | string | trim | length) > 0 %}
+
+        limits:
+          {%- if (docker_service.limits_mem | default('', true) | string | trim | length) > 0 %}
+
+          memory: {{ docker_service.limits_mem | string | trim }}
+          {%- endif %}
+          {%- if (docker_service.limits_cpu | default('', true) | string | trim | length) > 0 %}
+
+          cpus: "{{ docker_service.limits_cpu | string | trim }}"
+          {%- endif %}
+        {%- endif %}
+      {%- endif %}
+      {%- if (docker_service.placement_constraints | default([], true) | select | unique | length) > 0 or
+             (docker_service.placement_preferences | default([], true) | select | unique | length) > 0 or
+             (docker_service.placement_max_replicas_per_node | int) > 0 %}
+
+      placement:
+        {%- for item in (docker_service.placement_constraints | default([], true) | select | unique) %}
+        {%- if loop.first %}
+
+        constraints:
+        {%- endif %}
+
+          - {{ item }}
+        {%- endfor %}
+        {%- for item in (docker_service.placement_preferences | default([], true) | select | unique) %}
+        {%- if loop.first %}
+
+        preferences:
+        {%- endif %}
+
+          - {{ item | to_json }}
+        {%- endfor %}
+        {%- if (docker_service.placement_max_replicas_per_node | int) > 0 %}
+
+        max_replicas_per_node: {{ docker_service.placement_max_replicas_per_node }}
+        {%- endif %}
+      {%- endif %}
+      {%- for item in (docker_service.deploy_labels | default([], true) | unique)
+           if item is not none and (item | string | length) > 0 %}
+      {%- if loop.first %}
+
+      labels:
+      {%- endif %}
+
+        - {{ item }}
+      {%- endfor %}
+
+    logging:
+      driver: {{ docker_service.logging_driver | string | lower }}
+      options:
+        labels: com.docker.swarm.service.name,com.docker.stack.namespace
+        {%- if (docker_service.logging_driver | string | lower) == 'json-file' %}
+
+        max-size: {{ docker_service.logging_driver_json_file_max_size }}
+        max-file: {{ docker_service.logging_driver_json_file_max_file }}
+        {%- endif %}
+    {%- for item in (((docker_service.default_volumes | default([], true)) +
+                    (docker_service.volumes | default([], true))) | unique)
+        if item is not none and (item | length) > 0 %}
+    {%- if loop.first %}
+
+    volumes:
+    {%- endif %}
+
+      - {{ (item is string) | ternary(item, item | to_json) }}
+    {%- endfor %}
+    {%- for item in (docker_service.secrets_list | default([], true) | unique)
+        if item is mapping and (item.source | default('', true) | string | length) > 0 %}
+    {%- if loop.first %}
+
+    secrets:
+    {%- endif %}
+
+      - source: {{ item.alias }}
+        target: {{ [item.targetpath, item.target] | path_join }}
+        uid: "{{ item.uid }}"
+        gid: "{{ item.gid }}"
+        mode: {{ item.mode }}
+    {%- endfor %}
+{%- for item in (docker_service.networks | default([], true) | unique)
+    if item is not none and (item | string | length) > 0 %}
+{%- if loop.first %}
+
+
+networks:
+{%- endif %}
+
+  {{ item }}:
+    external: true
+{%- endfor %}
+{%- for item in (docker_service.secrets_list | default([], true) | unique)
+    if item is mapping and (item.source | default('', true) | string | length) > 0 %}
+{%- if loop.first %}
+
+
+secrets:
+{%- endif %}
+
+  {{ item.alias }}:
+    file: {{ [item.output_dir, ((item.remote_src | bool) | ternary(item.source, item.target))] | path_join }}
+    name: {{ item.name }}
+{%- endfor %}

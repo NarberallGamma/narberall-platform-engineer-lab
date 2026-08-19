@@ -1,0 +1,33 @@
+am_db_server: "{% if (idplat_postgres_install | bool) -%}
+                                  idplat_postgres
+                                {%- else -%}
+                                  {{ idplat_rdbms_hostname }} 
+                                {%- endif -%}" # Адрес базы, указан в global_env.yaml
+am_db_server_port: "{% if (idplat_postgres_install | bool) -%}
+                                  5432
+                                {%- endif %}
+                    {%- if (not idplat_postgres_install | bool) and idplat_rdbms_name is defined and (idplat_rdbms_name == 'postgres') -%}
+                                  {{ idplat_rdbms_port | default(5432, true) }} 
+                                {%- endif -%}
+                    {%- if (not idplat_postgres_install | bool) and idplat_rdbms_name is defined and (idplat_rdbms_name == 'mssql') -%}
+                                  {{ idplat_rdbms_port | default(1433, true) }}
+                                {%- endif -%}
+                    {%- if (not idplat_postgres_install | bool) and idplat_rdbms_name is defined and (idplat_rdbms_name == 'mysql') -%}
+                                  {{ idplat_rdbms_port | default(3306, true) }}
+                                {%- endif -%}
+                    " # Адрес базы, указан в global_env.yaml
+am_configuration_connection_string: "
+                                      {%- if (idplat_rdbms_name is defined and (idplat_rdbms_name == 'postgres')) or (idplat_postgres_install | bool) -%}
+                                        Host={{ am_db_server }};
+                                        Port={{ am_db_server_port }};
+                                        Database={{ am_db_name }};
+                                        Uid={{ am_db_user }};
+                                        Pwd={{ am_db_passwd }}
+                                      {%- else -%}
+                                        Server={{ am_db_server }};
+                                        Port={{ am_db_server_port }};
+                                        SslMode=None;Database={{ am_db_name }};
+                                        Uid={{ am_db_user }};
+                                        Pwd={{ am_db_passwd }};
+                                        AllowUserVariables=True;MinimumPoolSize=10;MaximumPoolSize=100;Connection Lifetime=60;
+                                      {%- endif -%}"

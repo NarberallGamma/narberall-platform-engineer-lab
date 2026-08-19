@@ -1,0 +1,31 @@
+---
+# render tasks file
+
+# copy required files and render templates
+
+- name: "{{ docker_service.name }} -> Create output dir structure"
+  ansible.builtin.file:
+    path: "{{ [docker_service.output_dir, item.output_dir, item.target] | path_join | dirname }}"
+    state: directory
+    mode: u=rwx,g=rx,o=rx
+  loop: "{{ docker_service.secrets_list }}"
+  when: not (item.remote_src | bool)
+
+- name: "{{ docker_service.name }} -> Copy required files"
+  ansible.builtin.copy:
+    src: "{{ item.source }}"
+    dest: "{{ [docker_service.output_dir, item.output_dir, item.target] | path_join }}"
+    directory_mode: u=rwx,g=rx,o=rx
+    mode: u=rw,g=r,o=r
+  loop: "{{ docker_service.secrets_list }}"
+  when: not (item.remote_src | bool)
+    and (item.source | basename | regex_findall('\\.j2$', ignorecase=True) | length) == 0
+
+- name: "{{ docker_service.name }} -> Render required templates"
+  ansible.builtin.template:
+    src: "{{ item.source }}"
+    dest: "{{ [docker_service.output_dir, item.output_dir, item.target] | path_join }}"
+    mode: u=rw,g=r,o=r
+  loop: "{{ docker_service.secrets_list }}"
+  when: not (item.remote_src | bool)
+    and (item.source | basename | regex_findall('\\.j2$', ignorecase=True) | length) > 0

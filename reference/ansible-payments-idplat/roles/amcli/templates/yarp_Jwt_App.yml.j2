@@ -1,0 +1,53 @@
+- DisplayName: jwtclient
+  ClientId: jwtclient
+  Settings:
+    ClientUri:
+    LogoUri:
+    RequireConsent: true
+    AllowRememberConsent: true
+    Flow: AuthorizationCode
+    AllowClientCredentialsOnly: true
+    RequireSignOutPrompt: false
+    AllowAccessToAllScopes: true
+    AllowedScopes: []
+    IdentityTokenLifetime: 300
+    AccessTokenLifetime: 3600
+    AuthorizationCodeLifetime: 300
+    AbsoluteRefreshTokenLifetime: 2592000
+    SlidingRefreshTokenLifetime: 1296000
+    RefreshTokenUsage: OneTimeOnly
+    UpdateAccessTokenClaimsOnRefresh: false
+    RefreshTokenExpiration: Absolute
+    AccessTokenType: Jwt
+    IdentityProviderRestrictions: []
+    IncludeJwtId: false
+    Claims: []
+    AlwaysSendClientClaims: false
+    PrefixClientClaims: true
+    AllowAccessToAllCustomGrantTypes: false
+    AllowedCustomGrantTypes: []
+    AllowedCorsOrigins: []
+    AllowAccessTokensViaBrowser: true
+    AllowedApiResources:
+    - aud
+    UserClaims: []
+    AuthFlow: Default
+    JWKSUri:
+    TlsClientCertificateBoundAccessTokens: false
+    TokenEndpointAuthSigningAlg: RS256
+    RequestObjectAllowedInterval: 3600
+    RequestObjectSignedAlg: none
+    RequestObjectEncryptionAlg:
+    RequestObjectEncryptionEncValues:
+    IdentityTokenSignedResponseAlg: RS256
+    IdentityTokenEncryptionAlg:
+    IdentityTokenEncryptionEncValues:
+    RequirePkce: false
+    UserInfoSignedResponseAlg: none
+    ProtectAgainstReplayAttack: true
+  Secrets:
+  - Description: 123456
+    Value: 123456
+    Expiration: 9999-12-31T23:59:59.9999999
+    Type: SecretHash
+  Enabled: true

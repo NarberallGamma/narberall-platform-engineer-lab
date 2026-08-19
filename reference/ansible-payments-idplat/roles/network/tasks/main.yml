@@ -1,0 +1,36 @@
+---
+# tasks file for network
+
+- name: "{{ role_name }} -> Check if network_name is defined and non-empty string"
+  ansible.builtin.assert:
+    that: network_name is defined and
+          network_name is string and (network_name | length) > 0
+    fail_msg: "network_name must be defined and non-empty string"
+    quiet: true
+  when: not (deploy_to_k8s | default(false, true) | bool)
+
+- name: "{{ role_name }} -> Create {{ network_name }} network"
+  community.docker.docker_network:
+    name: "{{ network_name }}"
+    driver: overlay
+    scope: swarm
+    state: present
+  when: not (deploy_to_k8s | default(false, true) | bool)
+        and not (network_encrypted | bool)
+        and (prepare_only is not defined or not (prepare_only | bool))
+
+- name: "{{ role_name }} -> Create encrypted {{ network_name }} network"
+  when: not (deploy_to_k8s | default(false, true) | bool)
+        and (network_encrypted | bool)
+        and (prepare_only is not defined or not (prepare_only | bool))
+  block:
+
+    - name: "{{ role_name }} -> Check if {{ network_name }} network exists"
+      ansible.builtin.command: docker network ls -q --filter 'name={{ network_name }}'
+      register: network_exists
+      changed_when: false
+
+    - name: "{{ role_name }} -> Create encrypted {{ network_name }} network"
+      ansible.builtin.command: docker network create --scope=swarm --driver=overlay --opt encrypted=true {{ network_name }}
+      when: network_exists.stdout is defined and (network_exists.stdout | length) == 0
+      changed_when: true

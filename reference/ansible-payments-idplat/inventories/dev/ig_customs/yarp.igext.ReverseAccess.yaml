@@ -1,0 +1,29 @@
+---
+Yarp:
+  Clusters:
+    ra-health:
+      Destinations:
+        destination1:
+          Address: http://ra-health/
+      Metadata:
+        StubMode.StatusCodeExp: 'ReverseAccessHealth() ? `200` : `503`'
+    reverse-access:
+      Destinations:
+        destination1:
+          Address: http://reverse-access/
+      Metadata:
+        ReverseAccessMode.TrustedSecrets.0: d1d8a244ed10a4068d5b01698d7e55e52dab8f5b
+        Tracing.Enable: true
+  Routes:
+  # Роут для проверки доступности нод класстера
+    ra-health:
+      ClusterId: ra-health
+      Match:
+        Path: "/ra/health"
+    reverse-access:
+      Match:
+        Path: "/{*any}"
+      Transforms:
+#        - X-Forwarded: 'Off'
+        - RequestHeaderOriginalHost: true
+      ClusterId: reverse-access

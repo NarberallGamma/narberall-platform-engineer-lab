@@ -1,0 +1,85 @@
+---
+# Развёртка nextcloud_matrix.folders в плоский список path/view/edit для WebDAV и occ.
+# client_name — имя клиента (в reapply задаётся из _current_client до включения этого файла).
+#
+# Уровень 4 под узлом матрицы с children_mkcol (например {client}/{client}/Accounting):
+# - children_mkcol — имена подпапок (MKCOL); по умолчанию на каждую из них копируются view/edit родительской строки,
+#   occ_skip: false — occ и авто-deny применяются так же, как на уровень 3, чтобы в ACL было явно видно группы.
+# - children_mkcol_occ_path_fallback — тот же порядок и длина, что у children_mkcol: альтернативное имя сегмента L4 на диске;
+#   в nextcloud_folders_flat для строки L4 добавляется path_occ_fallback; occ сначала основной path, затем fallback.
+# - children — словарь { name, view?, edit? } для исключений (например «Договоры» — свои группы вместо копии родителя).
+# - deny_on_l4_children — дополнительные deny (напр. Assistant на всех L4 кроме except_child_name — см. env matrix).
+# - matrix_deny у строки folders — список { group: … [, perms: … ] }; попадает в nextcloud_folders_flat (явный occ deny на путь).
+#
+# Маркер __NC_MATRIX_RO_ALL__ во view см. defaults matrix — развёртка RO по всем группам матрицы выполняется в groupfolders_apply_permissions.yml.
+
+# Результат нужно сериализовать в JSON и распарсить (from_json): иначе YAML `>- ... {{ ns.lst }}`
+# даёт строку, не list → loop/nextcloud_folders_flat ломаются (Ansible 2.14+).
+- name: Развернуть матрицу в плоский список папок (path, view, edit; deny; L4 без entry в children — копия view/edit родителя)
+  ansible.builtin.set_fact:
+    _folders_out_expanded: "{{ _folders_out_json | from_json }}"
+  vars:
+    _folders_out_json: >-
+      {% set ns = namespace(lst=[]) %}
+      {% for f in nextcloud_matrix.folders %}
+      {% set p = f.path.replace('{client}', client_name) %}
+      {% set row0 = {'path': p, 'view': f.view | default([]), 'edit': f.edit | default([]), 'occ_skip': false} %}
+      {% if f.matrix_deny is defined %}
+      {% set row0 = row0 | combine({'matrix_deny': f.matrix_deny}) %}
+      {% endif %}
+      {% set _ = ns.lst.append(row0) %}
+      {% set ns_m = namespace(names=[]) %}
+      {% for n in f.children_mkcol | default([]) %}
+      {% set _ = ns_m.names.append(n) %}
+      {% endfor %}
+      {% for c in f.children | default([]) %}
+      {% if c is mapping %}
+      {% if c.name not in ns_m.names %}
+      {% set _ = ns_m.names.append(c.name) %}
+      {% endif %}
+      {% else %}
+      {% if c not in ns_m.names %}
+      {% set _ = ns_m.names.append(c) %}
+      {% endif %}
+      {% endif %}
+      {% endfor %}
+      {% for chn in ns_m.names %}
+      {% set ex = namespace(v=[], e=[], mapped=false) %}
+      {% for c in f.children | default([]) %}
+      {% if c is mapping and c.name == chn %}
+      {% set ex.v = c.view | default(f.view | default([])) %}
+      {% set ex.e = c.edit | default(f.edit | default([])) %}
+      {% set ex.mapped = true %}
+      {% endif %}
+      {% endfor %}
+      {% if ex.mapped %}
+      {% set chv = ex.v %}
+      {% set che = ex.e %}
+      {% else %}
+      {% set chv = f.view | default([]) %}
+      {% set che = f.edit | default([]) %}
+      {% endif %}
+      {% set row = {'path': p ~ '/' ~ chn, 'view': chv, 'edit': che, 'occ_skip': false} %}
+      {% set _mkcol = f.children_mkcol | default([]) %}
+      {% set _fb = f.children_mkcol_occ_path_fallback | default([]) %}
+      {% if loop.index0 < (_mkcol | length) and loop.index0 < (_fb | length) %}
+      {% set _altn = _fb[loop.index0] %}
+      {% if _altn != chn %}
+      {% set row = row | combine({'path_occ_fallback': p ~ '/' ~ _altn}) %}
+      {% endif %}
+      {% endif %}
+      {% if f.deny_on_l4_children is defined %}
+      {% set exn = f.deny_on_l4_children.except_child_name | default('') %}
+      {% if chn != exn %}
+      {% set denyperm = f.deny_on_l4_children.perms | default(nextcloud_occ_deny_permissions | default('-read -write -create -delete -share')) %}
+      {% set mdn = namespace(ll=[]) %}
+      {% for dg in f.deny_on_l4_children.groups | default([]) %}
+      {% set _ = mdn.ll.append({'group': dg, 'perms': denyperm}) %}
+      {% endfor %}
+      {% set row = row | combine({'matrix_deny': mdn.ll}) %}
+      {% endif %}
+      {% endif %}
+      {% set _ = ns.lst.append(row) %}
+      {% endfor %}
+      {% endfor %}
+      {{ ns.lst | to_json }}

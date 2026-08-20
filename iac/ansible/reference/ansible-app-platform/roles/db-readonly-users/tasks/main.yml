@@ -1,0 +1,116 @@
+---
+
+#####################################################################
+# 0. Установка psycopg2
+#####################################################################
+- name: Ensure psycopg2 is installed
+  ansible.builtin.pip:
+    name: psycopg2-binary
+    state: present
+
+#####################################################################
+# 1. Получаем пароли из Vault (если указаны)
+#####################################################################
+- name: Fetch passwords from Vault for readonly users
+  set_fact:
+    readonly_passwords: >-
+      {{
+        readonly_passwords | default({}) |
+        combine({
+          item.name: lookup(
+            'community.hashi_vault.hashi_vault',
+            'secret=' + item.vault_path + ':' + item.vault_key,
+            url=vault_addr,
+            token=vault_token
+          ) if (item.vault_path is defined and item.vault_key is defined) else omit
+        })
+      }}
+  loop: "{{ db_users_readonly }}"
+  no_log: true
+
+#####################################################################
+# 2. Создаём пользователей (не трогаем пароль, если его нет)
+#####################################################################
+- name: Ensure readonly users exist
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    role_attr_flags: "LOGIN"
+    state: present
+    login_db: postgres
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    password: "{{ readonly_passwords[item.name] | default(omit) }}"
+  loop: "{{ db_users_readonly }}"
+  no_log: true
+
+#####################################################################
+# 3. Grant CONNECT на базы
+#####################################################################
+- name: Grant CONNECT on databases
+  community.postgresql.postgresql_privs:
+    database: "{{ item.0.name }}"
+    type: database
+    privs: CONNECT
+    roles: "{{ item.1.name }}"
+    state: present
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db | product(db_users_readonly) | list }}"
+
+#####################################################################
+# 4. Grant USAGE на схему public
+#####################################################################
+- name: Grant USAGE on public schema
+  community.postgresql.postgresql_privs:
+    database: "{{ item.0.name }}"
+    type: schema
+    objs: "{{ target_schema }}"
+    privs: USAGE
+    roles: "{{ item.1.name }}"
+    state: present
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db | product(db_users_readonly) | list }}"
+
+#####################################################################
+# 5. Grant SELECT на все существующие таблицы
+#####################################################################
+- name: Grant SELECT on all existing tables
+  community.postgresql.postgresql_privs:
+    database: "{{ item.0.name }}"
+    type: table
+    schema: "{{ target_schema }}"
+    objs: ALL_IN_SCHEMA
+    privs: SELECT
+    roles: "{{ item.1.name }}"
+    state: present
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db | product(db_users_readonly) | list }}"
+
+#####################################################################
+# 6. Grant default SELECT на будущие таблицы
+#####################################################################
+- name: Grant default SELECT on future tables created by owner role
+  community.postgresql.postgresql_privs:
+    database: "{{ item.0.name }}"
+    type: default_privs
+    schema: "{{ target_schema }}"
+    target_roles: "{{ item.0.name }}_owner_role"
+    objs: tables
+    privs: SELECT
+    roles: "{{ item.1.name }}"
+    state: present
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db | product(db_users_readonly) | list }}"

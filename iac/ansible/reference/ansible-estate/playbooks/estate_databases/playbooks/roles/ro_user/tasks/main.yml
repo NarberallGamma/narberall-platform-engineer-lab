@@ -1,0 +1,69 @@
+---
+# Read-only дополнительная учётка: CONNECT + GRANT SELECT (без OWNER, без правок treasury_user/schema_flyway).
+# default_privileges_for_role: только источник FOR ROLE в ALTER DEFAULT PRIVILEGES (не назначение владельца).
+# Требует: community.postgresql, community.general.
+
+- name: Установить py3-psycopg2 для модулей community.postgresql
+  community.general.apk:
+    name: py3-psycopg2
+    state: present
+
+- name: Создать или обновить RO-пользователя PostgreSQL
+  community.postgresql.postgresql_user:
+    name: "{{ ro_user }}"
+    password: "{{ ro_password }}"
+    state: present
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+
+- name: Выдать CONNECT на каждую БД (кластерный уровень)
+  community.postgresql.postgresql_query:
+    query: "GRANT CONNECT ON DATABASE {{ item }} TO {{ ro_user }};"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+  loop: "{{ db_list }}"
+
+- name: Выдать RO-права (GRANT) во всех пользовательских схемах каждой БД
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE
+        r RECORD;
+        v_ro TEXT := '{{ ro_user }}';
+        v_defrole TEXT := '{{ default_privileges_for_role }}';
+      BEGIN
+        FOR r IN
+          SELECT nspname
+          FROM pg_catalog.pg_namespace
+          WHERE nspname NOT LIKE 'pg_%' AND nspname != 'information_schema'
+          ORDER BY 1
+        LOOP
+          EXECUTE format('GRANT USAGE ON SCHEMA %I TO %I', r.nspname, v_ro);
+          EXECUTE format('GRANT SELECT ON ALL TABLES IN SCHEMA %I TO %I', r.nspname, v_ro);
+          EXECUTE format('GRANT SELECT ON ALL SEQUENCES IN SCHEMA %I TO %I', r.nspname, v_ro);
+          EXECUTE format(
+            'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I GRANT SELECT ON TABLES TO %I',
+            v_defrole, r.nspname, v_ro
+          );
+          EXECUTE format(
+            'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I GRANT SELECT ON SEQUENCES TO %I',
+            v_defrole, r.nspname, v_ro
+          );
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+- name: Итог
+  ansible.builtin.debug:
+    msg: "RO {{ ro_user }}: GRANT SELECT + CONNECT (без OWNER) для БД {{ db_list | join(', ') }}"

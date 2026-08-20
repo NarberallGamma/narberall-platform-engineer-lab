@@ -1,0 +1,67 @@
+# hsm-adapter — LEGACY docker app (prod). Хост estate-prod-cryptopro-01; после миграции keys в policy-gateway — выключить.
+# На той же VM: treasury-policy-gateway, cryptopro (playbooks docker_app_treasury_policy_gateway / docker_app_cryptopro).
+# CryptoPro data: bind mounts ./data/{keys,users,dsrf,tmp} (не docker named volumes).
+# Плейбук: playbooks/docker_app_hsm_adapter.yml | inventory: [hsm_adapter]
+# Legacy-миграция: playbooks/migrate_hsm_adapter_legacy.yml (копия из hsm_adapter_hsm_* volumes).
+#
+# Секреты в Vault: mount secret, path treasury-hsm-adapter (см. DOCKER_APPS_VAULT_SECRETS.md).
+# Порты (как preprod): API + actuator + healthcheck на 8080, management_port_enabled: false.
+
+docker_app_vault_mount_point: secret
+docker_app_vault_path: treasury-hsm-adapter
+docker_app_vault_key_map:
+  EXTERNAL_CSP_LICENSE: external_csp_license
+
+docker_app_base_dir: /docker/apps
+docker_app_compose_pull: always
+
+docker_app:
+  slug: hsm-adapter
+  bootstrap_image: registry.example.com/platform/base-images/hsm-bootstrap:0.2.0
+  adapter_image: registry.example.com/treasury/treasury-hsm-adapter-app:2.7.0
+  management_port_enabled: false
+  healthcheck_port: 8080
+  logging_level_root: INFO
+  logging_level_waves: DEBUG
+  management_endpoints: "*"
+
+# Каталоги относительно {{ docker_app_base_dir }}/hsm-adapter/
+hsm_adapter_data_uid: "10001"
+hsm_adapter_data_gid: "10001"
+hsm_adapter_data_dirs:
+  - { path: data/keys, mode: "0750" }
+  - { path: data/users, mode: "0750" }
+  - { path: data/dsrf, mode: "0750" }
+  - { path: data/tmp, mode: "0750" }
+
+# Legacy docker compose (/docker/hsm_adapter) -> named volumes для one-time copy при migrate
+hsm_adapter_legacy_compose_dir: /docker/hsm_adapter
+hsm_adapter_legacy_volume_copy:
+  - { src_volume: hsm_adapter_hsm_keys, dest: data/keys }
+  - { src_volume: hsm_adapter_hsm_users, dest: data/users }
+  - { src_volume: hsm_adapter_hsm_dsrf, dest: data/dsrf }
+  - { src_volume: hsm_adapter_hsm_tmp, dest: data/tmp }
+
+# migrate_hsm_adapter_legacy.yml
+hsm_adapter_legacy_migration_enabled: false
+hsm_adapter_purge_host_nginx: false
+# migrate_hsm_adapter_legacy.yml (host nginx cleanup)
+hsm_adapter_nginx_backup_dir: /docker/backup/hsm-adapter-legacy-nginx
+hsm_adapter_nginx_remove_packages:
+  - nginx
+  - nginx-common
+  - nginx-core
+hsm_adapter_nginx_sites_enabled_remove:
+  - /etc/nginx/sites-enabled/hsm-adapter.conf
+  - /etc/nginx/sites-enabled/default
+hsm_adapter_nginx_sites_available_remove:
+  - /etc/nginx/sites-available/hsm-adapter.conf
+  - /etc/nginx/sites-available/default
+hsm_adapter_nginx_remove_paths:
+  - /etc/nginx
+  - /var/log/nginx
+  - /var/lib/nginx
+
+# Публичный URL (TLS на edge-lb, не на этом хосте)
+hsm_adapter_public_domain: hsm-adapter.example.com
+hsm_adapter_public_path_prefix: /hsm-adapter/

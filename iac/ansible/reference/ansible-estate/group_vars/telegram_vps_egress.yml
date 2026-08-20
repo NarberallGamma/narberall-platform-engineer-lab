@@ -1,0 +1,35 @@
+---
+# Telegram VPS egress proxy на GitLab (local Envoy -> VPS-01/VPS-02).
+# Плейбук: playbooks/telegram_vps_egress.yml | inventory: [telegram_vps_egress]
+# Запуск: ./scripts/run/run_telegram_vps_egress.sh --prod|--preprod --limit estate-*-gitlab
+#
+# Только роль egress. Клиентские vars для docker_app: docker_app.telegram_egress в group_vars/<service>.yml
+
+telegram_vps_egress_enabled: true
+telegram_vps_egress_base_dir: /docker/apps/telegram-vps-egress
+
+telegram_vps_egress_network_name: telegram-vps-egress
+telegram_vps_egress_subnet: 172.30.100.0/24
+telegram_vps_egress_gateway: 172.30.100.1
+telegram_vps_egress_proxy_ip: 172.30.100.2
+
+telegram_vps_egress_container_name: telegram-vps-egress
+telegram_vps_egress_image: envoyproxy/envoy:v1.32.3
+telegram_vps_egress_listen_port: 443
+telegram_vps_egress_admin_port: 9901
+telegram_vps_egress_compose_pull: always
+
+telegram_vps_egress_vps_backends:
+  - host: 203.0.113.11
+    port: 443
+    priority: 0
+  - host: 203.0.113.12
+    port: 443
+    priority: 1
+
+telegram_vps_egress_health_check_interval: 10s
+telegram_vps_egress_health_check_timeout: 3s
+telegram_vps_egress_connect_timeout: 10s
+
+telegram_vps_egress_docker_log_max_size: 50m
+telegram_vps_egress_docker_log_max_file: "3"

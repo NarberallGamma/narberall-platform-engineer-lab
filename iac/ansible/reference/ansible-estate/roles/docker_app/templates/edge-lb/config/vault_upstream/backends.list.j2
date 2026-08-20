@@ -1,0 +1,5 @@
+# Managed by Ansible (docker_app edge-lb)
+# ip:port:name
+{% for node in edge_lb_vault_backends %}
+{{ node.ip }}:{{ node.port | default(8200) }}:{{ node.name | default(node.ip) }}
+{% endfor %}

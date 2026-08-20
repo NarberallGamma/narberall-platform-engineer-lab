@@ -1,0 +1,32 @@
+---
+- name: Restart systemd-resolved
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+  ignore_errors: yes
+
+- name: Restart sssd
+  ansible.builtin.service:
+    name: sssd
+    state: restarted
+    enabled: yes
+
+- name: restart docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+    daemon_reload: yes
+
+# После смены root в /etc/containerd/config.toml: остановить docker → перезапустить containerd → снова поднять docker.
+- name: restart containerd stack
+  ansible.builtin.shell: |
+    systemctl stop docker.socket docker 2>/dev/null || true
+    systemctl restart containerd
+    sleep 2
+    systemctl reset-failed docker docker.socket 2>/dev/null || true
+    systemctl start docker
+  args:
+    executable: /bin/bash
+  changed_when: true

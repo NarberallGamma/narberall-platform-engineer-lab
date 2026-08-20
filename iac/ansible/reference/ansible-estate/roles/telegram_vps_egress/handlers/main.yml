@@ -1,0 +1,7 @@
+---
+- name: restart telegram vps egress compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ telegram_vps_egress_base_dir }}"
+    state: present
+    pull: "{{ telegram_vps_egress_compose_pull }}"
+    recreate: always

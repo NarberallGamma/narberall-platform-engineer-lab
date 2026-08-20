@@ -1,0 +1,275 @@
+#to check config
+#docker-compose exec prometheus sh
+#promtool check config /etc/prometheus/prometheus.yml
+global:
+  scrape_interval:     60s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 10s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+  scrape_timeout: 50s
+
+remote_write:
+  - url: http://victoriametrics:8428/api/v1/write
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager).
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  - "alert.rules"
+  # - "second.rules"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+
+alerting:
+  alertmanagers:
+    - static_configs:
+      - targets:
+        - alertmanager:9093
+
+scrape_configs:
+  - job_name: 'prometheus'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['prometheus:9090']
+
+  - job_name: 'victoriametrics'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['victoriametrics:8428']
+
+  - job_name: 'docker_cadvisor'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  - job_name: 'alertmanager'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['alertmanager:9093']
+
+  - job_name: 'kube-state-metrics'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['kube-state-metrics:8080']
+        labels:
+          group: prd
+
+  - job_name: 'appsec-appsectrack-sbc'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['10.10.8.52:9100']
+        labels:
+          group: dev
+          ip: appsec-appsectrack-sbc
+
+  - job_name: 'appsec-owaspzap-sbc '
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['10.10.8.13:9100']
+        labels:
+          group: dev
+          ip: appsec-owaspzap-sbc
+
+  - job_name: 'appsec-defectdojo-sbc'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['10.10.8.81:9100']
+        labels:
+          group: dev
+          ip: appsec-defectdojo-sbc
+
+  - job_name: 'appsec-semgrep-sbc '
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['10.10.8.71:9100']
+        labels:
+          group: dev
+          ip: appsec-semgrep-sbc
+
+  - job_name: 'gitlab-runner-dev-01 '
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['10.10.6.93:9100']
+        labels:
+          group: dev
+          ip: gitlab-runner-dev-01
+
+  - job_name: 'elk-01'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['10.10.6.59:9100']
+        labels:
+          group: dev
+          ip: elk-01
+
+  - job_name: 'nexus'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['10.10.6.87:9100']
+        labels:
+          group: dev
+          ip: nexus
+
+  - job_name: 'gitlab'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['10.10.6.70:9100']
+        labels:
+          group: dev
+          ip: gitlab
+
+  - job_name: 'edr-proxy'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['10.10.1.37:9100']
+        labels:
+          group: dev
+          ip: edr-proxy
+
+  - job_name: 'monitoring-dev'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['10.10.6.174:9100']
+        labels:
+          group: dev
+          ip: monitoring-dev
+
+  - job_name: 'cAdvisor'
+    scheme: https
+    bearer_token_file: k8s_token
+    tls_config:
+      insecure_skip_verify: true
+    kubernetes_sd_configs:
+    - role: node
+      bearer_token_file: k8s_token
+      tls_config:
+        insecure_skip_verify: true
+      api_server: https://10.10.6.145:5443
+    relabel_configs:
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+    - target_label: __address__
+      replacement: 10.10.6.145:5443
+    - source_labels: [__meta_kubernetes_node_name]
+      regex: (.+)
+      target_label: __metrics_path__
+      replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+
+  - job_name: 'Kubelet'
+    scheme: https
+    bearer_token_file: k8s_token
+    tls_config:
+      insecure_skip_verify: true
+    kubernetes_sd_configs:
+    - role: node
+      bearer_token_file: k8s_token
+      tls_config:
+        insecure_skip_verify: true
+      api_server: https://10.10.6.145:5443
+    relabel_configs:
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+    - target_label: __address__
+      replacement: 10.10.6.145:5443
+    - source_labels: [__meta_kubernetes_node_name]
+      regex: (.+)
+      target_label: __metrics_path__
+      replacement: /api/v1/nodes/${1}/proxy/metrics
+
+  - job_name: 'Service'
+    scheme: https
+    bearer_token_file: k8s_token
+    tls_config:
+      insecure_skip_verify: true
+    kubernetes_sd_configs:
+    - role: endpoints
+      bearer_token_file: k8s_token
+      tls_config:
+        insecure_skip_verify: true
+      api_server: https://10.10.6.145:5443
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+      action: keep
+      regex: true
+    - target_label: __metrics_port
+      replacement: 8080
+    - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_port]
+      target_label: __metrics_port
+      regex: (.+)
+    - action: labelmap
+      regex: __meta_kubernetes_pod_(.+)
+    - target_label: __address__
+      replacement: 10.10.6.145:5443
+    - source_labels: [__meta_kubernetes_namespace,__meta_kubernetes_pod_name, __metrics_port]
+      regex: (.+);(.+);(.+)
+      target_label: __metrics_path__
+      replacement: /api/v1/namespaces/${1}/pods/${2}:${3}/proxy/actuator/prometheus
+
+  - job_name: 'ingress-nginx'
+    scheme: https
+    bearer_token_file: k8s_token
+    tls_config:
+      insecure_skip_verify: true
+    kubernetes_sd_configs:
+      - role: endpoints
+        bearer_token_file: k8s_token
+        tls_config:
+          insecure_skip_verify: true
+        api_server: https://10.10.6.145:5443
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_port]
+        target_label: __metrics_port
+        regex: (.+)
+        action: replace
+      - target_label: __address__
+        replacement: 10.10.6.145:5443
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_pod_name, __metrics_port]
+        regex: (.+);(.+);(.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/namespaces/${1}/pods/${2}:${3}/proxy/metrics
+      - source_labels: [__meta_kubernetes_namespace]
+        action: keep
+        regex: ingress-nginx
+
+  - job_name: 'blackbox_http'
+    metrics_path: /probe
+    params:
+      module: [https_2xx]  # или https_2xx, если так называется в blackbox.yml
+    static_configs:
+      - targets:
+        - jira.example.com
+        - wiki.example.com
+        - git.example.com
+    relabel_configs:
+      # Превращаем host, который Prometheus видит, 
+      # в параметр __param_target для blackbox (?target=<host>)
+      - source_labels: [__address__]
+        target_label: __param_target
+
+      # Чтобы в лейблах instance у нас писалось реальное имя хоста
+      - target_label: instance
+        source_labels: [__address__]
+
+      # Заменяем __address__ на адрес самого Blackbox Exporter:
+      - target_label: __address__
+        replacement: "10.10.6.174:9115"
+
+      # Дальше – если нам нужен конкретный путь, например для JIRA:
+      - source_labels: [instance]
+        regex: jira.example.com
+        target_label: __param_path
+        replacement: /login.jsp  # <-- Так указываем путь для JIRA
+
+      - source_labels: [instance]
+        regex: wiki.example.com
+        target_label: __param_path
+        replacement: /
+
+      - source_labels: [instance]
+        regex: git.example.com
+        target_label: __param_path
+        replacement: /users/sign_in

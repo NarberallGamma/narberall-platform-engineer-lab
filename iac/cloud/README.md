@@ -87,4 +87,4 @@ Brownfield: inventory → code → `terraform import` → clean `plan`. Same pat
 
 See case studies: [turnkey from zero](../../case-studies/02-cloud-platform-turnkey.md), [brownfield import](../../case-studies/04-terraform-brownfield-import.md), [legacy estate as Terraform](../../case-studies/05-legacy-estate-as-code.md), [VMware VCD + one-button CI](../../case-studies/06-vmware-vcd-greenfield.md), [Huawei compute catalog](../../case-studies/07-huawei-compute-catalog.md), [Selectel VPC + dedicated](../../case-studies/09-selectel-vpc-and-dedicated.md).
 
-Day-2 hosts (Ansible): [`../ansible/`](../ansible/). One-button CI: [`../ci/`](../ci/). Positioning: [`../../docs/positioning.md`](../../docs/positioning.md).
+Hosts (Ansible): [`../ansible/`](../ansible/). One-button CI: [`../ci/`](../ci/). Positioning: [`../../docs/positioning.md`](../../docs/positioning.md).

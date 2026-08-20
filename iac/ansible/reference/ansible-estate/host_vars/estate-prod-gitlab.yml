@@ -1,0 +1,6 @@
+---
+# Control node / bootstrap: SSH как ansible (.ssh/ansible_ssh_key), become: root для docker
+ansible_user: ansible
+
+# cert-orchestrator в bridge-сети Docker: см. group_vars/cert_orchestrator_ssh_targets.yml
+cert_orchestrator_authorized_key_from: "10.10.16.62,172.17.0.0/16,172.18.0.0/16,172.19.0.0/16,172.30.100.0/24"

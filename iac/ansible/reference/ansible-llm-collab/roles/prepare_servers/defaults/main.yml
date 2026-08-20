@@ -1,0 +1,27 @@
+---
+# Значения по умолчанию для роли prepare_servers
+# Эти значения можно переопределить в group_vars, host_vars или inventory
+
+# Ожидание блокировки apt/dpkg для dist-upgrade и установки Docker (секунды). У ansible.builtin.apt по умолчанию 60.
+prepare_servers_apt_lock_timeout: 600
+
+# Docker настройки
+# Если не указано, используется стандартная директория /var/lib/docker
+docker_data_dir: "/var/lib/docker"
+
+# Каталог данных containerd (слои/контент, часто ~десятки GiB). По умолчанию /var/lib/containerd на корневом разделе;
+# для вынесения на тот же диск, что и docker_data_dir — задать, например /docker/containerd (см. group_vars prepare_servers).
+containerd_data_dir: "/var/lib/containerd"
+
+# Официальный репозиторий Docker (download.docker.com)
+docker_apt_channel: stable
+# Снять пакеты docker.io / docker-compose из репозитория дистрибутива перед установкой docker-ce
+docker_remove_distro_packages: true
+# Только пакеты дистрибутива; без containerd/runc — иначе при повторном прогоне после docker-ce возможны конфликты.
+# При ошибке конфликта apt при первой установке docker-ce — удалить вручную по документации Docker.
+docker_distro_packages_remove:
+  - docker.io
+  - docker-doc
+  - docker-compose
+  - docker-compose-v2
+  - podman-docker

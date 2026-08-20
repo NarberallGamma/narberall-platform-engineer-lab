@@ -1,0 +1,11 @@
+# Managed by Ansible (docker_app edge-lb). Initial upstream; sidecar обновляет при edge_lb_vault_upstream_sidecar_enabled.
+# Файл включается из upstream в vault.conf, не в conf.d (иначе nginx грузит server на уровне http).
+{% if edge_lb_vault_upstream_sidecar_enabled | default(false) %}
+# Sidecar vault-upstream перезапишет после probe ?standbyok=false (bootstrap: первая нода)
+{% set bootstrap_node = edge_lb_vault_backends | first %}
+    server {{ bootstrap_node.ip }}:{{ bootstrap_node.port | default(8200) }};  # bootstrap {{ bootstrap_node.name | default(bootstrap_node.ip) }}
+{% else %}
+{% for node in edge_lb_vault_backends %}
+    server {{ node.ip }}:{{ node.port | default(8200) }};
+{% endfor %}
+{% endif %}

@@ -1,0 +1,21 @@
+---
+- name: Подготовка серверов и вступление в домен
+  hosts: prepare
+  gather_facts: yes
+  become: yes
+
+  pre_tasks:
+    - name: Подключить переменные prepare_servers
+      ansible.builtin.include_vars:
+        file: ../group_vars/prepare_servers.yml
+      tags: [always]
+
+    - name: Подключить переменные vmware (перекрытие prepare_servers)
+      ansible.builtin.include_vars:
+        file: ../group_vars/vmware.yml
+      when: inventory_hostname in groups.get('vmware', [])
+      tags: [always]
+
+  roles:
+    - role: prepare_servers
+      tags: [prepare]

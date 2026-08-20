@@ -1,0 +1,18 @@
+---
+- name: Найти все файлы в указанных директориях
+  ansible.builtin.find:
+    paths:
+      - "/etc/cron.d"
+      - "/etc/cron.daily"
+      - "/etc/cron.hourly"
+      - "/etc/cron.monthly"
+      - "/etc/cron.weekly"
+    recurse: yes                   # Рекурсивный поиск
+    file_type: file                # Искать только файлы
+  register: files_to_change        # Сохраняем результат поиска
+
+- name: Установить права 0744 на все найденные файлы
+  ansible.builtin.file:
+    path: "{{ item.path }}"        # Путь к файлу
+    mode: "0744"                   # Устанавливаем права 0755
+  loop: "{{ files_to_change.files }}"  # Перебираем все найденные файлы

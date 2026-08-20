@@ -1,0 +1,182 @@
+---
+# NVIDIA GPU host для llama.cpp / Docker Compose gpus: all
+# Требует установленный Docker (роль prepare_servers, enable_docker: true).
+
+- name: Проверить наличие Docker
+  ansible.builtin.command: docker info
+  register: prepare_nvidia_docker_info
+  changed_when: false
+  failed_when: prepare_nvidia_docker_info.rc != 0
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Проверить nvidia-smi на хосте
+  ansible.builtin.command: nvidia-smi
+  register: prepare_nvidia_smi
+  changed_when: false
+  failed_when: false
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Установить пакеты драйвера NVIDIA (если nvidia-smi недоступен)
+  when:
+    - prepare_nvidia_smi.rc != 0
+    - prepare_nvidia_install_driver_if_missing | bool
+  block:
+    - name: apt update перед драйвером NVIDIA
+      ansible.builtin.apt:
+        update_cache: true
+        lock_timeout: "{{ prepare_servers_apt_lock_timeout | default(600) }}"
+
+    - name: Установить драйвер NVIDIA
+      ansible.builtin.apt:
+        name: "{{ prepare_nvidia_driver_packages }}"
+        state: present
+        lock_timeout: "{{ prepare_servers_apt_lock_timeout | default(600) }}"
+      notify: reboot after nvidia driver install
+
+    - name: Повторная проверка nvidia-smi после установки драйвера
+      ansible.builtin.command: nvidia-smi
+      register: prepare_nvidia_smi_after_driver
+      changed_when: false
+      failed_when: prepare_nvidia_smi_after_driver.rc != 0
+      when: not (prepare_nvidia_reboot_after_driver | bool)
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Драйвер NVIDIA обязателен для LLM GPU-хоста
+  ansible.builtin.command: nvidia-smi
+  register: prepare_nvidia_smi_final
+  changed_when: false
+  failed_when: false
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Assert nvidia-smi
+  ansible.builtin.assert:
+    that:
+      - prepare_nvidia_smi_final.rc == 0
+    fail_msg: >-
+      nvidia-smi недоступен. На VK Cloud GPU-образе драйвер часто уже есть; иначе
+      prepare_nvidia_install_driver_if_missing: true и reboot (prepare_nvidia_reboot_after_driver).
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Собрать версию драйвера NVIDIA
+  ansible.builtin.slurp:
+    src: /proc/driver/nvidia/version
+  register: prepare_nvidia_proc_version
+  failed_when: false
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Версия драйвера NVIDIA (факт)
+  ansible.builtin.debug:
+    msg: "{{ (prepare_nvidia_proc_version.content | b64decode).splitlines() | first | default('unknown') }}"
+  when: prepare_nvidia_proc_version.content is defined
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Минимальная версия драйвера NVIDIA
+  ansible.builtin.assert:
+    that:
+      - prepare_nvidia_min_driver_version | length == 0
+        or (prepare_nvidia_proc_version.content is defined
+            and prepare_nvidia_min_driver_version in (prepare_nvidia_proc_version.content | b64decode))
+    fail_msg: >-
+      Версия драйвера ниже ожидаемой (prepare_nvidia_min_driver_version={{ prepare_nvidia_min_driver_version }}).
+  when: prepare_nvidia_proc_version.content is defined
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: GPG-ключ репозитория NVIDIA Container Toolkit
+  ansible.builtin.shell: |
+    set -eu
+    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+      gpg --dearmor -o "{{ prepare_nvidia_toolkit_gpg_keyring }}"
+  args:
+    creates: "{{ prepare_nvidia_toolkit_gpg_keyring }}"
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Репозиторий NVIDIA Container Toolkit (stable deb)
+  ansible.builtin.shell: |
+    set -eu
+    curl -s -L "{{ prepare_nvidia_toolkit_repo_url }}" | \
+      sed 's#deb https://#deb [signed-by={{ prepare_nvidia_toolkit_gpg_keyring }}] https://#g' > "{{ prepare_nvidia_toolkit_apt_list }}"
+  args:
+    creates: "{{ prepare_nvidia_toolkit_apt_list }}"
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Установить NVIDIA Container Toolkit
+  ansible.builtin.apt:
+    name: "{{ prepare_nvidia_container_toolkit_packages }}"
+    state: present
+    update_cache: true
+    lock_timeout: "{{ prepare_servers_apt_lock_timeout | default(600) }}"
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Версия nvidia-container-toolkit (факт)
+  ansible.builtin.command: dpkg-query -W -f='${Version}' nvidia-container-toolkit
+  register: prepare_nvidia_toolkit_version
+  changed_when: false
+  failed_when: false
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: CDI-спецификация NVIDIA для Docker
+  ansible.builtin.command: >-
+    nvidia-ctk cdi generate --output={{ prepare_nvidia_cdi_output }}
+  register: prepare_nvidia_cdi_generate
+  changed_when: prepare_nvidia_cdi_generate.rc == 0
+  failed_when: prepare_nvidia_cdi_generate.rc != 0
+  notify: restart docker after nvidia runtime
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Настроить Docker runtime для NVIDIA
+  ansible.builtin.command: >-
+    nvidia-ctk runtime configure --runtime={{ prepare_nvidia_container_runtime }}
+  register: prepare_nvidia_runtime_configure
+  changed_when: >-
+    'already' not in (prepare_nvidia_runtime_configure.stdout | default('') | lower)
+    and 'already' not in (prepare_nvidia_runtime_configure.stderr | default('') | lower)
+  failed_when: prepare_nvidia_runtime_configure.rc != 0
+  notify: restart docker after nvidia runtime
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: CDI-файл NVIDIA существует
+  ansible.builtin.stat:
+    path: "{{ prepare_nvidia_cdi_output }}"
+  register: prepare_nvidia_cdi_stat
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Assert CDI NVIDIA
+  ansible.builtin.assert:
+    that:
+      - prepare_nvidia_cdi_stat.stat.exists
+    fail_msg: "Не найден {{ prepare_nvidia_cdi_output }} после nvidia-ctk cdi generate."
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Принудительный перезапуск Docker после NVIDIA runtime (flush handlers)
+  ansible.builtin.meta: flush_handlers
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Проверка GPU внутри контейнера (docker run --gpus all)
+  when: prepare_nvidia_verify_docker_gpu | bool
+  block:
+    - name: docker run nvidia-smi smoke test
+      ansible.builtin.command: >-
+        docker run --rm --gpus all {{ prepare_nvidia_docker_test_image }} nvidia-smi
+      register: prepare_nvidia_docker_smoke
+      changed_when: false
+      async: "{{ prepare_nvidia_verify_docker_gpu_timeout }}"
+      poll: 10
+      tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+    - name: Assert docker GPU smoke test
+      ansible.builtin.assert:
+        that:
+          - prepare_nvidia_docker_smoke.rc == 0
+          - "'Driver Version' in prepare_nvidia_docker_smoke.stdout"
+        fail_msg: >-
+          docker run --gpus all не прошёл. Лог: {{ prepare_nvidia_docker_smoke.stderr | default('') }}
+      tags: [nvidia_gpu, prepare, llm_dev_gpu]
+
+- name: Итог подготовки NVIDIA GPU
+  ansible.builtin.debug:
+    msg:
+      - "Драйвер: {{ (prepare_nvidia_proc_version.content | b64decode).splitlines() | first | default('n/a') }}"
+      - "Container Toolkit: {{ prepare_nvidia_toolkit_version.stdout | default('n/a') }}"
+      - "CDI: {{ prepare_nvidia_cdi_output }}"
+      - "Docker GPU test: {{ 'OK' if (prepare_nvidia_docker_smoke is defined and prepare_nvidia_docker_smoke.rc == 0) else 'skipped/failed' }}"
+  tags: [nvidia_gpu, prepare, llm_dev_gpu]

@@ -1,0 +1,64 @@
+---
+- name: Пересоздание баз данных PostgreSQL
+  hosts: localhost
+  connection: local
+  become: no
+  gather_facts: no
+#  no_log: true
+  vars:
+    pg_host: "10.10.16.30" 
+    pg_port: 5432
+    pg_admin_user: root
+    pg_admin_password: ""
+    treasury_user: treasury_user
+    treasury_password: ""
+    default_encoding: "UTF8"  # Кодировка по умолчанию
+    default_lc_collate: "en_US.UTF-8"  # Локаль для сортировки по умолчанию
+    default_lc_ctype: "en_US.UTF-8"  # Локаль для классификации символов по умолчанию
+
+    target_schema: public
+
+    # default_databases намеренно пуст: без явного db_name или db_list в --extra-vars плейбук
+    # останавливается (см. pre_tasks), чтобы не пересоздать все БД по ошибке.
+    # Сводка полного стека (22 БД), только для справки: прежние 19 + 3 новых
+    #   (новые) treasury_safe_deal_adapter, treasury_lp_adapter, cryptopro_service, nodes_btc
+    #   (прежние) treasury_treasury_adapter, treasury_contract, treasury_audit, hsm, treasury_aml, treasury_api,
+    #   treasury_csp, keycloak, nodes_eth, nodes_tron, treasury_aml, treasury_auth_provider,
+    #   treasury_csp, treasury_notification, treasury_otp, treasury_rates, treasury_report, treasury_web, treasury_onboarding
+    # Переопределение: --extra-vars "db_name=treasury_contract" или "db_list=['db1','db2']"
+    default_databases: []
+
+    users: root
+
+  pre_tasks:
+    - name: Определить список баз данных для обработки
+      set_fact:
+        db_list: "{{ db_list | default(default_databases) }}"
+      when: db_name is not defined or db_name == "" or db_name is none
+
+    - name: Определить список баз данных из db_name (если указана одна БД)
+      set_fact:
+        db_list: "{{ [db_name] }}"
+      when: db_name is defined and db_name != "" and db_name is not none
+
+    - name: Инициализировать пустой список для БД
+      set_fact:
+        db: []
+
+    - name: Создать список словарей для роли
+      set_fact:
+        db: "{{ db + [{'name': item}] }}"
+      loop: "{{ db_list }}"
+
+    - name: Проверить, что список БД не пуст
+      ansible.builtin.fail:
+        msg: "❌ ОШИБКА: Список баз данных пуст! Укажите либо db_name='имя_базы', либо db_list=['db1','db2'] через --extra-vars"
+      when: db_list is not defined or db_list | length == 0
+
+    - name: Показать список БД для обработки
+      ansible.builtin.debug:
+        msg: "📋 Будет обработано {{ db_list | length }} баз данных: {{ db_list | join(', ') }}"
+
+  roles:
+      - db
+

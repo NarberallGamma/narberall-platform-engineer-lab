@@ -1,0 +1,103 @@
+---
+- name: Создание пользователя в удалённой PostgreSQL и выдача прав
+  hosts: localhost
+  connection: local
+  become: no
+  gather_facts: no
+#  no_log: true
+  vars:
+    vault_addr: "{{ lookup('env','VAULT_ADDR_PROD') }}"
+    vault_token: "{{ lookup('env','VAULT_TOKEN_PROD') }}"
+    pg_host: "10.10.4.178" 
+#    pg_host: "10.10.4.213"
+    pg_port: 5432
+    pg_admin_user: root
+    pg_admin_password: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=secret/data/postgres:admin_password', url=vault_addr, token=vault_token) }}"
+    default_encoding: "UTF8"  # Кодировка по умолчанию
+    default_lc_collate: "en_US.UTF-8"  # Локаль для сортировки по умолчанию
+    default_lc_ctype: "en_US.UTF-8"  # Локаль для классификации символов по умолчанию
+
+    target_schema: public
+
+    db_users_readonly:
+      - name: superset_readonly
+
+    db:
+      - name: jobsvc_prod
+        vault_path: secret/data/jobsvc/prod
+        vault_key: spring.datasource.password 
+      - name: dictionaries
+        vault_path: secret/data/dictionary-app/prod
+        vault_key: spring.datasource.password
+      - name: notification
+        vault_path: secret/data/notification/prod
+        vault_key: spring.datasource.password
+      - name: monolith
+        vault_path: secret/data/platform/prod
+        vault_key: spring.datasource.password
+      - name: keycloak
+        vault_path: secret/data/keycloak/prod
+        vault_key: spring.datasource.password
+      - name: currencyrate
+        vault_path: secret/data/currency-rate/prod
+        vault_key: spring.datasource.password
+      - name: chat
+        vault_path: secret/data/chat-app/prod
+        vault_key: spring.datasource.password
+      - name: partner_app
+        vault_path: secret/data/partner-app/prod-secret
+        vault_key: spring.datasource.password
+      - name: ai_agent
+        vault_path: secret/data/ai_agent/prod
+        vault_key: spring.datasource.password
+      - name: auth
+        vault_path: secret/data/auth/prod
+        vault_key: spring.datasource.password
+      - name: news_service
+        vault_path: secret/data/news-service/prod
+        vault_key: spring.datasource.password
+      - name: tariff
+        vault_path: secret/data/tariff/prod
+        vault_key: spring.datasource.password
+      - name: agreement
+        vault_path: secret/data/agreement/prod
+        vault_key: spring.datasource.password
+      - name: partner_app_partners
+        vault_path: secret/data/partner-app-partners/prod-secret
+        vault_key: spring.datasource.password
+      - name: prod_ai_assistant
+        vault_path: secret/data/ai_assistant/prod
+        vault_key: spring.datasource.password
+      - name: prod_bi_helper
+        vault_path: secret/data/bi-helper/prod
+        vault_key: spring.datasource.password
+
+    db_users:
+      - name: admin01
+        vault_path: secret/data/postgres_prod
+        vault_key: admin01
+      - name: admin02
+        vault_path: secret/data/postgres_prod
+        vault_key: admin02
+      - name: admin03
+        vault_path: secret/data/postgres_prod
+        vault_key: admin03
+      - name: admin04
+        vault_path: secret/data/postgres_prod
+        vault_key: admin04
+      - name: admin36
+        vault_path: secret/data/postgres_prod
+        vault_key: admin36
+      - name: monitoring
+        vault_path: secret/data/postgres_prod
+        vault_key: monitoring
+      - name: admin37
+        vault_path: secret/data/postgres_prod
+        vault_key: admin37
+
+    users: root
+
+  roles:
+      - db-pass
+      - db
+      - db-readonly-users

@@ -1,0 +1,29 @@
+---
+# Node Exporter Deployment Playbook
+# Docker Compose: /docker/apps/node-exporter (restart: always)
+
+- name: Deploy Node Exporter
+  hosts: monitoring_servers
+  become: yes
+  gather_facts: yes
+  vars_files:
+    - ../group_vars/node-exporter.yml
+
+  pre_tasks:
+    - name: Display deployment info
+      ansible.builtin.debug:
+        msg:
+          - "Deploying Node Exporter on: {{ inventory_hostname }}"
+          - "Host IP: {{ ansible_host }}"
+          - "Compose path: {{ node_exporter_base_dir }}"
+          - "Image: {{ node_exporter_image }}"
+          - "Restart policy: always"
+          - "Metrics port: {{ node_exporter_metrics_port }}"
+
+  roles:
+    - node-exporter
+
+  post_tasks:
+    - name: Display Node Exporter deployment status
+      ansible.builtin.debug:
+        msg: "Node Exporter on {{ inventory_hostname }} deployed via Docker Compose"

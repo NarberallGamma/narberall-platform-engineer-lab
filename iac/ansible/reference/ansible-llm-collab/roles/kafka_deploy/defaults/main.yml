@@ -1,0 +1,95 @@
+---
+# KRaft CLUSTER_ID задаётся ролью kafka_init или -e (для шаблона compose).
+kafka_cluster_id: ""
+
+# Каталог приложения на хосте (рядом с data/config)
+kafka_app_root: "/docker/apps/kafka"
+kafka_data_dir: "{{ kafka_app_root }}/data"
+kafka_config_dir: "{{ kafka_app_root }}/config"
+
+# Путь log.dirs внутри контейнера — должен совпадать с правой частью bind mount ./data (образ по умолчанию пишет в /tmp/kafka-logs).
+kafka_log_dirs_in_container: "/var/lib/kafka/data"
+
+kafka_image: "apache/kafka:3.9.2"
+kafka_compose_project_name: "kafka"
+
+# Скрытый .env рядом с docker-compose.yml (env_file).
+kafka_env_file_name: ".env"
+
+# Перезапуск контейнера: unless-stopped — при выходе с ошибкой и при старте dockerd;
+# после явного docker compose stop / docker stop контейнер не поднимается до следующего явного up/start.
+# Значение always — иное поведение после перезапуска демона Docker.
+kafka_compose_restart_policy: unless-stopped
+
+# Порт на хосте и в контейнере (PLAINTEXT)
+kafka_listener_port: 9092
+
+# Адрес для advertised.listeners (клиенты с других хостов должны достучаться до этого имени/IP)
+kafka_advertised_host: "{{ ansible_host | default(inventory_hostname, true) }}"
+
+# Внутренний listener контроллера KRaft (один узел — localhost внутри контейнера)
+kafka_controller_quorum_voters: "1@127.0.0.1:9093"
+
+# --- Количество брокеров в кластере (для расчёта RF и min.insync.replicas) ---
+# Целевой RF=3 и min ISR=2 возможны только при kafka_broker_count >= 3.
+kafka_broker_count: 1
+kafka_target_replication_factor: 3
+
+# Эффективный RF: не больше числа брокеров и не больше целевого.
+kafka_effective_replication_factor: "{{ [kafka_target_replication_factor | int, kafka_broker_count | int] | min }}"
+
+# min.insync.replicas: при одном брокере только 1; при RF>=3 обычно 2 (синхронная репликация с acks=all).
+kafka_min_insync_replicas: "{{ 1 if (kafka_effective_replication_factor | int) < 3 else 2 }}"
+
+# --- Автосоздание топиков и значения по умолчанию ---
+# auto.create.topics.enable=true — топик создаётся при первом produce/consume; применяются num.partitions и default.replication.factor.
+kafka_auto_create_topics_enable: true
+kafka_default_num_partitions: 10
+
+# Хранение логов: retention 7d; «aging» / ролл сегментов 72h (log.roll.ms).
+kafka_log_retention_hours: 168
+kafka_log_roll_ms: 259200000
+
+# «Synchronous flushing» — агрессивный flush на диск (нагрузка на I/O; для прод обычно ослабляют).
+kafka_log_flush_interval_messages: 1
+kafka_log_flush_interval_ms: 1
+
+# Дополнительные пары KEY=VALUE для env контейнера (образ apache/kafka: свойства → KAFKA_ + подчёркивания).
+kafka_broker_extra_env: {}
+
+# --- SASL + PLAIN (JAAS). kafka_sasl_enabled=false — PLAINTEXT без пароля.
+# kafka_sasl_tls_enabled=true — SASL_SSL + TLS (keystore); false — SASL_PLAINTEXT (пароль без SSL, трафик не шифруется на брокере).
+kafka_sasl_enabled: true
+kafka_sasl_tls_enabled: false
+
+# Учётные записи в PlainLoginModule (JAAS). Пароли — из Vault (kafka_init) или -e.
+# Доп. пользователи: kafka_sasl_extra_users + kafka_sasl_extra_credentials (kafka_init, шаблон kafka_server_jaas.conf.j2).
+kafka_sasl_admin_username: admin
+kafka_sasl_platform_kafka_username: platform_kafka
+
+# Пароль PKCS12 (генерация tls.yml и env SSL). Должен совпадать с тем, что в keystore.
+kafka_ssl_keystore_password: "changeit"
+
+# CN в самоподписанном сертификате (клиенты: ssl.endpoint.identification.algorithm="" или SAN).
+kafka_ssl_cert_cn: "{{ kafka_advertised_host }}"
+
+# Образ apache/kafka: процесс в контейнере — appuser uid/gid 1000; bind mount читает те же uid/gid на хосте.
+kafka_container_user_uid: 1000
+kafka_container_user_gid: 1000
+
+# Путь к JAAS внутри контейнера (bind mount из ./config/kafka_server_jaas.conf).
+kafka_jaas_path_in_container: /tmp/kafka_server_jaas.conf
+
+kafka_ssl_mount_path_in_container: /var/ssl
+kafka_ssl_keystore_location_in_container: "{{ kafka_ssl_mount_path_in_container }}/kafka.keystore.p12"
+
+# --- AKHQ (Web UI), образ tchiotludo/akhq; подключение к брокеру по имени сервиса compose: kafka:9092
+kafka_akhq_enabled: false
+kafka_akhq_image: "tchiotludo/akhq:0.27.0"
+kafka_akhq_host_port: 8080
+kafka_akhq_ui_username: admin
+kafka_akhq_cluster_name: kafka-prod.example.com
+kafka_akhq_bootstrap_servers: "kafka:9092"
+kafka_akhq_public_url_scheme: "https"
+kafka_akhq_public_host: "{{ kafka_advertised_host | regex_replace('^[^.]+', 'kafka-akhq') }}"
+kafka_akhq_public_url: "{{ kafka_akhq_public_url_scheme }}://{{ kafka_akhq_public_host }}"

@@ -1,0 +1,19 @@
+#export EDR_AUTHORITY_SERVICE=edr-proxy.example.com:80
+#export EDR_SENSORS_SERVICE=edr-proxy.example.com:443
+#export EDR_POLLING_PERIOD=300s
+#export EDR_DIAL_TIMEOUT=15s
+#export EDR_AGENT_GROUPS='nixprod'
+
+- name: edr
+  hosts:
+    - all
+  roles:
+    - roles/edr
+  gather_facts: no
+
+  vars:
+    edr_version: "1.29.3"
+    hosts_entry_ip: 10.10.1.37
+    hosts_entry_hostname: edr-proxy.example.com
+    file: edr-agent.deb
+    tmpdir: /tmp

@@ -1,0 +1,98 @@
+---
+- name: Проверить наличие systemd-resolved сервиса
+  ansible.builtin.command: systemctl list-unit-files systemd-resolved.service
+  register: systemd_resolved_check
+  changed_when: false
+  failed_when: false
+
+- name: Установить systemd-resolved если отсутствует (для Debian/минимальных образов)
+  ansible.builtin.apt:
+    name: systemd-resolved
+    state: present
+    update_cache: yes
+  when: systemd_resolved_check.rc != 0
+  register: systemd_resolved_installed
+  ignore_errors: yes
+
+- name: Убедиться, что установлен systemd (базовый пакет)
+  ansible.builtin.package:
+    name: systemd
+    state: present
+
+- name: Запустить и включить systemd-resolved если был установлен
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  when: systemd_resolved_installed.changed | default(false)
+  ignore_errors: yes
+
+- name: Проверить, что systemd-resolved запущен и работает
+  ansible.builtin.command: systemctl is-active systemd-resolved
+  register: systemd_resolved_active
+  changed_when: false
+  failed_when: false
+
+- name: Проверить существование файла /run/systemd/resolve/resolv.conf
+  ansible.builtin.stat:
+    path: /run/systemd/resolve/resolv.conf
+  register: systemd_resolve_file
+  when: systemd_resolved_active.rc == 0
+
+- name: Определить доступность systemd-resolved (только если установлен, запущен и файл существует)
+  ansible.builtin.set_fact:
+    systemd_resolved_available: "{{ (systemd_resolved_check.rc == 0 or systemd_resolved_installed.changed | default(false)) and systemd_resolved_active.rc == 0 and (systemd_resolve_file.stat.exists | default(false)) }}"
+
+- name: Создать/обновить resolved.conf (если systemd-resolved доступен)
+  ansible.builtin.copy:
+    dest: /etc/systemd/resolved.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Resolve]
+      DNS={{ dns_servers | join(' ') }}
+      Domains={{ search_domains | join(' ') }}
+      # FallbackDNS и прочие опции при необходимости
+  notify: Restart systemd-resolved
+  when: systemd_resolved_available | bool
+
+- name: Убедиться, что /etc/resolv.conf ссылается на systemd-resolved (только если файл существует)
+  ansible.builtin.file:
+    src: /run/systemd/resolve/resolv.conf
+    dest: /etc/resolv.conf
+    state: link
+    force: true
+  notify: Restart systemd-resolved
+  when: systemd_resolved_available | bool and systemd_resolve_file.stat.exists | default(false)
+
+- name: Настроить DNS через /etc/resolv.conf напрямую (если systemd-resolved недоступен)
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      # DNS configuration
+      {% for dns_server in dns_servers %}
+      nameserver {{ dns_server }}
+      {% endfor %}
+      {% for domain in search_domains %}
+      search {{ domain }}
+      {% endfor %}
+  when: not (systemd_resolved_available | bool)
+
+- name: Применить изменения немедленно (перезапуск systemd-resolved)
+  ansible.builtin.meta: flush_handlers
+  when: systemd_resolved_available | bool
+
+- name: Проверить видимость домена (realm discover)
+  ansible.builtin.command: realm discover {{ ad_domain }}
+  register: realm_discover
+  changed_when: false
+  failed_when: false
+
+- name: Показать результат discover
+  ansible.builtin.debug:
+    var: realm_discover.stdout_lines

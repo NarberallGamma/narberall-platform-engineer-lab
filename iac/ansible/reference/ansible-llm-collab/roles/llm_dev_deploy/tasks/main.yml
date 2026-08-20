@@ -1,0 +1,12 @@
+---
+- name: Установка (каталоги)
+  ansible.builtin.import_tasks: install.yml
+  tags: [llm_dev, llm_dev_install, llm_dev_deploy]
+
+- name: Развёртывание compose
+  ansible.builtin.import_tasks: deploy.yml
+  tags: [llm_dev, llm_dev_install, llm_dev_manage, llm_dev_config, llm_dev_deploy]
+
+- name: Перезапуск по тегу
+  ansible.builtin.import_tasks: restart.yml
+  tags: [never, llm_dev_restart, llm_dev_deploy]

@@ -1,0 +1,96 @@
+# Vault Cluster Configuration for PREPROD Environment
+# Все переменные для развертывания HA Vault кластера в preprod окружении
+
+# ========== DOCKER REGISTRY ==========
+docker_registry: "registry.example.com"
+docker_registry_username: ""
+docker_registry_password: ""
+vault_image: "platform/vault-ethsign-tron:latest"
+
+# ========== SSL CERTIFICATES ==========
+ssl_cert_path: "/etc/nginx/ssl/preprod.example.com.crt"
+ssl_key_path: "/etc/nginx/ssl/preprod.example.com.key"
+
+# ========== VAULT CONFIGURATION ==========
+vault_cluster_name: "vault-cluster-preprod"
+vault_data_path: "/opt/vault/data"
+vault_config_path: "/opt/vault/config"
+vault_log_level: "INFO"
+vault_domain: "vault.preprod.example.com"
+
+# ========== NETWORK CONFIGURATION ==========
+vault_api_port: 8200
+vault_cluster_port: 8201
+vault_ui_port: 8202
+lb_port: 443  # Стандартный HTTPS порт
+
+# ========== CLOUD.RU VIRTUAL IP CONFIGURATION ==========
+# Cloud.ru Virtual IP for high availability
+vault_virtual_ip: "10.10.18.77"
+vault_virtual_interface: "eth0"
+
+# ========== VAULT NODES ==========
+vault_nodes:
+  - name: "vault-1"
+    hostname: "estate-preprod-vault-1"
+    ip: "10.10.18.132"
+    node_id: "vault-1"
+  - name: "vault-2"
+    hostname: "estate-preprod-vault-2"
+    ip: "10.10.18.59"
+    node_id: "vault-2"
+  - name: "vault-3"
+    hostname: "estate-preprod-vault-3"
+    ip: "10.10.18.210"
+    node_id: "vault-3"
+
+# ========== LOAD BALANCER NODES ==========
+lb_nodes:
+  - name: "lb-1"
+    hostname: "estate-preprod-vault-lb-1"
+    ip: "10.10.18.142"
+    priority: 100  # MASTER
+  - name: "lb-2"
+    hostname: "estate-preprod-vault-lb-2"
+    ip: "10.10.18.252"
+    priority: 90   # BACKUP
+
+# ========== HEALTH CHECK CONFIGURATION ==========
+health_check_interval: 10
+health_check_timeout: 5
+health_check_retries: 3
+
+# ========== KEEPALIVED CONFIGURATION ==========
+keepalived_router_id: "vault_lb_preprod"
+keepalived_auth_pass: ""
+keepalived_health_check_interval: 2
+keepalived_health_check_rise: 2
+keepalived_health_check_fall: 3
+
+# ========== NGINX CONFIGURATION ==========
+nginx_worker_processes: "auto"
+nginx_worker_connections: 1024
+nginx_keepalive_timeout: 65
+nginx_client_max_body_size: "1m"
+
+# ========== VAULT PLUGINS ==========
+vault_plugins:
+  - name: "ethsign"
+    path: "/vault/plugins/ethsign"
+  - name: "vault-plugin-secrets-tronsign"
+    path: "/vault/plugins/vault-plugin-secrets-tronsign"
+
+# ========== MONITORING ==========
+monitoring_enabled: true
+
+# ========== SECURITY ==========
+vault_tls_disable: false
+vault_ui_enabled: true
+vault_disable_mlock: true
+
+# ========== FUTURE SECRETS (не деплоить в GitLab) ==========
+# Эти переменные будут добавлены позже для секретов
+# vault_secrets:
+#   - name: "secret1"
+#     path: "secret/data/app1"
+#     data: {...}

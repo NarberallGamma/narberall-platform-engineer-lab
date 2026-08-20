@@ -1,0 +1,25 @@
+---
+- name: Copy rc.local
+  copy:
+    src: rc.local
+    dest: /etc/rc.local
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Copy grub
+  copy:
+    src: grub
+    dest: /etc/default/grub
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Copy sysctl
+  copy:
+    src: 60-postgresql.conf
+    dest: /etc/sysctl.d/60-postgresql.conf
+    owner: root
+    group: root
+    mode: 0644
+  notify: sysctl

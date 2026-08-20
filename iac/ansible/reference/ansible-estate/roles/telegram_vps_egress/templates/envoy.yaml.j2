@@ -1,0 +1,46 @@
+# Managed by Ansible (telegram_vps_egress)
+# TCP proxy: docker apps -> VPS Envoy (TLS passthrough дальше до api.telegram.org)
+
+admin:
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: {{ telegram_vps_egress_admin_port }}
+
+static_resources:
+  listeners:
+    - name: listener_telegram_vps
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: {{ telegram_vps_egress_listen_port }}
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.tcp_proxy
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+                stat_prefix: telegram_vps
+                cluster: vps_egress_cluster
+
+  clusters:
+    - name: vps_egress_cluster
+      connect_timeout: {{ telegram_vps_egress_connect_timeout }}
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: vps_egress_cluster
+        endpoints:
+{% for backend in telegram_vps_egress_vps_backends %}
+          - priority: {{ backend.priority }}
+            lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: {{ backend.host }}
+                      port_value: {{ backend.port | default(443) }}
+{% endfor %}
+      health_checks:
+        - timeout: {{ telegram_vps_egress_health_check_timeout }}
+          interval: {{ telegram_vps_egress_health_check_interval }}
+          unhealthy_threshold: 3
+          healthy_threshold: 1
+          tcp_health_check: {}

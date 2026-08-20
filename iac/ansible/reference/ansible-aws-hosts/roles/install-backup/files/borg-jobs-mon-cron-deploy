@@ -1,0 +1,4 @@
+Defaults:jenkins !requiretty
+Defaults:jenkins visiblepw
+Cmnd_Alias BORG_JOBS_MON_CRON_DEPLOY = /backup/.borg_jobs_mon/cron_deploy
+jenkins ALL=(ALL) NOPASSWD: BORG_JOBS_MON_CRON_DEPLOY

@@ -1,0 +1,23 @@
+---
+# Ожидается: client_name. Загрузка матрицы, развёртка и формирование nextcloud_folders_flat.
+# Вызывается из groupfolders_main, groupfolders_reapply_one_client и groupfolders_reapply_one_client_with_mkcol.
+
+- name: Загрузить матрицу папок и прав
+  ansible.builtin.include_vars:
+    file: "{{ nextcloud_matrix_file }}"
+    name: nextcloud_matrix
+
+- name: Развернуть матрицу в плоский список папок (см. groupfolders_expand_matrix.yml)
+  ansible.builtin.include_tasks: groupfolders_expand_matrix.yml
+
+- name: Для клиентов «права как на корень» — один путь, все группы из матрицы
+  ansible.builtin.set_fact:
+    nextcloud_folders_flat: "{{ [{'path': client_name, 'view': _all_groups, 'edit': _all_groups, 'occ_skip': false}] }}"
+  vars:
+    _all_groups: "{{ ((_folders_out_expanded | map(attribute='view') | flatten) + (_folders_out_expanded | map(attribute='edit') | flatten)) | unique | list }}"
+  when: client_name in (nextcloud_root_like_clients | default([]))
+
+- name: Оставить полный список папок по матрице (обычные клиенты)
+  ansible.builtin.set_fact:
+    nextcloud_folders_flat: "{{ _folders_out_expanded }}"
+  when: client_name not in (nextcloud_root_like_clients | default([]))

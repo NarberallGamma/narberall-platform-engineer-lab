@@ -1,0 +1,28 @@
+---
+# treasury-policy-gateway (/docker/apps/treasury-policy-gateway)
+# VM cryptopro-01; TLS на edge-lb. Keys: ручной перенос в data/cprocsp/keys до первого compose up.
+# Переменные: group_vars/treasury-policy-gateway.yml
+#
+#   ./scripts/run/run_docker_app.sh deploy treasury-policy-gateway --prod --limit estate-prod-cryptopro-01
+
+- name: Deploy treasury-policy-gateway (VM)
+  hosts: cryptopro_vm
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/treasury-policy-gateway.yml"
+
+  pre_tasks:
+    - name: Deployment info
+      ansible.builtin.debug:
+        msg:
+          - "Host: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "App: {{ docker_app.slug }}"
+          - "Image: {{ docker_app.app_image }}"
+          - "Host port: {{ docker_app.host_port }}"
+          - "Path: {{ docker_app_base_dir }}/{{ docker_app.slug }}"
+          - "Keys (manual): {{ docker_app_base_dir }}/{{ docker_app.slug }}/data/cprocsp/keys"
+
+  roles:
+    - docker_app

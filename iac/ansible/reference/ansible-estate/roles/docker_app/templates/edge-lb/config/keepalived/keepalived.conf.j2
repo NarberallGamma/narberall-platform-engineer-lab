@@ -1,0 +1,36 @@
+# Managed by Ansible (docker_app edge-lb)
+{% set kn = edge_lb_keepalived_nodes | selectattr('hostname', 'equalto', inventory_hostname) | list | first | default({'state': 'BACKUP', 'priority': 90}) %}
+global_defs {
+    router_id {{ edge_lb_keepalived_router_id }}
+    enable_script_security
+    script_user root
+}
+
+vrrp_script chk_nginx {
+    script "/usr/bin/curl -f -k https://localhost:{{ docker_app.listen_port | default(443) }}/nginx-health || exit 1"
+    interval {{ edge_lb_keepalived_health_interval | default(2) }}
+    weight -2
+    fall {{ edge_lb_keepalived_health_fall | default(3) }}
+    rise {{ edge_lb_keepalived_health_rise | default(2) }}
+}
+
+vrrp_instance estate_LB {
+    state {{ kn.state | default('BACKUP') }}
+    priority {{ kn.priority | default(90) }}
+    interface {{ edge_lb_virtual_interface | default('eth0') }}
+    virtual_router_id {{ edge_lb_keepalived_vrrp_id | default(51) }}
+    advert_int 1
+
+    authentication {
+        auth_type PASS
+        auth_pass {{ edge_lb_keepalived_auth_pass }}
+    }
+
+    virtual_ipaddress {
+        {{ edge_lb_virtual_ip }}/24
+    }
+
+    track_script {
+        chk_nginx
+    }
+}

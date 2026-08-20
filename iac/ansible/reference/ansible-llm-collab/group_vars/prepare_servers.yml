@@ -1,0 +1,106 @@
+# Переменные роли prepare_servers. Заполнить значения прямо здесь перед запуском.
+timezone: Europe/Moscow
+
+# Включатели/выключатели блоков задач
+enable_timezone: false
+enable_apt_basics: false
+enable_apt_upgrade: false
+# Меняет hostname сервера навсегда, если нужно менять только временно, то использовать domain_join_hostname
+enable_hostname_change: false
+enable_dns: false
+enable_realm: false
+enable_sssd: false
+enable_ssh_pass_auth: false
+# enable_hardening: мастер-блок hardening
+enable_hardening: false
+# harden_permissions: права на /etc/passwd, shadow, sshd_config, cron (tasks/permissions.yml); нужен enable_hardening: true
+harden_permissions: false
+enable_agent: false
+enable_root_password_change: false
+enable_docker: false
+# NVIDIA GPU + Container Toolkit + CDI для docker compose gpus: all (LLM и др.)
+enable_nvidia_gpu: false
+
+# Хостнейм: по умолчанию НЕ меняем, берём текущий факт ansible_hostname
+host_hostname: ""
+
+# Короткий hostname для присоединения к домену (временно устанавливается перед realm join, т.к. AD имеет ограничение на длину имени компьютера до 15 символов)
+domain_join_hostname: ""
+
+# DNS: оба контроллера домена corp.example.com (реплика AD; не один nameserver)
+dns_manage: false
+dns_servers:
+  - 10.10.1.9
+  - 10.10.1.8
+search_domains:
+  - corp.example.com
+
+# Домен и OU для присоединения
+ad_domain: corp.example.com
+ad_realm: CORP.EXAMPLE.COM
+ad_computer_ou: "OU=Ubuntu,OU=Servers,OU=Assets,DC=corp,DC=example,DC=com"
+os_name: Linux
+os_version: "Ubuntu 24"
+
+# Учётные данные домена (логин/пароль)
+domain_admin_user: "admin"
+domain_admin_password: "CHANGE_ME"
+
+# SSSD
+sssd_use_fqdn: false
+# Группа %hostname% Administrators добавляется автоматически, тут указываем дополнительные группы.
+# Эти группы попадают как в sudoers файл, так и в конфигурацию SSSD.
+# Для входа добавить пользователя в группу в AD; после изменений в AD: sss_cache -E на сервере.
+# Эталон master: [] — только <hostname> Administrators (без domain users). Пример: - domain users
+simple_allow_groups: []
+# Эти пользователи попадают как в sudoers файл, так и в конфигурацию SSSD.
+simple_allow_users:
+  - admin
+  - admin02
+  - admin03
+  - admin04
+  - admin05
+
+# Агент edr-vendor
+# Можно использовать либо URL для скачивания, либо локальный файл из папки artifacts
+agent_deb_url: ""  # URL для скачивания (если пустой, будет использован локальный файл)
+agent_deb_local: "edr-agent.example.deb"  # Имя файла в папке artifacts
+agent_remote_path: "/tmp/edr-agent.deb"
+agent_remove_before_install: false
+agent_remove_purge: false
+agent_force_reinstall: false
+agent_env:
+  BZ_AUTHORITY_SERVICE: "edr-proxy.example.com:80"
+  BZ_SENSORS_SERVICE: "edr-proxy.example.com:443"
+  BZ_POLLING_PERIOD: "300s"
+  BZ_DIAL_TIMEOUT: "15s"
+  BZ_AGENT_GROUPS: "nixprod"
+
+# Смена пароля root (текстом или автогенерация при enable_root_password_change)
+root_password: ""
+root_password_auto_generate: false
+root_password_length: 30
+root_password_regenerate: false
+root_password_artifacts_dest: "{{ playbook_dir }}/../artifacts/root_credentials"
+root_password_credentials_tmp_path: "/tmp/ansible_root_credentials.txt"
+root_password_cleanup_credentials_tmp: true
+
+# Docker настройки
+# Директория для данных Docker; Engine ставится из официального репозитория download.docker.com (docker-ce, compose — плагин).
+docker_data_dir: "/docker/system"
+# Каталог данных containerd (рекомендуется на том же диске, что и docker_data_dir — иначе слои образов могут заполнять /).
+containerd_data_dir: "/docker/containerd"
+# Перенос /var/lib/docker и /var/lib/containerd в docker_data_dir / containerd_data_dir (tasks/docker_migrate.yml).
+# Требует enable_docker: true; останавливает Docker и containerd; старые каталоги в *.pre-migrate.bak (итог в PLAY RECAP).
+# Одноразово на хосте или с --tags docker; после миграции оставить false.
+docker_migrate_data: false
+# docker save/load образов в /docker/backup/docker-images до purge docker.io и после docker-ce (tasks/docker_images_*.yml).
+docker_images_backup_enabled: false
+docker_images_backup_dir: "/docker/backup/docker-images"
+# docker_remove_distro_packages: false  # раскомментировать после миграции на docker-ce, чтобы не вызывать purge при каждом прогоне
+
+# NVIDIA GPU (роль prepare_nvidia_gpu, после enable_docker: true)
+# Цепочка: nvidia-smi → Container Toolkit → nvidia-ctk cdi generate → runtime configure → docker run --gpus all
+prepare_nvidia_install_driver_if_missing: false
+prepare_nvidia_reboot_after_driver: false
+prepare_nvidia_verify_docker_gpu: false

@@ -1,0 +1,6 @@
+upstream: https://github.com/ansible-lockdown/UBUNTU24-CIS
+version: 1.6.0
+commit: c893ca6836fb32b1ea067d4a63c341e39693074b
+role_path: roles/ansible-lockdown.ubuntu24_cis
+playbook: playbooks/cis_ubuntu24.yml
+vars: group_vars/cis_ubuntu24.yml

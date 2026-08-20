@@ -1,0 +1,40 @@
+---
+# Access log Envoy на диске хоста + logrotate (аналог /docker/nginx/logs на proxy01mosvkc).
+# Включение: enable_vps_envoy_logging в group_vars/vps_cluster.yml
+
+- name: Каталог логов Envoy на хосте
+  ansible.builtin.file:
+    path: "{{ vps_envoy_log_dir }}"
+    state: directory
+    mode: "0755"
+  tags: [vps, envoy, envoy_logging, prepare_vps]
+
+- name: Пустой access.log (если ещё нет)
+  ansible.builtin.file:
+    path: "{{ vps_envoy_log_dir }}/access.log"
+    state: touch
+    mode: "0644"
+  tags: [vps, envoy, envoy_logging, prepare_vps]
+
+- name: logrotate для логов Envoy
+  ansible.builtin.template:
+    src: envoy/logrotate-envoy.j2
+    dest: "{{ vps_envoy_logrotate_path }}"
+    mode: "0644"
+  tags: [vps, envoy, envoy_logging, prepare_vps]
+
+- name: Проверка конфигурации logrotate (dry-run)
+  ansible.builtin.command:
+    cmd: "logrotate -d {{ vps_envoy_logrotate_path }}"
+  register: vps_envoy_logrotate_check
+  changed_when: false
+  failed_when: vps_envoy_logrotate_check.rc != 0
+  tags: [vps, envoy, envoy_logging, prepare_vps]
+
+- name: Статус логирования Envoy
+  ansible.builtin.debug:
+    msg:
+      - "Envoy access log (host): {{ vps_envoy_log_dir }}/access.log"
+      - "logrotate: {{ vps_envoy_logrotate_path }}"
+      - "stdout (docker logs): {{ vps_envoy_access_log_to_stdout | ternary('enabled', 'disabled') }}"
+  tags: [vps, envoy, envoy_logging, prepare_vps]

@@ -1,0 +1,60 @@
+# Сгенерировано Ansible — изменения через плейбук и templates
+# Том моделей: ./models (относительно каталога с compose → {{ llm_dev_models_dir }} на хосте).
+# GPU: требуются nvidia-container-toolkit и поддержка директивы gpus в Docker Compose на хосте.
+# llama-server и Open WebUI публикуются только на loopback для связки с nginx (network_mode: host у nginx в отдельном compose).
+services:
+  llama-server:
+    image: "{{ llm_dev_llama_image }}"
+    container_name: llm-dev-llama-server
+    restart: "{{ llm_dev_compose_restart_policy }}"
+    env_file:
+      - "{{ llm_dev_env_file_name }}"
+    gpus: all
+    ports:
+      - "{{ llm_dev_llama_host_bind_address }}:{{ llm_dev_llama_host_port }}:{{ llm_dev_listen_port }}"
+    volumes:
+      - "./models:/models:ro"
+{% if llm_dev_ouroboros_compat_enabled | default(false) | bool %}
+      - "./chat-templates:{{ llm_dev_ouroboros_compat_container_mount | default('/chat-templates') }}:ro"
+{% endif %}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+{% set _llama_extra_list = llm_dev_llama_extra_args_list | default([]) | join(' ') %}
+        ARGS="-m /models/{{ llm_dev_model_filename }} --host {{ llm_dev_llama_listen_host }} --port {{ llm_dev_listen_port | int }} -c {{ llm_dev_ctx_size | int }} -ngl {{ llm_dev_gpu_layers | int }}{% if _llama_extra_list | length > 0 %} {{ _llama_extra_list }}{% endif %}{% if llm_dev_llama_extra_args | default('') | length > 0 %} {{ llm_dev_llama_extra_args }}{% endif %}"
+{% if llm_dev_ouroboros_compat_enabled | default(false) | bool %}
+        ARGS="$$ARGS --jinja --chat-template-file {{ llm_dev_ouroboros_compat_container_mount | default('/chat-templates') }}/{{ llm_dev_ouroboros_compat_template_filename }}"
+{% endif %}
+        if [ -n "$${LLAMA_SERVER_API_KEY:-}" ]; then
+          ARGS="$$ARGS --api-key $$LLAMA_SERVER_API_KEY"
+        fi
+        exec {{ llm_dev_llama_server_binary }} $$ARGS
+{% if llm_dev_container_limits_enabled | default(false) | bool %}
+    cpus: "{{ llm_dev_llama_cpus }}"
+    mem_limit: "{{ llm_dev_llama_mem_limit }}"
+    memswap_limit: "{{ llm_dev_llama_memswap_limit }}"
+{% endif %}
+
+{% if llm_dev_open_webui_enabled | bool %}
+  open-webui:
+    image: "{{ llm_dev_open_webui_image }}"
+    container_name: llm-dev-open-webui
+    restart: "{{ llm_dev_compose_restart_policy }}"
+    depends_on:
+      - llama-server
+    env_file:
+      - "{{ llm_dev_open_webui_env_file_name }}"
+    extra_hosts:
+      # Linux: имя host.docker.internal по умолчанию отсутствует (в отличие от Docker Desktop). Убирает ошибки UI при обращении к Ollama 11434, если подключение не отключено в админке.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - "./open-webui-data:/app/backend/data"
+    ports:
+      - "{{ llm_dev_open_webui_host_bind_address }}:{{ llm_dev_open_webui_host_port }}:8080"
+{% if llm_dev_container_limits_enabled | default(false) | bool %}
+    cpus: "{{ llm_dev_open_webui_cpus }}"
+    mem_limit: "{{ llm_dev_open_webui_mem_limit }}"
+    memswap_limit: "{{ llm_dev_open_webui_memswap_limit }}"
+{% endif %}
+{% endif %}

@@ -1,0 +1,230 @@
+#!/bin/bash
+#Description: Используется для создания или обновления инвентаризационных
+#             файлов Ansible 
+
+################################################################################
+#Значения по умолчанию
+SSH_CONFIG_PATH="${HOME}/.ssh/config"
+INVENTORIES_DIR="./inventories"
+TFADM_USER="tfadm"
+
+################################################################################
+#Определения функций
+#Выводит сообщение в STDOUT
+#${1} - message
+print_message()
+{
+  local message="something happened, but message was not defined"
+  
+  if test -n "${1}";
+  then
+    message="${1}"
+  fi
+  
+  printf "%s\n" "${message}"
+  
+  return 0
+}
+
+################################################################################
+#Точка входа
+
+#Объявления и определения переменных
+PROJECT_FILTER=""
+SSH_CONFIG_CONTENT=""
+SSH_CONFIG_CONTENT_TFADM_USER_PART=""
+ALL_HOSTS=""
+ALL_PROJECTS=""
+PROJECTS=""
+TFADM_USER_HOSTS=""
+PROJECT_LIMIT_FILE=""
+
+#Разбор аргументов командной строки
+NORMALIZED_ARGS="$( getopt --options f:l: --longoptions ,project-filter:,project-limit-file: -- "${@}" 2>/dev/null )"
+if test "${?}" -gt 0;
+then
+  print_message "Received unknown arguments"
+  exit 1
+fi
+
+eval set -- "${NORMALIZED_ARGS}"
+
+while true
+do
+  case "${1}" in
+    -f|--project-filter)     PROJECT_FILTER="${2}";     shift 2;;
+    -l|--project-limit-file) PROJECT_LIMIT_FILE="${2}"; shift 2;;
+    *) break ;;
+  esac
+done
+
+#Работа
+if test ! -f "${SSH_CONFIG_PATH}";
+then
+  print_message "SSH-client configuration file does not exists. Nothing was done"
+  exit 1
+fi
+
+if test ! -r "${SSH_CONFIG_PATH}";
+then
+  print_message "SSH-client configuration file does not readable by this user. Nothing was done"
+  exit 1
+fi
+
+SSH_CONFIG_CONTENT="$( sed "s/^[ \t]*$//;s/^\#.*//;" "${SSH_CONFIG_PATH}" )"
+if test -z "${SSH_CONFIG_CONTENT}";
+then
+  print_message "SSH-client configuration file content was empty. Nothing was done"
+  exit 1
+fi
+
+ALL_HOSTS="$( printf "%s" "${SSH_CONFIG_CONTENT}" | sed --quiet "/Host[ \t]/I{s/Host[ \t][ \t]*//I;s/^[ \t]*//;s/[ \t]*$//;p}" | sort )"
+if test -z "${ALL_HOSTS}";
+then
+  print_message "Hosts was not found. Nothing was done"
+  exit 1
+fi
+
+ALL_PROJECTS="$( printf "%s" "${ALL_HOSTS}" | sed --quiet "s/^\([^\.]*\)\..*/\1/;p" | sort | uniq )"
+if test -z "${ALL_PROJECTS}";
+then
+  print_message "Projects was not found. Nothing was done"
+  exit 1
+fi
+
+if test -n "${PROJECT_LIMIT_FILE}";
+then
+  all_project_groups=""
+  all_project_groups="$( printf "%s" "${ALL_PROJECTS}" | sed --quiet "s/^/project_/;p" )"
+  
+  printf "%s\n" "localhost"             >  "${PROJECT_LIMIT_FILE}"
+  printf "%s"   "${all_project_groups}" >> "${PROJECT_LIMIT_FILE}"
+  
+  exit 0
+fi
+
+if test -z "${PROJECT_FILTER}";
+then
+  read -r -p "Enter project name filter:" "PROJECT_FILTER"
+  if test -z "${PROJECT_FILTER}";
+  then
+    print_message "Entered project name filter is empty. Nothing was done"
+    exit 1
+  fi
+fi
+
+PROJECTS="$( printf "%s" "${ALL_PROJECTS}" | grep "${PROJECT_FILTER}" )"
+if test -z "${PROJECTS}";
+then
+  print_message "Projects list after applying the filter is empty. Nothing was done"
+  exit 1
+fi
+
+print_message "Matching projects:"
+print_message "${PROJECTS}"
+
+continue_answer=""
+continue_answer_positive="yes"
+continue_answer_negative="no"
+read -p "Continue (${continue_answer_positive} or ${continue_answer_negative})? [${continue_answer_positive}]:" "continue_answer"
+
+if test -z "${continue_answer}";
+then
+  continue_answer="${continue_answer_positive}"
+fi
+
+if test "${continue_answer,,}" == "${continue_answer_negative}";
+then
+  print_message "You refused to continue, go out"
+  exit 1
+fi
+
+if test "${continue_answer,,}" != "${continue_answer_positive}";
+then
+  print_message "You did not enter '${continue_answer_positive}' or '${continue_answer_negative}', go out"
+  exit 1
+fi
+
+if test "${PROJECTS}" == "${ALL_PROJECTS}";
+then
+  find "${INVENTORIES_DIR}" -mindepth 1 -maxdepth 1 -regex ".*\/project_.*\.yml$" -type f -delete
+fi
+
+#Получение списка узлов с пользователем tfadm
+ssh_host=""
+ssh_user=""
+IFS=$'\n'
+for line in ${SSH_CONFIG_CONTENT};
+do
+  line_wo_trailing_spaces="${line#"${line%%[![:blank:]]*}"}"
+  line_wo_trailing_spaces="${line_wo_trailing_spaces%"${line_wo_trailing_spaces##*[![:blank:]]}"}"
+  
+  if test -z "${line_wo_trailing_spaces}";
+  then
+    continue
+  fi
+  
+  if [[ "${line_wo_trailing_spaces}" =~ ^[[:blank:]]*Host[[:blank:]][[:blank:]]*.*$ ]];
+  then
+    ssh_host=""
+    ssh_host="${line_wo_trailing_spaces##* }"
+    continue
+  fi
+  
+  if [[ "${line_wo_trailing_spaces}" =~ ^[[:blank:]]*IdentityFile[[:blank:]][[:blank:]]*~/.ssh/tfadm-id-rsa[[:blank:]]*$ ]];
+  then
+    if test -z "${ssh_host}";
+    then
+      print_message "Logical error in the script! INVENTORY FILES IS CORRUPTED, DO NOT USE THEM! Aborting"
+      exit 1
+    fi
+    
+    if test -z "${TFADM_USER_HOSTS}";
+    then
+      TFADM_USER_HOSTS="${ssh_host}"
+    else
+      TFADM_USER_HOSTS="${TFADM_USER_HOSTS}"$'\n'"${ssh_host}"
+    fi
+  fi
+done
+
+IFS=$'\n'
+for project in ${PROJECTS};
+do
+  project_file=""
+  project_file="${INVENTORIES_DIR}/project_${project}.yml"
+  
+  project_hosts=""
+  project_hosts="$( printf "%s" "${ALL_HOSTS}" | grep "^${project}\." )"
+  
+  printf "%s\n" "---"           > "${project_file}"
+  printf "%s\n" ""             >> "${project_file}"
+  printf "%s\n" "all:"         >> "${project_file}"
+  printf "%s\n" "  children:"  >> "${project_file}"
+  
+  printf "%s\n" "    project_${project}:"          >> "${project_file}"
+  printf "%s\n" "      vars:"                      >> "${project_file}"
+  printf "%s\n" "        project_name: ${project}" >> "${project_file}"
+  printf "%s\n" "      hosts:"                     >> "${project_file}"
+  for project_host in ${project_hosts};
+  do
+    printf "%s\n" "        ${project_host}:"  >> "${project_file}"
+  done
+  
+  project_tfadm_user_hosts=""
+  project_tfadm_user_hosts="$( printf "%s" "${TFADM_USER_HOSTS}" | grep "^${project}\." | sort )"
+  
+  if test -n "${project_tfadm_user_hosts}";
+  then
+    printf "%s\n" "    tfadm:"   >> "${project_file}"
+    printf "%s\n" "      hosts:" >> "${project_file}"
+    for project_host in ${project_tfadm_user_hosts};
+    do
+      printf "%s\n" "        ${project_host}:" >> "${project_file}"
+    done
+  fi
+done
+
+printf "\n"
+
+exit 0

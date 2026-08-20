@@ -1,0 +1,58 @@
+---
+llm_dev_app_root: "/docker/apps/llm-dev"
+llm_dev_models_dir: "{{ llm_dev_app_root }}/models"
+
+llm_dev_model_filename: "model.gguf"
+
+# CUDA12 + llama-server; реестр ggml-org (исторически ggerganov/llama.cpp мог быть снят с ghcr).
+llm_dev_llama_image: "ghcr.io/ggml-org/llama.cpp:server-cuda"
+# Образ ghcr.io/ggml-org/llama.cpp (*-server*): бинарник в /app (см. .devops/cuda.Dockerfile target server), не в PATH при своём shell-entrypoint.
+llm_dev_llama_server_binary: "/app/llama-server"
+
+llm_dev_compose_project_name: "llm-dev"
+llm_dev_env_file_name: ".env"
+llm_dev_compose_restart_policy: unless-stopped
+
+llm_dev_listen_port: 8080
+# Адрес bind llama-server внутри контейнера (--host); наружу на хост публикуется отдельным mapping портов.
+llm_dev_llama_listen_host: "0.0.0.0"
+# Публикация llama только на loopback (nginx на том же хосте шлёт запросы на 127.0.0.1:llm_dev_llama_host_port)
+llm_dev_llama_host_bind_address: "127.0.0.1"
+llm_dev_llama_host_port: "{{ llm_dev_listen_port }}"
+
+llm_dev_ctx_size: 4096
+llm_dev_gpu_layers: 99
+# Дополнительные аргументы llama-server в compose (список → строка через пробел), затем опционально llm_dev_llama_extra_args одной строкой.
+llm_dev_llama_extra_args_list: []
+llm_dev_llama_extra_args: ""
+
+llm_dev_assert_model_present: false
+
+llm_dev_enable_api_key: false
+llm_dev_enable_hf_token: false
+
+llm_dev_compose_pull: "missing"
+
+# docker compose up: всегда пересоздавать контейнеры (эквивалент --force-recreate), не только при изменении compose/env.
+# Значения модуля: auto | always | never.
+llm_dev_compose_recreate: "always"
+
+# Задачи docker_compose_v2 (pull/up) при долгом канале образов → async на контроллере (переопределяются в group_vars/llm_dev).
+llm_dev_compose_async_seconds: 10800
+llm_dev_compose_poll_seconds: 15
+
+# Open WebUI — веб-чат в браузере; backend OpenAI-compatible → llama-server по docker-сети.
+llm_dev_open_webui_enabled: true
+llm_dev_open_webui_image: "ghcr.io/open-webui/open-webui:main"
+llm_dev_open_webui_env_file_name: "open-webui.env"
+llm_dev_open_webui_host_bind_address: "127.0.0.1"
+llm_dev_open_webui_host_port: 8081
+
+# Публичный URL UI за reverse proxy (редиректы, OAuth). Пусто — не задавать WEBUI_URL.
+llm_dev_open_webui_public_url: ""
+
+# Совпадает с llm_dev_nginx_path_webui (шаблон open-webui.env); при только llm_dev_deploy без group_vars — безопасное значение.
+llm_dev_nginx_path_webui: "/"
+
+# Лимиты Docker — см. group_vars/llm_dev/main.yml (секция «Лимиты cgroup Docker»).
+llm_dev_container_limits_enabled: false

@@ -1,0 +1,83 @@
+{
+  "name": "Nextcloud Groupfolders (Webhook)",
+  "nodes": [
+    {
+      "id": "webhook-nextcloud",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [460, 300],
+      "parameters": {
+        "path": "nextcloud-groupfolders-api",
+        "httpMethod": "POST",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "nextcloud-groupfolders-api-webhook"
+    },
+    {
+      "id": "ssh-execute-command",
+      "name": "Execute a command",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "operation": "execute",
+        "command": "={{(() => { const raw = ({ ...($json.body || {}), ...$json }); const p = String(raw.profile ?? '').trim(); const h = String(raw.host ?? raw.limit ?? '').trim(); const c = String(raw.client_name ?? '').trim(); const rall = raw.reapply_all_clients === true || raw.reapply_all_clients === 1 || String(raw.reapply_all_clients).toLowerCase() === 'true' || String(raw.reapply_all_clients).toLowerCase() === 'on'; const ponl = raw.permissions_only === true || raw.permissions_only === 1 || String(raw.permissions_only).toLowerCase() === 'true' || String(raw.permissions_only).toLowerCase() === 'on'; let mode = 'standard'; if (rall) mode = 'reapply_all'; else if (ponl) mode = 'permissions_only'; const pref = p !== '' ? ('--profile \"' + p + '\" ') : ('--limit \"' + h + '\" '); const base = 'sudo -u ansible /ansible/scripts/run/run_nextcloud_groupfolders.sh ' + pref; if (mode === 'reapply_all') return base + '--all-clients'; if (mode === 'permissions_only') return base + '--permissions-only \"' + c + '\"'; return base + '\"' + c + '\"'; })()}}",
+        "workingDirectory": "/"
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "name": "SSH Ansible Host"
+        }
+      },
+      "onError": "continue",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [940, 300],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Результат Ansible</title><style>body{font-family:monospace;margin:1rem;background:#1e1e1e;color:#d4d4d4;} pre{white-space:pre-wrap;} .log-hint{margin-top:1.5rem;color:#888;font-size:0.9em;}</style></head><body><h2>Результат запуска Nextcloud Groupfolders</h2><p><strong>Exit code:</strong> {{ $json.code ?? 'N/A' }}</p><h3>Вывод (stdout)</h3><pre>{{ ($json.stdout ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}</pre><h3>Ошибки (stderr)</h3><pre>{{ ($json.stderr ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}</pre><p class=\"log-hint\">Full log on control Ansible node: <code>/ansible/artifacts/logs</code>. Job log: n8n → Executions.</p></body></html>",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a command": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

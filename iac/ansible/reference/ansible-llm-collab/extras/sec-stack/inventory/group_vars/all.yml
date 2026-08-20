@@ -1,0 +1,7 @@
+ansible_user: ubuntu          # TODO: пользователь на ВМ
+ansible_become: true
+
+# Internal DNS (zone example.com); role dns.
+dns_servers:
+  - 10.10.1.9
+  - 10.10.1.8

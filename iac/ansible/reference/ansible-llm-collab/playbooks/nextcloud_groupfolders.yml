@@ -1,0 +1,101 @@
+---
+# Плейбук Nextcloud Groupfolders (Clients INTFS).
+# Создаёт структуру папок по матрице (WebDAV), применение прав — через occ на сервере.
+# Хост не задаётся в плейбуке: обязательно --limit <хост инвентаря> (run-скрипт подставляет по --profile) из run_nextcloud_groupfolders.sh.
+# Запуск: ./scripts/run/run_nextcloud_groupfolders.sh --profile nextcloud-dev "ООО Рога и Копыта"
+#        или: ansible-playbook -i inventories/hosts.ini playbooks/nextcloud_groupfolders.yml --limit nextcloud-dev.example.com -e "client_name=ООО Рога и Копыта"
+# Только переиграть ACL одному клиенту (без MKCOL): -e nextcloud_reapply_permissions_only=true -e client_name="…"
+#        или ./scripts/run/run_nextcloud_groupfolders.sh --profile regul --permissions-only "Имя клиента"
+# Все клиенты — только ACL по матрице: --all-clients; с MKCOL по матрице для каждого и затем ACL: --all-clients-create.
+#        или -e nextcloud_reapply_all_clients_enabled=true [-e nextcloud_reapply_all_clients_mkcol_enabled=true]
+#
+# Секреты WebDAV — из Vault. Переменные — group_vars/nextcloud_groupfolders.yml.
+# Nextcloud groupfolders: матрица папок и прав (см. group_vars/env/matrix_*_cloud_platform.yaml по профилю, children_mkcol / children).
+
+- name: Nextcloud Groupfolders
+  hosts: all
+  gather_facts: true
+
+  # group_vars/nextcloud_groupfolders.yml и матрица (путь задаётся в nextcloud_profile_map) — явно подключаем.
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/nextcloud_groupfolders.yml"
+
+  vars:
+    # Обязательно при запуске: -e "client_name=ООО Рога и Копыта"
+    # client_name: ""
+
+  pre_tasks:
+    - name: Переменные режимов не конфликтуют
+      ansible.builtin.assert:
+        that:
+          - not (((nextcloud_reapply_all_clients_enabled | default(false) | bool)) and ((nextcloud_reapply_permissions_only | default(false) | bool)))
+          - not (((nextcloud_reapply_permissions_only | default(false) | bool)) and ((nextcloud_ldap_reset_groups_enabled | default(false) | bool)))
+          - not (((nextcloud_reapply_all_clients_mkcol_enabled | default(false) | bool)) and not ((nextcloud_reapply_all_clients_enabled | default(false) | bool)))
+          - not (((nextcloud_reapply_all_clients_mkcol_enabled | default(false) | bool)) and ((nextcloud_reapply_permissions_only | default(false) | bool)))
+        fail_msg: >-
+          Нельзя одновременно включать nextcloud_reapply_all_clients_enabled и nextcloud_reapply_permissions_only;
+          также нельзя сочетать nextcloud_reapply_permissions_only и nextcloud_ldap_reset_groups_enabled.
+          nextcloud_reapply_all_clients_mkcol_enabled допустим только вместе с nextcloud_reapply_all_clients_enabled и несовместим с nextcloud_reapply_permissions_only.
+      tags: always
+
+    - name: Хост задан в карте профилей (имена ключей Vault из nextcloud_profile_map)
+      ansible.builtin.assert:
+        that:
+          - nextcloud_matrix_profile_by_host is defined
+          - nextcloud_matrix_profile_by_host | length > 0
+          - inventory_hostname in nextcloud_matrix_profile_by_host
+          - nextcloud_profile_map is defined
+          - nextcloud_matrix_profile_by_host[inventory_hostname] in nextcloud_profile_map
+        fail_msg: >-
+          Добавьте "{{ inventory_hostname }}" в nextcloud_matrix_profile_by_host и выберите профиль из nextcloud_profile_map (nextcloud-dev, nextcloud-prod, regul).
+          Либо передайте словарь через -e.
+      tags: always
+
+    - name: Имена ключей Vault WebDAV по профилю хоста (nextcloud-dev | nextcloud-prod | regul), до роли nextcloud_init
+      ansible.builtin.set_fact:
+        nextcloud_vault_key_webdav_user: "{{ nextcloud_profile_map[_nc_gf_vault_profile].nextcloud_vault_key_webdav_user }}"
+        nextcloud_vault_key_webdav_password: "{{ nextcloud_profile_map[_nc_gf_vault_profile].nextcloud_vault_key_webdav_password }}"
+      vars:
+        _nc_gf_vault_profile: "{{ nextcloud_matrix_profile_by_host[inventory_hostname] }}"
+      tags: always
+
+    - name: Проверить client_name (не нужен в reapply по всем и в режиме только LDAP reset)
+      ansible.builtin.assert:
+        that: client_name is defined and client_name | length > 0
+        fail_msg: 'Передайте имя клиента: -e "client_name=ООО Рога и Копыта"'
+      when:
+        - not (nextcloud_reapply_all_clients_enabled | default(false) | bool)
+        - not ((nextcloud_ldap_reset_groups_enabled | default(false) | bool) and ((nextcloud_ldap_reset_groups | default([])) | length > 0))
+      tags: always
+
+  roles:
+    - role: nextcloud_init
+      tags: init, nextcloud
+    - role: nextcloud_groupfolders
+      tags: nextcloud
+
+  post_tasks:
+    - name: Итог
+      ansible.builtin.debug:
+        msg: >-
+          Готово. Режим: повторное применение прав по всем клиентам
+          {{ '(MKCOL по матрице для каждого клиента, затем ACL)' if (nextcloud_reapply_all_clients_mkcol_enabled | default(false) | bool) else '(только ACL по матрице)' }}.
+          Хост: {{ inventory_hostname }}.
+      when: nextcloud_reapply_all_clients_enabled | default(false) | bool
+      tags: always
+
+    - name: Итог (только переиграть ACL по матрице, MKCOL не выполнялся)
+      ansible.builtin.debug:
+        msg: "Готово. Режим: только переиграждение ACL по матрице (без MKCOL). Клиент: {{ client_name }}. Хост: {{ inventory_hostname }}."
+      when:
+        - nextcloud_reapply_permissions_only | default(false) | bool
+        - client_name is defined
+      tags: always
+
+    - name: Итог (один клиент — полный сценарий с MKCOL)
+      ansible.builtin.debug:
+        msg: "Готово. Клиент: {{ client_name }}. Хост: {{ inventory_hostname }}."
+      when:
+        - not (nextcloud_reapply_all_clients_enabled | default(false) | bool)
+        - not (nextcloud_reapply_permissions_only | default(false) | bool)
+      tags: always

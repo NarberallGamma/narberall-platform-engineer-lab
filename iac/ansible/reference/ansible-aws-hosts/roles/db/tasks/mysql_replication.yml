@@ -1,0 +1,92 @@
+---
+- name: Replication user must exist on master server
+  become: yes
+  mysql_user:
+    login_unix_socket: '{{ db_socket }}'
+    name: '{{ db_replication_username }}'
+    host: "{{ db_replication_network | default('%') }}"
+    password: "{{ db_replication_password[db_type] }}"
+    priv: "{{ db_replication_priv | default('*.*:REPLICATION SLAVE') }}"
+    state: present
+  when: db_replication_role == "master"
+
+- name: Check replication status (slave)
+  become: yes
+  mysql_replication:
+    login_unix_socket: '{{ db_socket }}'
+    mode: getslave
+  ignore_errors: true
+  register: slave
+  when: db_replication_role == "slave"
+  tags: debug_info
+
+- name: Stop replication
+  become: yes
+  mysql_replication:
+    login_unix_socket: '{{ db_socket }}'
+    mode: stopslave
+  when: >
+    (slave is failed
+    or (slave.Slave_IO_Running | default('No') == 'No')
+    or (slave.Slave_SQL_Running | default('No') == 'No'))
+    and db_replication_role == "slave"
+  tags: debug_info
+
+- name: Check replication status (master)
+  become: yes
+  mysql_replication:
+    login_unix_socket: '{{ db_socket }}'
+    mode: getmaster
+  register: master
+  when: >
+    (slave is failed
+    or (slave.Slave_IO_Running | default('No') == 'No')
+    or (slave.Slave_SQL_Running | default('No') == 'No'))
+    and db_replication_role == "master"
+  tags: debug_info
+
+- name: Set facts
+  set_fact: master_status="{{ master }}"
+  when: db_replication_role == "master"     
+  tags: debug_info
+
+- name: Configure slave debug
+  become: yes
+  debug:
+    msg: "{{ (hostvars | json_query(\"* | [?db_replication_role=='master' || master_status]\"))}}"
+  ignore_errors: true
+  when: >
+    (slave is failed
+    or (slave.Slave_IO_Running | default('No') == 'No')
+    or (slave.Slave_SQL_Running | default('No') == 'No'))
+    and db_replication_role == "slave"       
+  tags: debug_info
+
+- name: Configure slave
+  become: yes
+  mysql_replication:
+    login_unix_socket: '{{ db_socket }}'
+    mode: changemaster
+    master_host: "{{ db_replication_master_private_host }}"
+    master_user: "{{ db_replication_username }}"
+    master_password: "{{ db_replication_password[db_type] }}"
+    master_log_file: "{{ (hostvars | json_query(\"* | [? db_replication_role=='master' && master_status]\")|first).master_status.File }}"
+    master_log_pos: "{{ (hostvars | json_query(\"* | [? db_replication_role=='master' && master_status]\")|first).master_status.Position  }}"
+  ignore_errors: true
+  when: >
+    (slave is failed
+    or (slave.Slave_IO_Running | default('No') == 'No')
+    or (slave.Slave_SQL_Running | default('No') == 'No'))
+    and db_replication_role == "slave"       
+  tags: debug_info
+
+- name: Start replication
+  become: yes
+  mysql_replication:
+    login_unix_socket: '{{ db_socket }}'
+    mode: startslave
+  when: >
+    (slave is failed
+    or (slave.Slave_IO_Running | default('No') == 'No')
+    or (slave.Slave_SQL_Running | default('No') == 'No'))
+    and db_replication_role == "slave"

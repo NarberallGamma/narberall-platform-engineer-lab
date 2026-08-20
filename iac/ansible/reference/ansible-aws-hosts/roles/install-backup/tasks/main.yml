@@ -1,0 +1,144 @@
+---
+- name: Update and upgrade apt packages
+  apt:
+    upgrade: "yes"
+    update_cache: yes
+
+- name: Disable unnattended upgrades autoreboot
+  replace:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    regexp: '\/\/Unattended-Upgrade::Automatic-Reboot "false"'
+    replace: 'Unattended-Upgrade::Automatic-Reboot "false"'
+
+- name: Install essential utils
+  apt:
+    update_cache: yes
+    name:
+    - curl
+    - findutils
+    - git
+    - jq
+    - openjdk-8-jdk
+    - postfix
+    - python-pip
+    - sed
+    - tzdata
+    - unzip
+    - uuid-runtime
+    - yamllint
+
+- name: Add python packages
+  pip:
+    name: 
+    - pykwalify
+    - yq
+
+- name: Add the user 'jenkins'
+  user:
+    name: jenkins
+    shell: /bin/bash
+    home: /home/jenkins
+    generate_ssh_key: yes
+
+- name: "Add access for jenkins-server"
+  copy:
+    src: authorized_keys.jenkins
+    dest: /home/jenkins/.ssh/authorized_keys
+    owner: "jenkins"
+    group: "jenkins"
+    mode: '0400'
+
+- name: Add the user 'borg'
+  user:
+    name: borg
+    shell: /bin/bash
+    home: /backup/borg
+    generate_ssh_key: yes
+
+- name: "Add access for borg"
+  copy:
+    src: authorized_keys.borg
+    dest: /backup/borg/.ssh/authorized_keys
+    owner: "borg"
+    group: "borg"
+    mode: '0400'
+
+- name: Secure repo directory
+  file:
+    path: /backup/borg
+    state: directory
+    owner: "borg"
+    group: "borg"
+    mode: "0700"
+
+- name: Download borg
+  get_url:
+    url: https://github.com/borgbackup/borg/releases/download/1.1.6/borg-linux64
+    dest: /usr/local/bin/borg
+    mode: '0755'
+
+- name: Create borg symbolic links
+  file:
+    src: /usr/local/bin/borg
+    dest: "/usr/bin/{{ item.dest }}"
+    state: link
+  with_items:
+    - { dest: 'borg' }
+    - { dest: 'borgfs' }
+
+- name: Create monitoring directory
+  file:
+    path: /backup/.borg_jobs_mon
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0775"
+
+- name: Create temp dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0775
+  with_items:
+    - /backup/RESTORE
+    - /backup/TEMP
+
+- name: "Add sudo for jenkins"
+  copy:
+    src: borg-jobs-mon-cron-deploy
+    dest: /etc/sudoers.d/
+    owner: "root"
+    group: "root"
+    mode: '0440'
+
+- name: "Set smtp transport"
+  copy:
+    src: transport
+    dest: /etc/postfix/
+    owner: "root"
+    group: "root"
+    mode: '0644'
+
+- name: "Setup postfix"
+  copy:
+    src: main.cf
+    dest: /etc/postfix/
+    owner: "root"
+    group: "root"
+    mode: '0644'
+
+- name: Reload postfix
+  shell: |
+    /usr/sbin/postmap /etc/postfix/transport
+    /usr/sbin/postfix check
+    /usr/sbin/postfix reload
+
+- name: Update 18.04 kernel
+  apt:
+    update_cache: yes
+    name:
+    - linux-generic-hwe-18.04
+    - linux-headers-generic-hwe-18.04
+    - linux-image-generic-hwe-18.04

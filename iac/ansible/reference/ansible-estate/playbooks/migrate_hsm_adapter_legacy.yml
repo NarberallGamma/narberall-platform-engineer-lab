@@ -1,0 +1,189 @@
+---
+# Legacy-миграция: /docker/hsm_adapter + host apt nginx -> docker_app hsm-adapter (без nginx на хосте).
+# TLS: edge-lb (conf.d/hsm-adapter.conf).
+#
+# Порядок:
+#   1) Deploy edge-lb с hsm-adapter на LB (./scripts/run/run_docker_app.sh deploy edge-lb ...)
+#   2) migrate на estate-*-hsm-adapter (этот плейбук)
+#
+# Шаги migrate:
+#   1) Выложить /docker/apps/hsm-adapter (data/ bind mounts)
+#   2) Скопировать CryptoPro data из legacy named volumes -> data/{keys,users,dsrf,tmp}
+#   3) Остановить legacy compose в /docker/hsm_adapter
+#   4) Остановить и полностью удалить host apt nginx (/etc/nginx, ssl, logs)
+#   5) docker compose up hsm-adapter
+#   6) verify: localhost:8080 и https://<public_domain>/hsm-adapter/actuator/health (через edge-lb)
+#
+# Запуск:
+#   ./scripts/run/run_migrate_hsm_adapter_legacy.sh --preprod --limit estate-preprod-hsm-adapter
+#   ./scripts/run/run_migrate_hsm_adapter_legacy.sh --prod --limit estate-prod-cryptopro
+#
+# Переменные: group_vars/hsm-adapter.yml
+# Переключатель: hsm_adapter_legacy_migration_enabled
+
+- name: Migrate legacy hsm-adapter to Ansible docker_app
+  hosts: hsm_adapter
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/hsm-adapter.yml"
+
+  vars:
+    hsm_adapter_app_dir: "{{ docker_app_base_dir }}/hsm-adapter"
+    hsm_adapter_health_port: "{{ docker_app.healthcheck_port | default(8080) }}"
+
+  pre_tasks:
+    - name: Проверить, что legacy-миграция app включена
+      ansible.builtin.assert:
+        that:
+          - hsm_adapter_legacy_migration_enabled | default(false) | bool
+        fail_msg: >-
+          Legacy-миграция app отключена (hsm_adapter_legacy_migration_enabled: false).
+          Migrate завершён или не начинался. Для нового стенда: true в group_vars/hsm-adapter.yml.
+      tags: [always]
+
+    - name: Migration info
+      ansible.builtin.debug:
+        msg:
+          - "Host: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "Legacy compose: {{ hsm_adapter_legacy_compose_dir }}"
+          - "Target app: {{ hsm_adapter_app_dir }}"
+          - "App data: {{ hsm_adapter_app_dir }}/data/{keys,users,dsrf,tmp}"
+          - "Public URL: https://{{ hsm_adapter_public_domain }}{{ hsm_adapter_public_path_prefix }}actuator/health"
+          - "TLS proxy: edge-lb (deploy edge-lb до migrate, если vhost ещё не выложен)"
+          - "Host nginx: full purge (backup + apt purge + rm paths: {{ hsm_adapter_purge_host_nginx | default(true) | bool }})"
+      tags: [prepare, migrate, verify]
+
+    - name: Проверить legacy docker volumes (источник для copy в data/)
+      ansible.builtin.command:
+        argv:
+          - docker
+          - volume
+          - inspect
+          - "{{ item.src_volume }}"
+      register: hsm_adapter_legacy_volume_check
+      changed_when: false
+      failed_when: false
+      loop: "{{ hsm_adapter_legacy_volume_copy }}"
+      loop_control:
+        label: "{{ item.src_volume }}"
+      tags: [prepare, migrate]
+
+  tasks:
+    - name: Подготовить hsm-adapter (конфиги без compose up)
+      ansible.builtin.include_role:
+        name: docker_app
+      vars:
+        docker_app_compose_up: false
+      tags: [prepare, migrate]
+
+    - name: Остановить legacy compose (сохранить named volumes для copy)
+      community.docker.docker_compose_v2:
+        project_src: "{{ hsm_adapter_legacy_compose_dir }}"
+        state: stopped
+      failed_when: false
+      tags: [migrate]
+
+    - name: Удалить legacy compose containers (named volumes на диске остаются)
+      community.docker.docker_compose_v2:
+        project_src: "{{ hsm_adapter_legacy_compose_dir }}"
+        state: absent
+        remove_orphans: true
+      failed_when: false
+      tags: [migrate]
+
+    - name: Скопировать legacy named volumes в bind mounts data/
+      ansible.builtin.shell: |
+        set -euo pipefail
+        src="/var/lib/docker/volumes/{{ item.src_volume }}/_data"
+        dst="{{ hsm_adapter_app_dir }}/{{ item.dest }}"
+        if [[ ! -d "$src" ]]; then
+          echo "skip: no legacy volume $src"
+          exit 0
+        fi
+        if [[ -n "$(find "$dst" -mindepth 1 -maxdepth 1 2>/dev/null | head -1)" ]]; then
+          echo "skip: $dst already has data"
+          exit 0
+        fi
+        rsync -a "$src/" "$dst/"
+      args:
+        executable: /bin/bash
+      loop: "{{ hsm_adapter_legacy_volume_copy }}"
+      loop_control:
+        label: "{{ item.src_volume }} -> {{ item.dest }}"
+      register: hsm_adapter_data_copy
+      changed_when: "'skip:' not in hsm_adapter_data_copy.stdout"
+      tags: [migrate]
+
+    - name: Права на data/ после copy (uid 10001)
+      ansible.builtin.file:
+        path: "{{ hsm_adapter_app_dir }}/{{ item.path }}"
+        state: directory
+        owner: "{{ hsm_adapter_data_uid | default('10001') }}"
+        group: "{{ hsm_adapter_data_gid | default('10001') }}"
+        mode: "{{ item.mode }}"
+        recurse: true
+      loop: "{{ hsm_adapter_data_dirs | default([]) }}"
+      loop_control:
+        label: "{{ item.path }}"
+      tags: [migrate]
+
+    - name: Полная очистка legacy host nginx
+      ansible.builtin.import_tasks: tasks/hsm_adapter_host_nginx_cleanup.yml
+
+    - name: Убедиться, что 443 не слушается на hsm-adapter хосте
+      ansible.builtin.shell: |
+        set -euo pipefail
+        if ss -tlnp 2>/dev/null | grep -q ':443 '; then
+          ss -tlnp | grep ':443 ' || true
+          exit 1
+        fi
+      args:
+        executable: /bin/bash
+      changed_when: false
+      tags: [migrate, verify]
+
+    - name: Запустить hsm-adapter compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ hsm_adapter_app_dir }}"
+        env_files:
+          - .env
+        state: present
+        pull: "{{ docker_app_compose_pull }}"
+        recreate: always
+      tags: [migrate]
+
+    - name: Дождаться adapter health на localhost
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ hsm_adapter_health_port }}/actuator/health"
+        status_code: 200
+      register: hsm_adapter_local_health
+      retries: 20
+      delay: 5
+      until: hsm_adapter_local_health is succeeded
+      tags: [migrate, verify]
+
+    - name: Проверить HTTPS health через edge-lb (public domain)
+      ansible.builtin.uri:
+        url: "https://{{ hsm_adapter_public_domain }}{{ hsm_adapter_public_path_prefix }}actuator/health"
+        validate_certs: true
+        status_code: 200
+      register: hsm_adapter_https_health
+      retries: 15
+      delay: 5
+      until: hsm_adapter_https_health is succeeded
+      tags: [verify, migrate]
+
+    - name: Итог миграции
+      ansible.builtin.debug:
+        msg:
+          - "hsm-adapter: {{ hsm_adapter_app_dir }}"
+          - "App data: {{ hsm_adapter_app_dir }}/data/"
+          - "Local health: HTTP {{ hsm_adapter_local_health.status }} (port {{ hsm_adapter_health_port }})"
+          - "HTTPS health (edge-lb): HTTP {{ hsm_adapter_https_health.status }}"
+          - "Public: https://{{ hsm_adapter_public_domain }}{{ hsm_adapter_public_path_prefix }}"
+          - "Legacy host nginx: fully removed (purge={{ hsm_adapter_purge_host_nginx | default(true) | bool }}, backup under {{ hsm_adapter_nginx_backup_dir }})"
+          - "Legacy compose dir (не удалён): {{ hsm_adapter_legacy_compose_dir }}"
+          - "После verify: hsm_adapter_legacy_migration_enabled: false в group_vars/hsm-adapter.yml"
+      tags: [verify, migrate]

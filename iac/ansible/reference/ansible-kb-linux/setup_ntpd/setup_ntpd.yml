@@ -1,0 +1,18 @@
+---
+
+- hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: determine tfadm user sudo password
+      pause:
+        prompt: Please enter tfadm user sudo password
+        echo: false
+      when: groups['tfadm'] is defined and groups['tfadm'] | length > 0
+      register: tfadm_sudo_pass
+      no_log: true
+
+- hosts: all
+  gather_facts: no
+  become: yes
+  roles:
+    - setup_ntpd

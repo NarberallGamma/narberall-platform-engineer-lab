@@ -1,0 +1,122 @@
+[client]
+#password = your_password
+port = {{ db_port }}
+socket = {{ db_socket }}
+
+[mysqld]
+port = {{ db_port }}
+datadir = {{ db_datadir }}
+socket = {{ db_socket }}
+pid-file = {{ db_pid_file }}
+
+# Logging configuration.
+{% if db_log_error == 'syslog' or db_log == 'syslog' %}
+syslog
+syslog-tag = {{ db_syslog_tag }}
+{% else %}
+{% if db_log %}
+log = {{ db_log }}
+{% endif %}
+log-error = {{ db_log_error }}
+{% endif %}
+
+{% if db_version != "8.0" %}
+ignore-db-dir = lost+found
+{% endif %}
+
+{% if db_version == "8.0" %}
+default_authentication_plugin=mysql_native_password
+{% endif %}
+
+{% if db_slow_query_log_enabled %}
+# Slow query log configuration.
+slow_query_log = 1
+slow_query_log_file = {{ db_slow_query_log_file }}
+long_query_time = {{ db_slow_query_time }}
+{% endif %}
+
+{% if db_replication_role != '' %}
+# Replication
+server-id = {{ db_server_id }}
+report_host = {{ inventory_hostname }}
+
+{% if db_replication_role == 'master' %}
+read_only           = 0
+{% endif %}
+{% if db_replication_role == 'slave' %}
+read_only           = 1
+{% endif %}
+sync_binlog         = 1
+relay_log_index     = {{ db_datadir }}/binlogs/relay-bin.index
+relay_log           = {{ db_datadir }}/binlogs/relay-bin
+log_bin             = {{ db_datadir }}/binlogs/{{ db_type }}-bin
+log_bin_index       = {{ db_datadir }}/binlogs/{{ db_type }}-bin.index
+max_binlog_size     = {{ db_max_binlog_size }}
+
+{% if db_version == "8.0" %}
+expire_logs_days           = 0
+binlog_expire_logs_seconds = {{ db_binlog_expire_logs_seconds }}
+{% else %}
+expire_logs_days           = {{ db_expire_logs_days }}
+{% endif%}
+
+# Disabling symbolic-links is recommended to prevent assorted security risks
+symbolic-links = 0
+
+# User is ignored when systemd is used (fedora >= 15).
+user = mysql
+
+# http://dev.mysql.com/doc/refman/5.5/en/performance-schema.html
+;performance_schema
+
+# Memory settings.
+key_buffer_size = {{ db_key_buffer_size }}
+max_allowed_packet = {{ db_max_allowed_packet }}
+table_open_cache = {{ db_table_open_cache }}
+sort_buffer_size = {{ db_sort_buffer_size }}
+read_buffer_size = {{ db_read_buffer_size }}
+read_rnd_buffer_size = {{ db_read_rnd_buffer_size }}
+myisam_sort_buffer_size = {{ db_myisam_sort_buffer_size }}
+table_open_cache = {{ db_table_cache }}
+thread_cache_size = {{ db_thread_cache_size }}
+
+{% if db_version != "8.0" %}
+query_cache_size = {{ db_query_cache_size }}
+{% endif %}
+
+max_connections = {{ db_max_connections }}
+tmp_table_size = {{ db_tmp_table_size }}
+max_heap_table_size = {{ db_max_heap_table_size }}
+join_buffer_size = {{ db_join_buffer_size }}
+
+# Other settings.
+wait_timeout = {{ db_wait_timeout }}
+net_read_timeout={{ db_net_read_timeout }}
+{% if db_skip_name_resolve %}
+skip-name-resolve
+{% endif %}
+back_log={{ db_back_log }}
+max_connect_errors={{ db_max_connect_errors }}
+open-files-limit={{ db_open_files_limit }}
+interactive_timeout={{ db_interactive_timeout }}
+connect_timeout={{ db_connect_timeout }}
+slave_load_tmpdir={{ db_slave_load_tmpdir }}
+tmpdir={{ db_tmpdir }}
+{% if db_sql_mode != '' %}
+sql_mode = {{ db_sql_mode }}
+{% endif %}
+# InnoDB settings.
+innodb_file_per_table = {{ db_innodb_file_per_table }}
+innodb_buffer_pool_size = {{ db_innodb_buffer_pool_size }}
+innodb_log_file_size = {{ db_innodb_log_file_size }}
+innodb_log_buffer_size = {{ db_innodb_log_buffer_size }}
+innodb_flush_log_at_trx_commit = {{ db_innodb_flush_log_at_trx_commit }}
+innodb_lock_wait_timeout = {{ db_innodb_lock_wait_timeout }}
+#innodb_additional_mem_pool_size = {{ db_innodb_additional_mem_pool_size }}
+
+[mysqldump]
+quick
+max_allowed_packet = {{ db_mysqldump_max_allowed_packet }}
+
+[mysqld_safe]
+pid-file = {{ db_pid_file }}

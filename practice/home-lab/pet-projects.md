@@ -10,4 +10,4 @@ Small repos that support Platform / Linux / AI positioning. Entertainment-only w
 | ss-display (fork) | SteelSeries OLED on Linux: venv, example config, systemd user unit | HID / userspace — [`reference/apps/ss-display/`](reference/apps/ss-display/) |
 | Lian Li Linux stack | Daemon + OpenRGB + deploy/verify scripts for AIO + fans | systemd, USB, hardware as code (host JSON stays local) |
 
-Linux HID/cooling work is the same skill as day-2 hosts: example configs, no secrets in git, autostart units with placeholders.
+Linux HID/cooling work is the same skill as Ansible hosts: example configs, no secrets in git, autostart units with placeholders.

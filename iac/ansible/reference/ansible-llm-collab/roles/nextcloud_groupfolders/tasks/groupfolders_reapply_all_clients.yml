@@ -1,0 +1,64 @@
+---
+# Повторное применение прав по матрице ко всем клиентам, список которых берётся из корня groupfolder (PROPFIND).
+# При nextcloud_reapply_all_clients_mkcol_enabled: для каждого клиента — MKCOL по матрице (идемпотентно), затем те же occ, что в режиме без MKCOL.
+# Подключается из main.yml при nextcloud_reapply_all_clients_enabled. Профиль (nextcloud_matrix_profile_by_host) уже применён в main.yml.
+
+# PROPFIND через curl на целевом хосте — stdout всегда строка (uri может возвращать bytes и ломать парсинг).
+- name: Получить список папок клиентов в корне groupfolder (PROPFIND через curl)
+  ansible.builtin.shell: |
+    curl -s -u "{{ nextcloud_webdav_user }}:{{ nextcloud_webdav_password }}" \
+      -X PROPFIND -H "Depth: 1" \
+      "{{ nextcloud_webdav_url }}/"
+  register: _propfind_root
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+# Формат Nextcloud: <d:href>/remote.php/webdav/<сегмент groupfolder>/ИМЯ_ПАПКИ/</d:href> (ИМЯ может быть %-encoded)
+- name: Сформировать список имён папок клиентов из ответа PROPFIND
+  ansible.builtin.set_fact:
+    nextcloud_reapply_client_list: "{{ _decoded }}"
+    _reapply_encoded: "{{ _encoded }}"
+  vars:
+    _body: "{{ _propfind_root.stdout | default('') }}"
+    _path_re: "{{ (nextcloud_groupfolder_webdav_path_encoded | default(nextcloud_groupfolder_name | replace(' ', '%20'))) + '/([^/]+)' }}"
+    _raw: "{{ _body | regex_findall(_path_re) | default([]) | reject('eq', '') | unique | list }}"
+    _encoded: "{{ _raw | reject('eq', '<') | reject('eq', '>') | reject('eq', '&') | reject('eq', '\"') | list }}"
+    _decoded: "{{ _encoded | map('regex_replace', '%20', ' ') | map('regex_replace', '%27', \"'\") | map('regex_replace', '%28', '(') | map('regex_replace', '%29', ')') | map('regex_replace', '%2F', '/') | unique | list }}"
+  when: _propfind_root is defined
+
+# Полное URL-декодирование (UTF-8 и все %XX) — имена типа "01 Общая информация"
+- name: URL-decode имён папок (UTF-8)
+  ansible.builtin.set_fact:
+    nextcloud_reapply_client_list: "{{ _out_lines }}"
+  vars:
+    _json_b64: "{{ (_reapply_encoded | default([]) | to_json) | b64encode }}"
+    _out: "{{ lookup('pipe', 'echo -n ' + _json_b64 + ' | base64 -d | python3 -c \"import urllib.parse,json,sys; print(chr(10).join(urllib.parse.unquote(x) for x in json.load(sys.stdin)))\"') }}"
+    _out_lines: "{{ (_out | default('') | split('\n') | select() | list) if (_out is defined and _out | length > 0) else (nextcloud_reapply_client_list | default([])) }}"
+  when:
+    - _propfind_root is defined
+    - (_reapply_encoded | default([]) | length) > 0
+
+- name: Остановить выполнение — не удалось получить список папок из WebDAV
+  ansible.builtin.fail:
+    msg: "Не удалось получить список папок клиентов (PROPFIND). Проверьте доступ WebDAV и URL {{ nextcloud_webdav_url }}. curl rc: {{ _propfind_root.rc | default('?') }}."
+  when: (nextcloud_reapply_client_list | default([]) | length) == 0
+
+- name: Вывести список папок клиентов для повторного применения прав
+  ansible.builtin.debug:
+    msg: >-
+      Найдено папок клиентов в {{ nextcloud_groupfolder_name }}: {{ nextcloud_reapply_client_list | length }}.
+      Режим: {{ 'MKCOL по матрице + права (для каждого клиента)' if (nextcloud_reapply_all_clients_mkcol_enabled | default(false) | bool) else 'только права по матрице' }}.
+      Список: {{ nextcloud_reapply_client_list | join(', ') }}.
+
+- name: Выбрать цепочку задач для одного клиента (только ACL или MKCOL+ACL)
+  ansible.builtin.set_fact:
+    nextcloud_reapply_all_clients_one_client_tasks: "{{ 'groupfolders_reapply_one_client_with_mkcol.yml' if (nextcloud_reapply_all_clients_mkcol_enabled | default(false) | bool) else 'groupfolders_reapply_one_client.yml' }}"
+
+- name: Обработать каждого клиента из списка
+  ansible.builtin.include_tasks: "{{ nextcloud_reapply_all_clients_one_client_tasks }}"
+  loop: "{{ nextcloud_reapply_client_list }}"
+  loop_control:
+    label: "{{ item }}"
+  vars:
+    _current_client: "{{ item }}"

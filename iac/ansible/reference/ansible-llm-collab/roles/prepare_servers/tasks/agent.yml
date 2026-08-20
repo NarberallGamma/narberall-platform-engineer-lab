@@ -1,0 +1,131 @@
+---
+- name: Скачать .deb агента по URL (если указан)
+  ansible.builtin.get_url:
+    url: "{{ agent_deb_url }}"
+    dest: "{{ agent_remote_path }}"
+    mode: '0644'
+  when: agent_deb_url | length > 0
+
+- name: Скопировать .deb агента из папки artifacts (если используется локальный файл)
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../artifacts/{{ agent_deb_local }}"
+    dest: "{{ agent_remote_path }}"
+    mode: '0644'
+  when: agent_deb_url | length == 0 and agent_deb_local | length > 0
+
+- name: Проверить целостность .deb файла
+  ansible.builtin.command: "dpkg --info {{ agent_remote_path }}"
+  register: deb_info
+  changed_when: false
+  failed_when: false
+
+- name: Показать информацию о .deb файле
+  ansible.builtin.debug:
+    msg: "Deb info: {{ deb_info.stdout_lines[0:5] | join('\n') }}"
+  when: deb_info.rc == 0
+
+- name: Проверить установлен ли пакет edr-agent
+  ansible.builtin.shell: "dpkg -s edr-agent | grep -E '^Status: .* installed'"
+  register: bz_pkg
+  changed_when: false
+  failed_when: false
+
+- name: Подготовить переустановку EDR (kill, immutable, удаление каталога)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    pkill -9 -f '/opt/edr-vendor/Sensors/Agent/edr-agent' 2>/dev/null || true
+    pkill -9 -f bzsenedrcore 2>/dev/null || true
+    pkill -9 -f bzsenspsvc 2>/dev/null || true
+    sleep 3
+    if [[ -e /opt/edr-vendor/Sensors/Agent/edr-agent ]]; then
+      chattr -i /opt/edr-vendor/Sensors/Agent/edr-agent 2>/dev/null || true
+    fi
+    if [[ -d /opt/edr-vendor ]]; then
+      chattr -R -i /opt/edr-vendor 2>/dev/null || true
+      chattr -R -a /opt/edr-vendor 2>/dev/null || true
+      rm -rf /opt/edr-vendor
+    fi
+  changed_when: true
+  failed_when: false
+  when: >
+    agent_remove_before_install | default(false) | bool
+    or agent_force_reinstall | default(false) | bool
+
+- name: Удалить установленный edr-agent перед переустановкой
+  ansible.builtin.apt:
+    name: edr-agent
+    state: absent
+    purge: "{{ agent_remove_purge | default(true) | bool }}"
+  register: bz_pkg_remove
+  failed_when: false
+  when: >
+    agent_remove_before_install | default(false) | bool
+    or agent_force_reinstall | default(false) | bool
+
+- name: Принудительно удалить edr-agent если apt purge не завершился
+  ansible.builtin.shell: |
+    set -euo pipefail
+    dpkg --remove --force-remove-reinstreq edr-agent 2>/dev/null || true
+    dpkg --purge --force-remove-reinstreq edr-agent 2>/dev/null || true
+    rm -rf /opt/edr-vendor/Sensors/Agent 2>/dev/null || true
+    dpkg --configure -a 2>/dev/null || true
+  changed_when: false
+  failed_when: false
+  when: >
+    agent_remove_before_install | default(false) | bool
+    or agent_force_reinstall | default(false) | bool
+
+- name: Повторно проверить пакет после удаления
+  ansible.builtin.shell: "dpkg -s edr-agent | grep -E '^Status: .* installed'"
+  register: bz_pkg_after_remove
+  changed_when: false
+  failed_when: false
+  when: >
+    agent_remove_before_install | default(false) | bool
+    or agent_force_reinstall | default(false) | bool
+
+- name: Установить агент с ENV (чистая установка)
+  ansible.builtin.shell: |
+    export BZ_AUTHORITY_SERVICE="{{ agent_env.BZ_AUTHORITY_SERVICE }}" \
+           BZ_SENSORS_SERVICE="{{ agent_env.BZ_SENSORS_SERVICE }}" \
+           BZ_POLLING_PERIOD="{{ agent_env.BZ_POLLING_PERIOD }}" \
+           BZ_DIAL_TIMEOUT="{{ agent_env.BZ_DIAL_TIMEOUT }}" \
+           BZ_AGENT_GROUPS="{{ agent_env.BZ_AGENT_GROUPS }}"
+    for i in 1 2 3 4 5; do
+      if fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+        sleep 15
+        continue
+      fi
+      DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated "{{ agent_remote_path }}" && exit 0
+      sleep 15
+    done
+    exit 1
+  register: agent_install
+  retries: 2
+  delay: 20
+  until: agent_install.rc == 0
+  when: >
+    agent_remove_before_install | default(false) | bool
+    or agent_force_reinstall | default(false) | bool
+    or (bz_pkg.rc | default(1)) != 0
+
+- name: Задержка после установки агента для запуска сервиса
+  ansible.builtin.pause:
+    seconds: 5
+  when: agent_install is defined and agent_install.changed | default(false)
+
+- name: Проверить статус сервиса (если существует)
+  ansible.builtin.command: systemctl status edr-agent.service
+  register: bz_status
+  changed_when: false
+  failed_when: false
+
+- name: Показать статус сервиса
+  ansible.builtin.debug:
+    msg: "edr-vendor agent status: {{ bz_status.stdout_lines[0:3] | join('\n') }}"
+  when: bz_status.rc == 0
+
+- name: Показать ошибку если сервис не запущен
+  ansible.builtin.debug:
+    msg: "edr-vendor agent service not found or not running"
+  when: bz_status.rc != 0

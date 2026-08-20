@@ -1,0 +1,35 @@
+---
+db_config_file: /etc/mysql/my.cnf
+db_config_include_dir: /etc/mysql/conf.d
+db_socket: /var/run/mysqld/mysqld.sock
+
+db_service_name: mysql
+
+db_version: '5.7'
+
+db_apt_mirror: 'http://repo.mysql.com'
+db_apt_repositories:
+  - 'deb {{ db_apt_mirror }}/apt/{{ ansible_distribution | lower }}/ {{ ansible_distribution_release }} mysql-apt-config'
+  - 'deb {{ db_apt_mirror }}/apt/{{ ansible_distribution | lower }}/ {{ ansible_distribution_release }} mysql-{{ db_version }}'
+  - 'deb {{ db_apt_mirror }}/apt/{{ ansible_distribution | lower }}/ {{ ansible_distribution_release }} mysql-tools'
+  - 'deb-src {{ db_apt_mirror }}/apt/{{ ansible_distribution | lower }}/ {{ ansible_distribution_release }} mysql-{{ db_version }}'
+
+db_apt_keyserver: 'keyserver.ubuntu.com'
+db_apt_keyid: '8C718D3B5072E1F5'
+
+db_pip_dependencies:
+  - mysqlclient
+
+db_apt_dependencies:
+  - software-properties-common
+  - build-essential
+  - python3-mysqldb
+  - python3-pip
+
+db_apt_packages:
+  - mysql-server
+  - mysql-client
+
+db_apt_tools_packages:
+  - mysqltuner
+  - percona-toolkit

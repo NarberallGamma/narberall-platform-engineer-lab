@@ -1,0 +1,29 @@
+# Плейбук n8n_workflows: управление воркфлоу n8n как код (GitOps).
+# API key — из Vault (роль n8n_init): ключ ansible_main_n8n_api_key в Ubuntu_servers.
+# Запуск: ./scripts/run/run_n8n_workflows.sh [--all | --workflow ИМЯ] или ansible-playbook -i inventories/localhost/hosts.ini playbooks/n8n_workflows.yml.
+
+# URL n8n без завершающего слэша (тот же хост, что в браузере: https://n8n.x.example.com).
+n8n_base_url: "https://n8n.x.example.com"
+
+# Список воркфлоу для синхронизации: имена файлов без .json в roles/n8n_workflows/files/workflows/
+n8n_workflows_to_sync:
+  - nextcloud_groupfolders_webhook
+  - nextcloud_groupfolders_form
+
+# Vault: путь к секрету и имена **полей (ключей) внутри** KV (не сами значения). Задавать здесь или в vars плейбука / -e.
+# UI: Secrets → platform-infra → Ubuntu_servers. Содержимое секрета — пары "имя_поля": значение.
+n8n_vault_mount_point: "platform-infra"
+n8n_vault_path: "Ubuntu_servers"
+# Имена полей в секрете (значения — API key; для воркфлоу — только id credentials в n8n).
+n8n_vault_key_api_key: "ansible_main_n8n_api_key"
+n8n_vault_key_ssh_credential_id: "ansible_main_n8n_workflow_ssh_credential_id"
+n8n_vault_key_jwt_credential_id: "ansible_main_n8n_workflow_jwt_credential_id"
+# Читать id из Vault (роль n8n_init). false — id только из group_vars / -e (n8n_workflow_ssh_credential_id, n8n_workflow_jwt_credential_id).
+n8n_vault_inject_credential_ids: true
+# Подписи в JSON (не id): defaults роли — n8n_workflow_ssh_credential_name, n8n_workflow_webhook_credential_name (имя Header Auth в ноде Webhook), n8n_workflow_jwt_credential_name (запасной).
+
+# API key n8n: по умолчанию подтягивается из Vault. Если задать здесь (или в плейбуке / -e / CI Variables) — Vault не вызывается.
+# n8n_api_key: ""
+# Для доступа в Vault (токен с read на Ubuntu_servers) задать в окружении при запуске плейбука (в т.ч. в CI Variables репо):
+#   VAULT_ADDR=https://vault.x.example.com
+#   VAULT_TOKEN=<токен с доступом на чтение секрета Ubuntu_servers>

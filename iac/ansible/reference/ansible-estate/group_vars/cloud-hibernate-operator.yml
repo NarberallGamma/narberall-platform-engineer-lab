@@ -1,0 +1,38 @@
+# cloud-hibernate-operator — prod (фактически на estate-prod-gitlab, управляет preprod CCE)
+# Плейбук: playbooks/docker_app_cloud_hibernate_operator.yml | inventory: [cloud-hibernate-operator]
+#
+# Секреты: vault kv put ansible/cloud-hibernate-operator TELEGRAM_BOT_TOKEN=... IAM_PASSWORD=... API_KEYS=...
+
+docker_app_vault_mount_point: ansible
+docker_app_vault_path: cloud-hibernate-operator
+
+docker_app_vault_key_map:
+  TELEGRAM_BOT_TOKEN: TELEGRAM_BOT_TOKEN
+  IAM_PASSWORD: IAM_PASSWORD
+  API_KEYS: API_KEYS
+
+docker_app_registry: registry.example.com/platform/base-images
+
+docker_app:
+  slug: cloud-hibernate-operator
+  image: "{{ docker_app_registry }}/cloud-hibernate-operator:3.2.1"
+  api_port: 8081
+  telegram_chat_ids: "CHANGE_ME"
+  iam_endpoint: iam.example.com
+  iam_username: cce-ecs-hibernater
+  iam_domain_name: example-domain
+  iam_project_name: example-1
+  cce_endpoint: cce.example.com
+  ecs_endpoint: ecs.example.com
+  clusters_config: '[{"cluster_id":"00000000-0000-4000-8000-000000000001","name":"estate-preprod","project_id":"00000000-0000-4000-8000-000000000002","hibernate_schedule":"from 19:00 monday to 07:00 tuesday; from 19:00 tuesday to 07:00 wednesday; from 19:00 wednesday to 07:00 thursday; from 19:00 thursday to 07:00 friday; from 19:00 friday to 05:00 monday"}]'
+  ecs_instances_config: "[]"
+  schedule_enabled: true
+  api_enabled: true
+  api_auth_enabled: true
+  swagger_ui_enabled: true
+  telegram_egress:
+    enabled: true
+    network_name: telegram-vps-egress
+    extra_hosts:
+      - name: api.telegram.org
+        ip: 172.30.100.2

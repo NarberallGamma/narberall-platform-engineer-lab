@@ -1,0 +1,200 @@
+---
+- name: Создание пользователя в удалённой PostgreSQL и выдача прав
+  hosts: localhost
+  connection: local
+  become: no
+  gather_facts: no
+#  no_log: true
+  vars:
+    vault_addr: "{{ lookup('env','VAULT_ADDR_DEV') }}"
+    vault_token: "{{ lookup('env','VAULT_TOKEN_DEV') }}"
+    pg_host: "10.10.6.6"
+    pg_port: 5432
+    pg_admin_user: root
+    pg_admin_password: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=secret/data/postgres:loadtesting_admin_password', url=vault_addr, token=vault_token) }}"
+    default_encoding: "UTF8"  # Кодировка по умолчанию
+    default_lc_collate: "en_US.UTF-8"  # Локаль для сортировки по умолчанию
+    default_lc_ctype: "en_US.UTF-8"  # Локаль для классификации символов по умолчанию
+
+    target_schema: public
+
+
+    db:
+      #test2
+      - name: test2_dictionaries
+        vault_path: secret/data/dictionary-app/test2
+        vault_key: spring.datasource.password
+      - name: test2_notification
+        vault_path: secret/data/notification/test2
+        vault_key: spring.datasource.password
+      - name: test2_monolith
+        vault_path: secret/data/platform/test2
+        vault_key: spring.datasource.password
+      - name: test2_keycloak
+        vault_path: secret/data/keycloak/test2
+        vault_key: spring.datasource.password
+      - name: test2_currencyrate
+        vault_path: secret/data/currency-rate/test2
+        vault_key: spring.datasource.password
+      - name: test2_chat
+        vault_path: secret/data/chat-app/test2
+        vault_key: spring.datasource.password
+      - name: test2_partner_app
+        vault_path: secret/data/partner-app/test2-secret
+        vault_key: spring.datasource.password
+      - name: test2_ai_agent
+        vault_path: secret/data/ai_agent/test2
+        vault_key: spring.datasource.password
+      - name: test2_auth
+        vault_path: secret/data/auth/test2
+        vault_key: spring.datasource.password
+      - name: test2_news_service
+        vault_path: secret/data/news-service/test2
+        vault_key: spring.datasource.password
+      - name: test2_agreement
+        vault_path: secret/data/agreement/test2
+        vault_key: spring.datasource.password
+      - name: test2_tariff
+        vault_path: secret/data/tariff/test2
+        vault_key: spring.datasource.password
+      - name: test2_partner_app_partners
+        vault_path: secret/data/partner-app-partners/test2-secret
+        vault_key: spring.datasource.password
+      - name: test2_ai_assistant
+        vault_path: secret/data/ai_assistant/test2
+        vault_key: spring.datasource.password
+      - name: test2_bi_helper
+        vault_path: secret/data/bi-helper/test2
+        vault_key: spring.datasource.password
+
+    db_users:
+      - name: admin01
+        vault_path: secret/data/postgres
+        vault_key: admin01
+      - name: admin02
+        vault_path: secret/data/postgres
+        vault_key: admin02
+      - name: admin03
+        vault_path: secret/data/postgres
+        vault_key: admin03
+      - name: admin04
+        vault_path: secret/data/postgres
+        vault_key: admin04
+      - name: admin01
+        vault_path: secret/data/postgres
+        vault_key: admin01
+      - name: admin02
+        vault_path: secret/data/postgres
+        vault_key: admin02
+      - name: admin03
+        vault_path: secret/data/postgres
+        vault_key: admin03
+      - name: admin05
+        vault_path: secret/data/postgres
+        vault_key: admin05
+      - name: admin04
+        vault_path: secret/data/postgres
+        vault_key: admin04
+      - name: admin06
+        vault_path: secret/data/postgres
+        vault_key: admin06
+      - name: admin07
+        vault_path: secret/data/postgres
+        vault_key: admin07
+      - name: admin08
+        vault_path: secret/data/postgres
+        vault_key: admin08
+      - name: admin09
+        vault_path: secret/data/postgres
+        vault_key: admin09
+      - name: admin10
+        vault_path: secret/data/postgres
+        vault_key: admin10
+      - name: admin11
+        vault_path: secret/data/postgres
+        vault_key: admin11
+      - name: admin12
+        vault_path: secret/data/postgres
+        vault_key: admin12
+      - name: admin13
+        vault_path: secret/data/postgres
+        vault_key: admin13
+      - name: admin14
+        vault_path: secret/data/postgres
+        vault_key: admin14
+      - name: admin15
+        vault_path: secret/data/postgres
+        vault_key: admin15
+      - name: admin16
+        vault_path: secret/data/postgres
+        vault_key: admin16
+      - name: admin17
+        vault_path: secret/data/postgres
+        vault_key: admin17
+      - name: admin-00017
+        vault_path: secret/data/postgres
+        vault_key: admin-00017
+      - name: admin18
+        vault_path: secret/data/postgres
+        vault_key: admin18
+      - name: admin19
+        vault_path: secret/data/postgres
+        vault_key: admin19
+      - name: admin20
+        vault_path: secret/data/postgres
+        vault_key: admin20
+      - name: admin21
+        vault_path: secret/data/postgres
+        vault_key: admin21
+      - name: admin22
+        vault_path: secret/data/postgres
+        vault_key: admin22
+      - name: admin23
+        vault_path: secret/data/postgres
+        vault_key: admin23
+      - name: admin24
+        vault_path: secret/data/postgres
+        vault_key: admin24
+      - name: admin25
+        vault_path: secret/data/postgres
+        vault_key: admin25
+      - name: admin26
+        vault_path: secret/data/postgres
+        vault_key: admin26
+      - name: admin27
+        vault_path: secret/data/postgres
+        vault_key: admin27
+      - name: admin28
+        vault_path: secret/data/postgres
+        vault_key: admin28
+      - name: admin29
+        vault_path: secret/data/postgres
+        vault_key: admin29
+      - name: admin30
+        vault_path: secret/data/postgres
+        vault_key: admin30
+      - name: admin31
+        vault_path: secret/data/postgres
+        vault_key: admin31
+      - name: admin32
+        vault_path: secret/data/postgres
+        vault_key: admin32
+      - name: admin33
+        vault_path: secret/data/postgres
+        vault_key: admin33
+      - name: admin34
+        vault_path: secret/data/postgres
+        vault_key: admin34
+      - name: admin35
+        vault_path: secret/data/postgres
+        vault_key: admin35
+      - name: admin36
+        vault_path: secret/data/postgres
+        vault_key: admin36
+
+
+    users: root
+
+  roles:
+      - db-pass
+      - db

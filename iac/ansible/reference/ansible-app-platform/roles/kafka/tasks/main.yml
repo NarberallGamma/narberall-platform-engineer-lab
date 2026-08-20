@@ -1,0 +1,133 @@
+---
+- name: Ensure dirs is created
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "1000"
+    group: "1000"
+    mode: "0700"
+  with_items:
+    - {
+        path: "{{ kafka_docker_dir }}"
+      }
+    - {
+        path: "{{ kafka_configs_dir }}"
+      }
+    - {
+        path: "{{ kafka_certs_dir }}"
+      }
+    - {
+        path: "{{ kafka_data_dir }}"
+      }
+
+- name: Configuration files
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest | default(kafka_configs_dir) }}"
+    mode: "0600"
+    owner: "1000"
+    group: "1000"
+  with_items:
+    - {
+        src: client.properties
+      }
+    - {
+        src: server.properties
+      }
+  notify: Reboot docker-compose
+
+- name: Certificate files
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest | default(kafka_certs_dir) }}"
+    mode: "0600"
+    owner: "1000"
+    group: "1000"
+  with_items:
+    - {
+        src: ca.crt.example
+      }
+    - {
+        src: eip.pem.example
+      }
+    - {
+        src: "{{ kafka_host_id }}.pem.example"
+      }
+  notify: Reboot docker-compose
+
+- name: Script files
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest | default(kafka_certs_dir) }}"
+    mode: "0700"
+    owner: "0000"
+    group: "0000"
+  with_items:
+    - {
+        src: "download.sh"
+      }
+  notify: Reboot docker-compose
+
+- name: Script files to docker dir
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest | default(kafka_docker_dir) }}"
+    mode: "0700"
+    owner: "0000"
+    group: "0000"
+  with_items:
+    - {
+        src: "check-and-restart.sh"
+      }
+  notify: Reboot docker-compose
+
+- name: Cron files
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest | default(kafka_docker_dir) }}"
+    mode: "6000"
+    owner: "0000"
+    group: "0000"
+  with_items:
+    - {
+        src: "crontab"
+      }
+  notify: Reboot docker-compose
+
+#- name: Log into gitlab registry
+#  docker_login:
+#    registry_url: "{{ registry.url }}"
+#    username: "{{ registry.user }}"
+#    password: "{{ registry.pass }}"
+
+- name: Copy docker-compose from template
+  template:
+    src: "docker-compose.yml"
+    dest: "{{ kafka_docker_dir }}/docker-compose.yml"
+    mode: 0600
+
+
+- name: Install docker
+  apt:
+    name:
+      - docker-compose-v2 
+    state: present
+    update_cache: yes
+
+- name: Start the composes v2 projects
+  community.docker.docker_compose_v2:
+    project_src: "{{ kafka_docker_dir }}"
+    remove_orphans: yes
+
+- name: Add cron job to clean old Kafka logs in Docker compose plugin
+  ansible.builtin.cron:
+    name: "Clean Kafka logs older than 30 days plugin"
+    user: "{{ kafka_cron_user | default('root') }}"
+    minute: 0
+    hour: 3
+    job: >
+      docker compose -f {{ kafka_docker_dir }}/docker-compose.yml exec -T kafka
+      find /opt/kafka/logs -type f -mtime +30 -name "*.log*" -delete
+    state: present
+  tags:
+    - kafka-cron

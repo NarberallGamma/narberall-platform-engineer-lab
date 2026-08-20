@@ -1,0 +1,21 @@
+services:
+  cert-monitoring:
+    image: {{ app_item.value.image }}
+    container_name: cert-monitoring
+    restart: unless-stopped
+{% include 'snippets/telegram_egress_service.yml.j2' %}
+    env_file:
+      - .env
+    environment:
+      CONFIG_FILE: /etc/cert-monitoring.conf
+    volumes:
+      - ./config/cert-monitoring.conf:/etc/cert-monitoring.conf:ro
+      - ./logs:/app/logs
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; assert os.path.exists('/etc/cert-monitoring.conf')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+{% include 'snippets/telegram_egress_networks.yml.j2' %}

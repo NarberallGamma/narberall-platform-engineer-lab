@@ -1,0 +1,9 @@
+# Managed by Ansible (prepare_vps_cluster)
+
+{% for server in vps_chrony_servers %}
+pool {{ server }} iburst
+{% endfor %}
+
+makestep 1.0 3
+rtcsync
+logdir /var/log/chrony

@@ -1,0 +1,87 @@
+---
+# Vault Secrets Role - загрузка секретов в Vault
+# Эта роль загружает секреты из group_vars в Vault KV v2
+
+- name: Check if VAULT_TOKEN is set
+  fail:
+    msg: "VAULT_TOKEN environment variable is required"
+  when: lookup('env', 'VAULT_TOKEN') == ''
+  tags: [vault, secrets, check]
+
+- name: Display Vault configuration
+  debug:
+    msg:
+      - "Vault Address: {{ vault_addr }}"
+      - "Mount Point: {{ vault_mount_point }}"
+      - "Secrets to upload: {{ vault_secrets | length }}"
+  tags: [vault, secrets, info]
+
+- name: Enable KV v2 secrets engine (if not enabled)
+  uri:
+    url: "{{ vault_addr }}/v1/sys/mounts/{{ vault_mount_point }}"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ lookup('env', 'VAULT_TOKEN') }}"
+    body_format: json
+    body:
+      type: "kv"
+      options:
+        version: "2"
+    status_code: [200, 204, 400]
+    validate_certs: no
+  register: mount_result
+  failed_when: false
+  tags: [vault, secrets, mount]
+
+- name: Display mount result
+  debug:
+    msg: "Mount result: {{ 'Already exists' if mount_result.status == 400 else 'Created successfully' }}"
+  tags: [vault, secrets, mount]
+
+- name: Upload secrets to Vault
+  uri:
+    url: "{{ vault_addr }}/v1/{{ vault_mount_point }}/data/{{ item.path }}"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ lookup('env', 'VAULT_TOKEN') }}"
+    body_format: json
+    body:
+      data: "{{ item.data }}"
+    status_code: [200, 204]
+    validate_certs: no
+  loop: "{{ vault_secrets }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+  register: upload_result
+  tags: [vault, secrets, upload]
+
+- name: Display upload summary
+  debug:
+    msg:
+      - "=== SECRETS UPLOAD COMPLETE ==="
+      - "Total secrets uploaded: {{ vault_secrets | length }}"
+      - "Vault Address: {{ vault_addr }}"
+      - "Mount Point: {{ vault_mount_point }}"
+  tags: [vault, secrets, summary]
+
+- name: Verify secrets are accessible
+  uri:
+    url: "{{ vault_addr }}/v1/{{ vault_mount_point }}/data/{{ item.path }}"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ lookup('env', 'VAULT_TOKEN') }}"
+    status_code: [200]
+    validate_certs: no
+  loop: "{{ vault_secrets }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: verify_result
+  tags: [vault, secrets, verify]
+
+- name: Display verification result
+  debug:
+    msg: "All {{ vault_secrets | length }} secrets verified successfully!"
+  tags: [vault, secrets, verify]
+
+

@@ -1,0 +1,28 @@
+---
+# cryptopro (/docker/apps/cryptopro)
+# VM cryptopro-01; TLS на edge-lb. Сертификат подписи: Swagger importCertificate после deploy.
+# Переменные: group_vars/cryptopro.yml
+#
+#   ./scripts/run/run_docker_app.sh deploy cryptopro --prod --limit estate-prod-cryptopro-01
+
+- name: Deploy cryptopro (VM)
+  hosts: cryptopro_vm
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/cryptopro.yml"
+
+  pre_tasks:
+    - name: Deployment info
+      ansible.builtin.debug:
+        msg:
+          - "Host: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "App: {{ docker_app.slug }}"
+          - "Image: {{ docker_app.app_image }}"
+          - "Host port: {{ docker_app.host_port }}"
+          - "Path: {{ docker_app_base_dir }}/{{ docker_app.slug }}"
+          - "DB: {{ cryptopro_db_host }}/{{ cryptopro_db_name }}"
+
+  roles:
+    - docker_app

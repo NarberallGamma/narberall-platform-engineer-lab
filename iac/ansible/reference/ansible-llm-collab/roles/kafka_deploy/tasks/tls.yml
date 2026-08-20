@@ -1,0 +1,56 @@
+---
+# Самоподписанный сертификат и PKCS12 для listener SASL_SSL.
+# Повторный прогон не перезаписывает существующий kafka.keystore.p12 — удалить файл для перевыпуска.
+
+- name: Проверить наличие keystore
+  ansible.builtin.stat:
+    path: "{{ kafka_config_dir }}/ssl/kafka.keystore.p12"
+  register: kafka_keystore_stat
+
+- name: Сгенерировать TLS-ключ и сертификат для брокера
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - req
+      - -new
+      - -x509
+      - -days
+      - "3650"
+      - -nodes
+      - -out
+      - "{{ kafka_config_dir }}/ssl/kafka.crt"
+      - -keyout
+      - "{{ kafka_config_dir }}/ssl/kafka.key"
+      - -subj
+      - "/CN={{ kafka_ssl_cert_cn }}"
+      - -addext
+      - "subjectAltName=DNS:{{ kafka_ssl_cert_cn }}"
+  when: not kafka_keystore_stat.stat.exists
+
+- name: Собрать PKCS12 keystore
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - pkcs12
+      - -export
+      - -in
+      - "{{ kafka_config_dir }}/ssl/kafka.crt"
+      - -inkey
+      - "{{ kafka_config_dir }}/ssl/kafka.key"
+      - -out
+      - "{{ kafka_config_dir }}/ssl/kafka.keystore.p12"
+      - -name
+      - kafka
+      - -password
+      - "pass:{{ kafka_ssl_keystore_password }}"
+  when: not kafka_keystore_stat.stat.exists
+  no_log: true
+
+- name: Права на файлы TLS
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: "{{ '0600' if ('.key' in item) else '0644' }}"
+  loop:
+    - "{{ kafka_config_dir }}/ssl/kafka.key"
+    - "{{ kafka_config_dir }}/ssl/kafka.crt"
+  when: not kafka_keystore_stat.stat.exists

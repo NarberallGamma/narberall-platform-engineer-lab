@@ -1,0 +1,56 @@
+# Managed by ansible (sec_stack): генерится из SOPS-секретов поверх
+# stack/alertmanager/alertmanager.yml. Правки — в шаблоне роли.
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+route:
+  receiver: default
+  group_by: [alertname, site]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  routes:
+    # Heartbeat уходит отдельно и часто, минуя группировку
+    - matchers: [alertname = DeadManSwitch]
+      receiver: heartbeat
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+    - matchers: [severity = critical]
+      receiver: critical
+
+receivers:
+  - name: default
+{% if sec_stack_telegram_bot_token and sec_stack_telegram_chat_id_default %}
+    telegram_configs:
+      - bot_token: "{{ sec_stack_telegram_bot_token }}"
+        chat_id: {{ sec_stack_telegram_chat_id_default }}
+        parse_mode: HTML
+        message: '{{ '{{ template "sec_stack.telegram" . }}' }}'
+{% endif %}
+
+  - name: critical
+{% if sec_stack_telegram_bot_token and sec_stack_telegram_chat_id_critical %}
+    telegram_configs:
+      - bot_token: "{{ sec_stack_telegram_bot_token }}"
+        chat_id: {{ sec_stack_telegram_chat_id_critical }}   # чат "вахтёр ругается"
+        parse_mode: HTML
+        message: '{{ '{{ template "sec_stack.telegram" . }}' }}'
+{% endif %}
+
+  - name: heartbeat
+{% if sec_stack_heartbeat_url %}
+    webhook_configs:
+      - url: "{{ sec_stack_heartbeat_url }}"
+        send_resolved: false
+{% endif %}
+
+inhibit_rules:
+  # Если файрвол целиком недоступен — не спамить про его туннели/лицензии
+  - source_matchers: [alertname = PanosUnreachable]
+    target_matchers: [alertname =~ "Panos(IpsecTunnelDown|HAUnhealthyState|SessionUsageHigh)"]
+    equal: [firewall]
+  # NB: правила PanosHAUnhealthyState -> PanosIpsecTunnelDown здесь СОЗНАТЕЛЬНО нет.
+  # HAUnhealthyState срабатывает и когда нездоров peer, а метка firewall у него —
+  # локальной ноды: при peer=suspended оно гасило туннель-алерты ЗДОРОВОЙ активной
+  # ноды. Не-активные ноды отсекаются в самом правиле PanosIpsecTunnelDown (vmalert).

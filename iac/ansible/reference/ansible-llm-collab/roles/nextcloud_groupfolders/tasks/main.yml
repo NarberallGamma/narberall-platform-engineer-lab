@@ -1,0 +1,56 @@
+---
+# Роль nextcloud_groupfolders: структура папок группового ресурса по матрице + права.
+# Матрица: nextcloud-dev → matrix_nextcloud_dev_cloud_platform.yaml; nextcloud-prod → matrix_nextcloud_prod_cloud_platform.yaml; regul → matrix_regul_cloud_platform.yaml —
+# выбор через nextcloud_matrix_profile_by_host и nextcloud_profile_map (см. group_vars/nextcloud_groupfolders.yml).
+# WebDAV — из Vault (роль nextcloud_init), URL может переопределяться профилем.
+#
+# По ТЗ/матрице: только просмотр (view) и редактирование (edit). Соответствие:
+#   view (явный список групп) → +read (nextcloud_occ_view_permissions);
+#   view = маркер __NC_MATRIX_RO_ALL__ → каждая группа из объединения матрицы без edit на этой строке → nextcloud_occ_ro_permissions;
+#   edit → nextcloud_occ_edit_permissions (+rwcd и явный -- -share в occ, как в UI).
+# Права по путям: на каждый путь в матрице с occ_skip: false — те группы и права, что в view/edit; подпапки L4 из children_mkcol
+# наследуют view/edit узла родителя (явный occ), исключение — элементы из children с { name, view, edit } (напр. только Assistant на «Договоры»).
+#
+# 1) WebDAV MKCOL — создание папок по матрице (идемпотентно).
+# 2) Права на корень: occ groupfolders:group (при nextcloud_apply_root_groups) — для видимости папки.
+# 3) Права по путям: occ groupfolders:permissions (при nextcloud_apply_per_folder_permissions); deny — matrix_deny (deny_on_l4_children).
+#
+# Режим reapply по всем: nextcloud_reapply_all_clients_enabled; при nextcloud_reapply_all_clients_mkcol_enabled —
+# для каждого клиента из списка в корне groupfolder сначала MKCOL по матрице, затем те же occ, что без MKCOL.
+# Режим только ACL без MKCOL для одного client_name: nextcloud_reapply_permissions_only (+ client_name).
+# Режим сброса LDAP (nextcloud_ldap_reset_groups_enabled + список групп): выполняется только ldap:reset-group.
+#
+# Профиль матрицы / groupfolder / WebDAV по inventory_hostname (см. group_vars nextcloud_matrix_profile_by_host).
+- name: Профиль groupfolders (host → nextcloud-dev|nextcloud-prod|regul)
+  ansible.builtin.include_tasks: groupfolders_profile.yml
+  tags: always
+
+# В зависимости от vars: точечное переиграждение ACL одному клиенту, reapply по всем, LDAP или основной сценарий (MKCOL+права).
+- name: Таска переиграть только ACL по матрице для одного клиента без MKCOL (groupfolders_reapply_one_client)
+  ansible.builtin.include_tasks: groupfolders_reapply_one_client.yml
+  vars:
+    _current_client: "{{ client_name }}"
+  when:
+    - nextcloud_reapply_permissions_only | default(false) | bool
+    - not (nextcloud_reapply_all_clients_enabled | default(false) | bool)
+    - not (nextcloud_ldap_reset_groups_enabled | default(false) | bool)
+
+- name: Таска повторного применения прав по всем клиентам (groupfolders_reapply_all_clients)
+  ansible.builtin.include_tasks: groupfolders_reapply_all_clients.yml
+  when:
+    - nextcloud_reapply_all_clients_enabled | default(false) | bool
+    - not (nextcloud_reapply_permissions_only | default(false) | bool)
+
+- name: Таска сброса кеша LDAP-групп (groupfolders_etc_ldap_reset)
+  ansible.builtin.include_tasks: groupfolders_etc_ldap_reset.yml
+  when:
+    - nextcloud_ldap_reset_groups_enabled | default(false) | bool
+    - (nextcloud_ldap_reset_groups | default([])) | length > 0
+    - not (nextcloud_reapply_permissions_only | default(false) | bool)
+
+- name: Таска основной логики — один клиент, матрица, папки, права (groupfolders_main)
+  ansible.builtin.include_tasks: groupfolders_main.yml
+  when:
+    - not (nextcloud_reapply_all_clients_enabled | default(false) | bool)
+    - not (nextcloud_reapply_permissions_only | default(false) | bool)
+    - not (nextcloud_ldap_reset_groups_enabled | default(false) | bool)

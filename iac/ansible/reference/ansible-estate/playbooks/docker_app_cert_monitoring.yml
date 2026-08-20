@@ -1,0 +1,24 @@
+---
+# Deploy cert-monitoring (docker compose в /docker/apps/cert-monitoring)
+# Хосты: inventory group [cert-monitoring] (любая VM)
+# Переменные: group_vars/cert-monitoring.yml (vars_files — не зависит от пути inventory)
+
+- name: Deploy cert-monitoring
+  hosts: cert_monitoring
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/cert-monitoring.yml"
+
+  pre_tasks:
+    - name: Deployment info
+      ansible.builtin.debug:
+        msg:
+          - "Host: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "App: {{ docker_app.slug }}"
+          - "Path: {{ docker_app_base_dir }}/{{ docker_app.slug }}"
+          - "Vault: {{ docker_app_vault_mount_point }}/{{ docker_app_vault_path }}"
+
+  roles:
+    - docker_app

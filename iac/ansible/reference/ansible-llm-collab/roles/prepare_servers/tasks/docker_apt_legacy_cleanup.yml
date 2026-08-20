@@ -1,0 +1,41 @@
+---
+# Удаление legacy apt sources Docker (docker.gpg) перед добавлением docker.asc.
+# Конфликт: E: Conflicting values set for option Signed-By ... docker.gpg != docker.asc
+
+- name: Удалить legacy keyring docker.gpg
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/docker.gpg
+    state: absent
+  tags: [docker]
+
+- name: Удалить legacy list-файл docker (apt_repository)
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/docker.list
+    state: absent
+  tags: [docker]
+
+- name: Удалить legacy sources.list.d с download.docker.com
+  ansible.builtin.find:
+    paths: /etc/apt/sources.list.d
+    patterns: "*.list"
+    contains: "download.docker.com"
+  register: docker_legacy_apt_sources
+  tags: [docker]
+
+- name: Убрать legacy list-файлы Docker apt
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ docker_legacy_apt_sources.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: docker_legacy_apt_sources.matched | default(0) | int > 0
+  tags: [docker]
+
+- name: Убрать строки Docker из /etc/apt/sources.list (legacy)
+  ansible.builtin.lineinfile:
+    path: /etc/apt/sources.list
+    regexp: '.*download\.docker\.com.*'
+    state: absent
+  failed_when: false
+  tags: [docker]

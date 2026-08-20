@@ -1,0 +1,14 @@
+---
+# Handlers for Vault Load Balancer role
+
+- name: restart nginx
+  systemd:
+    name: nginx
+    state: restarted
+  listen: restart nginx
+
+- name: restart keepalived
+  systemd:
+    name: keepalived
+    state: restarted
+  listen: restart keepalived

@@ -1,0 +1,18 @@
+# Node Exporter (Prometheus) — {{ inventory_hostname }}
+# Плейбук: playbooks/node-exporter-deploy.yml
+services:
+  node-exporter:
+    image: {{ node_exporter_image }}
+    container_name: {{ node_exporter_container_name }}
+    restart: always
+    network_mode: host
+    pid: host
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /:/host:ro,rslave
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
+    command:
+{% for arg in node_exporter_command %}
+      - {{ arg }}
+{% endfor %}

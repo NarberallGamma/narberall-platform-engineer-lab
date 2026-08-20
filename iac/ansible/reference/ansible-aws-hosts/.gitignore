@@ -1,0 +1,12 @@
+inventories/hosts.ini
+inventories/host_vars/
+*.retry
+.vault_pass
+.vault_pass.txt
+roles/users/files/*.password
+roles/users/files/*.pub
+roles/install-backup/files/authorized_keys.borg
+roles/install-backup/files/authorized_keys.jenkins
+roles/install-bastion/files/config
+roles/db/vars/replication_password.yml
+roles/db/vars/proxysql_passwords.yml

@@ -1,0 +1,70 @@
+# treasury-policy-gateway — docker app (prod VM cryptopro-01).
+# Master keys CryptoPro: bind mount ./data/cprocsp/keys (ручной перенос с hsm-adapter, без migrate в playbook).
+# TLS на edge-lb (vhost policy-gateway.example.com, не web-treasury WAF).
+# Плейбук: playbooks/docker_app_treasury_policy_gateway.yml | inventory: [cryptopro_vm]
+#
+# Секреты: Vault mount secret, path treasury-policy-gateway-app (как ESO в k8s preprod).
+
+docker_app_vault_mount_point: secret
+docker_app_vault_path: treasury-policy-gateway-app
+docker_app_vault_key_map:
+  FILE_STORAGE_S3_ACCESS_KEY: file-storage.s3.accessKey
+  FILE_STORAGE_S3_SECRET_KEY: file-storage.s3.secretKey
+  TREASURY_POLICY_GATEWAY_DGTRY_PIN: treasury.policy-gateway.dgtry.pin
+  EXTERNAL_CSP_LICENSE: EXTERNAL_CSP_LICENSE
+  KAFKA_TRUSTSTORE_PASSWORD: spring.kafka.properties.ssl.truststore.password
+# Kafka password: как ESO preprod — secret/treasury-kafka, не treasury-policy-gateway-app
+docker_app_vault_extra_reads:
+  - path: treasury-kafka
+    mount: secret
+    key_map:
+      KAFKA_CLIENT_PASSWORD: kafkaClientPassword
+# Kafka CA: файл roles/docker_app/files/treasury-policy-gateway/kafka-ca-prod.crt (из k8s secret kafka-ca-cert)
+
+docker_app_base_dir: /docker/apps
+docker_app_compose_pull: always
+
+docker_app:
+  slug: treasury-policy-gateway
+  app_image: registry.example.com/treasury/treasury-policy-gateway-app:3.0.2
+  cryptopro_bootstrap_image: registry.example.com/devops/cryptopro:latest
+  kafka_truststore_init_image: eclipse-temurin:11-jre
+  host_port: 8082
+  healthcheck_port: 8082
+  # Treasury 3.0 dgtry + rocksdb (doc 18 / PREPROD YOUR_DATA) — required to avoid circular placeholders
+  dgtry_mode: PREGEN
+  dgtry_checksum: ANY
+  dgtry_recovery_public_key: ""
+  dgtry_recovery_public_key_any: true
+  rocksdb_data_dir: /service/data
+  rocksdb_db_key: NONE
+  bitcoin_network: MAINNET
+  logging_level_root: INFO
+  logging_level_treasury: INFO
+
+treasury_policy_gateway_data_uid: "10001"
+treasury_policy_gateway_data_gid: "10001"
+treasury_policy_gateway_data_dirs:
+  - { path: data/service, mode: "0750" }
+  - { path: data/cprocsp/keys, mode: "0750" }
+  - { path: data/cprocsp/users, mode: "0750" }
+  - { path: data/cprocsp/dsrf, mode: "0750" }
+  - { path: data/kafka-truststore, mode: "0755" }
+  - { path: config, mode: "0755" }
+
+# Kafka (prod DMS)
+treasury_policy_gateway_kafka_bootstrap: "kafka-2.example.com:9093,kafka-0.example.com:9093,kafka-1.example.com:9093"
+treasury_policy_gateway_kafka_consumer_group: treasury-policy-gateway-group-replica-0
+
+# S3 / OBS (prod bucket — сверить с фактическим OBS перед deploy)
+treasury_policy_gateway_s3_url: https://estate-prod-treasury-policy-gateway.obs.example.com
+treasury_policy_gateway_s3_bucket: estate-prod-treasury-policy-gateway
+treasury_policy_gateway_s3_region: example-1
+
+# Feign (cert-verifier / pki в k8s — URL через ingress или internal; уточнить перед prod cutover)
+treasury_policy_gateway_cert_verifier_url: http://treasury-cert-verifier-service-application:8080
+treasury_policy_gateway_pki_gateway_url: http://treasury-pki-gateway-service-application:8080
+
+# Публичный URL (edge-lb, конфиг позже)
+treasury_policy_gateway_public_domain: policy-gateway.example.com
+treasury_policy_gateway_public_path_prefix: /api/v0/treasury-policy-gateway/

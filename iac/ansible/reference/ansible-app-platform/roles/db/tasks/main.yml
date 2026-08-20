@@ -1,0 +1,147 @@
+- name: Установить psycopg2 при необходимости
+  ansible.builtin.pip:
+    name: psycopg2-binary
+    state: present
+
+- name: Ensure PostgreSQL group (NOLOGIN role) exists
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}_owner_role"
+    role_attr_flags: "NOLOGIN"
+    state: present
+    login_db: postgres
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db }}"
+
+- name: "Создание баз данных PostgreSQL"
+  community.general.postgresql_db:
+    name: "{{ item.name }}"
+    encoding: "{{ default_encoding }}"
+    lc_collate: "{{ default_lc_collate }}"
+    lc_ctype: "{{ default_lc_ctype }}"
+    owner: "{{ item.name }}_owner_role"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db }}"
+
+- name: Ensure PostgreSQL user exists (tuz)
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=' + item.vault_path + ':' + item.vault_key, url=vault_addr, token=vault_token) }}"
+    role_attr_flags: "LOGIN"
+    state: present
+    login_db: postgres
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db }}"
+
+- name: Ensure PostgreSQL user exists (users)
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=' + item.vault_path + ':' + item.vault_key, url=vault_addr, token=vault_token) }}"
+    role_attr_flags: "LOGIN"
+    state: present
+    login_db: postgres
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db_users }}"
+
+- name: Grant role to tech user
+  community.postgresql.postgresql_membership:
+    target_roles: "{{ item.name }}"
+    groups: "{{ item.name }}_owner_role"
+    state: present
+    login_db: postgres
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db }}"
+
+- name: Grant all roles to root
+  community.postgresql.postgresql_membership:
+    target_roles: "root"
+    groups: "{{ item.name }}_owner_role"
+    state: present
+    login_db: postgres
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db }}"
+
+- name: Grant all roles to users
+  community.postgresql.postgresql_membership:
+    target_roles: "{{ db_users | map(attribute='name') | list }}"
+    groups: "{{ item.name }}_owner_role"
+    state: present
+    login_db: postgres
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db }}"
+
+- name: ALTER DEFAULT PRIVILEGES ON DATABASE
+  community.postgresql.postgresql_privs:
+    login_db: "{{ item.name }}"
+    objs: ALL_DEFAULT
+    privs: ALL
+    type: default_privs
+    role: "{{ item.name }}_owner_role"
+    grant_option: true
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db }}"
+
+- name: Reassign all databases all objects in database
+  community.postgresql.postgresql_owner:
+    new_owner: "{{ item.name }}_owner_role"
+    login_db: "{{ item.name }}"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+  loop: "{{ db }}"
+
+- name: Grant all necessary privileges on public schema to group
+  community.postgresql.postgresql_privs:
+    login_db: "{{ item.name }}"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    database: "{{ item.name }}"
+    objs: public
+    privs: "USAGE,CREATE"
+    type: schema
+    role: "{{ item.name }}_owner_role"
+    grant_option: false
+    state: present
+  loop: "{{ db }}"
+
+- name: Configure users to SET ROLE to group automatically
+  community.postgresql.postgresql_query:
+    login_db: postgres
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    query: |
+      {% for db_item in db %}
+        {% for user in db_users | default([]) %}
+          ALTER USER "{{ user.name }}" IN DATABASE "{{ db_item.name }}" SET ROLE "{{ db_item.name }}_owner_role";
+        {% endfor %}
+        ALTER USER "{{ db_item.name }}" IN DATABASE "{{ db_item.name }}" SET ROLE "{{ db_item.name }}_owner_role";
+      {% endfor %}
+

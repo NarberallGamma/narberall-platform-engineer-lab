@@ -1,0 +1,5 @@
+# Managed by Ansible (docker_app). Vault {{ docker_app_vault_mount_point }}/{{ docker_app_vault_path }}
+SPRING_DATASOURCE_USERNAME={{ app_vault.SPRING_DATASOURCE_USERNAME | default('') | replace('$', '$$') }}
+SPRING_DATASOURCE_PASSWORD={{ app_vault.SPRING_DATASOURCE_PASSWORD | default('') | replace('$', '$$') }}
+SPRING_FLYWAY_USER={{ app_vault.SPRING_FLYWAY_USER | default('') | replace('$', '$$') }}
+SPRING_FLYWAY_PASSWORD={{ app_vault.SPRING_FLYWAY_PASSWORD | default('') | replace('$', '$$') }}

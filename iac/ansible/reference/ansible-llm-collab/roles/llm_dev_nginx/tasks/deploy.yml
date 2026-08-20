@@ -1,0 +1,58 @@
+---
+- name: Основной nginx.conf для контейнера (http {}, без stream)
+  ansible.builtin.template:
+    src: nginx-main.conf.j2
+    dest: "{{ llm_dev_nginx_root }}/nginx.conf"
+    mode: "0644"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+- name: Виртуальный хост LLM dev (HTTPS + раздельные location и логи)
+  ansible.builtin.template:
+    src: llm_dev_site.conf.j2
+    dest: "{{ llm_dev_nginx_root }}/config/{{ llm_dev_public_server_name }}.conf"
+    mode: "0644"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+- name: docker-compose.yml для nginx (host network)
+  ansible.builtin.template:
+    src: nginx-docker-compose.yml.j2
+    dest: "{{ llm_dev_nginx_root }}/docker-compose.yml"
+    mode: "0644"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+- name: Поднять или обновить контейнер nginx
+  community.docker.docker_compose_v2:
+    project_src: "{{ llm_dev_nginx_root }}"
+    project_name: "{{ llm_dev_nginx_compose_project_name }}"
+    state: present
+    pull: "{{ llm_dev_nginx_compose_pull | default('missing') }}"
+    recreate: "{{ llm_dev_compose_recreate | default('always') }}"
+  async: "{{ llm_dev_compose_async_seconds | default(10800) | int }}"
+  poll: "{{ llm_dev_compose_poll_seconds | default(15) | int }}"
+
+- name: Проверка синтаксиса nginx внутри контейнера
+  ansible.builtin.command:
+    cmd: docker exec "{{ llm_dev_nginx_container_name | default('llm-dev-nginx') }}" nginx -t
+  register: llm_dev_nginx_syntax
+  changed_when: false
+
+- name: Применить конфигурацию nginx (reload)
+  ansible.builtin.command:
+    cmd: docker exec "{{ llm_dev_nginx_container_name | default('llm-dev-nginx') }}" nginx -s reload
+  register: llm_dev_nginx_reload
+  changed_when: llm_dev_nginx_reload.rc == 0
+  failed_when: false
+
+- name: Пересоздать контейнер nginx при неудачном reload
+  community.docker.docker_compose_v2:
+    project_src: "{{ llm_dev_nginx_root }}"
+    project_name: "{{ llm_dev_nginx_compose_project_name }}"
+    state: present
+    services:
+      - nginx
+    pull: "{{ llm_dev_nginx_compose_pull | default('missing') }}"
+    recreate: "{{ llm_dev_compose_recreate | default('always') }}"
+  when: llm_dev_nginx_reload.rc | default(1) != 0

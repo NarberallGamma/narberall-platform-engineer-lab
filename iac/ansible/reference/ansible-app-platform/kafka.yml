@@ -1,0 +1,74 @@
+- name: Install kafka preprod
+  hosts:
+    - kafka-public-ift-0001
+    - kafka-public-ift-0002
+    - kafka-public-ift-0003
+  vars:
+    vault_token: "{{ lookup('env','VAULT_TOKEN_DEV') }}"
+    vault_addr: "{{ lookup('env','VAULT_ADDR_DEV') }}"
+    kafka_secret_path: secret/data/kafka-ift
+    kafka_eip_secret_name: kafka-ift-eip
+    controller_quorum_voters: "0@10.10.9.248:9091,1@10.10.9.76:9091,2@10.10.9.33:9091"
+    super_users: "User:CN=ift-admin;User:CN=kafka-public-ift-0001;User:CN=kafka-public-ift-0002;User:CN=kafka-public-ift-0003"
+  become: True
+  tags: kafka-preprod
+  roles:
+    - kafka
+  handlers:
+    - name: Reboot docker-compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ kafka_docker_dir }}"
+        state: present
+        recreate: always
+      listen: Reboot docker-compose
+
+
+- name: Install kafka preprod
+  hosts:
+    - kafka-public-preprod-0001 
+    - kafka-public-preprod-0002
+    - kafka-public-preprod-0003
+  vars:
+    vault_token: "{{ lookup('env','VAULT_TOKEN_DEV') }}"
+    vault_addr: "{{ lookup('env','VAULT_ADDR_DEV') }}"
+    kafka_secret_path: secret/data/kafka-preprod
+    kafka_eip_secret_name: kafka-preprod-eip
+    controller_quorum_voters: "0@10.10.9.45:9091,1@10.10.9.154:9091,2@10.10.9.161:9091"
+    super_users: "User:CN=preprod-admin;User:CN=kafka-public-preprod-0001;User:CN=kafka-public-preprod-0002;User:CN=kafka-public-preprod-0003"
+  become: True
+  tags: kafka-preprod
+  roles:
+    - kafka
+  handlers:
+    - name: Reboot docker-compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ kafka_docker_dir }}"
+        state: present
+        recreate: always 
+      listen: Reboot docker-compose
+
+- name: Install kafka prod
+  hosts:
+    - kafka-public-prod-0001 
+    - kafka-public-prod-0002
+    - kafka-public-prod-0003
+  vars:
+    vault_token: "{{ lookup('env','VAULT_TOKEN_PROD') }}"
+    vault_addr: "{{ lookup('env','VAULT_ADDR_PROD') }}"
+    kafka_secret_path: secret/data/kafka-prod
+    kafka_eip_secret_name: kafka-prod-eip
+    kafka_eip_secret_path: secret/data/kafka-prod-eip
+    controller_quorum_voters: "0@10.10.9.207:9091,1@10.10.9.122:9091,2@10.10.9.38:9091"
+    super_users: "User:CN=prod-admin;User:CN=kafka-public-prod-0001;User:CN=kafka-public-prod-0002;User:CN=kafka-public-prod-0003"
+  become: True
+  tags: kafka-prod
+  roles:
+    - kafka
+
+  handlers:
+    - name: Reboot docker-compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ kafka_docker_dir }}"
+        state: present
+        recreate: always 
+      listen: Reboot docker-compose

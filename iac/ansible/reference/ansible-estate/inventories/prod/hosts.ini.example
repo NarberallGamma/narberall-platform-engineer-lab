@@ -1,0 +1,101 @@
+[all:vars]
+ansible_user=root
+ansible_ssh_private_key_file=/root/.ssh/estate-prod-ecs-key.pem
+ansible_ssh_common_args='-o IdentitiesOnly=yes'
+
+[waf:vars]
+ansible_user=root
+ansible_ssh_private_key_file=/root/.ssh/estate-prod-ecs-key.pem
+
+# Vault Cluster Groups
+[vault_cluster]
+estate-prod-vault-1 ansible_host=10.10.16.11
+estate-prod-vault-2 ansible_host=10.10.16.159
+estate-prod-vault-3 ansible_host=10.10.16.7
+
+[vault_lb]
+estate-prod-vault-lb-1 ansible_host=10.10.16.5
+estate-prod-vault-lb-2 ansible_host=10.10.16.27
+
+[edge_lb]
+estate-prod-lb-1 ansible_host=10.10.16.5
+estate-prod-lb-2 ansible_host=10.10.16.27
+
+[cryptopro_vm]
+estate-prod-cryptopro-01 ansible_host=10.10.16.170
+
+[hsm_adapter:children]
+cryptopro_vm
+
+[waf]
+lb-waf-prod-01 ansible_host=10.10.13.96
+
+[app_servers]
+estate-prod-app-1 ansible_host=10.10.19.222
+
+[superset]
+estate-prod-superset ansible_host=10.10.19.141
+
+[teleport_db]
+estate-prod-teleport-db-1 ansible_host=10.10.16.150
+
+[teleport_k8s]
+estate-prod-teleport-k8s-01 ansible_host=10.10.16.10
+
+[gitlab]
+estate-prod-gitlab ansible_host=10.10.16.62
+
+# Docker compose apps (/docker/apps) — любая VM может быть в группе
+[cert_monitoring]
+estate-prod-gitlab
+
+[cert_orchestrator]
+# estate-prod-gitlab
+
+# Целевые хосты для SSL deploy (playbook setup_cert_orchestrator_ssh_user.yml)
+[cert_orchestrator_ssh_targets]
+estate-prod-gitlab
+
+[cloud_hibernate_operator]
+estate-prod-gitlab
+
+[telegram_vps_egress]
+estate-prod-gitlab
+
+[gitlab_nginx]
+estate-prod-gitlab
+
+[vps_cluster]
+estate-vps-cluster-01 ansible_host=203.0.113.11
+estate-vps-cluster-02 ansible_host=203.0.113.12
+# OUTDATED: estate-vps-cluster-03 ansible_host=203.0.113.13
+
+# Серверы для мониторинга
+[monitoring_servers]
+estate-prod-vault-1 ansible_host=10.10.16.11
+estate-prod-vault-2 ansible_host=10.10.16.159
+estate-prod-vault-3 ansible_host=10.10.16.7
+estate-prod-lb-1 ansible_host=10.10.16.5
+estate-prod-lb-2 ansible_host=10.10.16.27
+estate-prod-cryptopro-01 ansible_host=10.10.16.170
+estate-prod-app-1 ansible_host=10.10.19.222
+estate-prod-superset ansible_host=10.10.19.141
+estate-prod-teleport-db-1 ansible_host=10.10.16.150
+estate-prod-teleport-k8s-01 ansible_host=10.10.16.10
+estate-prod-gitlab ansible_host=10.10.16.62
+lb-waf-prod-01 ansible_host=10.10.13.96
+
+# Combined group for server preparation
+[prepare:children]
+vault_cluster
+vault_lb
+edge_lb
+hsm_adapter
+waf
+app_servers
+teleport_db
+teleport_k8s
+gitlab
+monitoring_servers
+superset
+vps_cluster

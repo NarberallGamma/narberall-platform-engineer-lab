@@ -1,0 +1,3 @@
+---
+
+ansible_become_pass: "{{ hostvars['localhost']['tfadm_sudo_pass']['user_input'] | quote }}"

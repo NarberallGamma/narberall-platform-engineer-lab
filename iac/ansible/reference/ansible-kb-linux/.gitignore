@@ -1,0 +1,26 @@
+# live inventory
+hosts.ini
+inventory.ini
+**/hosts.ini
+**/inventory.ini
+setup_ntpd/inventories/*.yml
+!setup_ntpd/inventories/*.yml.example
+
+# keys and host pins
+**/.ssh/id_rsa
+**/.ssh/id_rsa.pub
+**/.ssh/authorized_keys
+**/.ssh/known_hosts
+*.pem
+*.key
+
+# secrets
+**/passwd.yaml
+**/.ansible_vault_pass.txt
+
+# run debris
+*.retry
+logs/
+.DS_Store
+venv/
+__pycache__/

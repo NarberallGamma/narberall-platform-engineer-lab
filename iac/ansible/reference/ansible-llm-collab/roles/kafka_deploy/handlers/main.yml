@@ -1,0 +1,12 @@
+---
+# JAAS читается при старте JVM; без перезапуска контейнера новые пользователи/пароли не подхватятся.
+- name: restart kafka container
+  ansible.builtin.command:
+    cmd: docker compose restart kafka
+    chdir: "{{ kafka_app_root }}"
+
+- name: restart akhq container
+  ansible.builtin.command:
+    cmd: docker compose restart akhq
+    chdir: "{{ kafka_app_root }}"
+  when: kafka_akhq_enabled | bool

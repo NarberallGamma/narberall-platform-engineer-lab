@@ -1,0 +1,3 @@
+---
+# Параметры роли: group_vars/telegram_vps_egress.yml (inventory group [telegram_vps_egress]).
+# Для docker_app на том же хосте group_vars подхватывается автоматически.

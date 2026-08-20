@@ -1,0 +1,14 @@
+# estate prod: trusted infrastructure sources -> wallarm_mode off.
+# External user traffic keeps default block in geo $wallarm_mode_real.
+# Managed: (local notes omitted)
+
+# Kubernetes prod pod egress (NGFW SNAT)
+203.0.113.23/32 off;
+
+# SNAT nat-prod-db (gitlab, vault, edge-lb, cryptopro, teleport-db, ...)
+203.0.113.21/32 off;
+
+# Prod VPC internal CIDRs (direct access to WAF / hairpin without public SNAT)
+10.10.14.0/24 off;
+10.10.16.0/24 off;
+10.10.19.0/24 off;

@@ -1,0 +1,9 @@
+---
+# Строка 127.0.1.1 в /etc/hosts: без неё sudo и часть утилит не резолвят hostname после hostnamectl.
+- name: "Синхронизировать 127.0.1.1 в /etc/hosts ({{ hosts_file_hostname }})"
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s'
+    line: "127.0.1.1 {{ hosts_file_hostname }}"
+    insertafter: '^127\.0\.0\.1\s'
+  when: hosts_file_hostname | default('') | length > 0

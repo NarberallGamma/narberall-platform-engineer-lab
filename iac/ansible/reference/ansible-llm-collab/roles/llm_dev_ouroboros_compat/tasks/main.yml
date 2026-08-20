@@ -1,0 +1,16 @@
+---
+- name: Каталог chat-template для llama-server
+  ansible.builtin.file:
+    path: "{{ llm_dev_ouroboros_compat_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+- name: Patched official Qwen3.5-9B chat template (Ouroboros)
+  ansible.builtin.copy:
+    src: qwen35_9b_ouroboros_patched_chat_template.jinja
+    dest: "{{ llm_dev_ouroboros_compat_dir }}/{{ llm_dev_ouroboros_compat_template_filename }}"
+    mode: "0644"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"

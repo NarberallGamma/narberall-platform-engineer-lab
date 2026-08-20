@@ -1,0 +1,24 @@
+---
+# LEGACY: treasury-hsm-adapter (/docker/apps/hsm-adapter)
+# Prod: хост estate-prod-cryptopro-01 (группа cryptopro_vm / hsm_adapter).
+#   ./scripts/run/run_docker_app.sh deploy hsm-adapter --prod --limit estate-prod-cryptopro-01
+
+- name: Deploy hsm-adapter (legacy)
+  hosts: hsm_adapter
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/hsm-adapter.yml"
+
+  pre_tasks:
+    - name: Deployment info
+      ansible.builtin.debug:
+        msg:
+          - "Host: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "App: {{ docker_app.slug }} (LEGACY hsm-adapter)"
+          - "Adapter image: {{ docker_app.adapter_image }}"
+          - "Path: {{ docker_app_base_dir }}/{{ docker_app.slug }}"
+
+  roles:
+    - docker_app

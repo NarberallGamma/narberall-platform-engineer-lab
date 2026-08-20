@@ -1,0 +1,120 @@
+# Сгенерировано Ansible — виртуальный хост LLM dev (TLS, раздельные логи API и UI).
+{# Нормализация префиксов: всегда вид /segment/ для location ^~ ... #}
+{% set _pa = llm_dev_nginx_path_api | default('/v1/') %}
+{% set api_loc = '/' ~ (_pa | regex_replace('^/', '') | regex_replace('/$', '')) ~ '/' %}
+{% set _lp = llm_dev_nginx_llama_upstream_openai_prefix | default('/v1/') %}
+{% set llama_loc = '/' ~ (_lp | regex_replace('^/', '') | regex_replace('/$', '')) ~ '/' %}
+{% set api_proxy_pass_with_uri = api_loc != llama_loc %}
+{% set _pw = llm_dev_nginx_path_webui | default('/') %}
+{% if _pw == '/' or _pw == '' %}
+{% set webui_at_root = True %}
+{% set webui_loc = '/' %}
+{% else %}
+{% set webui_at_root = False %}
+{% set webui_loc = '/' ~ (_pw | regex_replace('^/', '') | regex_replace('/$', '')) ~ '/' %}
+{% endif %}
+# Публичный API: {{ api_loc }} → llama {{ llama_loc }} (loopback {{ llm_dev_llama_host_port }}){% if api_proxy_pass_with_uri %} через proxy_pass URI{% endif %}
+{% if llm_dev_open_webui_enabled | bool %}
+# Публичный WebUI: {% if webui_at_root %}/{% else %}{{ webui_loc }}{% endif %} → Open WebUI (loopback {{ llm_dev_open_webui_host_port }}).
+{% endif %}
+
+server {
+    listen {{ llm_dev_nginx_listen_ip }}:80;
+    server_name {{ llm_dev_public_server_name }};
+    return 301 https://{{ llm_dev_public_server_name }}$request_uri;
+}
+
+server {
+    listen {{ llm_dev_nginx_listen_ip }}:443 ssl;
+    server_name {{ llm_dev_public_server_name }};
+    http2 on;
+
+    ssl_certificate /etc/nginx/certs/{{ llm_dev_nginx_ssl_cert_subdir }}/{{ llm_dev_nginx_ssl_cert_file }};
+    ssl_certificate_key /etc/nginx/certs/{{ llm_dev_nginx_ssl_cert_subdir }}/{{ llm_dev_nginx_ssl_cert_key_file }};
+    ssl_protocols {{ llm_dev_nginx_ssl_protocols }};
+
+    error_log /var/log/nginx/error.log warn;
+    error_log /var/log/nginx/{{ llm_dev_public_server_name }}/error.log warn;
+    error_log /dev/stderr warn;
+
+    access_log /var/log/nginx/access.log main;
+    access_log /var/log/nginx/{{ llm_dev_public_server_name }}/access.log main;
+    access_log /dev/stdout main;
+
+    proxy_buffering off;
+    proxy_request_buffering off;
+    client_body_buffer_size 512k;
+    client_max_body_size {{ llm_dev_nginx_client_max_body_size }};
+
+    location ^~ {{ api_loc }} {
+        access_log /var/log/nginx/{{ llm_dev_public_server_name }}/api-access.log main;
+        access_log /dev/stdout main;
+
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Server $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_read_timeout {{ llm_dev_nginx_proxy_read_timeout }};
+        proxy_connect_timeout {{ llm_dev_nginx_proxy_connect_timeout }};
+{% if api_proxy_pass_with_uri %}
+        proxy_pass http://127.0.0.1:{{ llm_dev_llama_host_port }}{{ llama_loc }};
+{% else %}
+        proxy_pass http://127.0.0.1:{{ llm_dev_llama_host_port }};
+{% endif %}
+    }
+
+{% if llm_dev_open_webui_enabled | bool %}
+{% if webui_at_root %}
+    location / {
+        access_log /var/log/nginx/{{ llm_dev_public_server_name }}/chat-access.log main;
+        access_log /dev/stdout main;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Server $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_read_timeout {{ llm_dev_nginx_proxy_read_timeout }};
+        proxy_connect_timeout {{ llm_dev_nginx_proxy_connect_timeout }};
+        proxy_pass http://127.0.0.1:{{ llm_dev_open_webui_host_port }}/;
+    }
+{% else %}
+    location ^~ {{ webui_loc }} {
+        access_log /var/log/nginx/{{ llm_dev_public_server_name }}/chat-access.log main;
+        access_log /dev/stdout main;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Server $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_read_timeout {{ llm_dev_nginx_proxy_read_timeout }};
+        proxy_connect_timeout {{ llm_dev_nginx_proxy_connect_timeout }};
+        proxy_pass http://127.0.0.1:{{ llm_dev_open_webui_host_port }}/;
+    }
+
+    location = {{ webui_loc | regex_replace('/$', '') }} {
+        return 302 {{ webui_loc }};
+    }
+{% endif %}
+{% else %}
+    location / {
+        default_type text/plain;
+        return 503 "Open WebUI disabled\n";
+    }
+{% endif %}
+}

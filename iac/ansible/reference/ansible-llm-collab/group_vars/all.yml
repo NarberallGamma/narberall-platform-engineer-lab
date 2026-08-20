@@ -1,0 +1,16 @@
+# Общие переменные для всех хостов
+
+# Открытые SSH-ключи для bootstrap. Приватный ключ ansible раскатывается пайплайном из CI Variable ANSIBLE_SSH_PRIVATE_KEY в /ansible/.ssh/ansible_ssh_key.
+ansible_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI0000000000000000000000000000000000000000000 CHANGE_ME"
+gitlab_runner_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI0000000000000000000000000000000000000000001 CHANGE_ME"
+
+# Ограничение по источнику: ключ принимается только при подключении с контрол-ноды (IP app-06.example.com / GitLab). Пусто = без ограничения.
+ansible_authorized_key_from: "10.10.1.241"
+gitlab_runner_authorized_key_from: "10.10.1.241"
+
+# Плейбук setup_bootstrap_users (переопределять через --extra-vars при необходимости)
+setup_bootstrap_run_ansible: true
+setup_bootstrap_run_gitlab_runner: true
+setup_bootstrap_fetch_dest: "{{ playbook_dir }}/../artifacts/bootstrap_credentials"
+setup_bootstrap_cleanup_tmp: false
+setup_bootstrap_set_password: false

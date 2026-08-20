@@ -1,0 +1,170 @@
+---
+# Vault Cluster Initialization and Unseal Playbook
+# Инициализация и разблокировка Vault кластера
+
+- name: Initialize Vault Cluster
+  hosts: vault_cluster[0]
+  become: yes
+  gather_facts: yes
+  
+  pre_tasks:
+    - name: Load vault cluster variables
+      include_vars: ../group_vars/preprod/vault_cluster.yml
+    
+    - name: Wait for Vault cluster to be ready
+      uri:
+        url: "http://{{ ansible_host }}:{{ vault_api_port }}/v1/sys/health"
+        method: GET
+        status_code: [200, 429, 472, 501, 503]
+      register: vault_health
+      until: vault_health.status in [200, 429, 472, 501, 503]
+      retries: 30
+      delay: 10
+    
+    - name: Check if Vault is already initialized
+      uri:
+        url: "http://{{ ansible_host }}:{{ vault_api_port }}/v1/sys/health"
+        method: GET
+      register: vault_status
+      failed_when: false
+  
+  tasks:
+    - name: Initialize Vault cluster
+      command: >
+        docker exec {{ inventory_hostname }} vault operator init
+        -key-shares=5
+        -key-threshold=3
+        -format=json
+      register: vault_init_result
+      when: vault_status.json.initialized == false
+      no_log: true
+    
+    - name: Display initialization result
+      debug:
+        msg: 
+          - "Vault cluster initialized successfully"
+          - "Unseal keys generated (5 keys, threshold: 3)"
+          - "Root token generated"
+      when: vault_init_result is defined
+    
+    - name: Parse vault init output
+      set_fact:
+        vault_init_json: "{{ vault_init_result.stdout | from_json }}"
+      when: vault_init_result is defined and vault_init_result.changed
+
+    - name: Save unseal keys to file
+      copy:
+        content: |
+          # Vault Unseal Keys - KEEP SECURE!
+          # Generated: {{ ansible_date_time.iso8601 }}
+          # Cluster: {{ vault_cluster_name }}
+          
+          Unseal Key 1: {{ vault_init_json.unseal_keys_b64[0] }}
+          Unseal Key 2: {{ vault_init_json.unseal_keys_b64[1] }}
+          Unseal Key 3: {{ vault_init_json.unseal_keys_b64[2] }}
+          Unseal Key 4: {{ vault_init_json.unseal_keys_b64[3] }}
+          Unseal Key 5: {{ vault_init_json.unseal_keys_b64[4] }}
+          
+          Root Token: {{ vault_init_json.root_token }}
+          
+          # IMPORTANT: Store these keys securely!
+          # You need at least 3 unseal keys to unseal the cluster
+        dest: "/tmp/vault-keys-{{ ansible_date_time.date }}.txt"
+        mode: '0600'
+      when: vault_init_json is defined
+    
+    - name: Display unseal keys (SECURE OUTPUT)
+      debug:
+        msg: 
+          - "=== VAULT INITIALIZATION COMPLETE ==="
+          - "Unseal Key 1: {{ vault_init_json.unseal_keys_b64[0] }}"
+          - "Unseal Key 2: {{ vault_init_json.unseal_keys_b64[1] }}"
+          - "Unseal Key 3: {{ vault_init_json.unseal_keys_b64[2] }}"
+          - "Unseal Key 4: {{ vault_init_json.unseal_keys_b64[3] }}"
+          - "Unseal Key 5: {{ vault_init_json.unseal_keys_b64[4] }}"
+          - "Root Token: {{ vault_init_json.root_token }}"
+          - "Keys saved to: /tmp/vault-keys-{{ ansible_date_time.date }}.txt"
+      when: vault_init_json is defined
+      no_log: true
+
+- name: Unseal Vault Cluster
+  hosts: vault_cluster
+  become: yes
+  gather_facts: yes
+  
+  pre_tasks:
+    - name: Load vault cluster variables
+      include_vars: ../group_vars/preprod/vault_cluster.yml
+    
+    - name: Get unseal keys from first node
+      slurp:
+        src: "/tmp/vault-keys-{{ ansible_date_time.date }}.txt"
+      delegate_to: "{{ groups['vault_cluster'][0] }}"
+      register: vault_keys_file
+    
+    - name: Extract unseal keys using grep
+      shell: "grep '^Unseal Key' /tmp/vault-keys-{{ ansible_date_time.date }}.txt | cut -d' ' -f4"
+      register: unseal_keys_raw
+      delegate_to: "{{ groups['vault_cluster'][0] }}"
+      when: vault_keys_file is defined
+
+    - name: Set unseal keys from extracted values
+      set_fact:
+        unseal_keys: "{{ unseal_keys_raw.stdout_lines }}"
+      when: unseal_keys_raw is defined
+
+  tasks:
+    - name: Check Vault sealed status
+      uri:
+        url: "http://{{ ansible_host }}:{{ vault_api_port }}/v1/sys/seal-status"
+        method: GET
+      register: vault_seal_status
+    
+    - name: Unseal Vault 1 node 
+      command: >
+        docker exec {{ inventory_hostname }} vault operator unseal {{ item }}
+      loop: "{{ unseal_keys | select('string') | list }}"
+      when: 
+        - unseal_keys is defined
+        - item is defined
+        - item != ""
+      no_log: true
+
+    
+    - name: Verify Vault is unsealed
+      uri:
+        url: "http://{{ ansible_host }}:{{ vault_api_port }}/v1/sys/seal-status"
+        method: GET
+      register: vault_unseal_status
+      retries: 5
+
+    
+    - name: Display unseal status
+      debug:
+        msg: 
+          - "Vault {{ inventory_hostname }} unseal status: {{ 'UNSEALED' if not vault_unseal_status.json.sealed else 'SEALED' }}"
+          - "Progress: {{ vault_unseal_status.json.progress | default('N/A') }}/{{ vault_unseal_status.json.threshold | default('N/A') }}"
+
+- name: Display cluster information
+  hosts: vault_cluster[0]
+  become: yes
+  gather_facts: yes
+  
+  pre_tasks:
+    - name: Load vault cluster variables
+      include_vars: ../group_vars/preprod/vault_cluster.yml
+  
+  tasks:
+    - name: Display cluster information
+      debug:
+        msg: 
+          - "=== VAULT CLUSTER READY ==="
+          - "Cluster Name: {{ vault_cluster_name }}"
+          - "API Address: https://{{ vault_virtual_ip }}"
+          - "Domain: {{ vault_domain }}"
+          - "Status: Initialized and Unsealed"
+          - "Next Steps:"
+          - "  1. Configure authentication methods via UI"
+          - "  2. Create policies and roles"
+          - "  3. Deploy secrets using vault-secrets.yml"
+

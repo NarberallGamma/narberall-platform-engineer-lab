@@ -1,0 +1,92 @@
+# Сгенерировано Ansible — изменения через плейбук и templates
+# Секреты (CLUSTER_ID{% if kafka_sasl_enabled | bool and kafka_sasl_tls_enabled | bool %}, пароли SSL{% endif %}) — в {{ kafka_env_file_name }} (env_file).
+# Тома: пути ./ относительно каталога с этим docker-compose.yml ({{ kafka_app_root }}).
+# Данные: ./data → /var/lib/kafka/data
+# restart: {{ kafka_compose_restart_policy }} — автоперезапуск при сбоях; не поднимать после ручной остановки (docker stop / compose stop).
+{% if kafka_sasl_enabled | bool and kafka_sasl_tls_enabled | bool %}
+# Режим: SASL_SSL + PLAIN (TLS на брокере).
+{% elif kafka_sasl_enabled | bool %}
+# Режим: SASL_PLAINTEXT + PLAIN (без TLS на брокере).
+{% else %}
+# Режим: PLAINTEXT (без SASL).
+{% endif %}
+services:
+  kafka:
+    image: "{{ kafka_image }}"
+    container_name: kafka
+    restart: "{{ kafka_compose_restart_policy }}"
+    env_file:
+      - "{{ kafka_env_file_name }}"
+    ports:
+      - "{{ kafka_listener_port }}:9092"
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_LOG_DIRS: "{{ kafka_log_dirs_in_container }}"
+      # Имя listener ≠ протокол: в URL — BROKER/SSL/PLAINTEXT, реальный протокол — в LISTENER_SECURITY_PROTOCOL_MAP (KRaft + controller).
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+{% if kafka_sasl_enabled | bool and kafka_sasl_tls_enabled | bool %}
+      KAFKA_OPTS: "-Djava.security.auth.login.config={{ kafka_jaas_path_in_container }}"
+      KAFKA_LISTENERS: "SSL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "SSL://{{ kafka_advertised_host }}:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "SSL:SASL_SSL,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "SSL"
+      KAFKA_SASL_ENABLED_MECHANISMS: "PLAIN"
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: "PLAIN"
+      KAFKA_SSL_KEYSTORE_LOCATION: "{{ kafka_ssl_keystore_location_in_container }}"
+      KAFKA_SSL_KEYSTORE_TYPE: "PKCS12"
+      KAFKA_SSL_CLIENT_AUTH: "none"
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+{% elif kafka_sasl_enabled | bool %}
+      KAFKA_OPTS: "-Djava.security.auth.login.config={{ kafka_jaas_path_in_container }}"
+      KAFKA_LISTENERS: "BROKER://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "BROKER://{{ kafka_advertised_host }}:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "BROKER:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "BROKER"
+      KAFKA_SASL_ENABLED_MECHANISMS: "PLAIN"
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: "PLAIN"
+{% else %}
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://{{ kafka_advertised_host }}:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+{% endif %}
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "{{ kafka_controller_quorum_voters }}"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "{{ kafka_effective_replication_factor | string }}"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "{{ kafka_effective_replication_factor | string }}"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "{{ kafka_min_insync_replicas | string }}"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "{{ kafka_auto_create_topics_enable | string | lower }}"
+      KAFKA_NUM_PARTITIONS: "{{ kafka_default_num_partitions | string }}"
+      KAFKA_DEFAULT_REPLICATION_FACTOR: "{{ kafka_effective_replication_factor | string }}"
+      KAFKA_MIN_INSYNC_REPLICAS: "{{ kafka_min_insync_replicas | string }}"
+      KAFKA_LOG_RETENTION_HOURS: "{{ kafka_log_retention_hours | string }}"
+      KAFKA_LOG_ROLL_MS: "{{ kafka_log_roll_ms | string }}"
+      KAFKA_LOG_FLUSH_INTERVAL_MESSAGES: "{{ kafka_log_flush_interval_messages | string }}"
+      KAFKA_LOG_FLUSH_INTERVAL_MS: "{{ kafka_log_flush_interval_ms | string }}"
+{% for k, v in kafka_broker_extra_env | default({}) | dictsort %}
+      {{ k }}: "{{ v }}"
+{% endfor %}
+    volumes:
+      - "./data:/var/lib/kafka/data"
+{% if kafka_sasl_enabled | bool %}
+      - "./config/kafka_server_jaas.conf:{{ kafka_jaas_path_in_container }}:ro"
+{% endif %}
+{% if kafka_sasl_enabled | bool and kafka_sasl_tls_enabled | bool %}
+      - "./config/ssl:{{ kafka_ssl_mount_path_in_container }}:ro"
+{% endif %}
+{% if kafka_akhq_enabled | bool %}
+{# AKHQ — отдельный сервис под services, не внутри kafka #}
+  akhq:
+    image: "{{ kafka_akhq_image }}"
+    container_name: akhq
+    restart: "{{ kafka_compose_restart_policy }}"
+    depends_on:
+      - kafka
+    ports:
+      - "{{ kafka_akhq_host_port }}:8080"
+    volumes:
+      - "./config/akhq-application.yml:/app/application.yml:ro"
+    environment:
+      MICRONAUT_CONFIG_FILES: "/app/application.yml"
+{% endif %}

@@ -1,0 +1,5 @@
+---
+galaxy_info:
+  role_name: llm_dev_nginx
+  description: nginx в Docker (host network), TLS и раздельные location для OpenAI API (/v1) и Open WebUI (/)
+dependencies: []

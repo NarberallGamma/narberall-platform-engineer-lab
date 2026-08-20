@@ -1,0 +1,46 @@
+---
+- name: 'Include variables for install mysql'
+  include_vars: mysql.yml
+  when: db_type == "mysql"
+
+- name: 'Include variables for install mysql 8.0'
+  include_vars: mysql8.yml
+  when: db_type == "mysql8"
+
+- name: 'Include variables for install mariadb'
+  include_vars: mariadb.yml
+  when: db_type == "mariadb"
+
+- name: 'Include variables for install rethinkdb'
+  include_vars: rethinkdb.yml
+  when: db_type == "rethinkdb"
+
+- include: mysql_install.yml
+  when: db_type == "mariadb" or db_type == "mysql"
+
+- include: mysql8_install.yml
+  when: db_type == "mysql8"
+
+- name: 'Include replication password from ansible-vault'
+  include_vars: replication_password.yml
+  when: (db_type == "mariadb" or db_type == "mysql" or db_type == "mysql8") and db_replication_role != ''
+
+- include: mysql_replication.yml
+  when: (db_type == "mariadb" or db_type == "mysql" or db_type == "mysql8") and db_replication_role != ''
+
+- include: rethinkdb.yml
+  when: db_type == "rethinkdb"
+
+- name: 'Include ProxySQL passwords from ansible-vault'
+  include_vars: proxysql_passwords.yml
+  when: db_type == "proxysql"
+
+- include: proxysql.yml
+  when: db_type == "proxysql"
+
+- name: 'Neo4j vars'
+  include_vars: neo4j.yml
+  when: db_type == "neo4j"
+
+- include: neo4j.yml
+  when: db_type == "neo4j"

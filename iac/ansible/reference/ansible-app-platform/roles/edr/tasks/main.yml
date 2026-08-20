@@ -1,0 +1,23 @@
+---
+- name: Ensure the /etc/hosts entry is present
+  lineinfile:
+    path: /etc/hosts
+    state: present
+    line: "{{ hosts_entry_ip }} {{ hosts_entry_hostname }}"
+    regexp: "{{ hosts_entry_hostname }}"
+#  become: yes
+
+- copy:
+    src: '{{ file }}'
+    dest: '{{ tmpdir }}'
+
+- name: Install deb
+  apt:
+    deb: '{{ tmpdir }}/{{ file }}'
+#  become: true
+  environment:
+    EDR_AUTHORITY_SERVICE: edr-proxy.example.com:80
+    EDR_SENSORS_SERVICE: edr-proxy.example.com:443
+    EDR_POLLING_PERIOD: 300s
+    EDR_DIAL_TIMEOUT: 15s
+    EDR_AGENT_GROUPS: 'nixprod'

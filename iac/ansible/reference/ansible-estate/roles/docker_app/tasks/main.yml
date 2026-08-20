@@ -1,0 +1,36 @@
+---
+- name: Docker app | проверка Vault
+  ansible.builtin.import_tasks: vault_check.yml
+  when: docker_app_vault_enabled | default(true) | bool
+
+- name: Docker app | загрузка секретов из Vault
+  ansible.builtin.import_tasks: load_vault_secrets.yml
+  when: docker_app_vault_enabled | default(true) | bool
+
+- name: Docker app | подготовка app_item для templates
+  ansible.builtin.set_fact:
+    app_item:
+      key: "{{ docker_app.slug | replace('-', '_') }}"
+      value: "{{ docker_app }}"
+
+- name: Docker app | деплой {{ docker_app.slug }}
+  ansible.builtin.import_tasks: deploy_app.yml
+
+- name: Docker app | итог
+  ansible.builtin.debug:
+    msg:
+      - "Host: {{ inventory_hostname }}"
+      - "App: {{ docker_app.slug }}"
+      - "Path: {{ docker_app_base_dir }}/{{ docker_app.slug }}"
+      - "Vault: {{ docker_app_vault_mount_point }}/{{ docker_app_vault_path }}"
+  when: docker_app_vault_enabled | default(true) | bool
+  tags: [docker_app, always]
+
+- name: Docker app | итог (без Vault)
+  ansible.builtin.debug:
+    msg:
+      - "Host: {{ inventory_hostname }}"
+      - "App: {{ docker_app.slug }}"
+      - "Path: {{ docker_app_base_dir }}/{{ docker_app.slug }}"
+  when: not (docker_app_vault_enabled | default(true) | bool)
+  tags: [docker_app, always]

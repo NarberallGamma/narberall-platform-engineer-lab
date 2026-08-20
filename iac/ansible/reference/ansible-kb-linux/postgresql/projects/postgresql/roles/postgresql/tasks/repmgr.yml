@@ -1,0 +1,45 @@
+---
+
+- name: Copy repmgrd cron.d
+  copy:
+    src: "repmgr_cron.d"
+    dest: "/etc/cron.d/repmgr"
+    owner: root
+    group: root
+  tags: config
+
+- name: Copy repmgrd defaults
+  copy:
+    src: "repmgrd"
+    dest: "/etc/default/repmgrd"
+    owner: root
+    group: root
+  tags: config
+
+- name: Ensure repmgr systemd unit dir exists
+  file:
+    path: "/etc/systemd/system/repmgrd.service.d/"
+    state: directory
+
+- name: Copy override.conf
+  copy:
+    src: "repmgrd_override.conf"
+    dest: "/etc/systemd/system/repmgrd.service.d/override.conf"
+    owner: root
+    group: root
+  tags: config
+
+- name: Templating repmgr config
+  template:
+    src: "repmgr.conf.j2"
+    dest: "/etc/repmgr.conf"
+    owner: postgres
+    group: postgres
+  tags: config
+
+- name: Restart repmgr server only once after install
+  systemd:
+    state: restarted
+    daemon_reload: yes
+    name: repmgrd
+  when: packages_install.changed

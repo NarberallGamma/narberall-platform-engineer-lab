@@ -1,0 +1,128 @@
+---
+# Сохранение локальных образов Docker в tar до purge docker.io или docker_migrate (остановка engine).
+# Восстановление: tasks/docker_images_restore.yml после установки docker-ce и старта Docker.
+
+- name: Условие бэкапа образов Docker
+  ansible.builtin.set_fact:
+    docker_images_backup_needed: >-
+      {{
+        (docker_images_backup_enabled | default(true) | bool)
+        and (
+          (docker_remove_distro_packages | default(false) | bool)
+          or (docker_migrate_data | default(false) | bool)
+        )
+      }}
+  tags: [docker]
+
+- name: Проверить маркер бэкапа образов Docker
+  ansible.builtin.stat:
+    path: "{{ docker_images_backup_marker }}"
+  register: docker_images_backup_marker_stat
+  when: docker_images_backup_needed
+  tags: [docker]
+
+- name: Бэкап образов Docker в tar (docker save)
+  when:
+    - docker_images_backup_needed
+    - not docker_images_backup_marker_stat.stat.exists | default(false)
+  block:
+    - name: Проверить доступность Docker для бэкапа образов
+      ansible.builtin.command: docker info
+      register: docker_backup_info
+      changed_when: false
+      failed_when: false
+      tags: [docker]
+
+    - name: Запустить Docker для бэкапа образов (если остановлен)
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+      when: docker_backup_info.rc != 0
+      failed_when: false
+      tags: [docker]
+
+    - name: Повторная проверка Docker для бэкапа образов
+      ansible.builtin.command: docker info
+      register: docker_backup_info_retry
+      changed_when: false
+      failed_when: false
+      tags: [docker]
+
+    - name: Список образов Docker для бэкапа
+      ansible.builtin.shell: |
+        set -euo pipefail
+        docker images --format '{{ "{{" }}.Repository{{ "}}" }}:{{ "{{" }}.Tag{{ "}}" }}'
+      args:
+        executable: /bin/bash
+      register: docker_images_for_backup
+      changed_when: false
+      when: docker_backup_info_retry.rc == 0
+      tags: [docker]
+
+    - name: Отфильтровать образы для бэкапа
+      ansible.builtin.set_fact:
+        docker_images_backup_list: >-
+          {{
+            docker_images_for_backup.stdout_lines | default([])
+            | select('match', '.+')
+            | reject('equalto', '<none>:<none>')
+            | reject('search', '<none>')
+            | list
+            | unique
+          }}
+      when: docker_backup_info_retry.rc == 0
+      tags: [docker]
+
+    - name: Каталог бэкапа образов Docker
+      ansible.builtin.file:
+        path: "{{ docker_images_backup_dir }}"
+        state: directory
+        mode: "0700"
+      when:
+        - docker_backup_info_retry.rc == 0
+        - docker_images_backup_list | default([]) | length > 0
+      tags: [docker]
+
+    - name: Сохранить образы Docker в tar (docker save)
+      ansible.builtin.command:
+        argv:
+          - docker
+          - save
+          - "{{ item }}"
+          - -o
+          - "{{ docker_images_backup_dir }}/{{ item | regex_replace('[^a-zA-Z0-9._-]+', '_') }}.tar"
+      loop: "{{ docker_images_backup_list | default([]) }}"
+      when: docker_images_backup_list | default([]) | length > 0
+      register: docker_save_results
+      tags: [docker]
+
+    - name: Маркер завершённого бэкапа образов Docker
+      ansible.builtin.copy:
+        dest: "{{ docker_images_backup_marker }}"
+        content: |
+          images:
+          {% for img in docker_images_backup_list | default([]) %}
+          - {{ img }}
+          {% endfor %}
+        mode: "0600"
+      when: docker_backup_info_retry.rc == 0
+      tags: [docker]
+
+    - name: Итог бэкапа образов Docker
+      ansible.builtin.debug:
+        msg: |
+          Бэкап образов Docker на {{ inventory_hostname }}: {{ docker_images_backup_list | default([]) | length }} tar в {{ docker_images_backup_dir }}.
+          После миграции и docker load проверить: docker images
+          Удалить каталог бэкапа после успешной проверки: rm -rf {{ docker_images_backup_dir }}
+      when: docker_images_backup_list | default([]) | length > 0
+      tags: [docker]
+
+    - name: Бэкап образов Docker пропущен (нет локальных образов)
+      ansible.builtin.debug:
+        msg: "Бэкап образов Docker: локальных образов не найдено, tar не создавались."
+      when:
+        - docker_backup_info_retry.rc == 0
+        - docker_images_backup_list | default([]) | length == 0
+      tags: [docker]
+
+  tags: [docker]

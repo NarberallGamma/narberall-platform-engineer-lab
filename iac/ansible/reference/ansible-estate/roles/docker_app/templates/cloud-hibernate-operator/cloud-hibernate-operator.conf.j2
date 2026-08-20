@@ -1,0 +1,51 @@
+# Cloud Hibernate Operator — managed by Ansible (docker_app)
+# Секреты (IAM / Telegram / API keys): Vault → .env
+
+IAM_ENDPOINT="{{ app_item.value.iam_endpoint }}"
+IAM_USERNAME="{{ app_item.value.iam_username }}"
+IAM_DOMAIN_NAME="{{ app_item.value.iam_domain_name }}"
+IAM_PROJECT_NAME="{{ app_item.value.iam_project_name }}"
+
+IAM_TOKEN_REFRESH_INTERVAL=21600
+
+CCE_ENDPOINT="{{ app_item.value.cce_endpoint }}"
+ECS_ENDPOINT="{{ app_item.value.ecs_endpoint }}"
+
+CLUSTERS_CONFIG='{{ app_item.value.clusters_config }}'
+ECS_INSTANCES_CONFIG='{{ app_item.value.ecs_instances_config | default("[]") }}'
+
+TELEGRAM_CHAT_IDS="{{ app_item.value.telegram_chat_ids | default('') }}"
+
+TELEGRAM_CONNECT_TIMEOUT="{{ app_item.value.telegram_connect_timeout | default(docker_app_telegram_connect_timeout) }}"
+TELEGRAM_TOTAL_TIMEOUT="{{ app_item.value.telegram_total_timeout | default(docker_app_telegram_total_timeout) }}"
+TELEGRAM_RETRY_ATTEMPTS="{{ app_item.value.telegram_retry_attempts | default(docker_app_telegram_retry_attempts) }}"
+TELEGRAM_RETRY_DELAY_SECONDS="{{ app_item.value.telegram_retry_delay_seconds | default(docker_app_telegram_retry_delay_seconds) }}"
+
+LOG_LEVEL="INFO"
+LOG_DIR=/app/logs
+LOG_FORMAT=text
+
+API_ENABLED={{ app_item.value.api_enabled | default(true) | ternary('true', 'false') }}
+API_HOST=0.0.0.0
+API_PORT={{ app_item.value.api_port | default(8081) }}
+
+API_AUTH_ENABLED={{ app_item.value.api_auth_enabled | default(true) | ternary('true', 'false') }}
+API_KEY_HEADER=X-API-Key
+API_IP_WHITELIST_ENABLED=false
+API_ALLOWED_IPS="0.0.0.0/0"
+
+SWAGGER_UI_ENABLED={{ app_item.value.swagger_ui_enabled | default(true) | ternary('true', 'false') }}
+SWAGGER_UI_ENDPOINT=/api/swagger
+SWAGGER_ENDPOINT=/api/swagger.json
+
+SCHEDULE_ENABLED={{ app_item.value.schedule_enabled | default(true) | ternary('true', 'false') }}
+SCHEDULE_OVERRIDE_DURATION_HOURS=24
+
+OPERATION_VERIFICATION_DELAY=600
+OPERATION_RETRY_ATTEMPTS=3
+OPERATION_RETRY_DELAY=60
+
+HEALTH_CHECK_INTERVAL=60
+API_HEALTH_CHECK_ENABLED=true
+
+DOCKER_IMAGE="{{ app_item.value.image }}"

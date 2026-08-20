@@ -1,0 +1,6 @@
+---
+- name: apply sysctl params
+  service:
+    name: procps
+    state: restarted
+  listen: sysctl

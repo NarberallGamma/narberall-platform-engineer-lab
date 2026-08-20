@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  role_name: llm_dev_ouroboros_compat
+  description: >-
+    Patched official Qwen3.5-9B chat_template.jinja для llama-server (Ouroboros:
+    OpenAI API без обязательного system).
+dependencies: []

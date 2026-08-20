@@ -81,7 +81,7 @@ network {
 
 - `lifecycle.prevent_destroy = true` on instance, volume, and attach
 - Short `ignore_changes` on instance: `block_device` (provider Read vs managed boot volume), `flavor_name` / `flavor_id` (lock against accidental resize), `force_delete` / `stop_before_destroy` (schema defaults null in state)
-- Apply was **not** used to "fix" the estate. The goal was a clean plan, then day-2 through code.
+- Apply was **not** used to "fix" the estate. The goal was a clean plan, then Ansible on the hosts.
 
 ## Keywords
 

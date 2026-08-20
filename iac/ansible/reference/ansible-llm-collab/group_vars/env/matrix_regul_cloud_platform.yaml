@@ -1,0 +1,251 @@
+# Матрица папок и прав — cloud.example.com (групповая папка в NC: «Regul clients»).
+# Источник: Confluence «Матрица доступа файлового ресурса Clients Regul INTFS» + дерево уровней.
+#
+# Соглашения (как matrix_nextcloud_dev_cloud_platform.yaml для профиля nextcloud-dev):
+# - Плейсхолдер {client} — имя клиента (каталог уровня 1). Пути относительно корня groupfolder.
+# - view для явного списка групп: +read; маркер __NC_MATRIX_RO_ALL__ — все группы матрицы только RO (см. group_vars nextcloud_occ_ro_permissions).
+# - edit: +read +write +create +delete (см. nextcloud_occ_edit_permissions).
+# - Если в Confluence одна колонка на просмотр и редактирование — view и edit совпадают (одинаковые группы).
+# - Уровень 4 (children_mkcol + при необходимости children со словарями) только у {client}/{client}/Accounting —
+#   не у «Файлобменник/Accounting» ни у «Внутренний обмен».
+# - children_mkcol — имена L4 только для MKCOL; по умолчанию каждая L4-подпапка получает те же view/edit, что узел L3 Accounting.
+# - L4 «Договоры»: те же view/edit, что у {client}/{client}/Accounting (наследование с L3, включая Cloud Clients Regul Assistant).
+# - deny_on_l4_children: для Assistant — явный deny на все L4 под Accounting, кроме except_child_name «Договоры»
+#   (Assistant видит только «Договоры» на уровне 4; остальные группы с L3 Accounting по-прежнему на всех L4, где не переопределено).
+# - Группы: полное имя «Cloud Clients Regul …»; в таблице короткие «IT», «Admin» нормализованы до полного префикса.
+# - L3 «Требования PAY» под {client}/{client}: без __NC_MATRIX_RO_ALL__ — только Cloud Clients Regul Payroll и
+#   Cloud Clients Regul IntControl (view/edit *regul_edit_trebovaniya_pay); явный matrix_deny по остальным группам матрицы
+#   плюс авто-deny в group_vars (дубли не попадают в occ).
+
+# - В view вместо LDAP-группы «Cloud Clients Regul RO» используется маркер __NC_MATRIX_RO_ALL__ (см. defaults):
+#   не существует группы RO в AD — на объект с таким view всем группам из объединения матрицы выдаётся только чтение
+#   (nextcloud_occ_ro_permissions в group_vars), кроме групп из edit этой строки.
+#
+# Альтернативные имена L4 на диске для occ — список children_mkcol_occ_path_fallback под узлом Accounting (тот же порядок и длина, что children_mkcol).
+
+defaults:
+  regul_view_ro: &regul_view_ro [__NC_MATRIX_RO_ALL__]
+  regul_edit_it: &regul_edit_it [Cloud Clients Regul IT]
+  regul_view_empty: &regul_view_empty []
+  regul_edit_accounting_l3: &regul_edit_accounting_l3
+    - Cloud Clients Regul Accounting
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul Finance
+    - Cloud Clients Regul Corp
+    - Cloud Clients Regul IntControl
+    - Cloud Clients Regul Assistant
+  regul_internal_merged: &regul_internal_merged
+    - Cloud Clients Regul Payroll
+    - Cloud Clients Regul Accounting
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul Compliance
+    - Cloud Clients Regul EconSecurity
+    - Cloud Clients Regul IntSecurity
+    - Cloud Clients Regul Legal
+    - Cloud Clients Regul HR
+    - Cloud Clients Regul Corp
+    - Cloud Clients Regul Finance
+    - Cloud Clients Regul 1C
+    - Cloud Clients Regul IntControl
+    - Cloud Clients Regul Assistant
+  regul_edit_file_exchange: &regul_edit_file_exchange
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul Finance
+    - Cloud Clients Regul Compliance
+    - Cloud Clients Regul EconSecurity
+    - Cloud Clients Regul IntSecurity
+    - Cloud Clients Regul Legal
+    - Cloud Clients Regul Accounting
+    - Cloud Clients Regul HR
+    - Cloud Clients Regul IntControl
+    - Cloud Clients Regul Assistant
+  regul_edit_clients_info: &regul_edit_clients_info
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul Accounting
+    - Cloud Clients Regul Legal
+    - Cloud Clients Regul Finance
+    - Cloud Clients Regul Assistant
+    - Cloud Clients Regul IntControl
+  regul_edit_corp: &regul_edit_corp
+    - Cloud Clients Regul Corp
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul Finance
+  regul_edit_payroll_hr: &regul_edit_payroll_hr
+    - Cloud Clients Regul Payroll
+    - Cloud Clients Regul HR
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul Finance
+  regul_edit_int_security: &regul_edit_int_security
+    - Cloud Clients Regul IntSecurity
+    - Cloud Clients Regul EconSecurity
+  regul_edit_econ_security: &regul_edit_econ_security
+    - Cloud Clients Regul EconSecurity
+    - Cloud Clients Regul IntSecurity
+    - Cloud Clients Regul Compliance
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul IntControl
+  regul_edit_compliance: &regul_edit_compliance
+    - Cloud Clients Regul Compliance
+    - Cloud Clients Regul IntSecurity
+    - Cloud Clients Regul EconSecurity
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul IntControl
+  regul_edit_legal: &regul_edit_legal
+    - Cloud Clients Regul Legal
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul IntSecurity
+    - Cloud Clients Regul Accounting
+    - Cloud Clients Regul Assistant
+    - Cloud Clients Regul IntControl
+  regul_edit_purchasing: &regul_edit_purchasing
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul IntControl
+  regul_edit_trebovaniya_pay: &regul_edit_trebovaniya_pay
+    - Cloud Clients Regul Payroll
+    - Cloud Clients Regul IntControl
+  regul_matrix_deny_trebovaniya_pay: &regul_matrix_deny_trebovaniya_pay
+    - group: Cloud Clients Regul IT
+    - group: Cloud Clients Regul Accounting
+    - group: Cloud Clients Regul Admin
+    - group: Cloud Clients Regul Finance
+    - group: Cloud Clients Regul Corp
+    - group: Cloud Clients Regul Assistant
+    - group: Cloud Clients Regul Compliance
+    - group: Cloud Clients Regul EconSecurity
+    - group: Cloud Clients Regul IntSecurity
+    - group: Cloud Clients Regul Legal
+    - group: Cloud Clients Regul HR
+    - group: Cloud Clients Regul 1C
+  regul_edit_file_hra: &regul_edit_file_hra
+    - Cloud Clients Regul HR
+    - Cloud Clients Regul Payroll
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul Finance
+  regul_edit_file_corp: &regul_edit_file_corp
+    - Cloud Clients Regul Corp
+    - Cloud Clients Regul Admin
+  regul_edit_file_accounting: &regul_edit_file_accounting
+    - Cloud Clients Regul Payroll
+    - Cloud Clients Regul HR
+    - Cloud Clients Regul Admin
+    - Cloud Clients Regul Finance
+    - Cloud Clients Regul Accounting
+    - Cloud Clients Regul IntControl
+  regul_assistant_only: &regul_assistant_only [Cloud Clients Regul Assistant]
+
+folders:
+  - path: "{client}"
+    view: *regul_view_ro
+    edit: *regul_edit_it
+
+  - path: "{client}/{client}"
+    view: *regul_view_ro
+    edit: *regul_edit_it
+
+  - path: "{client}/Внутренний обмен"
+    view: *regul_internal_merged
+    edit: *regul_internal_merged
+
+  - path: "{client}/Файлобменник"
+    view: *regul_view_ro
+    edit: *regul_edit_file_exchange
+
+  # L4: children_mkcol — MKCOL; children — «Договоры»: полный доступ как у L3 Accounting; deny_on_l4_children — deny Assistant на прочих L4.
+  - path: "{client}/{client}/Accounting"
+    view: *regul_edit_accounting_l3
+    edit: *regul_edit_accounting_l3
+    children_mkcol:
+      - Авансовые отчеты
+      - Акты сверок
+      - Банк
+      - Выручка
+      - ГПХ
+      - Договоры
+      - Закрытие периода
+      - Инвентаризация
+      - Инструкции по клиенту
+      - НСО и депозиты
+      - Отчетность
+      - Представительские расходы
+      - Реализация
+      - Сверка ЕНС
+      - Статистика
+      - Счета на оплату
+      - Требования ИФНС
+      - Учетная политика
+    children_mkcol_occ_path_fallback:
+      - АВАНСОВЫЕ ОТЧЕТЫ
+      - АКТЫ СВЕРОК
+      - БАНК
+      - ВЫРУЧКА
+      - ГПХ
+      - ДОГОВОРЫ
+      - ЗАКРЫТИЕ ПЕРИОДА
+      - ИНВЕНТАРИЗАЦИЯ
+      - ИНСТРУКЦИИ ПО КЛИЕНТУ
+      - НСО И ДЕПОЗИТЫ
+      - ОТЧЕТНОСТЬ
+      - ПРЕДСТАВИТЕЛЬСКИЕ РАСХОДЫ
+      - РЕАЛИЗАЦИЯ
+      - СВЕРКА ЕНС
+      - СТАТИСТИКА
+      - СЧЕТА НА ОПЛАТУ
+      - ТРЕБОВАНИЯ ИФНС
+      - УЧЕТНАЯ ПОЛИТИКА
+    children:
+      - name: Договоры
+        view: *regul_edit_accounting_l3
+        edit: *regul_edit_accounting_l3
+    deny_on_l4_children:
+      except_child_name: "Договоры"
+      groups: *regul_assistant_only
+
+  - path: "{client}/{client}/Clients info"
+    view: *regul_view_ro
+    edit: *regul_edit_clients_info
+
+  - path: "{client}/{client}/Corp"
+    view: *regul_edit_corp
+    edit: *regul_edit_corp
+
+  - path: "{client}/{client}/Payroll+HR"
+    view: *regul_edit_payroll_hr
+    edit: *regul_edit_payroll_hr
+
+  - path: "{client}/{client}/IntSecurity"
+    view: *regul_edit_int_security
+    edit: *regul_edit_int_security
+
+  - path: "{client}/{client}/EconSecurity"
+    view: *regul_edit_econ_security
+    edit: *regul_edit_econ_security
+
+  - path: "{client}/{client}/Compliance"
+    view: *regul_edit_compliance
+    edit: *regul_edit_compliance
+
+  - path: "{client}/{client}/Legal"
+    view: *regul_edit_legal
+    edit: *regul_edit_legal
+
+  - path: "{client}/{client}/Purchasing"
+    view: *regul_edit_purchasing
+    edit: *regul_edit_purchasing
+
+  - path: "{client}/{client}/Требования PAY"
+    view: *regul_edit_trebovaniya_pay
+    edit: *regul_edit_trebovaniya_pay
+    matrix_deny: *regul_matrix_deny_trebovaniya_pay
+
+  - path: "{client}/Файлобменник/HRA"
+    view: *regul_edit_file_hra
+    edit: *regul_edit_file_hra
+
+  - path: "{client}/Файлобменник/Corp"
+    view: *regul_edit_file_corp
+    edit: *regul_edit_file_corp
+
+  # Уровень 3 «Файлобменник/Accounting» без children_mkcol (дерево L4 Confluence только под {client}/{client}/Accounting).
+  - path: "{client}/Файлобменник/Accounting"
+    view: *regul_edit_file_accounting
+    edit: *regul_edit_file_accounting

@@ -1,0 +1,15 @@
+---
+# Один дополнительный path Vault (docker_app_vault_extra_reads), merge в app_vault.
+
+- name: "{{ docker_app.slug }} | Vault extra path {{ vault_extra.path }}"
+  ansible.builtin.set_fact:
+    _docker_app_vault_extra_secret: "{{ lookup('community.hashi_vault.vault_kv2_get', vault_extra.path, engine_mount_point=vault_extra.mount | default(docker_app_vault_mount_point))['secret'] }}"
+  no_log: true
+  tags: [docker_app, deploy, vault]
+
+- name: "{{ docker_app.slug }} | merge extra Vault keys from {{ vault_extra.path }}"
+  ansible.builtin.set_fact:
+    app_vault: "{{ app_vault | default({}) | combine({item.key: _docker_app_vault_extra_secret[item.value] | default('')}) }}"
+  loop: "{{ vault_extra.key_map | dict2items }}"
+  no_log: true
+  tags: [docker_app, deploy, vault]

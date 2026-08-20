@@ -1,0 +1,41 @@
+# Ansible artifacts (содержит чувствительные данные и бинарные файлы)
+artifacts/
+
+# Ansible collections cache
+.collections/
+
+# Ansible retry files
+*.retry
+
+# Ansible vault files (если используются)
+*.vault
+
+# Local variables (если используются)
+vars.local.yml
+
+# Vault env (создаётся пайплайном из CI Variables на контрол-ноде, не коммитить)
+.env.vault
+
+# Локальные копии .env с хостов (Kafka и др.), не коммитить
+.env
+!.env.example
+
+# Приватный SSH-ключ ansible (раскатывается пайплайном из ANSIBLE_SSH_PRIVATE_KEY)
+.ssh/
+
+# Временный файл для client_name при вызове run_nextcloud_groupfolders.sh "Имя с пробелами"
+.ansible_client_vars.json
+
+# Временный файл для приватного SSH-ключа
+.ssh_key_mount
+
+# Live inventory / secrets (publish *.example only)
+hosts.ini
+inventories/hosts.ini
+passwd.yaml
+**/passwd.yaml
+*.pem
+*.key
+*.pfx
+**/secrets.sops.yml
+!**/secrets.sops.yml.example

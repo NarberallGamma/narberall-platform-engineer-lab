@@ -1,0 +1,78 @@
+---
+- name: Проверить, что заданы CIDR источников Kubernetes для правила :443
+  ansible.builtin.assert:
+    that:
+      - vps_k8s_egress_source_cidrs | length > 0
+    fail_msg: >-
+      Заполнить vps_k8s_egress_source_cidrs в group_vars/vps_cluster.yml
+      (публичные IP NAT cloud.ru и/или другие источники egress gateway, формат CIDR).
+  tags: [vps, firewall, prepare_vps]
+
+- name: Установить ufw
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+    lock_timeout: "{{ prepare_servers_apt_lock_timeout | default(600) }}"
+  tags: [vps, firewall, prepare_vps]
+
+- name: Сбросить правила ufw перед применением политики VPS
+  community.general.ufw:
+    state: reset
+  tags: [vps, firewall, prepare_vps]
+
+- name: Политика ufw по умолчанию для исходящих
+  community.general.ufw:
+    direction: outgoing
+    policy: "{{ 'allow' if vps_firewall_allow_outgoing | bool else 'deny' }}"
+  tags: [vps, firewall, prepare_vps]
+
+- name: Политика ufw по умолчанию для входящих
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+  tags: [vps, firewall, prepare_vps]
+
+- name: Разрешить SSH с любого адреса (режим по умолчанию)
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+  when: not vps_ssh_restrict_source_ips | bool
+  tags: [vps, firewall, prepare_vps]
+
+- name: Разрешить SSH только с указанных CIDR
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ vps_ssh_allowed_source_cidrs }}"
+  when:
+    - vps_ssh_restrict_source_ips | bool
+    - vps_ssh_allowed_source_cidrs | length > 0
+  tags: [vps, firewall, prepare_vps]
+
+- name: Проверить список CIDR при ограничении SSH
+  ansible.builtin.assert:
+    that:
+      - vps_ssh_allowed_source_cidrs | length > 0
+    fail_msg: >-
+      vps_ssh_restrict_source_ips=true требует непустой vps_ssh_allowed_source_cidrs
+      (включить IP, с которого выполняется ansible-playbook).
+  when: vps_ssh_restrict_source_ips | bool
+  tags: [vps, firewall, prepare_vps]
+
+- name: Разрешить входящий Envoy с адресов Kubernetes / NAT
+  community.general.ufw:
+    rule: allow
+    port: "{{ vps_envoy_listen_port | string }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ vps_k8s_egress_source_cidrs }}"
+  tags: [vps, firewall, prepare_vps]
+
+- name: Включить ufw
+  community.general.ufw:
+    state: enabled
+  tags: [vps, firewall, prepare_vps]

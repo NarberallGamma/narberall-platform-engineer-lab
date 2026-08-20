@@ -13,7 +13,7 @@ I talk to business first: **can the infra do what the product needs**, **how fas
 | Nobody wrote it down | Runbooks, diagrams, inventory, audit-walkable Git | Days, in parallel with the first apply |
 | Hand-built estate | Audit, inventory, import or wrap, runbooks, alerts | Days to first clean `plan`; weeks to stop click-ops |
 | Bill too high | Right-size, kill idle, **park non-prod at night** (start/stop schedules on Huawei-class / cloud.ru and the same idea on AWS) | First cuts in days; schedule lives in git |
-| Paper and tickets are slow | **OCR + LLM** so accounting, analysts, and developers stop retyping PDFs | Usable API in 1–2 weeks (see packages) |
+| Paper and tickets are slow | **OCR + LLM** so accounting, analysts, and developers stop retyping PDFs. Private GPU API + Nextcloud/n8n on one Ansible tree: [case 01](../case-studies/01-ai-llm-platform.md), [`../iac/ansible/reference/ansible-llm-collab/`](../iac/ansible/reference/ansible-llm-collab/) | Usable API in 1–2 weeks (see packages) |
 | GPU / chat / RAG | Local Ollama / vLLM-class serve, vector store, optional Karpenter-class GPU scale | Sprint, not a research programme |
 | Engineers paste tenant data or click the same ops | IDE as platform: MCP, local LLM when VRAM fits, API when not. **Same kit on Linux, macOS, or WSL** | Hours to a day on a new laptop |
 | Must move clouds (when asked) | Same platform shape on the next API. I do this **fast**; many treat it as a year. Example: VK Cloud / NOVA-class → Huawei-class Advanced | Design in days; window in hours |

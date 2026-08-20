@@ -1,0 +1,24 @@
+---
+sec_stack_dir: /opt/sec-stack
+sec_stack_grafana_admin_password: changeme # переопределяется из SOPS-секретов
+sec_stack_panos_api_keys: {} # переопределяется из SOPS-секретов, см. group_vars/sec_stack/
+
+# Telegram-бот sec-stack (@sec_stack_bot). Токен — из SOPS; chat_id — числа
+# (получить: написать в чат с ботом, затем /getUpdates). 0 = приёмник выключен.
+sec_stack_telegram_bot_token: "" # переопределяется из SOPS-секретов
+sec_stack_telegram_chat_id_default: 0 # обычный чат (warning и ниже)
+sec_stack_telegram_chat_id_critical: 0 # чат "вахтёр ругается"
+sec_stack_heartbeat_url: "" # healthchecks.io ping URL для DeadManSwitch
+
+# Registry GitLab: откуда тянется образ edr-exporter (собирается CI проекта
+# cybersec/edr-coverage). Нужен deploy-токен со scope read_registry — из SOPS.
+# Пустой токен = логин пропускается (образ уже локально или registry публичный).
+sec_stack_registry_host: git.example.com
+sec_stack_registry_user: "" # переопределяется из SOPS-секретов
+sec_stack_registry_token: "" # переопределяется из SOPS-секретов
+
+# Конфиги сборщиков edr-exporter: имя файла в /config -> содержимое. Задаётся
+# из SOPS (secrets.sops.yml). Пусто = сбор не идёт (нет кредов), экспортер
+# считает по готовым CSV. Ожидаемые ключи: ad_config.yaml, vkcloud_config.yaml,
+# sbc-adv_config.yaml, edr_config.json.
+sec_stack_edr_configs: {}

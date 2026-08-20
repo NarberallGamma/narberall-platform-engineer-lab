@@ -1,0 +1,36 @@
+# При любом обновлении main — деплой репо на хост Git (раннер) в /ansible через common-ci.
+# Переменные доступны в Run pipeline → Inputs.
+spec:
+  inputs:
+    PLAYBOOK:
+      default: ""
+      description: "Плейбук после синхронизации репо (пусто = только синхронизация)"
+    ANSIBLE_REPO_CHOWN_USER:
+      default: "ansible"
+      description: "Владелец каталога репо"
+    ANSIBLE_REPO_CHOWN_UID:
+      default: "1001"
+      description: "UID владельца"
+    ANSIBLE_REPO_CHOWN_GID:
+      default: "1001"
+      description: "GID владельца"
+---
+include:
+  - project: 'platform/common-ci'
+    file: 'deploys/ansible-deploy.yaml'
+    ref: main
+    inputs:
+      PLAYBOOK: $[[ inputs.PLAYBOOK ]]
+      ANSIBLE_REPO_CHOWN_USER: $[[ inputs.ANSIBLE_REPO_CHOWN_USER ]]
+      ANSIBLE_REPO_CHOWN_UID: $[[ inputs.ANSIBLE_REPO_CHOWN_UID ]]
+      ANSIBLE_REPO_CHOWN_GID: $[[ inputs.ANSIBLE_REPO_CHOWN_GID ]]
+  - project: 'platform/common-ci'
+    ref: main
+    file: '/releases/on-upgrade-branch-push.yaml'
+
+# Unify stages: ansible-deploy uses `deploy`, release-mr-create uses `releases`.
+# Last `stages` from on-upgrade-branch-push would otherwise drop `deploy` and break YAML.
+stages:
+  - deploy
+  - releases
+

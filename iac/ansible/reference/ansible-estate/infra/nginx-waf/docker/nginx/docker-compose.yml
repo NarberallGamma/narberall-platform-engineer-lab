@@ -1,0 +1,26 @@
+version: '2.1'
+
+services:
+
+  nginx:
+    image: 'wmx-public.gitlab.yandexcloud.net:5050/wmx-public/container-images/node:4.6'
+    restart: always
+    network_mode: host
+    logging:
+      options:
+        max-size: '500m'
+        max-file: '1'
+    environment:
+      - WALLARM_API_HOST=api.webmonitorx.ru
+      - WALLARM_API_TOKEN=[ключ на сервере] (выдается в консоли Wallarm)
+      - DEPLOY_FORCE=True
+      - TARANTOOL_MEMORY_GB=2
+    volumes:
+    - ./config:/etc/nginx/conf.d
+    - /docker/certgen/data:/docker/certgen/data:ro
+    - ./logs:/var/log/nginx
+    - ./nginx.conf:/etc/nginx/nginx.conf
+    - ./config_add:/etc/nginx/conf_add
+    - ./wallarm:/etc/wallarm
+    - ./wallarm-logs:/var/log/wallarm
+    - ./wallarm-html:/usr/share/nginx/html

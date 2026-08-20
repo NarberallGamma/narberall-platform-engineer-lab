@@ -1,0 +1,5 @@
+---
+galaxy_info:
+  role_name: llm_dev_deploy
+  description: Развёртывание llama.cpp server (Docker Compose, NVIDIA vGPU)
+dependencies: []

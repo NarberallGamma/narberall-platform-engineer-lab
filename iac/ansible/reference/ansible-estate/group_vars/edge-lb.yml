@@ -1,0 +1,138 @@
+# edge-lb — prod (estate-prod-lb-1/2, /docker/apps/edge-lb)
+# TLS-прокси + keepalived VIP для сервисов вне WAF/K8s (Vault, HSM adapter).
+# Плейбук: playbooks/docker_app_edge_lb.yml | inventory: [edge_lb]
+# Legacy-миграция: playbooks/migrate_edge_lb_legacy.yml (migrate завершён; switch в group_vars ниже).
+#
+# Секреты Vault KV не используются; TLS раскладывается cert-orchestrator в ssl_dir ниже.
+# keepalived osixia: ./config/keepalived -> /container/service/keepalived/assets (+ notify.sh)
+
+docker_app_vault_enabled: false
+docker_app_compose_env_files: []
+
+docker_app_base_dir: /docker/apps
+docker_app_compose_pull: always
+
+docker_app:
+  slug: edge-lb
+  nginx_image: nginx:1.27.4
+  keepalived_image: osixia/keepalived:2.0.20
+  listen_address: "0.0.0.0"
+  listen_port: 443
+  cert_basename: example.com
+  ssl_protocols: "TLSv1.2 TLSv1.3"
+  proxy_read_timeout: 60s
+  proxy_connect_timeout: 5s
+  proxy_send_timeout: 60s
+  client_max_body_size: "1m"
+  nginx_worker_processes: auto
+  nginx_worker_connections: 1024
+  nginx_keepalive_timeout: 65
+  rate_limit_zone_rate: "10r/s"
+  rate_limit_burst: 20
+
+# VIP keepalived (Cloud.ru, eth0)
+edge_lb_virtual_ip: "10.10.16.16"
+edge_lb_virtual_interface: eth0
+edge_lb_keepalived_router_id: vault_lb_prod
+edge_lb_keepalived_vrrp_id: 51
+# Пусто: читается с хоста при deploy; при legacy migrate извлекается из /etc/keepalived/keepalived.conf
+edge_lb_keepalived_auth_pass: ""
+edge_lb_keepalived_health_interval: 2
+edge_lb_keepalived_health_rise: 2
+edge_lb_keepalived_health_fall: 3
+
+edge_lb_keepalived_nodes:
+  - hostname: estate-prod-lb-1
+    state: MASTER
+    priority: 100
+  - hostname: estate-prod-lb-2
+    state: BACKUP
+    priority: 90
+
+# Включённые vhost (conf.d/*.conf)
+edge_lb_enabled_sites:
+  - vault
+  - hsm-adapter
+  - treasury-policy-gateway
+  - cryptopro
+
+# Vault backend (prod raft)
+edge_lb_vault_domain: vault.example.com
+edge_lb_vault_backends:
+  - { ip: "10.10.16.11", name: vault-1, port: 8200 }
+  - { ip: "10.10.16.159", name: vault-2, port: 8200 }
+  - { ip: "10.10.16.7", name: vault-3, port: 8200 }
+edge_lb_vault_upstream_tries: 3
+edge_lb_vault_health_check_retries: 3
+edge_lb_vault_health_check_interval: 10
+# nginx OSS: retry на standby/sealed/unavailable; http_501/472/474 не поддерживаются
+edge_lb_vault_proxy_next_upstream: "error timeout invalid_header http_429 http_503 http_500 http_502 http_504"
+
+# Dynamic upstream sidecar (prod HA: только active leader в vault_active_upstream.conf)
+edge_lb_vault_upstream_sidecar_enabled: true
+edge_lb_vault_upstream_sidecar_image: alpine:3.20
+edge_lb_vault_upstream_sidecar_nginx_container: edge-lb-nginx
+edge_lb_vault_upstream_sidecar_interval: 5
+edge_lb_vault_upstream_sidecar_probe_path: "/v1/sys/health?standbyok=false"
+edge_lb_vault_upstream_sidecar_probe_timeout: 3
+
+# Legacy hsm-adapter backend (estate-prod-cryptopro-01 VM, TLS на edge-lb VIP)
+# port: API и actuator/health (8080). health_port не задаётся, совпадает с port.
+edge_lb_hsm_adapter_domain: hsm-adapter.example.com
+edge_lb_hsm_adapter_path_prefix: /hsm-adapter/
+edge_lb_hsm_adapter_backend:
+  ip: "10.10.16.170"
+  port: 8080
+edge_lb_hsm_adapter_health_check_retries: 3
+edge_lb_hsm_adapter_health_check_interval: 10
+edge_lb_hsm_adapter_proxy_connect_timeout: 60s
+edge_lb_hsm_adapter_proxy_send_timeout: 60s
+edge_lb_hsm_adapter_proxy_read_timeout: 60s
+
+# treasury-policy-gateway (cryptopro-01 VM, отдельный vhost, не web-treasury WAF)
+edge_lb_treasury_policy_gateway_domain: policy-gateway.example.com
+edge_lb_treasury_policy_gateway_path_prefix: /api/v0/treasury-policy-gateway/
+edge_lb_treasury_policy_gateway_backend:
+  ip: "10.10.16.170"
+  port: 8082
+edge_lb_treasury_policy_gateway_health_check_retries: 3
+edge_lb_treasury_policy_gateway_health_check_interval: 10
+edge_lb_treasury_policy_gateway_proxy_connect_timeout: 60s
+edge_lb_treasury_policy_gateway_proxy_send_timeout: 60s
+edge_lb_treasury_policy_gateway_proxy_read_timeout: 120s
+
+# cryptopro Safe Deal (cryptopro-01 VM, отдельный vhost, не web WAF)
+edge_lb_cryptopro_domain: cryptopro.example.com
+edge_lb_cryptopro_path_prefix: /api/v0/cryptopro-service/
+edge_lb_cryptopro_backend:
+  ip: "10.10.16.170"
+  port: 8084
+edge_lb_cryptopro_health_check_retries: 3
+edge_lb_cryptopro_health_check_interval: 10
+edge_lb_cryptopro_proxy_connect_timeout: 60s
+edge_lb_cryptopro_proxy_send_timeout: 60s
+edge_lb_cryptopro_proxy_read_timeout: 120s
+
+# cert-orchestrator / routine deploy
+edge_lb_ssl_dir: "{{ docker_app_base_dir }}/edge-lb/certs"
+edge_lb_cert_basename: "{{ docker_app.cert_basename }}"
+
+# logrotate на хосте (logs/nginx mount)
+edge_lb_logrotate_path: /etc/logrotate.d/edge-lb-nginx
+edge_lb_logrotate_frequency: daily
+edge_lb_logrotate_rotate: 14
+edge_lb_logrotate_maxage: 14
+
+# ---------------------------------------------------------------------------
+# Legacy migration (playbooks/migrate_edge_lb_legacy.yml)
+# Migrate на prod/preprod завершён (2026-06-19); секция для истории и других стендов.
+# Повторный прогон: edge_lb_legacy_migration_enabled: true + раскомментировать vars ниже.
+# Плейбук при migrate выставляет edge_lb_migrate_legacy_ssl: true.
+# ---------------------------------------------------------------------------
+edge_lb_legacy_migration_enabled: false
+
+# edge_lb_migrate_legacy_ssl: false
+# edge_lb_legacy_ssl_source_dir: /etc/nginx/ssl
+# edge_lb_legacy_ssl_files:
+#   - { src: "example.com.crt", dest: "example.com.crt", mode: "0644" }
+#   - { src: "example.com.key", dest: "example.com.key", mode: "0600" }

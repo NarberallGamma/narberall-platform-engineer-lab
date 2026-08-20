@@ -1,0 +1,37 @@
+---
+- name: Файл окружения с секретами для compose (env_file llama)
+  ansible.builtin.template:
+    src: dotenv.j2
+    dest: "{{ llm_dev_app_root }}/{{ llm_dev_env_file_name }}"
+    mode: "0600"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  no_log: true
+
+- name: Файл окружения Open WebUI
+  ansible.builtin.template:
+    src: open-webui.env.j2
+    dest: "{{ llm_dev_app_root }}/{{ llm_dev_open_webui_env_file_name }}"
+    mode: "0600"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  no_log: true
+  when: llm_dev_open_webui_enabled | bool
+
+- name: docker-compose.yml для LLM dev
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ llm_dev_app_root }}/docker-compose.yml"
+    mode: "0644"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+- name: Поднять или обновить стек LLM dev
+  community.docker.docker_compose_v2:
+    project_src: "{{ llm_dev_app_root }}"
+    project_name: "{{ llm_dev_compose_project_name }}"
+    state: present
+    pull: "{{ llm_dev_compose_pull | default('missing') }}"
+    recreate: "{{ llm_dev_compose_recreate | default('always') }}"
+  async: "{{ llm_dev_compose_async_seconds | default(10800) | int }}"
+  poll: "{{ llm_dev_compose_poll_seconds | default(15) | int }}"

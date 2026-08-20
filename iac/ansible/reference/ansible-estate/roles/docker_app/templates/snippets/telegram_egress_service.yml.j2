@@ -1,0 +1,13 @@
+{# Telegram VPS egress (client): только docker_app.telegram_egress, без vars роли egress. #}
+{% set te = app_item.value.telegram_egress | default({}) %}
+{% if te.enabled | default(false) | bool %}
+    networks:
+      - {{ te.network_name }}
+    extra_hosts:
+{% for h in te.extra_hosts %}
+      - "{{ h.name }}:{{ h.ip }}"
+{% endfor %}
+{% elif docker_app_telegram_vps_enabled | default(false) | bool %}
+    extra_hosts:
+      - "api.telegram.org:{{ docker_app_telegram_vps_primary_ip }}"
+{% endif %}

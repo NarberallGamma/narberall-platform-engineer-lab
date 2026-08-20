@@ -1,0 +1,439 @@
+---
+# Роль: создание schema_flyway, выдача прав на схемы и разграничение schema_flyway (DDL) / treasury_user (DML).
+# Требует: community.postgresql, community.general.
+
+# community.postgresql требует psycopg2 в Python; в Alpine — пакет py3-psycopg2 (apk), не pip (PEP 668).
+# Образ registry.../base-images/ansible: также см. Dockerfile (py3-psycopg2 в RUN apk).
+- name: Установить py3-psycopg2 для модулей community.postgresql
+  community.general.apk:
+    name: py3-psycopg2
+    state: present
+
+- name: Создать пользователя schema_flyway
+  community.postgresql.postgresql_user:
+    name: "{{ schema_flyway }}"
+    password: "{{ schema_flyway_password }}"
+    state: present
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+
+- name: Выдать право репликации всем app-пользователям (для Debezium / logical replication)
+  community.postgresql.postgresql_query:
+    query: "ALTER ROLE {{ item }} WITH REPLICATION;"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+  loop: "{{ app_users }}"
+  ignore_errors: true
+
+- name: Выдать schema_flyway право подключения к каждой БД
+  community.postgresql.postgresql_query:
+    query: "GRANT CONNECT ON DATABASE {{ item }} TO {{ schema_flyway }};"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+  loop: "{{ db_list }}"
+
+# Flyway 2.13 (treasury_csp, treasury_api и др.): CREATE SCHEMA kafka_idempotent_consumer /
+# kafka_transactional_outbox требует CREATE на уровне базы, не только USAGE/CREATE в public.
+- name: Выдать schema_flyway право CREATE на каждую БД (создание новых схем Flyway)
+  community.postgresql.postgresql_query:
+    query: "GRANT CREATE ON DATABASE {{ item }} TO {{ schema_flyway }};"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+  loop: "{{ db_list }}"
+
+- name: Передать владение пользовательскими схемами (root) пользователю schema_flyway
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE r RECORD;
+      BEGIN
+        FOR r IN
+          SELECT n.nspname
+          FROM pg_catalog.pg_namespace n
+          JOIN pg_catalog.pg_roles rl ON n.nspowner = rl.oid
+          WHERE n.nspname NOT LIKE 'pg_%'
+            AND n.nspname != 'information_schema'
+            AND rl.rolname = '{{ pg_admin_user }}'
+        LOOP
+          EXECUTE format('ALTER SCHEMA %I OWNER TO %I', r.nspname, '{{ schema_flyway }}');
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+- name: Выдать schema_flyway права на схему public и сменить владельца схемы
+  community.postgresql.postgresql_query:
+    query: |
+      GRANT USAGE, CREATE ON SCHEMA public TO {{ schema_flyway }};
+      ALTER SCHEMA public OWNER TO {{ schema_flyway }};
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+- name: Передать владение таблицами в public пользователю schema_flyway
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE r RECORD;
+      BEGIN
+        FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public')
+        LOOP
+          EXECUTE format('ALTER TABLE public.%I OWNER TO %I', r.tablename, '{{ schema_flyway }}');
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+- name: Передать владение последовательностями в public пользователю schema_flyway
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE r RECORD;
+      BEGIN
+        FOR r IN (SELECT sequencename FROM pg_sequences WHERE schemaname = 'public')
+        LOOP
+          EXECUTE format('ALTER SEQUENCE public.%I OWNER TO %I', r.sequencename, '{{ schema_flyway }}');
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+# Flyway 2.13 (treasury_api): ALTER TYPE network_name ADD VALUE требует владельца enum-типа.
+- name: Передать владение enum/domain-типами в public пользователю schema_flyway (типы root)
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE r RECORD;
+      BEGIN
+        FOR r IN
+          SELECT t.typname
+          FROM pg_catalog.pg_type t
+          JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid
+          JOIN pg_catalog.pg_roles rl ON t.typowner = rl.oid
+          WHERE n.nspname = 'public'
+            AND t.typtype IN ('e', 'd')
+            AND rl.rolname = '{{ pg_admin_user }}'
+        LOOP
+          BEGIN
+            EXECUTE format('ALTER TYPE %I.%I OWNER TO %I', 'public', r.typname, '{{ schema_flyway }}');
+          EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Skipped type public.%', r.typname;
+          END;
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+# afterMigrate.sql вызывают CREATE/ALTER FUNCTION — владелец должен быть schema_flyway.
+# Root может передать только функции, которыми владеет сам (root). Остальные — нет.
+- name: Передать владение функциями в public пользователю schema_flyway (только функции root)
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE r RECORD;
+      BEGIN
+        FOR r IN
+          SELECT n.nspname, p.proname, pg_catalog.pg_get_function_identity_arguments(p.oid) AS args
+          FROM pg_catalog.pg_proc p
+          JOIN pg_catalog.pg_namespace n ON p.pronamespace = n.oid
+          JOIN pg_catalog.pg_roles rl ON p.proowner = rl.oid
+          WHERE n.nspname = 'public' AND rl.rolname = '{{ pg_admin_user }}'
+        LOOP
+          BEGIN
+            EXECUTE format('ALTER FUNCTION %I.%I(%s) OWNER TO %I', r.nspname, r.proname, r.args, '{{ schema_flyway }}');
+          EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Skipped %.%(%)', r.nspname, r.proname, r.args;
+          END;
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+  ignore_errors: true
+
+# Чтобы treasury_user мог сделать ALTER FUNCTION ... OWNER TO schema_flyway, он должен быть членом роли schema_flyway (требование PostgreSQL). Членство — на уровне кластера.
+- name: Временно выдать treasury_user членство в роли schema_flyway (для передачи владения функциями)
+  community.postgresql.postgresql_query:
+    query: "GRANT {{ schema_flyway }} TO {{ treasury_user }}"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+
+# Функции, принадлежащие treasury_user (create_new_partition, set_tx_report_sequence и т.д.), root передать не может. Выполняем от имени treasury_user — treasury_user отдаёт свои функции schema_flyway.
+- name: Передать владение функциями treasury_user в public пользователю schema_flyway (от имени treasury_user)
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE r RECORD;
+      BEGIN
+        FOR r IN
+          SELECT n.nspname, p.proname, pg_catalog.pg_get_function_identity_arguments(p.oid) AS args
+          FROM pg_catalog.pg_proc p
+          JOIN pg_catalog.pg_namespace n ON p.pronamespace = n.oid
+          JOIN pg_catalog.pg_roles rl ON p.proowner = rl.oid
+          WHERE n.nspname = 'public' AND rl.rolname = '{{ treasury_user }}'
+        LOOP
+          EXECUTE format('ALTER FUNCTION %I.%I(%s) OWNER TO %I', r.nspname, r.proname, r.args, '{{ schema_flyway }}');
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ treasury_user }}"
+    login_password: "{{ treasury_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+- name: Передать владение enum/domain-типами treasury_user в public пользователю schema_flyway (от имени treasury_user)
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE r RECORD;
+      BEGIN
+        FOR r IN
+          SELECT t.typname
+          FROM pg_catalog.pg_type t
+          JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid
+          JOIN pg_catalog.pg_roles rl ON t.typowner = rl.oid
+          WHERE n.nspname = 'public'
+            AND t.typtype IN ('e', 'd')
+            AND rl.rolname = '{{ treasury_user }}'
+        LOOP
+          EXECUTE format('ALTER TYPE %I.%I OWNER TO %I', 'public', r.typname, '{{ schema_flyway }}');
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ treasury_user }}"
+    login_password: "{{ treasury_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+# Убираем членство treasury_user в schema_flyway после передачи функций и типов.
+- name: Отозвать у treasury_user членство в роли schema_flyway
+  community.postgresql.postgresql_query:
+    query: "REVOKE {{ schema_flyway }} FROM {{ treasury_user }}"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+
+- name: Выдать app-пользователям права на схему public и DML
+  community.postgresql.postgresql_query:
+    query: |
+      GRANT USAGE ON SCHEMA public TO {{ item[1] }};
+      GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {{ item[1] }};
+      GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {{ item[1] }};
+      GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO {{ item[1] }};
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item[0] }}"
+  loop: "{{ db_list | product(app_users) | list }}"
+
+- name: Права по умолчанию для будущих объектов schema_flyway (на каждого app-пользователя)
+  community.postgresql.postgresql_query:
+    query: |
+      ALTER DEFAULT PRIVILEGES FOR ROLE {{ schema_flyway }} IN SCHEMA public
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {{ item[1] }};
+      ALTER DEFAULT PRIVILEGES FOR ROLE {{ schema_flyway }} IN SCHEMA public
+        GRANT USAGE, SELECT ON SEQUENCES TO {{ item[1] }};
+      ALTER DEFAULT PRIVILEGES FOR ROLE {{ schema_flyway }} IN SCHEMA public
+        GRANT EXECUTE ON FUNCTIONS TO {{ item[1] }};
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item[0] }}"
+  loop: "{{ db_list | product(app_users) | list }}"
+
+# Все пользовательские схемы: права для schema_flyway и для каждого app-пользователя (treasury_user, treasury_user, ...)
+- name: Выдать schema_flyway и app-пользователям права на все пользовательские схемы в каждой БД
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE
+        r RECORD;
+        v_flyway TEXT := '{{ schema_flyway }}';
+        v_user   TEXT := '{{ item[1] }}';
+      BEGIN
+        FOR r IN
+          SELECT nspname
+          FROM pg_catalog.pg_namespace
+          WHERE nspname NOT LIKE 'pg_%' AND nspname != 'information_schema'
+          ORDER BY 1
+        LOOP
+          EXECUTE format('GRANT USAGE, CREATE ON SCHEMA %I TO %I', r.nspname, v_flyway);
+          EXECUTE format('GRANT USAGE, CREATE ON SCHEMA %I TO %I', r.nspname, v_user);
+          EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %I TO %I', r.nspname, v_user);
+          EXECUTE format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA %I TO %I', r.nspname, v_user);
+          EXECUTE format('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA %I TO %I', r.nspname, v_user);
+          EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', v_flyway, r.nspname, v_user);
+          EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I GRANT USAGE, SELECT ON SEQUENCES TO %I', v_flyway, r.nspname, v_user);
+          EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I GRANT EXECUTE ON FUNCTIONS TO %I', v_flyway, r.nspname, v_user);
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item[0] }}"
+  loop: "{{ db_list | product(app_users) | list }}"
+
+# В пользовательских схемах (kafka_transactional_outbox и др.) Flyway запускается под schema_flyway — нужны владение или права на flyway_schema_history.
+- name: Передать владение flyway_schema_history в пользовательских схемах пользователю schema_flyway
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE
+        r RECORD;
+        v_flyway TEXT := '{{ schema_flyway }}';
+      BEGIN
+        FOR r IN
+          SELECT nspname
+          FROM pg_catalog.pg_namespace
+          WHERE nspname NOT IN ('public') AND nspname NOT LIKE 'pg_%' AND nspname != 'information_schema'
+          ORDER BY 1
+        LOOP
+          BEGIN
+            EXECUTE format('ALTER TABLE %I.flyway_schema_history OWNER TO %I', r.nspname, v_flyway);
+          EXCEPTION WHEN undefined_table THEN
+            NULL;
+          END;
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+# Явно выдать права на flyway_schema_history во всех пользовательских схемах (таблица могла появиться после GRANT ON ALL TABLES или принадлежать другому владельцу)
+- name: Выдать treasury_user права на flyway_schema_history во всех пользовательских схемах
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE
+        r RECORD;
+        v_user TEXT := '{{ treasury_user }}';
+      BEGIN
+        FOR r IN
+          SELECT nspname
+          FROM pg_catalog.pg_namespace
+          WHERE nspname NOT LIKE 'pg_%' AND nspname != 'information_schema'
+          ORDER BY 1
+        LOOP
+          BEGIN
+            EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.flyway_schema_history TO %I', r.nspname, v_user);
+          EXCEPTION WHEN undefined_table THEN
+            NULL;
+          END;
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+# Повторная выдача прав на все объекты в пользовательских схемах каждому app-пользователю
+- name: Повторно выдать app-пользователям права на все объекты во всех пользовательских схемах
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE
+        r RECORD;
+        v_user TEXT := '{{ item[1] }}';
+      BEGIN
+        FOR r IN
+          SELECT nspname
+          FROM pg_catalog.pg_namespace
+          WHERE nspname NOT LIKE 'pg_%' AND nspname != 'information_schema'
+          ORDER BY 1
+        LOOP
+          EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %I TO %I', r.nspname, v_user);
+          EXECUTE format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA %I TO %I', r.nspname, v_user);
+          EXECUTE format('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA %I TO %I', r.nspname, v_user);
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item[0] }}"
+  loop: "{{ db_list | product(app_users) | list }}"
+
+# Debezium подключается под app-пользователем (treasury_user). Для filtered publication pgoutput
+# нужен OWNER таблиц heartbeat и outbox_message у этого пользователя, не у schema_flyway.
+# Запускать повторно schema_flyway_setup после первого успешного старта приложения (Flyway создал outbox).
+- name: Передать владение outbox-таблиц kafka_transactional_outbox app-пользователю (Debezium)
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE
+        v_user TEXT := '{{ item[1] }}';
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = 'kafka_transactional_outbox'
+        ) THEN
+          BEGIN
+            EXECUTE format('ALTER TABLE kafka_transactional_outbox.heartbeat OWNER TO %I', v_user);
+          EXCEPTION WHEN undefined_table THEN
+            NULL;
+          END;
+          BEGIN
+            EXECUTE format('ALTER TABLE kafka_transactional_outbox.outbox_message OWNER TO %I', v_user);
+          EXCEPTION WHEN undefined_table THEN
+            NULL;
+          END;
+        END IF;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item[0] }}"
+  loop: "{{ db_list | product(app_users) | list }}"
+
+- name: Итог
+  ansible.builtin.debug:
+    msg: "schema_flyway и права разграничены для БД: {{ db_list | join(', ') }}"

@@ -1,0 +1,16 @@
+---
+# Один клиент: подготовка матрицы, MKCOL по путям, затем те же occ, что в groupfolders_reapply_one_client.
+# Вызывается из groupfolders_reapply_all_clients при nextcloud_reapply_all_clients_mkcol_enabled=true.
+
+- name: Установить текущее имя клиента для применения прав
+  ansible.builtin.set_fact:
+    client_name: "{{ _current_client }}"
+
+- name: Подготовить список папок по матрице для client_name
+  ansible.builtin.include_tasks: groupfolders_prepare_folders_flat_for_client.yml
+
+- name: Проверка WebDAV и MKCOL для клиента {{ _current_client }}
+  ansible.builtin.include_tasks: groupfolders_webdav_check_and_mkcol.yml
+
+- name: Применить права по матрице (корень + по путям) для клиента {{ _current_client }}
+  ansible.builtin.include_tasks: groupfolders_apply_permissions.yml

@@ -1,0 +1,54 @@
+# GitLab UI — {{ app_item.value.gitlab_host }}
+# Backend: gitlab-workhorse (Omnibus nginx отключён)
+
+server {
+    error_log /var/log/nginx/error.log warn;
+    access_log /var/log/nginx/access.log main;
+    error_log /var/log/nginx/{{ app_item.value.gitlab_host }}/error.log warn;
+    access_log /var/log/nginx/{{ app_item.value.gitlab_host }}/access.log main;
+    access_log /dev/stdout main;
+
+    server_name {{ app_item.value.gitlab_host }};
+    listen {{ app_item.value.listen_address | default('0.0.0.0') }}:80;
+
+    return 301 https://{{ app_item.value.gitlab_host }}$request_uri;
+}
+
+server {
+    error_log /var/log/nginx/error.log warn;
+    access_log /var/log/nginx/access.log main;
+    error_log /var/log/nginx/{{ app_item.value.gitlab_host }}/error.log warn;
+    access_log /var/log/nginx/{{ app_item.value.gitlab_host }}/access.log main;
+    access_log /dev/stdout main;
+
+    listen {{ app_item.value.listen_address | default('0.0.0.0') }}:443 ssl;
+    ssl_protocols {{ app_item.value.ssl_protocols | default('TLSv1.2 TLSv1.3') }};
+    server_name {{ app_item.value.gitlab_host }};
+    http2 on;
+
+    ssl_certificate /etc/nginx/certs/{{ app_item.value.cert_basename }}.crt;
+    ssl_certificate_key /etc/nginx/certs/{{ app_item.value.cert_basename }}.key;
+
+    proxy_buffering off;
+    proxy_request_buffering off;
+    client_max_body_size 0;
+    client_body_buffer_size 512k;
+    proxy_read_timeout {{ app_item.value.proxy_read_timeout | default('600s') }};
+    proxy_connect_timeout 60s;
+    proxy_send_timeout {{ app_item.value.proxy_read_timeout | default('600s') }};
+
+    location / {
+        client_max_body_size 0;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Server $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Ssl on;
+        proxy_set_header X-Forwarded-Port $server_port;
+        proxy_pass http://{{ app_item.value.gitlab_backend_host }}:{{ app_item.value.gitlab_backend_port }}/;
+        proxy_pass_request_headers on;
+        proxy_http_version 1.1;
+    }
+}

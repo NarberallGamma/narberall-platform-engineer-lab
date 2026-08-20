@@ -1,0 +1,125 @@
+services:
+  cryptopro-bootstrap:
+    image: {{ docker_app.cryptopro_bootstrap_image }}
+    container_name: treasury-policy-gateway-cryptopro-bootstrap
+    user: "0:0"
+    volumes:
+      - ./data/cprocsp/keys:/var/opt/cprocsp/keys/cprouser
+      - ./data/cprocsp/users:/var/opt/cprocsp/users/cprouser
+      - ./data/cprocsp/dsrf:/var/opt/cprocsp/dsrf
+      - ./config/bootstrap-cryptopro-keys.sh:/scripts/bootstrap-cryptopro-keys.sh:ro
+    environment:
+      - TREASURY_DGTRY_MODE={{ docker_app.dgtry_mode | default('PREGEN') }}
+      - KEYS_IMPORT_ENABLED=false
+      - KEYS_IMPORT_FORCE=false
+    command: ["/scripts/bootstrap-cryptopro-keys.sh"]
+    restart: "no"
+
+  kafka-truststore-init:
+    image: {{ docker_app.kafka_truststore_init_image }}
+    container_name: treasury-policy-gateway-kafka-truststore-init
+    user: "0:0"
+    volumes:
+      - ./config/kafka-ca.crt:/tmp/kafka-ca.crt:ro
+      - ./data/kafka-truststore:/tmp/kafka-truststore
+    command:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        JAVA_HOME=$$(dirname $$(dirname $$(readlink -f $$(which java))))
+        cp "$$JAVA_HOME/lib/security/cacerts" /tmp/kafka-truststore/kafka-truststore.jks
+        keytool -storepasswd -keystore /tmp/kafka-truststore/kafka-truststore.jks \
+          -storepass changeit -new {{ app_vault.KAFKA_TRUSTSTORE_PASSWORD | default('changeit') }}
+        keytool -import -noprompt -trustcacerts \
+          -file /tmp/kafka-ca.crt \
+          -alias kafka-ca \
+          -keystore /tmp/kafka-truststore/kafka-truststore.jks \
+          -storepass {{ app_vault.KAFKA_TRUSTSTORE_PASSWORD | default('changeit') }} \
+          -storetype JKS
+        chmod 644 /tmp/kafka-truststore/kafka-truststore.jks
+        echo "Kafka CA imported into truststore"
+    restart: "no"
+
+  treasury-policy-gateway:
+    image: {{ docker_app.app_image }}
+    container_name: treasury-policy-gateway
+    user: "10001:10001"
+    depends_on:
+      cryptopro-bootstrap:
+        condition: service_completed_successfully
+      kafka-truststore-init:
+        condition: service_completed_successfully
+    ports:
+      - "{{ docker_app.host_port }}:8080"
+    env_file:
+      - .env
+    environment:
+      - SPRING_PROFILES_ACTIVE=production
+      - SERVER_PORT=8080
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
+      - SPRING_APPLICATION_NAME=treasury-policy-gateway-app
+      - SPRING_CLOUD_VAULT_ENABLED=false
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS={{ treasury_policy_gateway_kafka_bootstrap }}
+      - SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL=SASL_SSL
+      - SPRING_KAFKA_PROPERTIES_SASL_MECHANISM=PLAIN
+      - SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG=org.apache.kafka.common.security.plain.PlainLoginModule required username="treasury_user" password="$${KAFKA_CLIENT_PASSWORD}";
+      - SPRING_KAFKA_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=
+      - SPRING_KAFKA_CONSUMER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=
+      - SPRING_KAFKA_PRODUCER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=
+      - SPRING_KAFKA_ADMIN_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=
+      - SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_TYPE=JKS
+      - SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_LOCATION=/tmp/kafka-truststore/kafka-truststore.jks
+      - SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_PASSWORD={{ app_vault.KAFKA_TRUSTSTORE_PASSWORD | default('changeit') }}
+      - SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_TYPE=JKS
+      - SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_LOCATION=/tmp/kafka-truststore/kafka-truststore.jks
+      - SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_PASSWORD={{ app_vault.KAFKA_TRUSTSTORE_PASSWORD | default('changeit') }}
+      - SPRING_KAFKA_CONSUMER_CUSTOM_REPLICATION_GROUP_ID={{ treasury_policy_gateway_kafka_consumer_group }}
+      - SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET=earliest
+      - TREASURY_POLICY_GATEWAY_FEATURES_TRANSACTION_POLICY=false
+      - TREASURY_POLICY_GATEWAY_FEATURES_VAULTS_REGISTRY=false
+      - TREASURY_POLICY_GATEWAY_FEATURES_USER_ACCOUNT=false
+      - TREASURY_POLICY_GATEWAY_BITCOIN_NETWORK={{ docker_app.bitcoin_network | default('MAINNET') }}
+      # Fallback (2.13 SCREAMING_SNAKE): keep until post-cutover smoke confirms dotted Spring keys alone are enough
+      - TREASURY_POLICY_GATEWAY_DGTRY_MODE={{ docker_app.dgtry_mode | default('PREGEN') }}
+      # Treasury 3.0 required (preprod cutover 2026-08-10): dotted keys — avoid circular placeholder crashes
+      - 'treasury.policy-gateway.dgtry.mode={{ docker_app.dgtry_mode | default("PREGEN") }}'
+      - 'treasury.policy-gateway.dgtry.checksum={{ docker_app.dgtry_checksum | default("ANY") }}'
+      - 'treasury.policy-gateway.dgtry.recovery-public-key={{ docker_app.dgtry_recovery_public_key | default("") }}'
+      - 'treasury.policy-gateway.dgtry.recovery-public-key-any={{ docker_app.dgtry_recovery_public_key_any | default(true) | lower }}'
+      - 'treasury.policy-gateway.rocksdb.data-dir={{ docker_app.rocksdb_data_dir | default("/service/data") }}'
+      - 'treasury.policy-gateway.rocksdb.db-key={{ docker_app.rocksdb_db_key | default("NONE") }}'
+      # Fallback (2.13): same data-dir via legacy env name
+      - TREASURY_POLICY_GATEWAY_ROCKSDB_DATA_DIR={{ docker_app.rocksdb_data_dir | default('/service/data') }}
+      - FILE_STORAGE_S3_URL={{ treasury_policy_gateway_s3_url }}
+      - FILE_STORAGE_S3_PROTOCOL=HTTPS
+      - FILE_STORAGE_S3_REGION={{ treasury_policy_gateway_s3_region }}
+      - FILE_STORAGE_S3_BUCKET={{ treasury_policy_gateway_s3_bucket }}
+      - FILE_STORAGE_S3_ADDRESSING_STYLE=virtual
+      - FILE-STORAGE_S3_ACCESS-KEY=$${FILE_STORAGE_S3_ACCESS_KEY}
+      - FILE-STORAGE_S3_SECRET-KEY=$${FILE_STORAGE_S3_SECRET_KEY}
+      - 'treasury.policy-gateway.dgtry.pin={{ app_vault.TREASURY_POLICY_GATEWAY_DGTRY_PIN | default('') | replace("'", "''") | replace('$', '$$') }}'
+      - cert-verifier-service.url={{ treasury_policy_gateway_cert_verifier_url }}
+      - pki-gateway-service.url={{ treasury_policy_gateway_pki_gateway_url }}
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*
+      - LOGGING_LEVEL_ROOT={{ docker_app.logging_level_root | default('INFO') }}
+      - LOGGING_LEVEL_COM_WAVESENTERPRISE_WE_TREASURY={{ docker_app.logging_level_treasury | default('INFO') }}
+      - JAVA_TOOL_OPTIONS=-Djdk.tls.namedGroups=secp256r1,secp384r1,secp521r1,ffdhe2048,ffdhe3072 -Djavax.net.ssl.trustStore=/tmp/kafka-truststore/kafka-truststore.jks -Djavax.net.ssl.trustStorePassword={{ app_vault.KAFKA_TRUSTSTORE_PASSWORD | default('changeit') }} -Djavax.net.ssl.trustStoreType=JKS -Djavax.net.ssl.keyStore=/tmp/kafka-truststore/kafka-truststore.jks -Djavax.net.ssl.keyStorePassword={{ app_vault.KAFKA_TRUSTSTORE_PASSWORD | default('changeit') }} -Djavax.net.ssl.keyStoreType=JKS -Dcom.sun.net.ssl.checkRevocation=false -Djdk.tls.client.enableStatusRequestExtension=false
+    volumes:
+      - ./data/service:/service/data
+      - ./data/cprocsp/keys:/var/opt/cprocsp/keys/cprouser
+      - ./data/cprocsp/users:/var/opt/cprocsp/users/cprouser
+      - ./data/cprocsp/dsrf:/var/opt/cprocsp/dsrf
+      - ./data/kafka-truststore:/tmp/kafka-truststore:ro
+    tmpfs:
+      - /tmp:rw,exec,size=100m
+    restart: always
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl -sf http://localhost:8080/actuator/health >/dev/null || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://k8s.estate.example.com:6443
+    insecure-skip-tls-verify: true
+  name: estate
+contexts:
+- context:
+    cluster: estate
+    user: admin
+  name: estate
+current-context: estate
+users:
+- name: admin
+  user:
+    token: CHANGE_ME

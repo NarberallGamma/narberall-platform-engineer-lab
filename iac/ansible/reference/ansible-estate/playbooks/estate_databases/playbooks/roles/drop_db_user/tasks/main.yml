@@ -1,0 +1,155 @@
+---
+# Снятие GRANT-ов и default privileges дополнительной учётки (аудит, ИБ, сопровождение).
+# Без REASSIGN OWNED, без правок treasury_user / schema_flyway / schema_flyway_setup.
+# Явный REVOKE GRANT-ов (root на RDS не superuser, DROP OWNED BY недоступен).
+# Требует: community.postgresql, community.general.
+
+- name: Установить py3-psycopg2 для модулей community.postgresql
+  community.general.apk:
+    name: py3-psycopg2
+    state: present
+
+- name: Завершить активные сессии удаляемой роли
+  community.postgresql.postgresql_query:
+    query: |
+      SELECT pg_terminate_backend(pid)
+      FROM pg_stat_activity
+      WHERE usename = '{{ drop_user }}' AND pid <> pg_backend_pid();
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+
+- name: Снять default privileges, выданные удаляемой роли
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE
+        d RECORD;
+        v_drop TEXT := '{{ drop_user }}';
+        priv_clause TEXT;
+        nsp_name TEXT;
+      BEGIN
+        FOR d IN
+          SELECT DISTINCT
+            defaclrole::regrole::text AS defrole,
+            defaclnamespace AS nsp_oid,
+            defaclobjtype AS objtype
+          FROM pg_default_acl da
+          CROSS JOIN LATERAL aclexplode(da.defaclacl) AS acl
+          JOIN pg_roles grantee ON grantee.oid = acl.grantee
+          WHERE grantee.rolname = v_drop
+        LOOP
+          IF d.objtype = 'r' THEN
+            priv_clause := 'ALL ON TABLES';
+          ELSIF d.objtype = 'S' THEN
+            priv_clause := 'ALL ON SEQUENCES';
+          ELSIF d.objtype = 'f' THEN
+            priv_clause := 'ALL ON FUNCTIONS';
+          ELSE
+            CONTINUE;
+          END IF;
+
+          IF d.nsp_oid = 0 THEN
+            EXECUTE format(
+              'ALTER DEFAULT PRIVILEGES FOR ROLE %I REVOKE %s FROM %I',
+              d.defrole, priv_clause, v_drop
+            );
+          ELSE
+            SELECT nspname INTO nsp_name
+            FROM pg_namespace
+            WHERE oid = d.nsp_oid;
+
+            EXECUTE format(
+              'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I REVOKE %s FROM %I',
+              d.defrole, nsp_name, priv_clause, v_drop
+            );
+          END IF;
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+- name: Снять GRANT-ы удаляемой роли во всех пользовательских схемах (REVOKE, без DROP OWNED)
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE
+        r RECORD;
+        v_drop TEXT := '{{ drop_user }}';
+      BEGIN
+        FOR r IN
+          SELECT nspname
+          FROM pg_catalog.pg_namespace
+          WHERE nspname NOT LIKE 'pg_%' AND nspname != 'information_schema'
+          ORDER BY 1
+        LOOP
+          BEGIN
+            EXECUTE format(
+              'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA %I FROM %I',
+              r.nspname, v_drop
+            );
+          EXCEPTION WHEN OTHERS THEN NULL;
+          END;
+          BEGIN
+            EXECUTE format(
+              'REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA %I FROM %I',
+              r.nspname, v_drop
+            );
+          EXCEPTION WHEN OTHERS THEN NULL;
+          END;
+          BEGIN
+            EXECUTE format(
+              'REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA %I FROM %I',
+              r.nspname, v_drop
+            );
+          EXCEPTION WHEN OTHERS THEN NULL;
+          END;
+          BEGIN
+            EXECUTE format('REVOKE ALL ON SCHEMA %I FROM %I', r.nspname, v_drop);
+          EXCEPTION WHEN OTHERS THEN NULL;
+          END;
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+- name: Отозвать CONNECT на каждую БД
+  community.postgresql.postgresql_query:
+    query: "REVOKE CONNECT ON DATABASE {{ item }} FROM {{ drop_user }};"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+  loop: "{{ db_list }}"
+
+- name: Удалить роль PostgreSQL
+  community.postgresql.postgresql_user:
+    name: "{{ drop_user }}"
+    state: absent
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+  when: drop_role_after_cleanup | default(false) | bool
+
+- name: Итог
+  ansible.builtin.debug:
+    msg: >-
+      Роль {{ drop_user }}: GRANT-ы и default privileges сняты на {{ db_list | length }} БД.
+      {% if drop_role_after_cleanup | default(false) | bool %}
+      DROP ROLE выполнен.
+      {% else %}
+      DROP ROLE не выполнялся (drop_role_after_cleanup=false); при необходимости удалить роль через UI cloud.ru или повторить с drop_role_after_cleanup=true.
+      {% endif %}

@@ -1,0 +1,23 @@
+- name: "Create dir for kube config in home dir"
+  file:
+    path: /home/{{ item }}/.kube/
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: '0700'
+    state: directory
+  loop: "{{ users }}"
+
+- name: "Copy kube config in home"
+  copy:
+    src: config
+    dest: /home/{{ item }}/.kube/
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: '0644'
+  loop: "{{ users }}"
+
+- name: "Set autocomplection for kubectl"
+  lineinfile:
+    path: /home/{{ item }}/.bashrc
+    line: "source <(kubectl completion bash)"
+  loop: "{{ users }}"

@@ -1,0 +1,14 @@
+---
+- hosts: alt-dev-mysql
+  vars:
+    db_type: "mysql"
+    disks:
+      aws:
+        - block: /dev/nvme0n1
+          part: /dev/nvme0n1p1
+          fs: ext4
+          path: /var/lib/mysql
+          options: defaults,discard
+  roles:
+    - disks
+    - db

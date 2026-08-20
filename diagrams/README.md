@@ -6,7 +6,7 @@ Prefer SVG/PNG from Excalidraw/draw.io, or Mermaid next to the case / practice p
 
 | Path | Use |
 |------|-----|
-| [`case-studies/`](case-studies/) | Architecture for published case studies (01-09, including Selectel VPC + dedicated Proxmox) |
+| [`case-studies/`](case-studies/) | Architecture for published case studies (01-10, including Selectel and Huawei-class estate Ansible) |
 | [`iac/`](iac/) | CI turnkey (Jenkins + GitLab CI, build/publish/revoke) |
 | [`practice/home-lab/`](practice/home-lab/) | Dual-boot, local AI, Ansible edge, Android SSH (AI-lab mermaid includes Replicate MCP) |
 

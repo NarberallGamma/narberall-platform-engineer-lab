@@ -1,0 +1,235 @@
+# Шаблон структуры папок и матрицы прав — Clients INTFS
+# Источник: https://wiki.x.example.com/pages/viewpage.action?pageId=1212731
+# Профиль Ansible: nextcloud-prod; prod (https://nextcloud.x.example.com / Clients INTFS). Файл матрицы:
+#   matrix_nextcloud_prod_cloud_platform.yaml — содержимое как у dev (matrix_nextcloud_dev_cloud_platform.yaml); синхронизация с вики при изменениях.
+
+# Путь — относительно корня groupfolder (Clients INTFS). Плейсхолдер {client} подставляется именем клиента.
+# Порядок записей = порядок создания. view = просмотр (RO), edit = редактирование.
+# Соответствие во View: явный список групп → +read (nextcloud_occ_view_permissions); маркер __NC_MATRIX_RO_ALL__ во view —
+# все группы матрицы только RO (нет отдельной LDAP-группы «INTFS Clients RO», см. group_vars nextcloud_occ_ro_permissions).
+# edit → +read +write +create +delete (nextcloud_occ_edit_permissions).
+# Уровень 4 только под `{client}/{client}/Accounting`: `children_mkcol` — MKCOL; подпапки без своей строки в `children` наследуют view/edit узла Accounting (явный occ).
+# Опционально `children` — переопределения L4; для «Договоры» отдельной строки нет — наследование от родителя. `deny_on_l4_children` — явный deny (напр. Assistant на всех L4 кроме except_child_name «Договоры») для корректного advanced ACL в Nextcloud.
+#
+# Якоря (defaults): &name задаёт именованный фрагмент, *name — подставляет его. Менять список прав —
+# править в defaults (одно место), в folders только ссылки *name. Новый набор: добавить запись в defaults
+# с &новое_имя и в folders указать view/edit: *новое_имя.
+#
+# Во view вместо LDAP-группы «INTFS Clients RO» используется маркер __NC_MATRIX_RO_ALL__ (defaults: view_ro), Ansible разворачивает его в RO для объединения всех групп матрицы (см. roles/nextcloud_groupfolders groupfolders_apply_permissions.yml).
+# L3 «Требования PAY» под {client}/{client}: без __NC_MATRIX_RO_ALL__ — только INTFS Clients Payroll и INTFS Clients IntControl; явный matrix_deny по остальным группам матрицы плюс авто-deny в group_vars.
+#
+# При расхождении путей occ с каталогом на диске — опциональный children_mkcol_occ_path_fallback в матрице (см. matrix_regul_cloud_platform.yaml).
+
+defaults:
+  view_ro: &view_ro [__NC_MATRIX_RO_ALL__]
+  edit_it: &edit_it [INTFS Clients IT]
+  view_empty: &view_empty []
+  edit_accounting: &edit_accounting
+    - INTFS Clients Accounting
+    - INTFS Clients Admin
+    - INTFS Clients Finance
+    - INTFS Clients Corp
+    - INTFS Clients IntControl
+  # Внутренний обмен (уровень 2): те же группы на просмотр и на редактирование (как Corp — один якорь на view и edit)
+  edit_internal: &edit_internal
+    - INTFS Clients Payroll
+    - INTFS Clients Accounting
+    - INTFS Clients Admin
+    - INTFS Clients Compliance
+    - INTFS Clients EconSecurity
+    - INTFS Clients IntSecurity
+    - INTFS Clients Legal
+    - INTFS Clients HR
+    - INTFS Clients Corp
+    - INTFS Clients Finance
+    - INTFS Clients 1C
+    - INTFS Clients IntControl
+  edit_file_exchange: &edit_file_exchange
+    - INTFS Clients Admin
+    - INTFS Clients Finance
+    - INTFS Clients Compliance
+    - INTFS Clients EconSecurity
+    - INTFS Clients IntSecurity
+    - INTFS Clients Legal
+    - INTFS Clients Accounting
+    - INTFS Clients HR
+    - INTFS Clients 1C
+    - INTFS Clients IntControl
+  edit_clients_info: &edit_clients_info
+    - INTFS Clients Admin
+    - INTFS Clients Legal
+    - INTFS Clients Finance
+    - INTFS Clients Assistant
+    - INTFS Clients IntControl
+  assistant_only: &assistant_only [INTFS Clients Assistant]
+  edit_corp: &edit_corp
+    - INTFS Clients Corp
+    - INTFS Clients Admin
+    - INTFS Clients Finance
+  edit_payroll_hr: &edit_payroll_hr
+    - INTFS Clients Payroll
+    - INTFS Clients HR
+    - INTFS Clients Admin
+    - INTFS Clients Finance
+  edit_int_security: &edit_int_security
+    - INTFS Clients IntSecurity
+    - INTFS Clients EconSecurity
+  edit_econ_security: &edit_econ_security
+    - INTFS Clients EconSecurity
+    - INTFS Clients IntSecurity
+    - INTFS Clients Compliance
+    - INTFS Clients Admin
+    - INTFS Clients IntControl
+  edit_compliance: &edit_compliance
+    - INTFS Clients Compliance
+    - INTFS Clients IntSecurity
+    - INTFS Clients EconSecurity
+    - INTFS Clients Admin
+    - INTFS Clients IntControl
+  edit_legal: &edit_legal
+    - INTFS Clients Legal
+    - INTFS Clients Admin
+    - INTFS Clients IntSecurity
+    - INTFS Clients Accounting
+    - INTFS Clients Assistant
+    - INTFS Clients IntControl
+  edit_purchasing: &edit_purchasing
+    - INTFS Clients Admin
+    - INTFS Clients IntControl
+  edit_trebovaniya_pay: &edit_trebovaniya_pay
+    - INTFS Clients Payroll
+    - INTFS Clients IntControl
+  intfs_matrix_deny_trebovaniya_pay: &intfs_matrix_deny_trebovaniya_pay
+    - group: INTFS Clients IT
+    - group: INTFS Clients Accounting
+    - group: INTFS Clients Admin
+    - group: INTFS Clients Finance
+    - group: INTFS Clients Corp
+    - group: INTFS Clients Assistant
+    - group: INTFS Clients Compliance
+    - group: INTFS Clients EconSecurity
+    - group: INTFS Clients IntSecurity
+    - group: INTFS Clients Legal
+    - group: INTFS Clients HR
+    - group: INTFS Clients 1C
+  edit_int_control: &edit_int_control [INTFS Clients IntControl]
+  edit_file_hra: &edit_file_hra
+    - INTFS Clients HR
+    - INTFS Clients Payroll
+    - INTFS Clients Admin
+    - INTFS Clients Finance
+  edit_file_corp: &edit_file_corp
+    - INTFS Clients Corp
+    - INTFS Clients Admin
+  edit_file_accounting: &edit_file_accounting
+    - INTFS Clients Payroll
+    - INTFS Clients HR
+    - INTFS Clients Admin
+    - INTFS Clients Finance
+    - INTFS Clients Accounting
+    - INTFS Clients IntControl
+  edit_file_intsecurity: &edit_file_intsecurity [INTFS Clients IntSecurity]
+
+folders:
+  - path: "{client}"
+    view: *view_ro
+    edit: *edit_it
+
+  - path: "{client}/{client}"
+    view: *view_ro
+    edit: *edit_it
+
+  - path: "{client}/Внутренний обмен"
+    view: *edit_internal
+    edit: *edit_internal
+
+  - path: "{client}/Файлобменник"
+    view: *view_ro
+    edit: *edit_file_exchange
+
+  # Уровень 3 (Client name): просмотр и редактирование — одни и те же группы (кроме Clients info). L4 только здесь, не под Файлобменник/Accounting.
+  - path: "{client}/{client}/Accounting"
+    view: *edit_accounting
+    edit: *edit_accounting
+    children_mkcol:
+      - Авансовые отчеты
+      - Акты сверок
+      - Банк
+      - Выручка
+      - ГПХ
+      - Договоры
+      - Закрытие периода
+      - Инвентаризация
+      - Инструкции по клиенту
+      - НСО и депозиты
+      - Отчетность
+      - Представительские расходы
+      - Реализация
+      - Сверка ЕНС
+      - Статистика
+      - Счета на оплату
+      - Требования ИФНС
+      - Учетная политика
+    deny_on_l4_children:
+      except_child_name: "Договоры"
+      groups: *assistant_only
+
+  # Clients info — исключение: просмотр RO (все группы матрицы), редактирование — свой список
+  - path: "{client}/{client}/Clients info"
+    view: *view_ro
+    edit: *edit_clients_info
+
+  - path: "{client}/{client}/Corp"
+    view: *edit_corp
+    edit: *edit_corp
+
+  - path: "{client}/{client}/Payroll+HR"
+    view: *edit_payroll_hr
+    edit: *edit_payroll_hr
+
+  - path: "{client}/{client}/IntSecurity"
+    view: *edit_int_security
+    edit: *edit_int_security
+
+  - path: "{client}/{client}/EconSecurity"
+    view: *edit_econ_security
+    edit: *edit_econ_security
+
+  - path: "{client}/{client}/Compliance"
+    view: *edit_compliance
+    edit: *edit_compliance
+
+  - path: "{client}/{client}/Legal"
+    view: *edit_legal
+    edit: *edit_legal
+
+  - path: "{client}/{client}/Purchasing"
+    view: *edit_purchasing
+    edit: *edit_purchasing
+
+  - path: "{client}/{client}/Внутренний контроль"
+    view: *edit_int_control
+    edit: *edit_int_control
+
+  - path: "{client}/{client}/Требования PAY"
+    view: *edit_trebovaniya_pay
+    edit: *edit_trebovaniya_pay
+    matrix_deny: *intfs_matrix_deny_trebovaniya_pay
+
+  # Уровень 3 (Файлобменник): просмотр и редактирование — одни и те же группы
+  - path: "{client}/Файлобменник/HRA"
+    view: *edit_file_hra
+    edit: *edit_file_hra
+
+  - path: "{client}/Файлобменник/Corp"
+    view: *edit_file_corp
+    edit: *edit_file_corp
+
+  # Без children_mkcol: дерево L4 только у {client}/{client}/Accounting выше.
+  - path: "{client}/Файлобменник/Accounting"
+    view: *edit_file_accounting
+    edit: *edit_file_accounting
+
+  - path: "{client}/Файлобменник/IntSecurity"
+    view: *edit_file_intsecurity
+    edit: *edit_file_intsecurity

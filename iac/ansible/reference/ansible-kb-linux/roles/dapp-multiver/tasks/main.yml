@@ -1,0 +1,165 @@
+---
+- name: gitlab-runner | Check if gitlab-runner is installed
+  shell: dpkg -l | grep 'gitlab-runner\|gitlab-ci-multi-runner'
+  ignore_errors: yes
+  register: gitlab_runner
+  changed_when: False
+
+- name: Docker | Check if /docker.*/ is installed
+  shell: dpkg -l | grep docker
+  ignore_errors: yes
+  register: docker
+  changed_when: False
+
+- import_tasks: repos.yml
+
+- name: gitlab-runner | Install gitlab-runner
+  apt: name=gitlab-runner state=present cache_valid_time=86400
+  when: gitlab_runner.rc != 0
+
+- name: Default Dapp | Get currently install Dapp version
+  shell: bash -il -c "set -o pipefail ; dapp --version | cut -f2 -d' '"
+  register: default_dapp_version
+  become: yes
+  become_user: "gitlab-runner"
+  ignore_errors: yes
+  changed_when: False
+  args:
+    executable: /bin/bash
+
+- name: Default Dapp | Create empty file in /etc/profile.d/rvm.sh
+  copy:
+    content: ""
+    dest: /etc/profile.d/rvm.sh
+    force: yes
+    group: root
+    owner: root
+    mode: 0644
+
+- name: Default Dapp | Show default Dapp version
+  debug:
+    msg: "gitlab-runner's default dapp version {{ default_dapp_version.stdout }}"
+
+- name: RVM | Remove old RVM installation
+  shell: bash -lic "rvm implode --force; rm -rf /etc/rvmrc"
+  ignore_errors: yes
+  args:
+    executable: /bin/bash
+
+- name: Docker | Install docker-ce package
+  apt:
+    name: docker-ce=17.03*
+    state: present
+    cache_valid_time: 86400
+  when: docker.rc != 0
+
+- name: Docker | Add gitlab-runner user to docker group
+  user:
+    name: 'gitlab-runner'
+    groups: docker
+    append: yes
+
+- name: RVM | Install RVM for user gitlab-runner | Download rvm.sh
+  get_url:
+    url: https://get.rvm.io
+    dest: /tmp/rvm.sh
+    mode: 0755
+
+- name: RVM | Install RVM for user gitlab-runner | Execute rvm.sh
+  shell: "/tmp/rvm.sh --path /home/gitlab-runner/.rvm"
+  args:
+    executable: /bin/bash
+  become: yes
+  become_user: 'gitlab-runner'
+
+- name: RVM | Install RVM for user gitlab-runner | Include source in gitlab-runner's .bashrc
+  lineinfile:
+    path: /home/gitlab-runner/.bashrc
+    line: "source ~/.rvm/scripts/rvm"
+  become: yes
+  become_user: 'gitlab-runner'
+
+- name: RVM | Install RVM for user gitlab-runner | Include source in gitlab-runner's .profile
+  lineinfile:
+    path: /home/gitlab-runner/.profile
+    line: "source ~/.rvm/scripts/rvm"
+  become: yes
+  become_user: 'gitlab-runner'
+
+- name: Dapp | Install Dapp deps
+  apt: "name={{ item }} state=present cache_valid_time=86400"
+  with_items:
+    - cmake
+    - libssh2-1-dev
+    - libssl-dev
+
+- name: RVM | Install Ruby deps
+  apt: "name={{ item }} state=present cache_valid_time=86400"
+  with_items:
+    - gawk
+    - libssl-dev
+    - zlib1g-dev
+    - libyaml-dev
+    - libsqlite3-dev
+    - sqlite3
+    - autoconf
+    - libgmp-dev
+    - libgdbm-dev
+    - libncurses5-dev
+    - automake
+    - libtool
+    - bison
+    - libffi-dev
+    - libreadline6-dev
+    - g++
+    - pkg-config
+
+- name: RVM | Install ruby-2.5.3 for user gitlab-runner
+  shell: "source ~/.rvm/scripts/rvm ; rvm install ruby-2.5.3"
+  args:
+    executable: /bin/bash
+    creates: "/home/gitlab-runner/.rvm/rubies/ruby-2.5.3/"
+  become: yes
+  become_user: 'gitlab-runner'
+
+- name: Default Dapp | Install
+  shell: |
+    bash -il -c "source /home/gitlab-runner/.rvm/scripts/rvm
+    gem install dapp{% if default_dapp_version.stdout %} -v {{ default_dapp_version.stdout }}{% endif %}"
+  args:
+    executable: /bin/bash
+    creates: "/home/gitlab-runner/.rvm/gems/ruby-2.5.3/bin/dapp"
+  become: yes
+  become_user: "gitlab-runner"
+
+- name: Dapp | Create .dapp folder
+  file:
+    path: /home/gitlab-runner/.dapp
+    state: directory
+    owner: gitlab-runner
+    group: gitlab-runner
+    mode: 0755
+  become: yes
+  become_user: 'gitlab-runner'
+
+- name: Dapp | Copy dapp_use script
+  copy:
+    src: ../scripts/dapp_use
+    dest: /home/gitlab-runner/.dapp/dapp_use
+    mode: 0755
+  become: yes
+  become_user: 'gitlab-runner'
+
+- name: Dapp | Add dapp_use to PATH in gitlab-runner's .bashrc
+  lineinfile:
+    path: /home/gitlab-runner/.bashrc
+    line: "export PATH=$PATH:$HOME/.dapp/"
+  become: yes
+  become_user: 'gitlab-runner'
+
+- name: Dapp | Add dapp_use to PATH in gitlab-runner's .profile
+  lineinfile:
+    path: /home/gitlab-runner/.profile
+    line: "export PATH=$PATH:$HOME/.dapp/"
+  become: yes
+  become_user: 'gitlab-runner'

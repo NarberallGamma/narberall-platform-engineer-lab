@@ -1,0 +1,7 @@
+---
+- name: Update /etc/hosts
+  lineinfile:
+    path: "/etc/hosts"
+    line: "{{ item }}"
+  with_items: "{{ neo4j_mongodb_hosts }}"
+  tags: etchostsupdate

@@ -1,0 +1,29 @@
+wallarm_block_page @block_attack type=attack;
+wallarm_block_page @block_acl_ip type=acl_ip;
+wallarm_block_page @block_acl_source type=acl_source;
+location @block_attack {
+    return 403;
+    error_page 403 /wallarm_blocked.html;
+}
+location @block_acl_ip {
+    return 403;
+    error_page 403 /wallarm_blocked.html;
+}
+location @block_acl_source {
+    return 403;
+    error_page 403 /wallarm_acl_source.html;
+}
+location /wallarm_blocked.html {
+    root /usr/share/nginx/html;
+    add_header X-Request-ID $request_id always;
+    add_header X-Remote-IP $remote_addr always;
+    add_header X-IS-ATTACK "1" always;
+    add_header X-Time $time_iso8601 always;
+}
+location /wallarm_acl_source.html {
+    root /usr/share/nginx/html;
+    add_header X-Request-ID $request_id always;
+    add_header X-Remote-IP $remote_addr always;
+    add_header X-IS-ATTACK "1" always;
+    add_header X-Time $time_iso8601 always;
+}

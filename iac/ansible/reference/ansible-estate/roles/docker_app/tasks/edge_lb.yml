@@ -1,0 +1,246 @@
+---
+# edge-lb: каталоги, nginx/keepalived конфиги, vault-upstream sidecar, logrotate, legacy SSL (migrate)
+
+- name: "{{ docker_app.slug }} | keepalived auth_pass из существующего конфига (если не задан)"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    f="{{ docker_app_base_dir }}/edge-lb/config/keepalived/keepalived.conf"
+    if [[ -f "$f" ]]; then
+      grep -E '^\s*auth_pass' "$f" | awk '{print $2}' | tr -d '"' | head -1
+    elif [[ -f /etc/keepalived/keepalived.conf ]]; then
+      grep -E '^\s*auth_pass' /etc/keepalived/keepalived.conf | awk '{print $2}' | tr -d '"' | head -1
+    fi
+  args:
+    executable: /bin/bash
+  register: edge_lb_auth_pass_discovered
+  changed_when: false
+  failed_when: false
+  when: edge_lb_keepalived_auth_pass | default('') | length == 0
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | установить keepalived auth_pass из discovery"
+  ansible.builtin.set_fact:
+    edge_lb_keepalived_auth_pass: "{{ edge_lb_auth_pass_discovered.stdout | trim }}"
+  when:
+    - edge_lb_keepalived_auth_pass | default('') | length == 0
+    - edge_lb_auth_pass_discovered.stdout | default('') | length > 0
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | каталоги edge-lb"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ docker_app_base_dir }}/edge-lb/certs", mode: "0700" }
+    - { path: "{{ docker_app_base_dir }}/edge-lb/config/conf.d", mode: "0755" }
+    - { path: "{{ docker_app_base_dir }}/edge-lb/config/keepalived", mode: "0755" }
+    - { path: "{{ docker_app_base_dir }}/edge-lb/config/vault_upstream", mode: "0755" }
+    - { path: "{{ docker_app_base_dir }}/edge-lb/scripts", mode: "0755" }
+    - { path: "{{ docker_app_base_dir }}/edge-lb/logs/nginx", mode: "0755" }
+    - { path: "{{ docker_app_base_dir }}/edge-lb/logs/nginx/{{ edge_lb_vault_domain }}", mode: "0755" }
+    - { path: "{{ docker_app_base_dir }}/edge-lb/logs/keepalived", mode: "0755" }
+    - { path: "{{ docker_app_base_dir }}/edge-lb/logs/vault-upstream", mode: "0755" }
+  loop_control:
+    label: "{{ item.path }}"
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | logs/nginx hsm-adapter vhost"
+  ansible.builtin.file:
+    path: "{{ docker_app_base_dir }}/edge-lb/logs/nginx/{{ edge_lb_hsm_adapter_domain }}"
+    state: directory
+    mode: "0755"
+  when: "'hsm-adapter' in edge_lb_enabled_sites"
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | logs/nginx treasury-policy-gateway vhost"
+  ansible.builtin.file:
+    path: "{{ docker_app_base_dir }}/edge-lb/logs/nginx/{{ edge_lb_treasury_policy_gateway_domain }}"
+    state: directory
+    mode: "0755"
+  when: "'treasury-policy-gateway' in edge_lb_enabled_sites"
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | logs/nginx cryptopro vhost"
+  ansible.builtin.file:
+    path: "{{ docker_app_base_dir }}/edge-lb/logs/nginx/{{ edge_lb_cryptopro_domain }}"
+    state: directory
+    mode: "0755"
+  when: "'cryptopro' in edge_lb_enabled_sites"
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | nginx.conf"
+  ansible.builtin.template:
+    src: edge-lb/nginx.conf.j2
+    dest: "{{ docker_app_base_dir }}/edge-lb/nginx.conf"
+    mode: "0644"
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | stat vault_active_upstream.conf (sidecar)"
+  ansible.builtin.stat:
+    path: "{{ docker_app_base_dir }}/edge-lb/config/vault_upstream/vault_active_upstream.conf"
+  register: edge_lb_vault_active_upstream_stat
+  when:
+    - "'vault' in edge_lb_enabled_sites"
+    - edge_lb_vault_upstream_sidecar_enabled | default(false) | bool
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | vault_upstream/vault_active_upstream.conf (bootstrap)"
+  ansible.builtin.template:
+    src: edge-lb/config/vault_upstream/vault_active_upstream.conf.j2
+    dest: "{{ docker_app_base_dir }}/edge-lb/config/vault_upstream/vault_active_upstream.conf"
+    mode: "0644"
+  when:
+    - "'vault' in edge_lb_enabled_sites"
+    - edge_lb_vault_upstream_sidecar_enabled | default(false) | bool
+    - not edge_lb_vault_active_upstream_stat.stat.exists
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | удалить legacy vault_active_upstream из conf.d"
+  ansible.builtin.file:
+    path: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/vault_active_upstream.conf"
+    state: absent
+  when:
+    - "'vault' in edge_lb_enabled_sites"
+    - edge_lb_vault_upstream_sidecar_enabled | default(false) | bool
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | conf.d/vault.conf"
+  ansible.builtin.template:
+    src: edge-lb/config/conf.d/vault.conf.j2
+    dest: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/vault.conf"
+    mode: "0644"
+  when: "'vault' in edge_lb_enabled_sites"
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | conf.d/hsm-adapter.conf"
+  ansible.builtin.template:
+    src: edge-lb/config/conf.d/hsm-adapter.conf.j2
+    dest: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/hsm-adapter.conf"
+    mode: "0644"
+  when: "'hsm-adapter' in edge_lb_enabled_sites"
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | удалить conf.d/hsm-adapter.conf (site отключён)"
+  ansible.builtin.file:
+    path: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/hsm-adapter.conf"
+    state: absent
+  when: "'hsm-adapter' not in edge_lb_enabled_sites"
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | conf.d/treasury-policy-gateway.conf"
+  ansible.builtin.template:
+    src: edge-lb/config/conf.d/treasury-policy-gateway.conf.j2
+    dest: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/treasury-policy-gateway.conf"
+    mode: "0644"
+  when: "'treasury-policy-gateway' in edge_lb_enabled_sites"
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | удалить conf.d/treasury-policy-gateway.conf (site отключён)"
+  ansible.builtin.file:
+    path: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/treasury-policy-gateway.conf"
+    state: absent
+  when: "'treasury-policy-gateway' not in edge_lb_enabled_sites"
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | conf.d/cryptopro.conf"
+  ansible.builtin.template:
+    src: edge-lb/config/conf.d/cryptopro.conf.j2
+    dest: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/cryptopro.conf"
+    mode: "0644"
+  when: "'cryptopro' in edge_lb_enabled_sites"
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | удалить conf.d/cryptopro.conf (site отключён)"
+  ansible.builtin.file:
+    path: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/cryptopro.conf"
+    state: absent
+  when: "'cryptopro' not in edge_lb_enabled_sites"
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | vault-upstream backends.list"
+  ansible.builtin.template:
+    src: edge-lb/config/vault_upstream/backends.list.j2
+    dest: "{{ docker_app_base_dir }}/edge-lb/config/vault_upstream/backends.list"
+    mode: "0644"
+  when:
+    - "'vault' in edge_lb_enabled_sites"
+    - edge_lb_vault_upstream_sidecar_enabled | default(false) | bool
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | vault-upstream watcher script"
+  ansible.builtin.template:
+    src: edge-lb/scripts/vault_upstream_watcher.sh.j2
+    dest: "{{ docker_app_base_dir }}/edge-lb/scripts/vault_upstream_watcher.sh"
+    mode: "0755"
+  when:
+    - "'vault' in edge_lb_enabled_sites"
+    - edge_lb_vault_upstream_sidecar_enabled | default(false) | bool
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | vault-upstream entrypoint"
+  ansible.builtin.template:
+    src: edge-lb/scripts/vault_upstream_entrypoint.sh.j2
+    dest: "{{ docker_app_base_dir }}/edge-lb/scripts/vault_upstream_entrypoint.sh"
+    mode: "0755"
+  when:
+    - "'vault' in edge_lb_enabled_sites"
+    - edge_lb_vault_upstream_sidecar_enabled | default(false) | bool
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | keepalived.conf"
+  ansible.builtin.template:
+    src: edge-lb/config/keepalived/keepalived.conf.j2
+    dest: "{{ docker_app_base_dir }}/edge-lb/config/keepalived/keepalived.conf"
+    mode: "0644"
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | keepalived notify.sh (osixia assets)"
+  ansible.builtin.template:
+    src: edge-lb/config/keepalived/notify.sh.j2
+    dest: "{{ docker_app_base_dir }}/edge-lb/config/keepalived/notify.sh"
+    mode: "0755"
+  notify: restart docker app compose
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | legacy SSL в certs (migrate)"
+  ansible.builtin.copy:
+    src: "{{ edge_lb_legacy_ssl_source_dir }}/{{ item.src }}"
+    dest: "{{ docker_app_base_dir }}/edge-lb/certs/{{ item.dest }}"
+    remote_src: true
+    mode: "{{ item.mode }}"
+  loop: "{{ edge_lb_legacy_ssl_files }}"
+  when: edge_lb_migrate_legacy_ssl | default(false) | bool
+  tags: [docker_app, deploy, edge_lb, migrate]
+
+- name: "{{ docker_app.slug }} | logrotate nginx"
+  ansible.builtin.template:
+    src: edge-lb/logrotate-nginx.j2
+    dest: "{{ edge_lb_logrotate_path }}"
+    mode: "0644"
+  tags: [docker_app, deploy, edge_lb]
+
+- name: "{{ docker_app.slug }} | проверка logrotate (dry-run)"
+  ansible.builtin.command:
+    argv:
+      - logrotate
+      - -d
+      - "{{ edge_lb_logrotate_path }}"
+  register: edge_lb_logrotate_check
+  changed_when: false
+  failed_when: edge_lb_logrotate_check.rc != 0
+  tags: [docker_app, deploy, edge_lb]

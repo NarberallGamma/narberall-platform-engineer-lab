@@ -1,0 +1,23 @@
+---
+# Deploy cloud-hibernate-operator (docker compose в /docker/apps/cloud-hibernate-operator)
+# Переменные: group_vars/cloud-hibernate-operator.yml
+
+- name: Deploy cloud-hibernate-operator
+  hosts: cloud_hibernate_operator
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/cloud-hibernate-operator.yml"
+
+  pre_tasks:
+    - name: Deployment info
+      ansible.builtin.debug:
+        msg:
+          - "Host: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "App: {{ docker_app.slug }}"
+          - "Path: {{ docker_app_base_dir }}/{{ docker_app.slug }}"
+          - "Vault: {{ docker_app_vault_mount_point }}/{{ docker_app_vault_path }}"
+
+  roles:
+    - docker_app

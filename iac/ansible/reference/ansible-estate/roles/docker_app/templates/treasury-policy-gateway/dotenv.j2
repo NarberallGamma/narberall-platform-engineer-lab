@@ -1,0 +1,6 @@
+# Managed by Ansible (docker_app). Vault {{ docker_app_vault_mount_point }}/{{ docker_app_vault_path }} + extra treasury-kafka
+# PIN: literal в docker-compose.yml (не .env); $ -> $$ для compose
+KAFKA_CLIENT_PASSWORD={{ app_vault.KAFKA_CLIENT_PASSWORD | default('') | replace('$', '$$') }}
+FILE_STORAGE_S3_ACCESS_KEY={{ app_vault.FILE_STORAGE_S3_ACCESS_KEY | default('') | replace('$', '$$') }}
+FILE_STORAGE_S3_SECRET_KEY={{ app_vault.FILE_STORAGE_S3_SECRET_KEY | default('') | replace('$', '$$') }}
+EXTERNAL_CSP_LICENSE={{ app_vault.EXTERNAL_CSP_LICENSE | default('') | replace('$', '$$') }}

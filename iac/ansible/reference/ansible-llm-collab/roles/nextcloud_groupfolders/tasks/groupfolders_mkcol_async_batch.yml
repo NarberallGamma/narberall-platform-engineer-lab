@@ -1,0 +1,28 @@
+---
+# Ожидает _mkcol_batch — список элементов nextcloud_folders_flat (path, …). Параллельный MKCOL в пределах батча.
+- name: Запустить MKCOL (async) в батче
+  ansible.builtin.uri:
+    url: "{{ nextcloud_webdav_url }}/{{ _mkcol_folder.path | urlencode }}"
+    method: MKCOL
+    user: "{{ nextcloud_webdav_user }}"
+    password: "{{ nextcloud_webdav_password }}"
+    status_code: [201, 405, 409]
+    force_basic_auth: true
+  loop: "{{ _mkcol_batch }}"
+  loop_control:
+    loop_var: _mkcol_folder
+    label: "{{ _mkcol_folder.path }}"
+  async: "{{ nextcloud_async_job_timeout_sec | default(180) }}"
+  poll: 0
+  register: _mkcol_async_fired
+
+- name: Дождаться завершения MKCOL батча
+  ansible.builtin.async_status:
+    jid: "{{ _mkcol_job.ansible_job_id }}"
+  loop: "{{ _mkcol_async_fired.results }}"
+  loop_control:
+    loop_var: _mkcol_job
+  register: _mkcol_async_wait
+  until: _mkcol_async_wait.finished
+  retries: "{{ nextcloud_async_status_retries | default(180) | int }}"
+  delay: "{{ nextcloud_async_status_delay | default(1) | int }}"

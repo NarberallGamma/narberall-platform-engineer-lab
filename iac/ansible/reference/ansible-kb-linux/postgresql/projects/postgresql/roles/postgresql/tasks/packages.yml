@@ -1,0 +1,23 @@
+---
+- name: Add repository key
+  apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+
+- name: Add postgresql official repository
+  apt_repository:
+    repo: deb http://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main
+    filename: postgresql
+
+- name: Install packages
+  apt:
+    name: "{{ packages }}"
+    update_cache: yes
+  register: packages_install
+  vars:
+    packages:
+      - postgresql-{{ pg_version }}
+      - postgresql-contrib-{{ pg_version }}
+      - postgresql-client-{{ pg_version }}
+      - repmgr
+      - repmgr-common
+      - postgresql-{{ pg_version }}-repmgr

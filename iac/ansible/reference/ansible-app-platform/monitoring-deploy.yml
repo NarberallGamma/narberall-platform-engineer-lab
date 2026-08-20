@@ -1,0 +1,8 @@
+#Решение не проверенное, протестировано в отрыве от контура monitoring-dev
+---
+- name: Deploy monitoring
+  hosts:
+    - monitoring-dev
+  become: yes
+  roles:
+    - monitoring_deploy

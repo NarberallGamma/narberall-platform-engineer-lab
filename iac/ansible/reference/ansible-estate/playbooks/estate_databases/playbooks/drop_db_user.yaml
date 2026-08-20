@@ -1,0 +1,91 @@
+---
+# Снятие GRANT-ов дополнительной учётки (аудит, ИБ, сопровождение) перед удалением.
+# Без REASSIGN OWNED. Не затрагивает treasury_user, schema_flyway и их default privileges.
+# DROP ROLE по умолчанию не выполняется (drop_role_after_cleanup=false).
+# Запуск:
+#   ansible-playbook drop_db_user.yaml --extra-vars "drop_user=estate_0006 pg_admin_password=..."
+#   ansible-playbook drop_db_user.yaml --extra-vars "drop_user=estate_0006 drop_role_after_cleanup=true pg_admin_password=..."
+- name: Снятие GRANT-ов дополнительной роли PostgreSQL
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    pg_host: "10.10.16.30"
+    pg_port: 5432
+    pg_admin_user: root
+    pg_admin_password: ""
+
+    drop_user: "estate_0006"
+    drop_role_after_cleanup: false
+
+    protected_roles:
+      - root
+      - treasury_user
+      - schema_flyway
+      - postgres
+      - rdsadmin
+      - rds_superuser
+
+    default_databases:
+      - cryptopro_service
+      - hsm
+      - keycloak
+      - nodes_btc
+      - nodes_eth
+      - nodes_tron
+      - treasury_aml
+      - treasury_api
+      - treasury_csp
+      - treasury_aml
+      - treasury_audit
+      - treasury_auth_provider
+      - treasury_contract
+      - treasury_contract_restored_3
+      - treasury_csp
+      - treasury_notification
+      - treasury_onboarding
+      - treasury_otp
+      - treasury_rates
+      - treasury_report
+      - treasury_safe_deal_adapter
+      - treasury_lp_adapter
+      - treasury_treasury_adapter
+      - treasury_web
+
+  pre_tasks:
+    - name: Проверить drop_user
+      ansible.builtin.fail:
+        msg: "Задать drop_user в vars или --extra-vars"
+      when: drop_user is not defined or (drop_user | default('') | trim | length) == 0
+
+    - name: Запретить снятие зависимостей у прикладных и системных ролей
+      ansible.builtin.fail:
+        msg: "drop_user={{ drop_user }}: роль в protected_roles, операция запрещена"
+      when: drop_user in protected_roles
+
+    - name: Определить список баз данных для обработки
+      ansible.builtin.set_fact:
+        db_list: "{{ db_list | default(default_databases) }}"
+      when: db_name is not defined or db_name == '' or db_name is none
+
+    - name: Определить список баз данных из db_name
+      ansible.builtin.set_fact:
+        db_list: "{{ [db_name] }}"
+      when: db_name is defined and db_name != '' and db_name is not none
+
+    - name: Проверить, что список БД не пуст
+      ansible.builtin.fail:
+        msg: "ОШИБКА: список баз данных пуст. Указать db_name или db_list"
+      when: db_list is not defined or db_list | length == 0
+
+    - name: Показать параметры
+      ansible.builtin.debug:
+        msg:
+          - "Удаляемая роль: {{ drop_user }}"
+          - "REASSIGN OWNED: не используется"
+          - "DROP ROLE после cleanup: {{ drop_role_after_cleanup | default(false) }}"
+          - "Базы ({{ db_list | length }}): {{ db_list | join(', ') }}"
+
+  roles:
+    - drop_db_user

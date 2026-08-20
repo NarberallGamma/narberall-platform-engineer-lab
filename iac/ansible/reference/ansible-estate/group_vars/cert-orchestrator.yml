@@ -1,0 +1,99 @@
+# cert-orchestrator — prod (на prod GitLab; конфиг для будущего прогона)
+# Плейбук: playbooks/docker_app_cert_orchestrator.yml | inventory: [cert-orchestrator]
+# SSH user на nginx targets: playbooks/setup_cert_orchestrator_ssh_user.yml
+#
+# edge-lb: targets lb-1/lb-2, ssl_dir /docker/apps/edge-lb/certs (vault + hsm-adapter vhost).
+# TODO: setup_cert_orchestrator_ssh_user на lb-1/lb-2; раскомментировать [cert_orchestrator] на GitLab; redeploy.
+#
+# Секреты Vault: TELEGRAM_*, REG_RU_DNS_*, ssh_private_key, K8S_TOKEN, k8s_ca_cert
+
+# Bootstrap SSH user на nginx targets: playbooks/setup_cert_orchestrator_ssh_user.yml
+# Переменные SSH bootstrap: group_vars/cert_orchestrator_ssh_targets.yml
+#
+# K8s: TLS secret по namespace (kubectl + SA token из Vault, без kubeconfig mount)
+cert_orchestrator_k8s_namespace_secrets:
+  - { namespace: argocd, secret_name: wildcard-tls }
+  - { namespace: default, secret_name: wildcard-tls }
+  - { namespace: external-secret-manager, secret_name: wildcard-tls }
+  - { namespace: ingress-nginx, secret_name: wildcard-tls }
+  - { namespace: istio-system, secret_name: wildcard-tls }
+  - { namespace: kafka, secret_name: wildcard-tls }
+  - { namespace: keycloak, secret_name: wildcard-tls }
+  - { namespace: kube-node-lease, secret_name: wildcard-tls }
+  - { namespace: kube-public, secret_name: wildcard-tls }
+  - { namespace: kube-system, secret_name: wildcard-tls }
+  - { namespace: monitoring, secret_name: wildcard-tls }
+  - { namespace: platform, secret_name: wildcard-tls }
+
+docker_app_vault_mount_point: ansible
+docker_app_vault_path: cert-orchestrator
+
+docker_app_vault_key_map:
+  TELEGRAM_BOT_TOKEN: TELEGRAM_BOT_TOKEN
+  TELEGRAM_CHAT_IDS: TELEGRAM_CHAT_IDS
+  REG_RU_DNS_USERNAME: REG_RU_DNS_USERNAME
+  REG_RU_DNS_PASSWORD: REG_RU_DNS_PASSWORD
+  ssh_private_key: ssh_private_key
+  K8S_TOKEN: K8S_TOKEN
+  k8s_ca_cert: k8s_ca_cert
+
+docker_app_registry: registry.example.com/platform/base-images
+
+docker_app:
+  slug: cert-orchestrator
+  image: "{{ docker_app_registry }}/cert-orchestrator:1.0"
+  timezone: Europe/Moscow
+  meta_environment: prod
+  schedule_days_interval: 7
+  schedule_renew_on_container_start: true
+  schedule_weekday: tuesday
+  schedule_time: "10:00"
+  schedule_poll_seconds: 3600
+  letsencrypt_email: admin@example.com
+  letsencrypt_domain: example.com
+  letsencrypt_live_dir: /etc/letsencrypt/live/example.com
+  dns_propagation_seconds: 360
+  kubernetes_enabled: true
+  k8s_api_server: "https://10.10.14.181:5443"
+  target_nginx_enabled: true
+  target_nginx_hosts:
+    # gitlab-nginx (TLS gitlab/registry)
+    - host: "10.10.16.62"
+      user: estate-cert-orchestrator
+      identity_file: /ssh/id_estate
+      ssl_dir: /docker/apps/gitlab-nginx/certs
+      cert_basename: example.com
+    # edge-lb (TLS vault.example.com, hsm-adapter.example.com на одном cert example.com)
+    - host: "10.10.16.5"
+      user: estate-cert-orchestrator
+      identity_file: /ssh/id_estate
+      ssl_dir: /docker/apps/edge-lb/certs
+      nginx_container: edge-lb-nginx
+      cert_basename: example.com
+    - host: "10.10.16.27"
+      user: estate-cert-orchestrator
+      identity_file: /ssh/id_estate
+      ssl_dir: /docker/apps/edge-lb/certs
+      nginx_container: edge-lb-nginx
+      cert_basename: example.com
+  https_verification_enabled: true
+  https_verification_hosts:
+    - host: gitlab.example.com
+      port: 443
+      enabled: true
+    - host: registry.example.com
+      port: 443
+      enabled: true
+    - host: vault.example.com
+      port: 443
+      enabled: true
+    - host: hsm-adapter.example.com
+      port: 443
+      enabled: true
+  host_letsencrypt: /etc/letsencrypt
+  telegram_egress:
+    enabled: true
+    network_name: telegram-vps-egress
+    extra_hosts:
+      - name: api.telegram.org
+        ip: 172.30.100.2

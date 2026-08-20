@@ -1,0 +1,70 @@
+# Сгенерировано Ansible — AKHQ UI для Kafka (micronaut/akhq).
+# Пароль basic-auth — SHA-256 (hex). default-group no-roles; JWT — проверка ролей в API.
+# За reverse proxy: nginx передаёт Host / X-Forwarded-* (см. kafka_akhq_nginx.example.conf).
+# micronaut.server.url — публичный URL за reverse proxy.
+# context-path должен быть пустым: при "/" в AKHQ uri("/ui") даёт строку "//ui" и new URI("//ui") → хост "ui".
+micronaut:
+  server:
+    url: "{{ kafka_akhq_public_url }}"
+    context-path: ""
+    host-resolution:
+      host-header: Host
+      protocol-header: X-Forwarded-Proto
+      port-header: X-Forwarded-Port
+  security:
+    enabled: true
+    token:
+      jwt:
+        signatures:
+          secret:
+            generator:
+              secret: "{{ kafka_akhq_jwt_secret | default(kafka_akhq_ui_password | hash('sha512'), true) }}"
+
+akhq:
+  server:
+    url: "{{ kafka_akhq_public_url }}"
+    access-log:
+      enabled: true
+  connections:
+    {{ kafka_akhq_cluster_name }}:
+      properties:
+        bootstrap.servers: "{{ kafka_akhq_bootstrap_servers }}"
+{% if kafka_sasl_enabled | bool %}
+        security.protocol: SASL_PLAINTEXT
+        sasl.mechanism: PLAIN
+        sasl.jaas.config: "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"{{ kafka_sasl_admin_username | replace('\\', '\\\\') | replace('\"', '\\\"') }}\" password=\"{{ kafka_sasl_admin_password | replace('\\', '\\\\') | replace('\"', '\\\"') }}\";"
+{% else %}
+        security.protocol: PLAINTEXT
+{% endif %}
+  security:
+    basic-auth:
+      - username: "{{ kafka_akhq_ui_username }}"
+        password: "{{ kafka_akhq_ui_password | hash('sha256') }}"
+        groups:
+          - admin
+    default-group: no-roles
+    roles:
+      node-read:
+        - resources: [ "NODE" ]
+          actions: [ "READ", "READ_CONFIG" ]
+      node-admin:
+        - resources: [ "NODE" ]
+          actions: [ "READ", "READ_CONFIG", "ALTER_CONFIG" ]
+      topic-read:
+        - resources: [ "TOPIC", "TOPIC_DATA" ]
+          actions: [ "READ" ]
+        - resources: [ "TOPIC" ]
+          actions: [ "READ_CONFIG" ]
+      topic-admin:
+        - resources: [ "TOPIC", "TOPIC_DATA" ]
+          actions: [ "READ", "CREATE", "DELETE" ]
+        - resources: [ "TOPIC" ]
+          actions: [ "UPDATE", "READ_CONFIG", "ALTER_CONFIG" ]
+      group-read:
+        - resources: [ "CONSUMER_GROUP" ]
+          actions: [ "READ" ]
+    groups:
+      admin:
+        - role: node-admin
+        - role: topic-admin
+        - role: group-read

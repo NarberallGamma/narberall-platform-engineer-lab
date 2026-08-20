@@ -1,0 +1,12 @@
+---
+# groupfolders_main: загрузка матрицы, создание папок по WebDAV, назначение прав (корень + по путям).
+# Подключается из main.yml когда режим сброса LDAP (nextcloud_ldap_reset_groups_enabled) выключен.
+
+- name: Подготовить список папок по матрице для client_name
+  ansible.builtin.include_tasks: groupfolders_prepare_folders_flat_for_client.yml
+
+- name: Проверка WebDAV и MKCOL
+  ansible.builtin.include_tasks: groupfolders_webdav_check_and_mkcol.yml
+
+- name: Применить права по матрице (корень + по путям) для клиента
+  ansible.builtin.include_tasks: groupfolders_apply_permissions.yml

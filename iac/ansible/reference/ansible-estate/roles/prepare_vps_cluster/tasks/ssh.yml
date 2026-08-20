@@ -1,0 +1,20 @@
+---
+- name: Запретить вход root по SSH (sshd)
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?\s*PermitRootLogin\s+'
+    line: "PermitRootLogin no"
+    validate: "sshd -t -f %s"
+  notify: reload sshd
+  when: vps_ssh_disable_root_login | bool
+  tags: [vps, ssh, prepare_vps]
+
+- name: Разрешить вход root по SSH (sshd, явное значение)
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?\s*PermitRootLogin\s+'
+    line: "PermitRootLogin yes"
+    validate: "sshd -t -f %s"
+  notify: reload sshd
+  when: not vps_ssh_disable_root_login | bool
+  tags: [vps, ssh, prepare_vps]

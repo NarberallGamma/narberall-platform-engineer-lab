@@ -1,0 +1,8 @@
+inventory.ini
+*.pem
+*.key
+*.deb
+passwd
+passwd.yaml
+*passwd*
+*.crt

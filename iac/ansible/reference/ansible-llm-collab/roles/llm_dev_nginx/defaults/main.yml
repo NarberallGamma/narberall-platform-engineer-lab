@@ -1,0 +1,48 @@
+---
+llm_dev_nginx_enabled: true
+
+llm_dev_nginx_root: "{{ llm_dev_app_root }}/nginx-proxy"
+llm_dev_nginx_image: "nginx:1.27-bookworm"
+llm_dev_nginx_compose_project_name: "llm-dev-nginx"
+llm_dev_nginx_restart_policy: always
+
+llm_dev_nginx_container_name: llm-dev-nginx
+
+llm_dev_nginx_listen_ip: "0.0.0.0"
+
+llm_dev_nginx_ssl_cert_subdir: "corp.example.com"
+llm_dev_nginx_ssl_cert_file: "wildcert.pem"
+llm_dev_nginx_ssl_cert_key_file: "wildkey.pem"
+
+llm_dev_nginx_ssl_sync_src: ""
+
+llm_dev_nginx_assert_certs_present: true
+
+llm_dev_nginx_log_max_size: "50m"
+llm_dev_nginx_log_max_file: "1"
+
+llm_dev_nginx_client_max_body_size: "50m"
+llm_dev_nginx_proxy_read_timeout: "3600s"
+llm_dev_nginx_proxy_connect_timeout: "75s"
+
+llm_dev_nginx_ssl_protocols: "TLSv1.2 TLSv1.3"
+
+llm_dev_public_server_name: "llm-dev.local"
+
+llm_dev_llama_host_port: 8080
+llm_dev_open_webui_enabled: true
+llm_dev_open_webui_host_port: 8081
+
+llm_dev_nginx_compose_pull: "missing"
+
+# Согласовано с llm_dev_deploy: принудительное пересоздание контейнеров при up.
+llm_dev_compose_recreate: "always"
+
+# Те же параметры async/poll для docker_compose_v2, что в llm_dev_deploy (при отдельном вызове роли без общих group_vars).
+llm_dev_compose_async_seconds: 10800
+llm_dev_compose_poll_seconds: 15
+
+# URI префиксы: публичный путь для API и фактический префикс на llama-server; публичный путь для WebUI.
+llm_dev_nginx_path_api: "/v1/"
+llm_dev_nginx_llama_upstream_openai_prefix: "/v1/"
+llm_dev_nginx_path_webui: "/"

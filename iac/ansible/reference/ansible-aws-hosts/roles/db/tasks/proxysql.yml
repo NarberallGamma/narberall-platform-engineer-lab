@@ -1,0 +1,58 @@
+---
+
+- name: Add Proxysql repo key
+  apt_key:
+    url: https://repo.proxysql.com/ProxySQL/repo_pub_key
+    state: present
+
+- name: Add nginx ppa
+  apt_repository:
+    repo: ppa:nginx/stable
+
+- name: Add Proxysql repo
+  apt_repository:
+    repo: deb https://repo.proxysql.com/ProxySQL/proxysql-2.0.x/bionic/ ./
+    state: present
+    update_cache: yes
+    filename: proxysql
+
+- name: Install db server apt packages
+  become: yes
+  apt:
+    name: proxysql=2.0.8
+    state: present
+
+- name: Install nginx server
+  become: yes
+  apt:
+    name: nginx-full
+    state: present
+
+- name: Install mysql-client
+  become: yes
+  apt:
+    name: mysql-client
+    state: present
+
+- name: Main configuration for Proxysql
+  template:
+    src: proxysql.cnf.j2
+    dest: "/etc/proxysql.cnf"
+    owner: proxysql
+    group: proxysql
+    mode: 0400
+
+- name: Reload service Proxysql, in all cases
+  service:
+    name: proxysql
+    state: restarted
+
+- name: Main configuration for Nginx
+  copy:
+    src: "{{ role_path }}/files/nginx.conf"
+    dest: "/etc/nginx/nginx.conf"
+
+- name: Reload service Nginx, in all cases
+  service:
+    name: nginx
+    state: restarted

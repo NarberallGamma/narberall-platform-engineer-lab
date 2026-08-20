@@ -1,0 +1,28 @@
+---
+  - name: Install smartmontools
+    yum: name=smartmontools state=installed
+    tags: install
+    when: ansible_distribution == "CentOS"
+
+  - name: Creating /etc/prometheus dir
+    file: state=directory dest=/etc/prometheus owner=root group=root mode=755
+    when: ansible_distribution == "CentOS"
+    tags: install
+
+  - name: Create /etc/prometheus/scripts dir 
+    file: state=directory dest=/etc/prometheus/scripts owner=root group=root mode=755
+    when: ansible_distribution == "CentOS"
+    tags: install
+    
+  - name: Create /var/run/prometheus dir 
+    file: state=directory dest=/var/run/prometheus owner=root group=root mode=755
+    when: ansible_distribution == "CentOS"
+    tags: install
+
+  - name: Synchronizing /etc/prometheus/scripts folder
+    synchronize: src=files/scripts/ dest=/etc/prometheus/scripts mode=push
+    when: ansible_distribution == "CentOS"
+    tags: install, update
+
+
+

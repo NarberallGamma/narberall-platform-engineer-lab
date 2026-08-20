@@ -1,0 +1,43 @@
+---
+- name: Kubernetes | Add GPG key
+  apt_key:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    state: present
+
+- name: Kubernetes | Add repo
+  apt_repository:
+    repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+    state: present
+    filename: 'kubernetes'
+
+- name: Docker | Add GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Docker | Add repo
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
+    state: present
+    filename: 'docker'
+
+- name: gitlab-runner | Download gitlab-runner repository-adding script
+  get_url:
+    url: https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh
+    dest: /tmp/script.deb.sh
+    mode: 0750
+  when: gitlab_runner.rc != 0
+
+- name: gitlab-runner | Install gitlab-runner repository
+  shell: /tmp/script.deb.sh
+  args:
+    executable: /bin/bash
+  when: gitlab_runner.rc != 0
+
+- name: RVM | Add GPG key
+  apt_key:
+    keyserver: hkp://keys.gnupg.net
+    id: 409B6B1796C275462A1703113804BB82D39DC0E3
+
+- name: Update apt cache
+  apt: update_cache=yes cache_valid_time=3600

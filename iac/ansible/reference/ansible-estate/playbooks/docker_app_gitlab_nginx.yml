@@ -1,0 +1,30 @@
+---
+# Deploy gitlab-nginx (внешний TLS-прокси GitLab + Registry в /docker/apps/gitlab-nginx)
+# Переменные: group_vars/gitlab-nginx.yml
+#
+# Запуск:
+#   ./scripts/run/run_docker_app.sh deploy gitlab-nginx --preprod --limit estate-preprod-gitlab
+#   ./scripts/run/run_docker_app.sh deploy gitlab-nginx --prod --limit estate-prod-gitlab
+#
+# Перед первым запуском на живом GitLab с встроенным nginx: migrate_gitlab_nginx_legacy.yml
+
+- name: Deploy gitlab-nginx
+  hosts: gitlab_nginx
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/gitlab-nginx.yml"
+
+  pre_tasks:
+    - name: Deployment info
+      ansible.builtin.debug:
+        msg:
+          - "Host: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "App: {{ docker_app.slug }}"
+          - "GitLab: https://{{ docker_app.gitlab_host }}"
+          - "Registry: https://{{ docker_app.registry_host }}"
+          - "Path: {{ docker_app_base_dir }}/{{ docker_app.slug }}"
+
+  roles:
+    - docker_app

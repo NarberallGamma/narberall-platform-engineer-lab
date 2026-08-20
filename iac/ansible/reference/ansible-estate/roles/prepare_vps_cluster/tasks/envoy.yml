@@ -1,0 +1,59 @@
+---
+- name: Каталог приложения Envoy
+  ansible.builtin.file:
+    path: "{{ vps_envoy_app_dir }}"
+    state: directory
+    mode: "0755"
+  tags: [vps, envoy, prepare_vps]
+
+- name: Конфигурация Envoy (SNI dynamic forward proxy)
+  ansible.builtin.template:
+    src: envoy/envoy.yaml.j2
+    dest: "{{ vps_envoy_app_dir }}/envoy.yaml"
+    mode: "0644"
+  notify: restart envoy compose
+  tags: [vps, envoy, prepare_vps]
+
+- name: Docker Compose для Envoy
+  ansible.builtin.template:
+    src: envoy/docker-compose.yml.j2
+    dest: "{{ vps_envoy_app_dir }}/docker-compose.yml"
+    mode: "0644"
+  notify: restart envoy compose
+  tags: [vps, envoy, prepare_vps]
+
+- name: Запустить или обновить стек Envoy (docker compose)
+  community.docker.docker_compose_v2:
+    project_src: "{{ vps_envoy_app_dir }}"
+    state: present
+    pull: "{{ vps_envoy_compose_pull }}"
+  register: vps_envoy_compose_result
+  tags: [vps, envoy, prepare_vps]
+
+- name: Дождаться listener Envoy на localhost:{{ vps_envoy_listen_port }}
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ vps_envoy_listen_port }}"
+    timeout: 60
+    state: started
+  tags: [vps, envoy, prepare_vps, health]
+
+- name: Проверить admin /ready (localhost)
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ vps_envoy_admin_port }}/ready"
+    method: GET
+    status_code: 200
+  register: vps_envoy_ready
+  retries: 5
+  delay: 3
+  until: vps_envoy_ready.status == 200
+  tags: [vps, envoy, prepare_vps, health]
+
+- name: Статус Envoy на хосте
+  ansible.builtin.debug:
+    msg:
+      - "Envoy {{ inventory_hostname }}: listener 0.0.0.0:{{ vps_envoy_listen_port }}"
+      - "Compose: {{ vps_envoy_app_dir }}/docker-compose.yml"
+      - "Admin (local): http://127.0.0.1:{{ vps_envoy_admin_port }}/stats"
+      - "Access log: {{ (enable_vps_envoy_logging | bool) | ternary(vps_envoy_log_dir ~ '/access.log', 'disabled') }}"
+  tags: [vps, envoy, prepare_vps, health]

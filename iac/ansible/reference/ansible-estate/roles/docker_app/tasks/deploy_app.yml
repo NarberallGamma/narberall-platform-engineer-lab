@@ -1,0 +1,214 @@
+---
+- name: "{{ docker_app.slug }} | каталоги приложения"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ docker_app_base_dir }}/{{ docker_app.slug }}", mode: "0755" }
+    - { path: "{{ docker_app_base_dir }}/{{ docker_app.slug }}/config", mode: "0755" }
+    - { path: "{{ docker_app_base_dir }}/{{ docker_app.slug }}/logs", mode: "{{ docker_app_logs_dir_mode }}" }
+  loop_control:
+    label: "{{ item.path }}"
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | конфиг cert-monitoring"
+  ansible.builtin.template:
+    src: cert-monitoring/cert-monitoring.conf.j2
+    dest: "{{ docker_app_base_dir }}/cert-monitoring/config/cert-monitoring.conf"
+    mode: "0644"
+  when: docker_app.slug == 'cert-monitoring'
+  notify: restart docker app compose
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | конфиг cert-orchestrator"
+  ansible.builtin.template:
+    src: cert-orchestrator/config.yaml.j2
+    dest: "{{ docker_app_base_dir }}/cert-orchestrator/config/config.yaml"
+    mode: "0644"
+  when: docker_app.slug == 'cert-orchestrator'
+  notify: restart docker app compose
+  tags: [docker_app, deploy]
+
+- name: cert-orchestrator | каталог .ssh (ключ из Vault, только для mount в контейнер)
+  ansible.builtin.file:
+    path: "{{ docker_app_base_dir }}/cert-orchestrator/.ssh"
+    state: directory
+    mode: "0700"
+  when: docker_app.slug == 'cert-orchestrator'
+  tags: [docker_app, deploy, vault]
+
+- name: cert-orchestrator | приватный SSH ключ из Vault
+  ansible.builtin.template:
+    src: cert-orchestrator/id_estate.j2
+    dest: "{{ docker_app_base_dir }}/cert-orchestrator/.ssh/id_estate"
+    mode: "0600"
+  when:
+    - docker_app.slug == 'cert-orchestrator'
+    - app_vault.ssh_private_key is defined
+    - app_vault.ssh_private_key | length > 0
+  no_log: true
+  notify: restart docker app compose
+  tags: [docker_app, deploy, vault]
+
+- name: cert-orchestrator | проверить формат SSH ключа
+  ansible.builtin.command:
+    argv:
+      - ssh-keygen
+      - -y
+      - -f
+      - "{{ docker_app_base_dir }}/cert-orchestrator/.ssh/id_estate"
+  register: cert_orchestrator_ssh_key_validate
+  changed_when: false
+  failed_when: false
+  when:
+    - docker_app.slug == 'cert-orchestrator'
+    - app_vault.ssh_private_key is defined
+    - app_vault.ssh_private_key | length > 0
+  tags: [docker_app, deploy, vault]
+
+- name: cert-orchestrator | размер SSH ключа (диагностика при ошибке ssh-keygen)
+  ansible.builtin.command:
+    argv:
+      - wc
+      - -c
+      - "{{ docker_app_base_dir }}/cert-orchestrator/.ssh/id_estate"
+  register: cert_orchestrator_ssh_key_size
+  changed_when: false
+  when:
+    - docker_app.slug == 'cert-orchestrator'
+    - cert_orchestrator_ssh_key_validate is defined
+    - cert_orchestrator_ssh_key_validate.rc is defined
+    - cert_orchestrator_ssh_key_validate.rc != 0
+  tags: [docker_app, deploy, vault]
+
+- name: cert-orchestrator | подсказка при битом SSH ключе
+  ansible.builtin.fail:
+    msg: >-
+      ssh-keygen не прочитал {{ docker_app_base_dir }}/cert-orchestrator/.ssh/id_estate
+      (размер {{ cert_orchestrator_ssh_key_size.stdout | default('?') }}, ожидается 419 байт для ed25519).
+      Частая причина: нет перевода строки после -----END OPENSSH PRIVATE KEY-----.
+      Перезалить ключ в Vault через ssh_private_key=@file; повторить deploy.
+  when:
+    - docker_app.slug == 'cert-orchestrator'
+    - cert_orchestrator_ssh_key_validate is defined
+    - cert_orchestrator_ssh_key_validate.rc is defined
+    - cert_orchestrator_ssh_key_validate.rc != 0
+  tags: [docker_app, deploy, vault]
+
+- name: cert-orchestrator | каталог .k8s (CA API из Vault)
+  ansible.builtin.file:
+    path: "{{ docker_app_base_dir }}/cert-orchestrator/.k8s"
+    state: directory
+    mode: "0700"
+  when: docker_app.slug == 'cert-orchestrator'
+  tags: [docker_app, deploy, vault]
+
+- name: cert-orchestrator | CA сертификат K8s API из Vault
+  ansible.builtin.template:
+    src: cert-orchestrator/k8s_ca.crt.j2
+    dest: "{{ docker_app_base_dir }}/cert-orchestrator/.k8s/ca.crt"
+    mode: "0644"
+  when:
+    - docker_app.slug == 'cert-orchestrator'
+    - app_vault.k8s_ca_cert is defined
+    - app_vault.k8s_ca_cert | length > 0
+  no_log: true
+  notify: restart docker app compose
+  tags: [docker_app, deploy, vault]
+
+- name: "{{ docker_app.slug }} | конфиг cloud-hibernate-operator"
+  ansible.builtin.template:
+    src: cloud-hibernate-operator/cloud-hibernate-operator.conf.j2
+    dest: "{{ docker_app_base_dir }}/cloud-hibernate-operator/config/cloud-hibernate-operator.conf"
+    mode: "0644"
+  when: docker_app.slug == 'cloud-hibernate-operator'
+  notify: restart docker app compose
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | каталоги gitlab-nginx"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "{{ '0700' if item.endswith('certs') else '0755' }}"
+  loop:
+    - "{{ docker_app_base_dir }}/gitlab-nginx/certs"
+    - "{{ docker_app_base_dir }}/gitlab-nginx/logs/{{ docker_app.gitlab_host }}"
+    - "{{ docker_app_base_dir }}/gitlab-nginx/logs/{{ docker_app.registry_host }}"
+  when: docker_app.slug == 'gitlab-nginx'
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | nginx.conf"
+  ansible.builtin.template:
+    src: gitlab-nginx/nginx.conf.j2
+    dest: "{{ docker_app_base_dir }}/gitlab-nginx/nginx.conf"
+    mode: "0644"
+  when: docker_app.slug == 'gitlab-nginx'
+  notify: restart docker app compose
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | vhost gitlab.conf"
+  ansible.builtin.template:
+    src: gitlab-nginx/config/gitlab.conf.j2
+    dest: "{{ docker_app_base_dir }}/gitlab-nginx/config/gitlab.conf"
+    mode: "0644"
+  when: docker_app.slug == 'gitlab-nginx'
+  notify: restart docker app compose
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | vhost registry.conf"
+  ansible.builtin.template:
+    src: gitlab-nginx/config/registry.conf.j2
+    dest: "{{ docker_app_base_dir }}/gitlab-nginx/config/registry.conf"
+    mode: "0644"
+  when: docker_app.slug == 'gitlab-nginx'
+  notify: restart docker app compose
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | edge-lb (nginx, keepalived, logrotate)"
+  ansible.builtin.import_tasks: edge_lb.yml
+  when: docker_app.slug == 'edge-lb'
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | hsm-adapter (data bind mounts)"
+  ansible.builtin.import_tasks: hsm_adapter.yml
+  when: docker_app.slug == 'hsm-adapter'
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | treasury-policy-gateway (data, bootstrap, kafka CA)"
+  ansible.builtin.import_tasks: treasury_policy_gateway.yml
+  when: docker_app.slug == 'treasury-policy-gateway'
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | cryptopro (data bind mounts)"
+  ansible.builtin.import_tasks: cryptopro.yml
+  when: docker_app.slug == 'cryptopro'
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | docker-compose.yml"
+  ansible.builtin.template:
+    src: "{{ docker_app.slug }}/docker-compose.yml.j2"
+    dest: "{{ docker_app_base_dir }}/{{ docker_app.slug }}/docker-compose.yml"
+    mode: "0644"
+  notify: restart docker app compose
+  tags: [docker_app, deploy]
+
+- name: "{{ docker_app.slug }} | .env (секреты Vault)"
+  ansible.builtin.template:
+    src: "{{ docker_app.slug }}/dotenv.j2"
+    dest: "{{ docker_app_base_dir }}/{{ docker_app.slug }}/.env"
+    mode: "0600"
+  no_log: true
+  when: docker_app_compose_env_files | length > 0
+  notify: restart docker app compose
+  tags: [docker_app, deploy, vault]
+
+- name: "{{ docker_app.slug }} | docker compose up"
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_app_base_dir }}/{{ docker_app.slug }}"
+    env_files: "{{ docker_app_compose_env_files if docker_app_compose_env_files | length > 0 else omit }}"
+    state: present
+    pull: "{{ docker_app_compose_pull }}"
+    recreate: "{{ docker_app_compose_recreate | default('always') }}"
+  when: docker_app_compose_up | default(true) | bool
+  tags: [docker_app, deploy]

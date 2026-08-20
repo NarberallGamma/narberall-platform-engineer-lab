@@ -1,0 +1,30 @@
+---
+# Deploy edge-lb (nginx + keepalived в /docker/apps/edge-lb)
+# Переменные: group_vars/edge-lb.yml
+#
+# Запуск:
+#   ./scripts/run/run_docker_app.sh deploy edge-lb --prod --limit estate-prod-lb-1
+#   ./scripts/run/run_docker_app.sh deploy edge-lb --preprod --limit estate-preprod-lb-1
+#
+# Перед первым запуском на legacy host nginx/keepalived: migrate_edge_lb_legacy.yml
+
+- name: Deploy edge-lb
+  hosts: edge_lb
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/edge-lb.yml"
+
+  pre_tasks:
+    - name: Deployment info
+      ansible.builtin.debug:
+        msg:
+          - "Host: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "App: {{ docker_app.slug }}"
+          - "VIP: {{ edge_lb_virtual_ip }}"
+          - "Sites: {{ edge_lb_enabled_sites | join(', ') }}"
+          - "Path: {{ docker_app_base_dir }}/{{ docker_app.slug }}"
+
+  roles:
+    - docker_app

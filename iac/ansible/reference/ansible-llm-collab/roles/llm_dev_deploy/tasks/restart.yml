@@ -1,0 +1,11 @@
+---
+# Пересоздание стека (как при deploy), не «docker compose restart».
+- name: Пересоздать стек LLM dev (llama-server, Open WebUI, …)
+  community.docker.docker_compose_v2:
+    project_src: "{{ llm_dev_app_root }}"
+    project_name: "{{ llm_dev_compose_project_name }}"
+    state: present
+    pull: "{{ llm_dev_compose_pull | default('missing') }}"
+    recreate: "{{ llm_dev_compose_recreate | default('always') }}"
+  async: "{{ llm_dev_compose_async_seconds | default(10800) | int }}"
+  poll: "{{ llm_dev_compose_poll_seconds | default(15) | int }}"

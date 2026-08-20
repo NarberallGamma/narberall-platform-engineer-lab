@@ -1,0 +1,183 @@
+---
+  - name: Installing prometheus repo for Centos 6
+    copy: src=prometheus6.repo dest=/etc/yum.repos.d/prometheus.repo
+    tags: node
+    when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "6"
+
+  - name: Installing prometheus repo for Centos 7
+    copy: src=prometheus7.repo dest=/etc/yum.repos.d/prometheus.repo
+    tags: node
+    when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "7"
+
+  - name: Installing Node_exporter
+    yum: name=node_exporter state=present
+    notify: restart node_exporter
+    tags: node
+    when: ansible_distribution == "CentOS"
+
+  - name: Chmod 755 init script for Centos 6
+    file:
+      path: /etc/init.d/node_exporter
+      mode: 0755
+    when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "6"
+
+  - name: Copy node_exporter to /etc/default/node_exporter for Centos 6
+    copy: src=node_exporter6 dest=/etc/default/node_exporter
+    notify: restart node_exporter
+    when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "6"
+
+  - name: Copy node_exporter to /etc/default/node_exporter for Centos 7
+    copy: src=node_exporter7 dest=/etc/default/node_exporter
+    notify: restart node_exporter
+    when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "7"
+
+  - name: Enabling and starting Node_exporter service for Centos 6
+    service:
+      name: node_exporter
+      enabled: yes
+    when: ansible_distribution == "CentOS" and ansible_distribution_major_version == "6"
+
+  - name: install needed packages
+    package:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - curl
+      - tar
+      - bzip2
+    when: ansible_os_family == "Debian"
+
+  - name: create prometheus system group
+    group:
+      name: "{{ prometheus_exporters_common_group }}"
+      system: yes
+      state: present
+    when: ansible_os_family == "Debian"
+
+  - name: create prometheus system user
+    user:
+      name: "{{ prometheus_exporters_common_user }}"
+      system: yes
+      shell: "/sbin/nologin"
+      group: "{{ prometheus_exporters_common_group }}"
+      createhome: no
+    when: ansible_os_family == "Debian"
+
+  - name: create prometheus directories
+    file:
+      path: "{{ item }}"
+      state: directory
+      owner: "{{ prometheus_exporters_common_user }}"
+      group: "{{ prometheus_exporters_common_group }}"
+      mode: 0755
+    with_items:
+      - "{{ prometheus_exporters_common_root_dir }}"
+      - "{{ prometheus_exporters_common_dist_dir }}"
+      - "{{ prometheus_exporters_common_log_dir }}"
+      - "{{ prometheus_exporters_common_conf_dir }}"
+    when: ansible_os_family == "Debian"
+
+  - name: create textfile collector directory
+    file:
+      path: "{{ item }}"
+      state: directory
+      owner: "{{ prometheus_exporters_common_user }}"
+      group: "{{ prometheus_exporters_common_group }}"
+      mode: 0755
+    with_items:
+      - "{{ prometheus_textfile_collector_directory }}"
+    when: prometheus_textfile_collector_directory is defined
+
+  - name: download prometheus node exporter binary
+    get_url:
+      url: "{{ url }}"
+      dest: "{{ prometheus_exporters_common_dist_dir }}/{{ prometheus_node_exporter_release_name }}.tar.gz"
+    when: ansible_os_family == "Debian"
+
+  - name: unarchive binary tarball
+    unarchive:
+      copy: no
+      src: "{{ prometheus_exporters_common_dist_dir }}/{{ prometheus_node_exporter_release_name }}.tar.gz"
+      dest: "{{ prometheus_exporters_common_dist_dir }}"
+      creates: "{{ prometheus_exporters_common_dist_dir }}/{{ prometheus_node_exporter_release_name }}/node_exporter"
+    register: prometheus_node_exporter_updated
+    notify:
+      - restart node exporter
+    when: ansible_os_family == "Debian"
+
+  - name: update group and owner for files
+    file:
+      path: "{{ prometheus_node_exporter_release_name }}"
+      state: directory
+      recurse: yes
+      owner: "{{ prometheus_exporters_common_user}}"
+      group: "{{ prometheus_exporters_common_group }}"
+    when: prometheus_node_exporter_updated is changed and ansible_os_family == "Debian"
+
+  - name: create symlink to the current release
+    file:
+      src: "{{ prometheus_exporters_common_dist_dir }}/{{ prometheus_node_exporter_release_name }}"
+      path: "{{ prometheus_exporters_common_root_dir }}/node_exporter_current"
+      state: link
+    when: ansible_os_family == "Debian"
+
+  - name: create systemd service unit
+    template:
+      src: etc/systemd/system/prometheus-node-exporter.service.j2
+      dest: /etc/systemd/system/prometheus-node-exporter.service
+      owner: root
+      group: root
+      mode: 0644
+    when: service_mgr | default(ansible_service_mgr) == 'systemd' and ansible_os_family == "Debian"
+    notify:
+      - reenable node exporter service
+      - restart node exporter
+
+  - name: Looking which version of upstart is install
+    command: initctl version
+    when: service_mgr | default(ansible_service_mgr) == 'upstart' and ansible_os_family == "Debian"
+    register: upstart_version
+
+  - name: create init service unit
+    template:
+      src: etc/init/prometheus-node-exporter.conf.j2
+      dest: /etc/init/prometheus-node-exporter.conf
+      owner: root
+      group: root
+      mode: 0644
+    when: service_mgr | default(ansible_service_mgr) == 'upstart' and ansible_os_family == "Debian"
+    notify:
+      - reinit node exporter
+      - restart node exporter
+
+  - name: create sysvinit service unit
+    template:
+      src: etc/init.d/prometheus-node-exporter.j2
+      dest: /etc/init.d/prometheus-node-exporter
+      owner: root
+      group: root
+      mode: 0755
+    when: service_mgr | default(ansible_service_mgr) in [ 'sysvinit', 'service' ] and ansible_os_family == "Debian"
+    notify:
+      - restart node exporter
+
+  - meta: flush_handlers
+
+  - name: ensure prometheus node exporter service is enabled and started
+    service:
+      name: prometheus-node-exporter
+      state: started
+      enabled: yes
+    when: ansible_os_family == "Debian"
+
+
+
+
+
+
+
+
+
+
+
+

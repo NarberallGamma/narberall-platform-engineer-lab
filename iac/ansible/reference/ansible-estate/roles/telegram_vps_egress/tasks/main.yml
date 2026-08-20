@@ -1,0 +1,65 @@
+---
+- name: Telegram VPS egress | каталог приложения
+  ansible.builtin.file:
+    path: "{{ telegram_vps_egress_base_dir }}"
+    state: directory
+    mode: "0755"
+  when: telegram_vps_egress_enabled | bool
+  tags: [telegram_vps_egress, deploy]
+
+- name: Telegram VPS egress | docker network
+  community.docker.docker_network:
+    name: "{{ telegram_vps_egress_network_name }}"
+    driver: bridge
+    ipam_config:
+      - subnet: "{{ telegram_vps_egress_subnet }}"
+        gateway: "{{ telegram_vps_egress_gateway }}"
+  when: telegram_vps_egress_enabled | bool
+  tags: [telegram_vps_egress, deploy, network]
+
+- name: Telegram VPS egress | envoy.yaml
+  ansible.builtin.template:
+    src: envoy.yaml.j2
+    dest: "{{ telegram_vps_egress_base_dir }}/envoy.yaml"
+    mode: "0644"
+  when: telegram_vps_egress_enabled | bool
+  notify: restart telegram vps egress compose
+  tags: [telegram_vps_egress, deploy]
+
+- name: Telegram VPS egress | docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ telegram_vps_egress_base_dir }}/docker-compose.yml"
+    mode: "0644"
+  when: telegram_vps_egress_enabled | bool
+  notify: restart telegram vps egress compose
+  tags: [telegram_vps_egress, deploy]
+
+- name: Telegram VPS egress | docker compose up
+  community.docker.docker_compose_v2:
+    project_src: "{{ telegram_vps_egress_base_dir }}"
+    state: present
+    pull: "{{ telegram_vps_egress_compose_pull }}"
+  when: telegram_vps_egress_enabled | bool
+  tags: [telegram_vps_egress, deploy]
+
+- name: Telegram VPS egress | контейнер запущен
+  community.docker.docker_container_info:
+    name: "{{ telegram_vps_egress_container_name }}"
+  register: telegram_vps_egress_container
+  until: telegram_vps_egress_container.exists and telegram_vps_egress_container.container.State.Status == 'running'
+  retries: 8
+  delay: 3
+  when: telegram_vps_egress_enabled | bool
+  tags: [telegram_vps_egress, deploy, health]
+
+- name: Telegram VPS egress | итог
+  ansible.builtin.debug:
+    msg:
+      - "Host: {{ inventory_hostname }}"
+      - "Proxy: {{ telegram_vps_egress_container_name }} @ {{ telegram_vps_egress_proxy_ip }}:{{ telegram_vps_egress_listen_port }}"
+      - "Network: {{ telegram_vps_egress_network_name }} ({{ telegram_vps_egress_subnet }})"
+      - "VPS backends: {{ telegram_vps_egress_vps_backends | map(attribute='host') | list | join(', ') }}"
+      - "Path: {{ telegram_vps_egress_base_dir }}"
+  when: telegram_vps_egress_enabled | bool
+  tags: [telegram_vps_egress, always]

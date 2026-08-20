@@ -1,0 +1,40 @@
+[all:vars]
+ansible_user=admin
+ansible_python_interpreter=/usr/bin/python3
+provider=aws
+
+[mysql]
+mysql-prod-0.estate.example.com ansible_host=10.10.10.20
+mysql-prod-1.estate.example.com ansible_host=10.10.10.21
+
+[mysql8]
+mysql8-prod-0.estate.example.com ansible_host=10.10.10.30
+mysql8-prod-1.estate.example.com ansible_host=10.10.10.31
+
+[mysql8-cs]
+mysql8-cs-0.estate.example.com ansible_host=10.10.10.32
+
+[mt5report_mysql8]
+report-mysql8-0.estate.example.com ansible_host=10.10.10.33
+
+[mysql8-mt4report]
+report-alt-mysql8-0.estate.example.com ansible_host=10.10.11.20
+
+[mariadb]
+mariadb-prod-0.estate.example.com ansible_host=10.10.10.40
+
+[rethinkdb]
+rethinkdb-prod-0.estate.example.com ansible_host=10.10.10.50
+rethinkdb-prod-1.estate.example.com ansible_host=10.10.10.51
+
+[neo4j]
+neo4j-prod-0.estate.example.com ansible_host=10.10.10.60
+
+[proxysql]
+proxysql-prod-0.estate.example.com ansible_host=10.10.10.70
+
+[backup]
+backup-0.estate.example.com ansible_host=10.10.20.10
+
+[alt-dev-mysql]
+mysql-dev-0.estate.example.com ansible_host=10.10.30.10

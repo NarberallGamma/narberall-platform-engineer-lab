@@ -1,0 +1,84 @@
+# Managed by Ansible (docker_app). Секреты: Vault + .env
+meta:
+  environment: {{ app_item.value.meta_environment | default('preprod') }}
+  timezone: {{ app_item.value.timezone | default('Europe/Moscow') }}
+
+schedule:
+  days_interval: {{ app_item.value.schedule_days_interval | default(7) }}
+  renew_on_container_start: {{ app_item.value.schedule_renew_on_container_start | default(true) | bool }}
+  weekday: {{ app_item.value.schedule_weekday | default('tuesday') }}
+  time_hhmm: "{{ app_item.value.schedule_time | default('10:00') }}"
+  poll_interval_seconds: {{ app_item.value.schedule_poll_seconds | default(3600) }}
+
+letsencrypt:
+  email: {{ app_item.value.letsencrypt_email | default('admin@example.com') }}
+  domain: {{ app_item.value.letsencrypt_domain | default('preprod.example.com') }}
+  regru:
+    dns_username: ""
+    dns_password: ""
+  live_dir: {{ app_item.value.letsencrypt_live_dir | default('/etc/letsencrypt/live/preprod.example.com') }}
+  certbot_extra_args: []
+  dns_propagation_seconds: {{ app_item.value.dns_propagation_seconds | default(360) }}
+
+timeouts:
+  certbot_seconds: 1800
+  kubectl_seconds: 300
+  ssh_connect_seconds: 60
+  ssh_command_seconds: 300
+  openssl_checkend_seconds: 86400
+
+kubernetes:
+  enabled: {{ app_item.value.kubernetes_enabled | default(true) | bool }}
+  api_server: "{{ app_item.value.k8s_api_server }}"
+  ca_cert_path: /run/cert-orchestrator/k8s-ca.crt
+  namespace_secrets:
+{% for item in cert_orchestrator_k8s_namespace_secrets %}
+    - namespace: {{ item.namespace }}
+      secret_name: {{ item.secret_name }}
+{% endfor %}
+
+targets:
+  nginx_remotes:
+    enabled: {{ app_item.value.target_nginx_enabled | default(true) | bool }}
+    hosts:
+{% for h in app_item.value.target_nginx_hosts | default([]) %}
+      - host: "{{ h.host }}"
+        user: "{{ h.user | default('root') }}"
+        identity_file: "{{ h.identity_file | default('') }}"
+        ssl_dir: "{{ h.ssl_dir | default('/etc/nginx/ssl') }}"
+{% if h.cert_basename is defined and h.cert_basename | length > 0 %}
+        cert_basename: "{{ h.cert_basename }}"
+{% endif %}
+{% if h.nginx_container is defined and h.nginx_container | length > 0 %}
+        nginx_container: "{{ h.nginx_container }}"
+{% endif %}
+{% endfor %}
+
+telegram:
+  bot_token: ""
+  chat_ids: []
+  connect_timeout_seconds: {{ app_item.value.telegram_connect_timeout | default(docker_app_telegram_connect_timeout) }}
+  total_timeout_seconds: {{ app_item.value.telegram_total_timeout | default(docker_app_telegram_total_timeout) }}
+  retry_attempts: {{ app_item.value.telegram_retry_attempts | default(docker_app_telegram_retry_attempts) }}
+  retry_delay_seconds: {{ app_item.value.telegram_retry_delay_seconds | default(docker_app_telegram_retry_delay_seconds) }}
+  notify_on:
+    container_start: true
+    errors: true
+    renewal_started: true
+    renewal_finished: true
+    per_host_result: true
+    next_rotation_reminder: true
+
+https_verification:
+  enabled: {{ app_item.value.https_verification_enabled | default(true) | bool }}
+  ssl_timeout_seconds: 15
+  hosts:
+{% for h in app_item.value.https_verification_hosts | default([]) %}
+      - host: "{{ h.host }}"
+        port: {{ h.port | default(443) }}
+        enabled: {{ h.enabled | default(true) | bool }}
+{% endfor %}
+
+logging:
+  level: INFO
+  format: text

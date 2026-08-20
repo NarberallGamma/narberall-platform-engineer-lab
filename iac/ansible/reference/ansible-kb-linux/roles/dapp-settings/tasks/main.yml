@@ -1,0 +1,21 @@
+---
+- name: Dapp Settings | Ensure .dapp folder exists
+  file:
+    path: /home/gitlab-runner/.dapp
+    state: directory
+    mode: 0755
+    owner: gitlab-runner
+    group: gitlab-runner
+  tags:
+    - settings
+- name: Dapp Settings | Setup global per gitlab-runner dapp settings
+  copy:
+    content: |
+      [sentry]
+      dsn = "https://CHANGE_ME@sentry.example.com/0"
+      detect-push-tag-usage = true
+    dest: /home/gitlab-runner/.dapp/settings.toml
+    owner: gitlab-runner
+    group: gitlab-runner
+  tags:
+    - settings

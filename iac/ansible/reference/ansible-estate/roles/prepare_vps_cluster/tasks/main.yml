@@ -1,0 +1,37 @@
+---
+- name: Локальный admin-пользователь (admin_vps)
+  ansible.builtin.include_tasks: admin_user.yml
+  when: enable_vps_admin_user | bool
+  tags: [vps, admin_user, prepare_vps]
+
+- name: Проверка Docker (без установки)
+  ansible.builtin.include_tasks: docker_check.yml
+  when: enable_vps_docker_check | bool
+  tags: [vps, docker, prepare_vps]
+
+- name: Настройка SSH (опционально)
+  ansible.builtin.include_tasks: ssh.yml
+  when: enable_vps_ssh | bool
+  tags: [vps, ssh, prepare_vps]
+
+- name: Синхронизация времени (chrony)
+  ansible.builtin.include_tasks: chrony.yml
+  when: enable_vps_chrony | bool
+  tags: [vps, chrony, prepare_vps]
+
+- name: Firewall (ufw) для egress
+  ansible.builtin.include_tasks: firewall.yml
+  when: enable_vps_firewall | bool
+  tags: [vps, firewall, prepare_vps]
+
+- name: Логирование Envoy (access log, logrotate)
+  ansible.builtin.include_tasks: envoy_logging.yml
+  when:
+    - enable_vps_envoy | bool
+    - enable_vps_envoy_logging | bool
+  tags: [vps, envoy, envoy_logging, prepare_vps]
+
+- name: Деплой Envoy через Docker Compose
+  ansible.builtin.include_tasks: envoy.yml
+  when: enable_vps_envoy | bool
+  tags: [vps, envoy, prepare_vps]

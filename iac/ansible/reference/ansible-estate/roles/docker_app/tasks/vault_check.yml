@@ -1,0 +1,23 @@
+---
+- name: Проверить VAULT_ADDR для lookup секретов
+  ansible.builtin.assert:
+    that:
+      - lookup('env', 'VAULT_ADDR') | length > 0
+      - lookup('env', 'VAULT_TOKEN') | length > 0
+    fail_msg: >
+      Нет VAULT_ADDR или VAULT_TOKEN. CI job deploy-ansible:runner_host создаёт /ansible/.env.vault;
+      run-скрипт source через control_node_env.sh.
+  tags: [docker_app, vault]
+
+- name: Проверить docker_app и Vault path
+  ansible.builtin.assert:
+    that:
+      - docker_app.slug | length > 0
+      - docker_app_vault_mount_point | length > 0
+      - docker_app_vault_path | length > 0
+      - docker_app_vault_key_map is defined
+      - docker_app_vault_key_map | length > 0
+    fail_msg: >
+      Задать docker_app.slug, docker_app_vault_mount_point, docker_app_vault_path и docker_app_vault_key_map
+      в group_vars/<service>.yml и vars_files в плейбуке (см. group_vars/cert-monitoring.yml).
+  tags: [docker_app]

@@ -34,7 +34,7 @@ Full six-year narrative (domains, JVM, brokers, org): [`experience.md`](experien
 ## Kubernetes and data
 
 - Clusters: **OpenShift**, **Deckhouse**, vanilla Kubernetes, and cloud PaaS (EKS / CCE / GKE-class)
-- Databases under load: long SQL, locks/blocking, replication lag and failover, read/write spread, balancers in front of the data path, **sharding** when one primary is the ceiling. PostgreSQL / RDS-class in public code; same ops pattern in private estates.
+- Databases under load: long SQL, locks/blocking, replication lag and failover, read/write spread, balancers in front of the data path, **sharding** when one primary is the ceiling. PostgreSQL users as code (Flyway/DDL vs app DML, extra RO/RW): [`../iac/ansible/reference/ansible-estate/`](../iac/ansible/reference/ansible-estate/). Same ops pattern in private estates.
 - Messaging and cache on the critical path: **Kafka**, **Debezium**, **RabbitMQ**, **NATS**, **Artemis**, **Redis**
 - Application delivery: Java/Kotlin JVM (including Tomcat and dumps), .NET, Go, Python, PHP, Node, 1C — plus CI gates (SonarQube, Trivy, OSV-Scanner)
 - CI/CD: **Jenkins** (plugins, Kubernetes workers instead of dedicated VMs), **GitLab CI + Argo CD**, **Azure DevOps**, **Helm + werf**. Full map (create → accompany → build/publish → gates → revoke): [`../iac/ci/`](../iac/ci/)
@@ -69,5 +69,5 @@ See [`iac/cloud/`](../iac/cloud/) for per-platform write-ups and links into Terr
 
 ## Proof model
 
-Case studies (outcomes) + [`experience.md`](experience.md) (six years) + [`iac/cloud/`](../iac/cloud/) (keywords) + [`iac/terraform/`](../iac/terraform/) (code) + [`iac/ansible/`](../iac/ansible/) (day-2) + live portfolio site.  
+Case studies (outcomes) + [`experience.md`](experience.md) (six years) + [`iac/cloud/`](../iac/cloud/) (keywords) + [`iac/terraform/`](../iac/terraform/) (code) + [`iac/ansible/`](../iac/ansible/) (hosts) + live portfolio site.  
 Not a dump of private client IaC.

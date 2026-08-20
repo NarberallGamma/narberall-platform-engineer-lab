@@ -54,6 +54,7 @@ Async poll is the production pattern (connect timeouts vs GPU cold start). CDN d
 
 | Kit | Path |
 |-----|------|
+| Ansible GPU/LLM + collab estate (company path, [case 01](../../case-studies/01-ai-llm-platform.md)) | [`../../iac/ansible/reference/ansible-llm-collab/`](../../iac/ansible/reference/ansible-llm-collab/) |
 | Ollama compose | [`reference/ai/llm-compose-kit/`](reference/ai/llm-compose-kit/) |
 | SD GPU compose | [`reference/ai/sd-compose/`](reference/ai/sd-compose/) |
 | Kohya LoRA preset | [`reference/ai/kohya-lora-preset.example.md`](reference/ai/kohya-lora-preset.example.md) |

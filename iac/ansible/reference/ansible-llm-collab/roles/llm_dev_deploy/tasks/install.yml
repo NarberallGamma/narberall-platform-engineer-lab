@@ -1,0 +1,37 @@
+---
+- name: Каталог приложения LLM dev
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - { path: "{{ llm_dev_app_root }}", mode: "0755" }
+    - { path: "{{ llm_dev_models_dir }}", mode: "0755" }
+
+- name: Каталог данных Open WebUI
+  ansible.builtin.file:
+    path: "{{ llm_dev_app_root }}/open-webui-data"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  when: llm_dev_open_webui_enabled | bool
+
+- name: Проверить наличие файла модели GGUF
+  ansible.builtin.stat:
+    path: "{{ llm_dev_models_dir }}/{{ llm_dev_model_filename }}"
+  register: llm_dev_model_stat
+  when: llm_dev_assert_model_present | bool
+
+- name: Остановиться, если модель отсутствует
+  ansible.builtin.assert:
+    that:
+      - llm_dev_model_stat.stat.exists | default(false)
+      - (llm_dev_model_stat.stat.size | default(0)) > 0
+    fail_msg: >-
+      Ожидается файл {{ llm_dev_models_dir }}/{{ llm_dev_model_filename }}.
+      Включить llm_dev_model_fetch_enabled и пресет в group_vars/llm_dev/main.yml или положить GGUF вручную;
+      при отладке выключить llm_dev_assert_model_present.
+  when: llm_dev_assert_model_present | bool

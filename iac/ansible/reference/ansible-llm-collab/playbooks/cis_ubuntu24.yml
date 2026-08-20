@@ -1,0 +1,11 @@
+---
+- name: CIS Ubuntu 24 hardening (ansible-lockdown.ubuntu24_cis)
+  hosts: prepare
+  gather_facts: yes
+  become: yes
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/cis_ubuntu24.yml"
+
+  roles:
+    - role: ansible-lockdown.ubuntu24_cis

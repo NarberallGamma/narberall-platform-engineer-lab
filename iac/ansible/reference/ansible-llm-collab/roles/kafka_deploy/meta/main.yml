@@ -1,0 +1,5 @@
+---
+galaxy_info:
+  role_name: kafka_deploy
+  description: Развёртывание Kafka (apache/kafka, KRaft) через Docker Compose
+dependencies: []

@@ -1,0 +1,46 @@
+---
+- name: Каталоги nginx-proxy
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - { path: "{{ llm_dev_nginx_root }}", mode: "0755" }
+    - { path: "{{ llm_dev_nginx_root }}/config", mode: "0755" }
+    - { path: "{{ llm_dev_nginx_root }}/certs", mode: "0755" }
+    - { path: "{{ llm_dev_nginx_root }}/certs/{{ llm_dev_nginx_ssl_cert_subdir }}", mode: "0755" }
+    - { path: "{{ llm_dev_nginx_root }}/logs", mode: "0755" }
+    - { path: "{{ llm_dev_nginx_root }}/logs/{{ llm_dev_public_server_name }}", mode: "0755" }
+    - { path: "{{ llm_dev_nginx_root }}/logs/default", mode: "0755" }
+
+- name: Синхронизация TLS с контрол-ноды в каталог certs
+  ansible.builtin.copy:
+    src: "{{ llm_dev_nginx_ssl_sync_src }}/"
+    dest: "{{ llm_dev_nginx_root }}/certs/{{ llm_dev_nginx_ssl_cert_subdir }}/"
+  when: llm_dev_nginx_ssl_sync_src | default('') | length > 0
+  no_log: true
+
+- name: Проверить наличие сертификата на хосте
+  ansible.builtin.stat:
+    path: "{{ llm_dev_nginx_root }}/certs/{{ llm_dev_nginx_ssl_cert_subdir }}/{{ llm_dev_nginx_ssl_cert_file }}"
+  register: llm_dev_nginx_cert_stat
+
+- name: Проверить наличие ключа на хосте
+  ansible.builtin.stat:
+    path: "{{ llm_dev_nginx_root }}/certs/{{ llm_dev_nginx_ssl_cert_subdir }}/{{ llm_dev_nginx_ssl_cert_key_file }}"
+  register: llm_dev_nginx_key_stat
+
+- name: Остановиться при отсутствии TLS-файлов
+  ansible.builtin.assert:
+    that:
+      - llm_dev_nginx_cert_stat.stat.exists | default(false)
+      - llm_dev_nginx_cert_stat.stat.size | default(0) > 0
+      - llm_dev_nginx_key_stat.stat.exists | default(false)
+      - llm_dev_nginx_key_stat.stat.size | default(0) > 0
+    fail_msg: >-
+      Ожидаются файлы TLS в {{ llm_dev_nginx_root }}/certs/{{ llm_dev_nginx_ssl_cert_subdir }}/:
+      {{ llm_dev_nginx_ssl_cert_file }}, {{ llm_dev_nginx_ssl_cert_key_file }}.
+      Положить вручную или задать llm_dev_nginx_ssl_sync_src; при необходимости выключить llm_dev_nginx_assert_certs_present.
+  when: llm_dev_nginx_assert_certs_present | bool

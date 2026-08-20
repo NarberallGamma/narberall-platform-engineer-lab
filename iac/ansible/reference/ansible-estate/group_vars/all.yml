@@ -1,0 +1,19 @@
+# Общие переменные для всех хостов (bootstrap пользователей и прочее).
+# Переопределять через group_vars/<service>.yml или --extra-vars при необходимости.
+# Vault HA: group_vars/prod|preprod/vault_cluster.yml и playbooks/vault-*.yml.
+
+# Открытые SSH-ключи для bootstrap (ansible и gitlab-runner).
+# Приватные ключи в GitLab CI Variables: ANSIBLE_SSH_PRIVATE_KEY_B64, GITLAB_RUNNER_SSH_PRIVATE_KEY_B64 (base64, Mask).
+ansible_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA admin@example.com"
+gitlab_runner_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA admin@example.com"
+
+# Ограничение по источнику для authorized_keys (from="IP"). Пусто = без ограничения.
+ansible_authorized_key_from: ""
+gitlab_runner_authorized_key_from: ""
+
+# Плейбук setup_bootstrap_users (переопределять через --extra-vars при необходимости).
+setup_bootstrap_run_ansible: true
+setup_bootstrap_run_gitlab_runner: true
+setup_bootstrap_fetch_dest: "{{ playbook_dir }}/../artifacts/bootstrap_credentials"
+setup_bootstrap_cleanup_tmp: false
+setup_bootstrap_set_password: false

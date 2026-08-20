@@ -1,0 +1,7 @@
+---
+# Движок KV v2 в Vault (mount point и путь к секрету). Окружение: VAULT_ADDR, VAULT_TOKEN.
+nextcloud_vault_mount_point: "platform-infra"
+nextcloud_vault_path: "Ubuntu_servers"
+# Имена ключей в секрете Ubuntu_servers (логин и пароль WebDAV).
+nextcloud_vault_key_webdav_user: "ansible_dev_nextcloud_webdav_user"
+nextcloud_vault_key_webdav_password: "ansible_dev_nextcloud_webdav_password"

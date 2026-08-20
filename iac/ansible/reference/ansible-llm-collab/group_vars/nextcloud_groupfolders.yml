@@ -1,0 +1,133 @@
+# Запуск (один клиент): ./scripts/run/run_nextcloud_groupfolders.sh --profile nextcloud-dev "ООО Рога и Копыта"  (или: --limit nextcloud-dev.example.com — без профиля берётся карта ниже по inventory_hostname).
+# Параллелизм: ./scripts/run/run_nextcloud_groupfolders.sh --profile nextcloud-dev --mkcol-threads 4 --occ-threads 4 "ООО …" (без флагов — nextcloud_concurrency_* из этого файла).
+# или: ansible-playbook ... --limit … -e "client_name=ООО Рога и Копыта"
+# Run-скрипт: --profile nextcloud-dev|nextcloud-prod|regul (авто-хост см. nextcloud_profile_default_inventory_host) или только --limit — тогда профиль из nextcloud_matrix_profile_by_host ниже.
+# Режим «все клиенты»: --all-clients (только ACL) или --all-clients-create (MKCOL+ACL).
+# Имя групповой папки, WebDAV, матрица, контейнер occ — в nextcloud_profile_map (профиль задаёт ключ матрицы: nextcloud-dev | nextcloud-prod | regul).
+
+# Профиль матрицы по inventory_hostname — для плейбука (--limit задаёт узел SSH; ключ — имя хоста из инвентаря).
+# Регул: хост inventory app-02.example.com ([nextcloud_regul] в hosts.ini). Prod: nextcloud-prod-oc3.example.com ([nextcloud_prod_cluster], backup 10.10.3.20).
+# Для переопределения соответствий — -e или run-скрипт --profile без --limit.
+nextcloud_matrix_profile_by_host:
+  nextcloud-dev.example.com: nextcloud-dev
+  nextcloud-prod-oc3.example.com: nextcloud-prod
+  app-02.example.com: regul
+
+# Хост инвентаря по умолчанию для --profile без --limit (то же должно быть в блоке резолва run_nextcloud_groupfolders.sh).
+nextcloud_profile_default_inventory_host:
+  nextcloud-dev: nextcloud-dev.example.com
+  nextcloud-prod: nextcloud-prod-oc3.example.com
+  regul: app-02.example.com
+
+# Описание профилей (ключи совпадают со значениями в nextcloud_matrix_profile_by_host).
+nextcloud_profile_map:
+  nextcloud-dev:
+    # Имя корневой групповой папки в Nextcloud.
+    nextcloud_groupfolder_name: "Clients INTFS"
+    # URL WebDAV до корня групповой папки.
+    # DEV: https://demo-nextcloud.x.example.com/remote.php/webdav/Clients%20INTFS/
+    # PROD (другой стенд): https://nextcloud.x.example.com/remote.php/webdav/Clients%20INTFS/
+    nextcloud_webdav_url: "https://demo-nextcloud.x.example.com/remote.php/webdav/Clients%20INTFS"
+    # Имя контейнера Nextcloud на хосте для вызова occ.
+    nextcloud_container_name: "app-server"
+    # Путь к матрице dev (Clients INTFS, профиль nextcloud-dev): group_vars/env/matrix_nextcloud_dev_cloud_platform.yaml.
+    nextcloud_matrix_file: "{{ playbook_dir }}/../group_vars/env/matrix_nextcloud_dev_cloud_platform.yaml"
+    # Имена полей в секрете Ubuntu_servers (ключи KV, не значения).
+    nextcloud_vault_key_webdav_user: "ansible_dev_nextcloud_webdav_user"
+    nextcloud_vault_key_webdav_password: "ansible_dev_nextcloud_webdav_password"
+  nextcloud-prod:
+    # Имя корневой групповой папки в Nextcloud (как dev — Clients INTFS).
+    nextcloud_groupfolder_name: "Clients INTFS"
+    # PROD: https://nextcloud.x.example.com/settings/users
+    nextcloud_webdav_url: "https://nextcloud.x.example.com/remote.php/webdav/Clients%20INTFS"
+    # Имя контейнера Nextcloud на хосте для вызова occ (как dev; при необходимости переопределить host_vars для prod).
+    nextcloud_container_name: "app-server"
+    # Матрица: копия dev, файл matrix_nextcloud_prod_cloud_platform.yaml (синхронизировать с dev при изменениях матрицы).
+    nextcloud_matrix_file: "{{ playbook_dir }}/../group_vars/env/matrix_nextcloud_prod_cloud_platform.yaml"
+    nextcloud_vault_key_webdav_user: "ansible_prod_nextcloud_webdav_user"
+    nextcloud_vault_key_webdav_password: "ansible_prod_nextcloud_webdav_password"
+  regul:
+    # Имя корневой групповой папки в Nextcloud (как в UI / в groupfolders:list; на стенде — «Regul clients»).
+    nextcloud_groupfolder_name: "Regul clients"
+    # Путь к матрице Regul.
+    nextcloud_matrix_file: "{{ playbook_dir }}/../group_vars/env/matrix_regul_cloud_platform.yaml"
+    # URL WebDAV до корня групповой папки (сегмент пути = имя папки с пробелами → %20).
+    nextcloud_webdav_url: "https://cloud.example.com/remote.php/webdav/Regul%20clients"
+    # Имя контейнера Nextcloud на хосте для вызова occ.
+    nextcloud_container_name: "NC_CLIENTS_APP_SERVER"
+    # Имена полей в секрете Ubuntu_servers (ключи KV, не значения).
+    nextcloud_vault_key_webdav_user: "ansible_regul_nextcloud_webdav_user"
+    nextcloud_vault_key_webdav_password: "ansible_regul_nextcloud_webdav_password"
+
+# --- Режим повторного применения прав по всем существующим клиентам (после сброса LDAP и т.п.) ---
+# Включённый режим: получает список папок клиентов из WebDAV (корень groupfolder), выводит список,
+# затем последовательно для каждого клиента применяет права по матрице (--all-clients / nextcloud_reapply_all_clients_enabled).
+# Опция MKCOL по всем (--all-clients-create / nextcloud_reapply_all_clients_mkcol_enabled): перед ACL для каждого клиента —
+# идемпотентный WebDAV MKCOL по путям матрицы (новые папки появятся; уже существующие не удаляются).
+# По умолчанию выключено (false).
+nextcloud_reapply_all_clients_enabled: false
+# Только вместе с nextcloud_reapply_all_clients_enabled: для каждого клиента из списка — MKCOL, затем общая логика occ.
+nextcloud_reapply_all_clients_mkcol_enabled: false
+# Одновременных операций в батче (async на одном хосте): MKCOL WebDAV и occ groupfolders:permissions. Роль defaults: 1; здесь для стендов platform — 4.
+nextcloud_concurrency_mkcol: 4
+nextcloud_concurrency_occ: 4
+# --- Только переиграть ACL по матрице для одного client_name (MKCOL не выполняется) — точечное тестирование ---
+nextcloud_reapply_permissions_only: false
+# --- Режим сброса кеша LDAP-групп (подготовка к корректным именам групп из AD) ---
+# Включённый режим выполняет только сброс указанных групп (occ ldap:reset-group). Проверки и init
+# (другие роли/плейбук) по-прежнему запускаются, но создание иерархии папок и назначение прав по матрице
+# в этом запуске не выполняются — отдельный режим подготовки. По умолчанию выключено (no).
+nextcloud_ldap_reset_groups_enabled: false
+# Список имён групп для сброса (старые имена в скобках в UI: INTFS Clients Admin (FS Admin users) и т.д.).
+# После сброса при следующей синхронизации с AD группы появятся под правильными именами (INTFS Clients *).
+nextcloud_ldap_reset_groups:
+  - "FS Admin users"
+  - "FS Accounting users"
+  - "FS Corp users"
+  - "FS HR users"
+  - "FS Payroll users"
+  - "FS Legal Users"
+# --- Исключения по клиентам: права «как на корень» ---
+# Для перечисленных клиентов не применяется детальная матрица по путям: один путь (имя папки клиента)
+# с теми же группами, что и на корень Clients INTFS (всем — доступ и запись). Подпапки не перечисляются.
+# Пример: "01 Общая информация" — структуры Внутренний обмен/Файлобменник и т.д. нет, даём доступ всем.
+nextcloud_root_like_clients:
+  - "01 Общая информация"
+  - "0_Общая информация"
+# ---
+
+# Применять ли права на корневую групповую папку (occ groupfolders:group) для всех групп из матрицы.
+# Нужно для видимости групповой папки; детальная раздача по путям — через nextcloud_apply_per_folder_permissions.
+nextcloud_apply_root_groups: false
+# Применять ли права по каждой папке (occ groupfolders:permissions path + view/edit по матрице).
+nextcloud_apply_per_folder_permissions: true
+# По матрице/вики: просмотр = +read; редактирование = +read +write +create +delete и явный запрет публикации (-- -share), как в UI существующих клиентов.
+# В occ одна строка допуска после --group=…: сначала разрешения «+…», затем «--», затем отрицания (см. документацию occ groupfolders:permissions).
+nextcloud_occ_edit_permissions: "+read +write +create +delete -- -share"
+# «Один RO на все группы матрицы» (нет отдельной LDAP Cloud … RO в AD): в matrix в view подставляется маркер __NC_MATRIX_RO_ALL__;
+# Ansible назначает на этот путь каждую группу из объединения view/edit матрицы, у кого не edit на этой строке, только RO в UI (+read и запрет write/create/delete/share).
+nextcloud_occ_ro_permissions: "+read -- -write -create -delete -share"
+# Обычный view — явный список групп в YAML (не маркер): только +read (без отдельной deny-строки; при необходимости как RO — перейти на маркер).
+nextcloud_occ_view_permissions: "+read"
+nextcloud_matrix_ro_sentinel: "__NC_MATRIX_RO_ALL__"
+# Запрет доступа (occ после «--»). Явные правила deny_on_l4_children в matrix — по-прежнему; плюс авто для прочих путей (см. ниже).
+# например «-read -write -create -delete -share». Для строк deny в матрице, если не задан perms, подставляется nextcloud_occ_deny_permissions.
+nextcloud_occ_deny_permissions: "-read -write -create -delete -share"
+# Всем группам из объединения матрицы, у которых на данном пути нет строки ни в edit, ни в view (и не подразумевается RO по маркеру __NC_MATRIX_RO_ALL__),
+# назначить явный deny — как на проде, чтобы доступ не наследовался с родителя у «лишних» групп (IntSecurity только для двух групп и т.д.).
+nextcloud_occ_auto_deny_unlisted_matrix_groups: true
+# Права на корень для occ groupfolders:group: слова через пробел — read, write, share, delete
+# Пусто = только чтение. На корне достаточно read+write для видимости; детализация — по путям.
+nextcloud_occ_group_permission: "read write share delete"
+
+# Vault: только mount и путь к секрету. Имена ключей в секрете Ubuntu_servers — в nextcloud_profile_map у каждого профиля (-e при необходимости).
+# UI: Secrets → platform-infra → Ubuntu_servers. Выбор ключей по хосту — nextcloud_matrix_profile_by_host + pre_tasks плейбука до nextcloud_init.
+nextcloud_vault_mount_point: "platform-infra"
+nextcloud_vault_path: "Ubuntu_servers"
+
+# Учётные данные WebDAV: по умолчанию подтягиваются из Vault. Если задать здесь (или в плейбуке / -e / CI Variables) — Vault не вызывается.
+# nextcloud_webdav_user: ""
+# nextcloud_webdav_password: ""
+# Для доступа в Vault (токен с read на Ubuntu_servers) задать в окружении при запуске плейбука (в т.ч. в CI Variables репо):
+#   VAULT_ADDR=https://vault.x.example.com
+#   VAULT_TOKEN=<токен с доступом на чтение секрета Ubuntu_servers>

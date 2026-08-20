@@ -1,0 +1,78 @@
+---
+# Загрузка образов Docker из tar после установки docker-ce, миграции data-root и старта engine.
+
+- name: Условие восстановления образов Docker
+  ansible.builtin.set_fact:
+    docker_images_restore_needed: >-
+      {{
+        (docker_images_backup_enabled | default(true) | bool)
+        and (
+          (docker_remove_distro_packages | default(false) | bool)
+          or (docker_migrate_data | default(false) | bool)
+        )
+      }}
+  tags: [docker]
+
+- name: Проверить маркер бэкапа образов Docker для restore
+  ansible.builtin.stat:
+    path: "{{ docker_images_backup_marker }}"
+  register: docker_images_backup_marker_restore
+  when: docker_images_restore_needed
+  tags: [docker]
+
+- name: Проверить маркер восстановления образов Docker
+  ansible.builtin.stat:
+    path: "{{ docker_images_restore_marker }}"
+  register: docker_images_restore_marker_stat
+  when: docker_images_restore_needed
+  tags: [docker]
+
+- name: Восстановление образов Docker из tar (docker load)
+  when:
+    - docker_images_restore_needed
+    - docker_images_backup_marker_restore.stat.exists | default(false)
+    - not docker_images_restore_marker_stat.stat.exists | default(false)
+  block:
+    - name: Найти tar-бэкапы образов Docker
+      ansible.builtin.find:
+        paths: "{{ docker_images_backup_dir }}"
+        patterns: "*.tar"
+        file_type: file
+      register: docker_image_backup_tars
+      tags: [docker]
+
+    - name: Загрузить образы Docker из tar (docker load)
+      ansible.builtin.command:
+        argv:
+          - docker
+          - load
+          - -i
+          - "{{ item.path }}"
+      loop: "{{ docker_image_backup_tars.files | default([]) }}"
+      when: docker_image_backup_tars.matched | default(0) | int > 0
+      register: docker_load_results
+      tags: [docker]
+
+    - name: Маркер восстановления образов Docker
+      ansible.builtin.file:
+        path: "{{ docker_images_restore_marker }}"
+        state: touch
+        mode: "0644"
+      tags: [docker]
+
+    - name: Итог восстановления образов Docker
+      ansible.builtin.debug:
+        msg: |
+          Образы Docker восстановлены из {{ docker_images_backup_dir }} ({{ docker_image_backup_tars.matched | default(0) }} tar).
+          Проверить: docker images
+          После проверки можно удалить: rm -rf {{ docker_images_backup_dir }}
+      when: docker_image_backup_tars.matched | default(0) | int > 0
+      tags: [docker]
+
+    - name: Восстановление образов Docker пропущено (tar не найдены)
+      ansible.builtin.debug:
+        msg: "Маркер бэкапа есть, но tar в {{ docker_images_backup_dir }} не найдены (образов не было до migrate)."
+      when: docker_image_backup_tars.matched | default(0) | int == 0
+      tags: [docker]
+
+  tags: [docker]

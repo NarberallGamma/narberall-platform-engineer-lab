@@ -1,0 +1,13 @@
+---
+# Один клиент в цикле reapply: подставить client_name, загрузить матрицу, развернуть пути, применить права (без MKCOL).
+# Вызывается из groupfolders_reapply_all_clients.yml с vars: _current_client.
+
+- name: Установить текущее имя клиента для применения прав
+  ansible.builtin.set_fact:
+    client_name: "{{ _current_client }}"
+
+- name: Подготовить список папок по матрице для client_name
+  ansible.builtin.include_tasks: groupfolders_prepare_folders_flat_for_client.yml
+
+- name: Применить права по матрице (корень + по путям) для клиента {{ _current_client }}
+  ansible.builtin.include_tasks: groupfolders_apply_permissions.yml

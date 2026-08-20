@@ -1,0 +1,57 @@
+#!/bin/bash
+
+function get_rolling_version() {
+  versionName=$1
+  # rolling-versions map for the dapp gem (historical builder; later werf)
+  url="https://raw.githubusercontent.com/example/dapp/master/rolling-versions"
+
+  output=$(curl --fail --silent --show-error $url)
+  status=$?
+
+  if [ $status -ne 0 ] ; then
+    echo "Cannot fetch rolling versions map at $url"
+    return $status
+  fi
+
+  echo "$output" | grep $versionName | cut -d' ' -f2
+}
+
+if [ "$1" == "latest" ] || [ "$1" == "stable" ] ; then
+  DAPP_VERSION=$(get_rolling_version $1) || exit 1
+else
+  DAPP_VERSION=$1
+
+  # Check if DAPP_VERSION exists
+  VERSIONS_COUNT=$( git ls-remote --refs --tags https://github.com/example/dapp.git "${DAPP_VERSION}.*" | wc -l )
+  if [[ $VERSIONS_COUNT == 0 ]]; then
+    echo "Dapp version $DAPP_VERSION doesn't exist"
+    exit 1;
+  fi
+fi
+
+# Install new version of Dapp
+function install_dapp {
+  source /home/gitlab-runner/.rvm/scripts/rvm
+  rvm use --default 2.5.3
+  rvm gemset create "dapp-${DAPP_VERSION}"
+  rvm gemset use "dapp-${DAPP_VERSION}"
+  gem install dapp -v "~>${DAPP_VERSION}.0"
+  mkdir -p "${HOME}/.dapp/versions/${DAPP_VERSION}"
+}
+
+# Install cron task for update dapp patch version (https://semver.org define version as MAJOR.MINOR.PATCH)
+function update_dapp {
+  crontab -l | { cat; echo "0,30 * * * * /home/gitlab-runner/.rvm/scripts/rvm && /home/gitlab-runner/.rvm/bin/rvm-exec @dapp-${DAPP_VERSION} dapp update"; } | crontab -
+}
+
+function run {
+  source /home/gitlab-runner/.rvm/scripts/rvm
+  rvm gemset use "dapp-${DAPP_VERSION}"
+}
+
+if [ ! -d "/home/gitlab-runner/.rvm/gems/ruby-2.5.3@dapp-${DAPP_VERSION}" ]; then
+  install_dapp
+  update_dapp
+fi
+
+run

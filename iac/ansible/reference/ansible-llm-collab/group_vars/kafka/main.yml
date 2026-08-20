@@ -1,0 +1,81 @@
+# Плейбук: playbooks/kafka_deploy.yml, группа инвентаря: kafka
+# Запуск: с контрол-ноды /ansible после git pull — ./scripts/run/run_kafka.sh --limit kafka-prod.example.com
+# (Vault: .env.vault; SSH: .ssh/ansible_ssh_key). Локально без .env.vault — экспорт VAULT_ADDR и VAULT_TOKEN.
+# Шаблоны compose: roles/kafka_deploy/templates/ (не в group_vars — стандарт Ansible).
+
+# =============================================================================
+# Тома и данные
+# =============================================================================
+# В compose том данных: ./data → /var/lib/kafka/data (на хосте каталог с владельцем uid/gid 1000 — иначе AccessDenied в контейнере при KAFKA_LOG_DIRS).
+# При SASL — ./config/kafka_server_jaas.conf (тот же uid/gid 1000).
+# Рядом: .env, при SASL_SSL — ./config/ssl.
+# Другой uid в образе: kafka_container_user_uid / kafka_container_user_gid в defaults роли kafka_deploy.
+
+# =============================================================================
+# Секреты и доступ (важно)
+# =============================================================================
+# Режим: SASL_PLAINTEXT + PLAIN (без TLS на брокере при kafka_sasl_tls_enabled: false).
+# Клиенты: security.protocol=SASL_PLAINTEXT, sasl.mechanism=PLAIN, JAAS PlainLoginModule (platform_kafka / admin).
+# SASL_SSL на брокере: kafka_sasl_tls_enabled: true и keystore в config/ssl (роль kafka_deploy, tls.yml).
+# Vault (Ubuntu_servers): ansible_kafka_sasl_admin_password, ansible_kafka_sasl_platform_kafka_password, CLUSTER_ID;
+# для доп. SASL пользователей — ключи из списка kafka_sasl_extra_users (например ansible_kafka_sasl_svc_1c_kafka_password);
+# при kafka_akhq_enabled: ansible_kafka_akhq_ui_password (пароль входа в веб-интерфейс AKHQ).
+# Отключить SASL: kafka_sasl_enabled: false — только PLAINTEXT без пароля.
+# CLUSTER_ID из Vault — идентификатор кластера KRaft.
+
+# --- Vault (init) ---
+# UI: Secrets → platform-infra → Ubuntu_servers
+kafka_vault_mount_point: "platform-infra"
+kafka_vault_path: "Ubuntu_servers"
+kafka_vault_key_cluster_id: "ansible_kafka_kraft_cluster_id"
+kafka_vault_key_sasl_admin_password: "ansible_kafka_sasl_admin_password"
+kafka_vault_key_sasl_platform_kafka_password: "ansible_kafka_sasl_platform_kafka_password"
+kafka_vault_key_akhq_ui_password: "ansible_kafka_akhq_ui_password"
+
+kafka_sasl_enabled: true
+# TLS на брокере вместе с SASL (SASL_SSL). false — только SASL_PLAINTEXT + пароль.
+kafka_sasl_tls_enabled: false
+
+# Доп. SASL PLAIN пользователи (JAAS user_<username>). В Vault (Ubuntu_servers) — ключ vault_key = пароль.
+kafka_sasl_extra_users:
+  - username: svc_1c_kafka
+    vault_key: ansible_kafka_sasl_svc_1c_kafka_password
+
+# Если задать здесь или в -e — Vault для CLUSTER_ID не вызывается.
+# kafka_cluster_id: ""
+
+# --- AKHQ (Kafka UI) ---
+# Образ: tchiotludo/akhq; подключение к брокеру внутри compose: kafka:9092 (SASL — учётка admin из Vault).
+# В Vault (Ubuntu_servers): ansible_kafka_akhq_ui_password — пароль входа в веб-интерфейс (в конфиге хранится как SHA-256).
+# Публичное имя: kafka-akhq.<тот же домен, что и у kafka> — из kafka_akhq_public_host (по умолчанию от kafka_advertised_host).
+# Прокси: HTTP(S) reverse proxy на порт хоста kafka_akhq_host_port (8080), см. roles/kafka_deploy/files/kafka_akhq_nginx.example.conf
+kafka_akhq_enabled: true
+kafka_akhq_image: "tchiotludo/akhq:0.27.0"
+kafka_akhq_host_port: 8080
+
+# --- Развёртывание ---
+kafka_app_root: "/docker/apps/kafka"
+kafka_image: "apache/kafka:3.9.2"
+kafka_listener_port: 9092
+
+# Имя для advertised.listeners и bootstrap.servers (при kafka_sasl_tls_enabled — CN/SAN сертификата).
+kafka_advertised_host: kafka.example.com
+
+# Число брокеров и целевой RF — см. расчёт kafka_effective_replication_factor в defaults роли kafka_deploy.
+kafka_broker_count: 1
+kafka_target_replication_factor: 3
+
+# Политика pull образа при compose up: missing | always | never | policy
+kafka_compose_pull: "missing"
+
+# Перезапуск контейнера Kafka: по умолчанию unless-stopped (см. defaults kafka_deploy).
+# kafka_compose_restart_policy: unless-stopped
+
+# Автопараметры новых топиков (при auto.create.topics.enable=true)
+kafka_default_num_partitions: 10
+kafka_log_retention_hours: 168
+kafka_log_roll_ms: 259200000
+
+# «Синхронный» flush (частые fsync) — нагрузка на диск; при необходимости увеличить интервалы.
+kafka_log_flush_interval_messages: 1
+kafka_log_flush_interval_ms: 1

@@ -1,0 +1,54 @@
+---
+- name: Enable postgresql server service
+  service:
+    name: postgresql
+    enabled: yes
+
+- name: Templating postgresql config
+  template:
+    src: "{{ pg_version }}/postgresql.conf.j2"
+    dest: "/etc/postgresql/{{ pg_version }}/{{ pg_cluster }}/postgresql.conf"
+    owner: postgres
+    group: postgres
+  tags: config
+
+- name: Copy pg_hba.conf
+  copy:
+    src: "pg_hba.conf"
+    dest: "/etc/postgresql/{{ pg_version }}/{{ pg_cluster }}/pg_hba.conf"
+    owner: postgres
+    group: postgres
+  tags: config
+
+- name: Ensure .ssh/ dir exists
+  file:
+    path: "{{ pg_home_dir }}/.ssh"
+    owner: postgres
+    group: postgres
+    mode: 0700
+    state: directory
+  tags: config
+
+# copy postgres replication SSH material from a local path (files/.ssh/, not committed)
+- name: Copy .ssh/ files
+  copy:
+    src: ".ssh/"
+    dest: "{{ pg_home_dir }}/.ssh/"
+    owner: postgres
+    group: postgres
+    mode: 0600
+  tags: config
+
+- name: Restart postgresql server only once after install
+  service:
+    name: postgresql
+    state: restarted
+  when: packages_install.changed
+
+- name: Ensure /var/backup/pgsql/wal/ dir exists
+  file:
+    path: "/var/backup/pgsql/wal/"
+    owner: postgres
+    group: postgres
+    mode: 0755
+    state: directory

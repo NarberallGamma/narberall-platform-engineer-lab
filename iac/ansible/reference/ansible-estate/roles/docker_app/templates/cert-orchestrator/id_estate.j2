@@ -1,0 +1,1 @@
+{{ app_vault.ssh_private_key | default('') | replace('\\n', '\n') | regex_replace('\r\n', '\n') | regex_replace('\r', '') | trim }}

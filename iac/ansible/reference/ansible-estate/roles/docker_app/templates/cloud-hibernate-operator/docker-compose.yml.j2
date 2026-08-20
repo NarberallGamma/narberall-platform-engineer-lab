@@ -1,0 +1,23 @@
+services:
+  cloud-hibernate-operator:
+    image: {{ app_item.value.image }}
+    container_name: cloud-hibernate-operator
+    restart: unless-stopped
+{% include 'snippets/telegram_egress_service.yml.j2' %}
+    env_file:
+      - .env
+    environment:
+      CONFIG_FILE: /etc/cloud-hibernate-operator.conf
+    volumes:
+      - ./config/cloud-hibernate-operator.conf:/etc/cloud-hibernate-operator.conf:ro
+      - ./logs:/app/logs
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "{{ app_item.value.api_port | default(8081) }}:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+{% include 'snippets/telegram_egress_networks.yml.j2' %}

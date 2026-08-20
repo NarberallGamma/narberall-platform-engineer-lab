@@ -1,0 +1,5 @@
+- name: Run hardering_cron 
+  become_user: root
+  hosts: all
+  roles:
+      - hardering_cron 

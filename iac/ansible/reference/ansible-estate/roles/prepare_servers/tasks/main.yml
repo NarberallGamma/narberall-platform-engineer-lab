@@ -1,0 +1,113 @@
+---
+- name: Установить часовой пояс
+  community.general.timezone:
+    name: "{{ timezone }}"
+  when: enable_timezone | bool
+
+- name: Обновить apt-кеш
+  ansible.builtin.apt:
+    update_cache: yes
+  when: enable_apt_basics | bool
+  ignore_errors: yes
+
+- name: Обновить установленные пакеты (dist-upgrade)
+  ansible.builtin.apt:
+    upgrade: dist
+    autoremove: yes
+    lock_timeout: "{{ prepare_servers_apt_lock_timeout }}"
+  when: enable_apt_upgrade | bool
+
+# Сначала пробуем установить пакеты для Ubuntu (software-properties-common доступен в Ubuntu)
+- name: Установить базовые пакеты (Ubuntu - software-properties-common)
+  ansible.builtin.apt:
+    name:
+      - software-properties-common
+      - net-tools
+    state: present
+  when: enable_apt_basics | bool
+  register: ubuntu_packages_install
+  ignore_errors: yes
+
+# Если установка не удалась (например, на Debian где пакет может отсутствовать), используем альтернативные пакеты
+- name: Установить базовые пакеты (Debian - альтернатива для software-properties-common)
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - net-tools
+    state: present
+  when: enable_apt_basics | bool and ubuntu_packages_install.failed | default(false)
+
+- name: Переименовать хост (если задан host_hostname и отличается)
+  ansible.builtin.hostname:
+    name: "{{ host_hostname }}"
+  when: enable_hostname_change | bool and host_hostname | length > 0 and host_hostname != ansible_facts['hostname']
+
+- name: Обновить /etc/hosts после смены hostname
+  ansible.builtin.include_tasks: hosts_file.yml
+  vars:
+    hosts_file_hostname: "{{ host_hostname }}"
+  when: enable_hostname_change | bool and host_hostname | length > 0
+
+- name: Настроить DNS (systemd-resolved) при необходимости
+  ansible.builtin.include_tasks: dns.yml
+  when: enable_dns | bool and dns_manage | bool
+
+- name: Подготовить пакеты для домена
+  ansible.builtin.apt:
+    name:
+      - sssd-ad
+      - sssd-tools
+      - realmd
+      - adcli
+    state: present
+  when: enable_realm | bool
+
+- name: Вступление в домен (realm)
+  ansible.builtin.include_tasks: realm.yml
+  when: enable_realm | bool
+
+- name: Конфигурация SSSD и PAM
+  ansible.builtin.include_tasks: sssd.yml
+  when: enable_sssd | bool
+
+- name: Настройка SSH для парольной аутентификации доменных пользователей
+  ansible.builtin.include_tasks: ssh_pass_auth.yml
+  when: enable_ssh_pass_auth | bool
+
+- name: Установка EDR агента
+  ansible.builtin.include_tasks: agent.yml
+  when: enable_agent | bool and ((agent_deb_local | length > 0) or (agent_deb_url | length > 0))
+
+- name: Установка и настройка Docker
+  ansible.builtin.include_tasks: docker.yml
+  when: enable_docker | bool
+  tags: [docker]
+
+- name: Проверка enable_docker перед NVIDIA GPU
+  ansible.builtin.assert:
+    that:
+      - enable_docker | bool
+    fail_msg: "enable_nvidia_gpu: true требует enable_docker: true (Docker ставится до Container Toolkit)."
+  when: enable_nvidia_gpu | bool
+
+- name: NVIDIA GPU — драйвер, Container Toolkit, CDI, проверка docker --gpus
+  ansible.builtin.include_role:
+    name: prepare_nvidia_gpu
+    apply:
+      tags:
+        - nvidia_gpu
+        - prepare
+  tags:
+    - nvidia_gpu
+    - prepare
+  when: enable_nvidia_gpu | bool
+
+- name: Хардненинг прав
+  ansible.builtin.include_tasks: permissions.yml
+  when: enable_hardening | bool and harden_permissions | bool
+
+- name: Смена пароля root (ручной или автогенерация в artifacts)
+  ansible.builtin.include_tasks: root_password.yml
+  when: enable_root_password_change | bool

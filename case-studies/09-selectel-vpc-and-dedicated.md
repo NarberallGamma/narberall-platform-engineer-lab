@@ -29,7 +29,7 @@ Selectel (RU cloud + DC)
 - VPC: Neutron nets, volume-boot kube masters (etcd disk), Postgres root/data/WAL, dual-homed GitLab, Selectel S3 remote state
 - Dedicated: role-split kube pools (frontend, websocket, stateful, system, logging, isolated, test), Ceph OSDs, search, cron, analytics DB, VPN
 - Unique-name discipline for `proxmox_vm_qemu` (provider does not reject colliding vmid/name)
-- Same day-2 path as other clouds: guests → cluster → CI/CD
+- Same host path as other clouds: guests → cluster → CI/CD
 
 ## Results
 

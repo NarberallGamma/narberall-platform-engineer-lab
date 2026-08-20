@@ -1,0 +1,69 @@
+# Managed by Ansible (docker_app edge-lb)
+# treasury-policy-gateway — {{ edge_lb_treasury_policy_gateway_domain }}
+{% set pg_backend_port = edge_lb_treasury_policy_gateway_backend.port | default(8082) %}
+{% set pg_path = edge_lb_treasury_policy_gateway_path_prefix | default('/api/v0/treasury-policy-gateway/') %}
+{% set pg_health_port = edge_lb_treasury_policy_gateway_backend.health_port | default(pg_backend_port) %}
+
+upstream treasury_policy_gateway_backend {
+    server {{ edge_lb_treasury_policy_gateway_backend.ip }}:{{ pg_backend_port }}
+        max_fails={{ edge_lb_treasury_policy_gateway_health_check_retries | default(3) }}
+        fail_timeout={{ edge_lb_treasury_policy_gateway_health_check_interval | default(10) }}s
+        weight=1;
+    keepalive 16;
+    keepalive_requests 100;
+    keepalive_timeout 60s;
+}
+
+limit_req_zone $binary_remote_addr zone=treasury_policy_gateway_limit:10m rate={{ docker_app.rate_limit_zone_rate | default('10r/s') }};
+
+server {
+    listen {{ docker_app.listen_port | default(443) }} ssl;
+    server_name {{ edge_lb_treasury_policy_gateway_domain }};
+    http2 on;
+
+    ssl_certificate /etc/nginx/certs/{{ edge_lb_cert_basename }}.crt;
+    ssl_certificate_key /etc/nginx/certs/{{ edge_lb_cert_basename }}.key;
+    ssl_protocols {{ docker_app.ssl_protocols | default('TLSv1.2 TLSv1.3') }};
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    limit_req zone=treasury_policy_gateway_limit burst={{ docker_app.rate_limit_burst | default(20) }} nodelay;
+
+    error_log /var/log/nginx/{{ edge_lb_treasury_policy_gateway_domain }}/error.log warn;
+    access_log /var/log/nginx/{{ edge_lb_treasury_policy_gateway_domain }}/access.log main;
+
+    location {{ pg_path }} {
+        rewrite ^{{ pg_path }}(.*) /$1 break;
+
+        proxy_pass http://treasury_policy_gateway_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Prefix {{ pg_path | regex_replace('/$', '') }};
+
+        proxy_connect_timeout {{ edge_lb_treasury_policy_gateway_proxy_connect_timeout | default(docker_app.proxy_connect_timeout | default('60s')) }};
+        proxy_send_timeout {{ edge_lb_treasury_policy_gateway_proxy_send_timeout | default(docker_app.proxy_send_timeout | default('60s')) }};
+        proxy_read_timeout {{ edge_lb_treasury_policy_gateway_proxy_read_timeout | default(docker_app.proxy_read_timeout | default('120s')) }};
+
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+
+    location {{ pg_path }}actuator/health {
+        proxy_pass http://{{ edge_lb_treasury_policy_gateway_backend.ip }}:{{ pg_health_port }}/actuator/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        access_log off;
+    }
+}

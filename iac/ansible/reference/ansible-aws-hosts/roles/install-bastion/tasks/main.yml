@@ -1,0 +1,45 @@
+---
+# tasks file for install-bastion
+- name: "Install k8s repo keys"
+  apt_key:
+    url: "{{ k8s_apt_keyserver }}"
+    state: present
+
+- name: "Install k8s repo"
+  apt_repository:
+    repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+    state: present
+
+- name: "Install kubectl package"
+  apt:
+    name: kubectl={{ kubectl_version }}
+    state: present
+    update_cache: yes
+
+- name: "Create dir for kube config in root home dir"
+  file:
+    path: /root/.kube/
+    owner: root
+    group: root
+    mode: '0700'
+    state: directory
+
+- name: "Copy kube config in root home"
+  copy:
+    src: config
+    dest: /root/.kube/
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: "Added bash autocomplection package"
+  apt:
+    name: bash-completion
+    state: present
+
+- name: "Set autocomplection for kubectl"
+  lineinfile:
+    path: /root/.bashrc
+    line: "source <(kubectl completion bash)"
+
+- include: copy_kubeconf.yml

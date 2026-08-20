@@ -1,0 +1,24 @@
+services:
+  cert-orchestrator:
+    image: {{ app_item.value.image }}
+    container_name: cert-orchestrator
+    restart: unless-stopped
+{% include 'snippets/telegram_egress_service.yml.j2' %}
+    env_file:
+      - .env
+    environment:
+      TZ: {{ app_item.value.timezone | default('Europe/Moscow') }}
+      CONFIG_FILE: /etc/cert-orchestrator/config.yaml
+    volumes:
+      - ./config/config.yaml:/etc/cert-orchestrator/config.yaml:ro
+      - ./.ssh/id_estate:/ssh/id_estate:ro
+      - ./.k8s/ca.crt:/run/cert-orchestrator/k8s-ca.crt:ro
+      - {{ app_item.value.host_letsencrypt | default('/etc/letsencrypt') }}:/etc/letsencrypt
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; assert os.path.exists('/etc/cert-orchestrator/config.yaml')"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+{% include 'snippets/telegram_egress_networks.yml.j2' %}

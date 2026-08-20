@@ -12,6 +12,12 @@
 | [`practice/workstation/reference/mcp-replicate/`](../practice/workstation/reference/mcp-replicate/) | Replicate MCP wrapper + `replicate-img` (async poll) | Minutes on Linux, macOS, or WSL once a token file exists |
 | [`practice/workstation/reference/scripts/`](../practice/workstation/reference/scripts/) | SSH / kube / Ansible / JSM helpers the IDE agent calls | Hours on a new laptop; same kit, any of those OS |
 | [`iac/ansible/reference/monitoring-starter/`](../iac/ansible/reference/monitoring-starter/) | Host metrics | Minutes via Ansible |
+| [`iac/ansible/reference/ansible-llm-collab/`](../iac/ansible/reference/ansible-llm-collab/) | GPU/LLM + Nextcloud + Kafka + CIS | Hours once inventory and GPU host exist |
+| [`iac/ansible/reference/ansible-estate/`](../iac/ansible/reference/ansible-estate/) | docker_app family + Vault + hibernate + RDS Flyway/RO/RW users | Hours for one app after SSH and images exist |
+| [`iac/ansible/reference/ansible-app-platform/`](../iac/ansible/reference/ansible-app-platform/) | Kafka mTLS, EDR, Prometheus, Postgres users | Hours after hosts are inventory |
+| [`iac/ansible/reference/ansible-kb-linux/`](../iac/ansible/reference/ansible-kb-linux/) | PostgreSQL / Percona / NTP / host audit | Hours for a Linux DB or NTP estate |
+| [`iac/ansible/reference/ansible-backup-borg/`](../iac/ansible/reference/ansible-backup-borg/) | Borg user + dump scripts | Hours once the backup host and keys exist |
+| [`iac/ansible/reference/ansible-aws-hosts/`](../iac/ansible/reference/ansible-aws-hosts/) | AWS bastion / DB / disks / users | Hours next to [`../iac/terraform/aws/`](../iac/terraform/aws/) |
 
 Sentence a buyer can quote: **this library is how I stand up a HA EKS / CCE / GKE-class cluster with a monitoring starter in hours, and a VPC+compute baseline in minutes, once access is ready.** GKE follows the same ownership pattern; the published live tree is AWS. Huawei-class CCE is in [`../iac/terraform/cloud-ru-compute/`](../iac/terraform/cloud-ru-compute/).
 

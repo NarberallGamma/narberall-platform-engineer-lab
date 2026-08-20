@@ -1,0 +1,36 @@
+---
+- hosts: mysql
+  roles:
+    - role: users
+      vars:
+        users: ["admin", "dba", "operator", "analyst"]
+
+- hosts: mysql8
+  roles:
+    - role: users
+      vars:
+        users: ["admin", "dba", "operator", "analyst"]
+
+- hosts: mt5report_mysql8
+  roles:
+    - role: users
+      vars:
+        users: ["admin", "dba", "operator"]
+
+- hosts: mariadb
+  roles:
+    - role: users
+      vars:
+        users: ["admin", "dba", "operator", "developer"]
+
+- hosts: rethinkdb
+  roles:
+    - role: users
+      vars:
+        users: ["admin", "dba", "operator", "developer"]
+
+- hosts: neo4j
+  roles:
+    - role: users
+      vars:
+        users: ["admin", "dba", "operator", "developer"]

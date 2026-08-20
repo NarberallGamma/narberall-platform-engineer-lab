@@ -1,0 +1,6 @@
+---
+- import_tasks: packages.yml
+- import_tasks: postgresql.yml
+- import_tasks: repmgr.yml
+- import_tasks: system.yml
+  tags: config

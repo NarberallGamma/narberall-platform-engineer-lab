@@ -1,0 +1,33 @@
+---
+- name: "Create partitions"
+  parted:
+    device: "{{ item.block }}"
+    number: 1
+    state: present
+  loop: "{{ disks[provider] }}"
+- name: "Make fs on partition"
+  filesystem:
+    fstype: "{{ item.fs }}"
+    dev: "{{ item.part }}"
+  loop: "{{ disks[provider] }}"
+- name: "Ensure the mount directory exists"
+  file:
+    path: "{{ item.path }}"
+    state: directory
+  with_items: '{{ disks[provider] }}'
+- name: "Get UUID for partition"
+  command: "blkid -s UUID -o value {{ item.part }}"
+  register: disk_blkid
+  with_items: "{{ disks[provider] }}"
+  changed_when: False
+- name: "Mount additional disks"
+  mount:
+    name: '{{ item.0.path }}'
+    fstype: '{{ item.0.fs }}'
+    opts: '{{ item.0.options }}'
+    passno: '0'
+    src: 'UUID={{ item.1.stdout }}'
+    state: mounted
+  with_together:
+    - '{{ disks[provider] }}'
+    - '{{ disk_blkid.results }}'

@@ -1,0 +1,6 @@
+.env
+data/
+ca-certificates.crt
+nginx/certs/*.crt
+nginx/certs/*.key
+nginx/certs/*.pem

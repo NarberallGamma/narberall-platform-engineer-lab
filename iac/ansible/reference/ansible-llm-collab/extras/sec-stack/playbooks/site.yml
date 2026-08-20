@@ -1,0 +1,12 @@
+---
+- name: Стек sec-stack (VictoriaMetrics + Grafana + экспортеры)
+  hosts: sec_stack
+  roles:
+    - dns
+    - docker
+    - sec_stack
+
+- name: Node exporter на инфраструктурные ВМ
+  hosts: teleport:teleport_db
+  roles:
+    - node_exporter

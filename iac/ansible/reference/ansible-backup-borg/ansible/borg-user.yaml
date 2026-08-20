@@ -1,0 +1,23 @@
+- hosts: all
+  tasks:
+  - name: borg user
+    user:
+      name: borg
+      shell: /bin/bash
+  - name: borg user .ssh dir
+    file: path="~borg/.ssh" state=directory owner='borg' group='borg'
+  - name: borg user key
+    template:
+      src: "./authorized_keys"
+      dest: "~borg/.ssh/authorized_keys"
+      owner: borg
+      group: borg
+      mode: '0400'
+  - name: borg at sudoers
+    template:
+      src: "./sudoers-borg"
+      dest: "/etc/sudoers.d/borg"
+      validate: '/usr/sbin/visudo -cf %s'
+      mode: 0440
+      owner: root
+      group: root

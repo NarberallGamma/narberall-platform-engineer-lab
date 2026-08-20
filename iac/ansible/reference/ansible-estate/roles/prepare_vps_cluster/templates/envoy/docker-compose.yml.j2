@@ -1,0 +1,31 @@
+# Managed by Ansible (prepare_vps_cluster)
+# Каталог: {{ vps_envoy_app_dir }}
+
+services:
+  {{ vps_envoy_container_name }}:
+    image: {{ vps_envoy_image }}
+    container_name: {{ vps_envoy_container_name }}
+    restart: always
+    network_mode: host
+    user: "0:0"
+    cap_add:
+      - NET_BIND_SERVICE
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+{% if enable_vps_envoy_logging | bool %}
+      - ./logs:/var/log/envoy
+{% endif %}
+    entrypoint:
+      - /usr/local/bin/envoy
+    command:
+      - -c
+      - /etc/envoy/envoy.yaml
+      - --service-cluster
+      - vps-egress
+      - --service-node
+      - {{ inventory_hostname }}
+    logging:
+      driver: json-file
+      options:
+        max-size: "{{ vps_envoy_docker_log_max_size }}"
+        max-file: "{{ vps_envoy_docker_log_max_file }}"

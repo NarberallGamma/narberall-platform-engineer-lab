@@ -1,0 +1,43 @@
+---
+# LLM dev: загрузка GGUF → llama.cpp server + Open WebUI → nginx (TLS, /v1 и UI).
+# При каждом прогоне deploy: контейнеры пересоздаются (llm_dev_compose_recreate: always), не ограничиваясь restart.
+# Секреты: llm_dev_init → HashiCorp Vault KV (group_vars/llm_dev/main.yml).
+# Запуск: ./scripts/run/run_llm_dev.sh --limit llm-dev-01.example.com
+#
+# Теги: llm_dev, llm_dev_init, llm_dev_model_fetch, llm_dev_ouroboros, llm_dev_deploy, llm_dev_nginx, llm_dev_install, llm_dev_manage, llm_dev_config, llm_dev_restart, llm_dev_gpu, llm_dev_gpu_prepare.
+# Роль llm_dev_model_fetch также помечена тегом llm_dev_deploy, чтобы при --tags llm_dev_deploy подтягивалась модель до assert в llm_dev_deploy.
+#
+# Полный цикл: модель качается ролью llm_dev_model_fetch в {{ llm_dev_models_dir }}, манифест в {{ llm_dev_sources_dir }}.
+# Перед первым запуском по-прежнему нужны TLS PEM для nginx (каталог certs или llm_dev_nginx_ssl_sync_src).
+# Долгие шаги: group_vars llm_dev_ansible_ssh_timeout_seconds, *_async_* (см. group_vars/llm_dev/main.yml).
+
+- name: Развёртывание LLM dev (модель + Compose + nginx)
+  hosts: llm_dev
+  gather_facts: true
+  become: true
+  vars:
+    ansible_ssh_timeout: "{{ llm_dev_ansible_ssh_timeout_seconds | default(14400) | int }}"
+
+  pre_tasks:
+    - name: Параметры группы llm_dev (group_vars/llm_dev/main.yml)
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../group_vars/llm_dev/main.yml"
+      tags: [always]
+
+  roles:
+    - role: prepare_nvidia_gpu
+      tags: [llm_dev, llm_dev_gpu, llm_dev_install, llm_dev_gpu_prepare]
+      when: llm_dev_gpu_host_prepare_enabled | default(false) | bool
+    - role: llm_dev_init
+      tags: [llm_dev, llm_dev_init, vault, llm_dev_install]
+    - role: llm_dev_model_fetch
+      tags: [llm_dev, llm_dev_model_fetch, llm_dev_install, llm_dev_deploy]
+      when: llm_dev_model_fetch_enabled | bool
+    - role: llm_dev_ouroboros_compat
+      tags: [llm_dev, llm_dev_ouroboros, llm_dev_config, llm_dev_deploy]
+      when: llm_dev_ouroboros_compat_enabled | default(false) | bool
+    - role: llm_dev_deploy
+      tags: [llm_dev, llm_dev_deploy]
+    - role: llm_dev_nginx
+      tags: [llm_dev, llm_dev_nginx, llm_dev_install]
+      when: llm_dev_nginx_enabled | bool

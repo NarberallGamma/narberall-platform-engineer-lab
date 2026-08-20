@@ -1,0 +1,60 @@
+- name: "[{{ user_item.name }}] Парсинг vault_path={{ user_item.vault_path }}, vault_key={{ user_item.vault_key }}"
+  set_fact:
+    vault_path: "{{ user_item.vault_path }}"
+    vault_key: "{{ user_item.vault_key }}"
+    username_key: spring.datasource.username
+
+- name: "[{{ user_item.name }}] Проверка, что vault_path задан"
+  assert:
+    that:
+      - vault_path != ''
+    fail_msg: "Для пользователя {{ user_item.name }} пароль должен быть задан через lookup('hashi_vault', ...)"
+
+- name: "[{{ user_item.name }}] Чтение секрета из Vault ({{ vault_path }})"
+  community.hashi_vault.vault_read:
+    url: "{{ vault_addr }}"
+    token: "{{ vault_token }}"
+    path: "{{ vault_path }}"
+  register: vault_read
+  failed_when: false
+
+- name: "[{{ user_item.name }}] Проверка наличия ключа пароля {{ vault_key }}"
+  set_fact:
+    pw_exists: "{{ vault_key in (vault_read.data.data.data | default({})) }}"
+
+- name: "[{{ user_item.name }}] Проверка наличия ключа логина {{ username_key }}"
+  set_fact:
+    user_exists: "{{ username_key in (vault_read.data.data.data | default({})) }}"
+
+- name: "[{{ user_item.name }}] Генерация пароля, так как ключ {{ vault_key }} отсутствует"
+  when: not pw_exists
+  set_fact:
+    new_password: >-
+      {{
+        lookup(
+          'ansible.builtin.password',
+          '/dev/null length=70 chars=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@*-_=+.'
+        )
+      }}
+
+- name: "[{{ user_item.name }}] Объединение данных для Vault: {{ vault_key }} и {{ username_key }}"
+  set_fact:
+    new_vault_data: >-
+      {{
+        (vault_read.data.data.data | default({}))
+        | combine({ vault_key: (vault_read.data.data.data[vault_key] if pw_exists else new_password) })
+        | combine({ username_key: (vault_read.data.data.data[username_key] if user_exists else user_item.name) })
+      }}
+
+- name: "[{{ user_item.name }}] Запись в Vault: путь={{ vault_path }}, ключи={{ vault_key }}, {{ username_key }}"
+  when: not pw_exists or not user_exists
+  community.hashi_vault.vault_write:
+    url: "{{ vault_addr }}"
+    token: "{{ vault_token }}"
+    path: "{{ vault_path }}"
+    data:
+      data: "{{ new_vault_data }}"
+
+- name: "[{{ user_item.name }}] Обновление db_passwords из ключа {{ vault_key }}"
+  set_fact:
+    db_passwords: "{{ db_passwords | combine({ (user_item.name): (vault_read.data.data.data[vault_key] if pw_exists else new_password) }) }}"

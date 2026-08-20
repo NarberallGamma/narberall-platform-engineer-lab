@@ -1,0 +1,24 @@
+---
+# Плейбук n8n_workflows: синхронизация воркфлоу из репо в n8n через REST API.
+# Запуск с контроллера (доступ по сети до n8n): ansible-playbook -i inventories/hosts.ini playbooks/n8n_workflows.yml
+# Ожидает: VAULT_ADDR, VAULT_TOKEN (или уже заданный n8n_api_key в -e/group_vars). n8n_base_url и n8n_workflows_to_sync — в group_vars/n8n_workflows.yml.
+
+- name: n8n Workflows (GitOps)
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/n8n_workflows.yml"
+
+  roles:
+    - role: n8n_init
+      tags: init, n8n
+    - role: n8n_workflows
+      tags: n8n
+
+  post_tasks:
+    - name: Итог
+      ansible.builtin.debug:
+        msg: "Готово. Синхронизированы воркфлоу: {{ n8n_workflows_to_sync | join(', ') }}. Id credentials: из Vault/vars (роль n8n_init) при n8n_vault_inject_credential_ids; иначе — вручную в n8n. Активировать воркфлоу в UI."
+      tags: always

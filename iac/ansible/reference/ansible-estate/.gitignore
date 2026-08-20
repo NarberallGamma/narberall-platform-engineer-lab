@@ -1,0 +1,20 @@
+# Local inventory and secrets
+hosts.ini
+**/hosts.ini
+passwd.yaml
+**/passwd.yaml
+
+# Control-node artifacts (credentials, certs, EDR packages)
+artifacts/
+
+# Keys
+*.pem
+*.key
+
+# Ansible runtime
+.collections/
+*.retry
+*.vault
+vars.local.yml
+.env.vault
+.ssh/

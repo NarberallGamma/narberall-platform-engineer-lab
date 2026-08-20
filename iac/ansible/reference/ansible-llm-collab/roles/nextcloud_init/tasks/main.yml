@@ -1,0 +1,37 @@
+---
+# Роль nextcloud_init: WebDAV user/password — из переменных (vars, -e, CI Variables) или из Vault.
+# Если nextcloud_webdav_user/nextcloud_webdav_password уже заданы — Vault не вызывается.
+# Пути и имена ключей в Vault: nextcloud_vault_mount_point, nextcloud_vault_path, nextcloud_vault_key_webdav_user, nextcloud_vault_key_webdav_password (group_vars).
+# Для Vault на control node: VAULT_ADDR, VAULT_TOKEN (или AppRole).
+
+- name: Проверить, что задано имя клиента
+  ansible.builtin.assert:
+    that: client_name is defined and client_name | length > 0
+    fail_msg: 'Задайте client_name: ansible-playbook ... -e "client_name=ООО Рога и Копыта"'
+  when: not (nextcloud_reapply_all_clients_enabled | default(false) | bool) and not (nextcloud_ldap_reset_groups_enabled | default(false) | bool)
+  tags: always
+
+# Имена ключей в Vault зависят от профиля (nextcloud_profile_map → pre_tasks плейбука).
+# Доступ через secrets[k_user] в vars, а не _vault.secret[k] в одной строке: иначе Jinja иногда
+# превращает это в attribute lookup и даёт «dict has no attribute ansible_regul_…».
+- name: Загрузить секреты Nextcloud из Vault
+  ansible.builtin.set_fact:
+    nextcloud_webdav_user: "{{ secrets[k_user] }}"
+    nextcloud_webdav_password: "{{ secrets[k_pass] }}"
+  vars:
+    _vault: "{{ lookup('community.hashi_vault.vault_kv2_get', nextcloud_vault_path, engine_mount_point=nextcloud_vault_mount_point) }}"
+    secrets: "{{ _vault['secret'] }}"
+    k_user: "{{ nextcloud_vault_key_webdav_user }}"
+    k_pass: "{{ nextcloud_vault_key_webdav_password }}"
+  no_log: true
+  when: >
+    (nextcloud_webdav_user is not defined or nextcloud_webdav_user | length == 0) or
+    (nextcloud_webdav_password is not defined or nextcloud_webdav_password | length == 0)
+
+- name: Проверить, что учётные данные WebDAV заданы
+  ansible.builtin.assert:
+    that:
+      - nextcloud_webdav_user is defined and nextcloud_webdav_user | length > 0
+      - nextcloud_webdav_password is defined and nextcloud_webdav_password | length > 0
+    fail_msg: 'Задайте nextcloud_webdav_user и nextcloud_webdav_password (Vault или -e/group_vars/CI Variables). Путь в Vault: nextcloud_vault_mount_point, nextcloud_vault_path.'
+  tags: always

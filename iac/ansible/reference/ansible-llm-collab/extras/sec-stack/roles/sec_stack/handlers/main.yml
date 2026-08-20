@@ -1,0 +1,16 @@
+---
+# vmagent/vmalert перечитывают конфиги сами (configCheckInterval);
+# остальным при изменении статичных конфигов нужен рестарт.
+- name: Restart stack services with static configs
+  ansible.builtin.command:
+    cmd: docker compose restart alertmanager grafana blackbox panos-exporter
+    chdir: "{{ sec_stack_dir }}"
+  changed_when: true
+
+# Смена кредов сборщиков — перезапуск, чтобы новый сбор пошёл сразу, а не через
+# EDR_COLLECT_INTERVAL (актуально для SberCloud: STS обновляют часто).
+- name: Restart edr-exporter
+  ansible.builtin.command:
+    cmd: docker compose restart edr-exporter
+    chdir: "{{ sec_stack_dir }}"
+  changed_when: true

@@ -1,0 +1,26 @@
+- hosts: all
+  gather_facts: no
+  # vars_files:
+  #   - mysql-passwords.yml
+  tasks:
+  # - name: check if readonly
+  #   shell: echo 'SELECT @@global.read_only;' | mysql -N
+  #   register: mysql_read_only
+  # - debug: var=mysql_read_only.stdout_lines
+  # - name: mysql backup user
+  #   shell: |-
+  #     echo "DROP USER IF EXISTS 'backup'@'127.0.0.1';
+  #     CREATE USER 'backup'@'127.0.0.1' IDENTIFIED BY '{{ mysql_password }}';
+  #     GRANT BACKUP_ADMIN, PROCESS, RELOAD, LOCK TABLES, REPLICATION CLIENT ON *.* TO 'backup'@'127.0.0.1';
+  #     GRANT SELECT ON performance_schema.log_status TO 'backup'@'127.0.0.1';
+  #     FLUSH PRIVILEGES;" | mysql
+  #   register: mysql_output
+  #   when: mysql_read_only.stdout == "0"
+  # - debug: var=mysql_output.stdout_lines
+  - name: create config
+    template:
+      src: mysql-config.j2
+      dest: ~borg/.my.cnf
+      owner: borg
+      group: borg
+      mode: 0400

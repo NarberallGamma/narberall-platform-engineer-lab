@@ -1,0 +1,63 @@
+---
+# Значения по умолчанию роли prepare_vps_cluster.
+# Переопределение: group_vars/vps_cluster.yml, host_vars.
+
+# Включатели блоков (Docker не устанавливается, только проверка)
+enable_vps_docker_check: true
+enable_vps_admin_user: true
+enable_vps_ssh: true
+enable_vps_firewall: true
+enable_vps_envoy: true
+enable_vps_envoy_logging: true
+enable_vps_chrony: true
+
+# Локальный admin-пользователь VPS (sudo, пароль + SSH keys)
+vps_admin_username: admin_vps
+vps_admin_password_length: 30
+vps_admin_regenerate_password: false
+vps_admin_sudo_group: sudo
+vps_admin_sudo_nopasswd: true
+vps_admin_ssh_public_keys: []
+vps_admin_artifacts_dest: "{{ playbook_dir }}/../artifacts/vps_cluster_credentials"
+vps_admin_credentials_tmp_path: /tmp/vps_admin_credentials.txt
+vps_admin_cleanup_credentials_tmp: true
+
+# SSH: по умолчанию открыт с любого IP, root разрешён; ограничения выключены
+vps_ssh_disable_root_login: false
+vps_ssh_restrict_source_ips: false
+vps_ssh_allowed_source_cidrs: []
+
+# UFW
+vps_firewall_allow_outgoing: true
+vps_envoy_listen_port: 443
+
+# Источники трафика от Kubernetes / estate NAT (CIDR, обычно /32 публичных NAT)
+vps_k8s_egress_source_cidrs: []
+
+# Каталог приложений Docker Compose на хосте
+vps_docker_apps_base_dir: "/docker/apps"
+
+# Envoy (blockchain egress, SNI dynamic forward proxy)
+vps_envoy_app_name: "envoy"
+vps_envoy_app_dir: "{{ vps_docker_apps_base_dir }}/{{ vps_envoy_app_name }}"
+vps_envoy_image: "envoyproxy/envoy:v1.32.3"
+vps_envoy_container_name: "envoy-egress"
+vps_envoy_admin_port: 9901
+vps_envoy_compose_pull: "always"
+
+# Access log Envoy (TCP/SNI passthrough): файл на хосте + logrotate, опционально stdout (docker logs)
+vps_envoy_log_dir: "{{ vps_envoy_app_dir }}/logs"
+vps_envoy_access_log_container_path: "/var/log/envoy/access.log"
+vps_envoy_access_log_to_stdout: true
+# Формат: SNI из tls_inspector, upstream из tcp_proxy
+vps_envoy_access_log_format: '[%START_TIME%] %DOWNSTREAM_REMOTE_ADDRESS% sni=%REQUESTED_SERVER_NAME% upstream=%UPSTREAM_HOST% cluster=%UPSTREAM_CLUSTER% tx=%BYTES_SENT% rx=%BYTES_RECEIVED% dur=%DURATION%'
+vps_envoy_logrotate_path: "/etc/logrotate.d/envoy-egress"
+vps_envoy_logrotate_frequency: daily
+vps_envoy_logrotate_rotate: 7
+vps_envoy_logrotate_maxage: 7
+vps_envoy_docker_log_max_size: "50m"
+vps_envoy_docker_log_max_file: "1"
+
+# Chrony
+vps_chrony_servers:
+  - "pool.ntp.org"

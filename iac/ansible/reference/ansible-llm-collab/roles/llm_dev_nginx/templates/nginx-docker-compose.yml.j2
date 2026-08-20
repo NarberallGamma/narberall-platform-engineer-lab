@@ -1,0 +1,22 @@
+# Сгенерировано Ansible — nginx reverse proxy для LLM dev (host network, маунты как на proxy-01.example.com).
+services:
+  nginx:
+    image: "{{ llm_dev_nginx_image }}"
+    container_name: "{{ llm_dev_nginx_container_name | default('llm-dev-nginx') }}"
+    restart: "{{ llm_dev_nginx_restart_policy }}"
+    network_mode: host
+    volumes:
+      - ./config:/etc/nginx/conf.d
+      - ./certs:/etc/nginx/certs
+      - ./logs:/var/log/nginx
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "{{ llm_dev_nginx_log_max_size }}"
+        max-file: "{{ llm_dev_nginx_log_max_file }}"
+{% if llm_dev_container_limits_enabled | default(false) | bool %}
+    cpus: "{{ llm_dev_nginx_cpus }}"
+    mem_limit: "{{ llm_dev_nginx_mem_limit }}"
+    memswap_limit: "{{ llm_dev_nginx_memswap_limit }}"
+{% endif %}

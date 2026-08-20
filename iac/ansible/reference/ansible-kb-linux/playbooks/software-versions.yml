@@ -1,0 +1,22 @@
+# RUN:
+# ansible-playbook ./software-versions.yml -vvv
+#
+# PARSE:
+# * combine all results into single file:
+# find -maxdepth 1 -name project_name.\* -exec cat {} + | jq -s . > output.json
+#
+# * for example, show elasticsearch versions:
+# jq '.[] | [."elasticsearch"[]?.version] | select(length > 0)' output.json | sort | uniq
+---
+- hosts: project_name
+  tasks:
+    - name: get the rpm package facts
+      package_facts:
+        manager: "auto"
+
+# this is debug, do not use unless needed for!
+#    - name: show them
+#      debug: var=ansible_facts.packages
+
+    - name: copy them
+      local_action: copy content="{{ ansible_facts.packages }}" dest=/tmp/project_name/{{ inventory_hostname }}

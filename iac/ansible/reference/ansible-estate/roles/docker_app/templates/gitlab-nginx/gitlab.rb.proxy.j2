@@ -1,0 +1,14 @@
+# Managed by migrate_gitlab_nginx_legacy.yml (blockinfile)
+# Omnibus nginx отключён; TLS и прокси только через docker gitlab-nginx.
+external_url 'https://{{ gitlab_nginx_gitlab_host }}'
+nginx['enable'] = false
+letsencrypt['enable'] = false
+
+gitlab_workhorse['listen_network'] = 'tcp'
+gitlab_workhorse['listen_addr'] = '{{ docker_app.gitlab_workhorse_listen_addr | default("127.0.0.1:8181") }}'
+
+registry_external_url 'https://{{ gitlab_nginx_registry_host }}'
+registry['enable'] = true
+gitlab_rails['registry_enabled'] = true
+registry_nginx['enable'] = false
+registry['registry_http_addr'] = '{{ docker_app.registry_backend_host }}:{{ docker_app.registry_backend_port }}'

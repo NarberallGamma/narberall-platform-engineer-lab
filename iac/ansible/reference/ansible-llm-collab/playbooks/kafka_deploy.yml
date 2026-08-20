@@ -1,0 +1,23 @@
+---
+# Kafka (apache/kafka, KRaft) в Docker Compose, каталог на хосте — kafka_app_root (по умолчанию /docker/apps/kafka).
+# Init: CLUSTER_ID из Vault (kafka_init) или -e kafka_cluster_id=...
+# Запуск: ./scripts/run/run_kafka.sh --limit kafka-prod.example.com
+# Теги: kafka (всё), kafka_install (каталоги + compose), kafka_manage | kafka_config (шаблон + compose), kafka_restart (пересоздание контейнеров).
+
+- name: Развёртывание Kafka (Docker Compose)
+  hosts: kafka
+  gather_facts: true
+  become: true
+
+  # Явная загрузка: один файл со всеми переменными группы kafka, без зависимости от того, как Ansible сопоставляет inventory и group_vars в Docker.
+  pre_tasks:
+    - name: Параметры группы kafka (group_vars/kafka/main.yml)
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../group_vars/kafka/main.yml"
+      tags: [always]
+
+  roles:
+    - role: kafka_init
+      tags: [kafka, kafka_init, vault, kafka_install]
+    - role: kafka_deploy
+      tags: [kafka, kafka_deploy]

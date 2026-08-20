@@ -1,0 +1,39 @@
+---
+# Ожидает _occ_allow_batch — список dict path, group, perms (allow). Накопление в _occ_perm_acc (инициализировать в вызывающем файле).
+# script не поддерживает async — тот же файл из roles/.../files через stdin (bash -s).
+- name: Запустить occ groupfolders:permissions allow (async) в батче
+  ansible.builtin.shell:
+    cmd: /bin/bash -s
+    stdin: "{{ lookup('file', role_path ~ '/files/nextcloud_occ_groupfolders_permissions.sh') }}"
+  environment:
+    GF_CONTAINER: "{{ nextcloud_container_name }}"
+    GF_FOLDER_ID: "{{ nextcloud_folder_id }}"
+    GF_GROUP: "{{ _perm_rule.group }}"
+    GF_PATH: "{{ _perm_rule.path }}"
+    GF_OP: allow
+    GF_PERMS: "{{ _perm_rule.perms }}"
+    GF_PATH_ALT: "{{ _perm_rule.path_occ_fallback | default('') }}"
+    GF_IGNORE_PATH_NOT_FOUND: "{{ (nextcloud_occ_ignore_path_not_found | default(true) | bool) | ternary('1', '0') }}"
+  loop: "{{ _occ_allow_batch }}"
+  loop_control:
+    loop_var: _perm_rule
+    label: "{{ _perm_rule.path }} → {{ _perm_rule.group }}"
+  async: "{{ nextcloud_async_job_timeout_sec | default(300) }}"
+  poll: 0
+  register: _occ_allow_fired
+  failed_when: false
+
+- name: Дождаться occ allow батча
+  ansible.builtin.async_status:
+    jid: "{{ _occ_j.ansible_job_id }}"
+  loop: "{{ _occ_allow_fired.results }}"
+  loop_control:
+    loop_var: _occ_j
+  register: _occ_allow_wait
+  until: _occ_allow_wait.finished
+  retries: "{{ nextcloud_async_status_retries | default(300) | int }}"
+  delay: "{{ nextcloud_async_status_delay | default(1) | int }}"
+
+- name: Накопить результаты occ allow
+  ansible.builtin.set_fact:
+    _occ_perm_acc: "{{ _occ_perm_acc + (_occ_allow_wait.results | default([])) }}"

@@ -1,0 +1,27 @@
+user nginx;
+worker_processes {{ app_item.value.nginx_worker_processes | default('auto') }};
+
+error_log /var/log/nginx/error.log warn;
+error_log /dev/stderr warn;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections {{ app_item.value.nginx_worker_connections | default(1024) }};
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for" host=$server_name';
+
+    access_log /var/log/nginx/access.log main;
+
+    sendfile on;
+    keepalive_timeout {{ app_item.value.nginx_keepalive_timeout | default(65) }};
+    client_max_body_size {{ app_item.value.client_max_body_size | default('1m') }};
+
+    include /etc/nginx/conf.d/*.conf;
+}

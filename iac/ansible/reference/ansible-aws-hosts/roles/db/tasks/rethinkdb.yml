@@ -1,0 +1,80 @@
+---
+- name: Install db repo keys
+  become: yes
+  apt_key:
+    url: "{{ apt_key_url }}"
+    state: present
+
+- name: Install db apt dependencies
+  become: yes
+  apt:
+    pkg: '{{ db_apt_dependencies }}'
+    state: present
+    update_cache: yes
+    cache_valid_time: 86400
+    allow_unauthenticated: yes
+
+- name: Install python packages
+  become: yes
+  pip:
+    name: "{{ db_pip_dependencies }}"
+    state: present
+
+- name: Install db apt repositories
+  become: yes
+  apt_repository:
+    repo: "{{ item }}"
+    state: present
+    update_cache: yes
+    filename: "{{ db_type }}"
+  with_items: "{{ db_apt_repositories }}"
+
+- name: Install db server apt packages
+  become: yes
+  apt:
+    pkg: '{{ db_apt_packages }}'
+    state: present
+    allow_unauthenticated: yes
+
+- name: Install db tools
+  become: yes
+  apt:
+    pkg: '{{ db_apt_tools_packages }}'
+    state: present
+  when: db_install_tools
+
+- name: "Ensure the permissions for mounts are set correctly"
+  file:
+    path: "{{ item.path }}"
+    owner: "{{ rethinkdb_runuser }}"
+    group: "{{ rethinkdb_rungroup }}"
+    state: directory
+  with_items: "{{ disks[provider] }}"
+
+- name: "Ensure the permissions for mounts are set correctly"
+  file:
+    path: "{{ item }}"
+    owner: "{{ rethinkdb_runuser }}"
+    group: "{{ rethinkdb_rungroup }}"
+    state: directory
+  with_items: ["{{ rethinkdb_data_path }}"]
+
+- name: "Get hostname"
+  shell: hostname
+  register: current_hostname
+
+- name: Main configuration
+  template:
+    src: instance.conf.j2
+    dest: "{{ db_config_include_dir }}/{{ cur_hostname }}.conf"
+    owner: root
+    group: root
+    mode: 0644
+  vars:
+    cur_hostname: "{{ current_hostname.stdout }}"
+
+- name: Start db server
+  service:
+    name: "{{ db_service_name }}"
+    enabled: yes
+    state: restarted

@@ -1,0 +1,23 @@
+---
+- name: Установить chrony
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+    update_cache: true
+    lock_timeout: "{{ prepare_servers_apt_lock_timeout | default(600) }}"
+  tags: [vps, chrony, prepare_vps]
+
+- name: Настроить upstream NTP в chrony
+  ansible.builtin.template:
+    src: chrony/chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    mode: "0644"
+  notify: restart chrony
+  tags: [vps, chrony, prepare_vps]
+
+- name: Запустить chrony
+  ansible.builtin.systemd:
+    name: chrony
+    state: started
+    enabled: true
+  tags: [vps, chrony, prepare_vps]

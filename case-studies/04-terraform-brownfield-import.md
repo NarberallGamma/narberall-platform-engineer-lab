@@ -17,7 +17,7 @@ See diagram: [`diagrams/case-studies/04-terraform-brownfield-import.md`](../diag
 2) Write matching Terraform resource blocks (generic names in public examples)
 3) terraform import (or equivalent) per resource address
 4) terraform plan -refresh-only / plan until No changes
-5) Day-2: manage drift via code, not console
+5) Then: manage drift via code, not console
 ```
 
 ## What shipped

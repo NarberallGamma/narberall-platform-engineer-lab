@@ -68,7 +68,7 @@ flowchart TB
 ## Related
 
 - CI catalog (turnkey map + pipelines): [`../ci/`](../ci/)
-- Ansible day-2 (what CI runs after apply): [`../ansible/`](../ansible/)
+- Ansible (what CI runs on hosts after apply): [`../ansible/`](../ansible/)
 
 ## Case studies
 
@@ -79,6 +79,7 @@ flowchart TB
 - [Huawei-class compute catalog (split state)](../../case-studies/07-huawei-compute-catalog.md)
 - [SBP-class identity autodeploy (Ansible)](../../case-studies/08-payments-swarm-autodeploy.md)
 - [Selectel VPC + dedicated Proxmox](../../case-studies/09-selectel-vpc-and-dedicated.md)
+- [Huawei-class estate Ansible](../../case-studies/10-ansible-estate.md)
 
 ## Keywords
 

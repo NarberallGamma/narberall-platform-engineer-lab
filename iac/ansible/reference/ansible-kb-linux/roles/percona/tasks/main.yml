@@ -1,0 +1,44 @@
+---
+- name: Install percona repo
+  apt:
+    deb: https://repo.percona.com/apt/percona-release_0.1-4.{{ ansible_distribution_release }}_all.deb
+
+- name: Add common internal repo
+  apt_repository:
+    state: present
+    repo: deb [trusted=yes] https://apt.example.com/common {{ ansible_distribution_release }} main
+    filename: platform.common
+
+- name: Install Percona Server config
+  apt:
+    name: percona-server-config
+    update_cache: yes
+    state: latest
+
+- name: Disable thread_concurrency option
+  replace:
+    path: /etc/mysql/conf.d/02-performance.cnf
+    regexp: '^( *thread_concurrency *= *)(.*)$'
+    replace: '#\1\2'
+
+- name: Disable slow-query-log-timestamp-precision option
+  replace:
+    path: /etc/mysql/conf.d/03-slow-query.cnf
+    regexp: '^( *slow-query-log-timestamp-precision *= *)(.*)$'
+    replace: '#\1\2'
+
+- name: Install Percona Server
+  apt:
+    name: "{{ percona_packages }}"
+    update_cache: yes
+    state: latest
+  vars:
+    percona_packages:
+    - percona-server-server-5.7
+    - python-mysqldb
+
+- name: Enable all services and restart
+  service:
+    name: mysql
+    enabled: yes
+    state: started

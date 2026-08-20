@@ -2,7 +2,7 @@
 
 Light host metrics as Ansible: **sysstat** (sar), **vnstat**, disk-usage CSV snapshots, a report script, and a sudoers drop-in so the deploy user can read logs without a password.
 
-Not Prometheus/Grafana — day-2 visibility on a small fleet before a full observability stack. Same inventory groups as the edge platform.
+The role is complete for that job (tasks + systemd timers + report script + sudoers). It is not a cut of Prometheus. Estate scrape and compose live in [`../ansible-app-platform/`](../ansible-app-platform/) (`monitoring_deploy`, `node_exporter`) and [`../ansible-estate/`](../ansible-estate/) (`node-exporter`).
 
 Practice: [`../../../../practice/home-lab/edge-platform.md`](../../../../practice/home-lab/edge-platform.md). Bootstrap: [`../ansible-bootstrap/`](../ansible-bootstrap/).
 

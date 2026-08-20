@@ -1,0 +1,65 @@
+---
+# Плейбук настройки пользователя schema_flyway и разграничения прав (Flyway/DDL — schema_flyway, приложение/DML — treasury_user).
+# Без db_name / db_list в --extra-vars плейбук останавливается (пустой default_databases).
+# Примеры:
+#   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_name=treasury_contract"
+#   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_name=treasury_api"
+#   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_name=treasury_csp"
+#   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_name=treasury_safe_deal_adapter"
+#   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_name=treasury_lp_adapter"
+#   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_list=['treasury_safe_deal_adapter','cryptopro_service','nodes_btc']"
+# После первого успешного старта приложения (Flyway создал kafka_transactional_outbox):
+# повторить setup для treasury_* / сервисов с Debezium connector (outbox OWNER -> treasury_user).
+# Переменные pg_admin_password, treasury_password, schema_flyway_password — в vars или --extra-vars (или vault).
+- name: Настройка пользователя schema_flyway и разграничение прав (DDL vs DML)
+  hosts: localhost
+  connection: local
+  become: no
+  gather_facts: no
+  vars:
+    pg_host: "10.10.16.30"
+    pg_port: 5432
+    pg_admin_user: root
+    pg_admin_password: ""
+
+    treasury_user: treasury_user
+    treasury_password: ""
+
+    schema_flyway: schema_flyway
+    schema_flyway_password: ""
+
+    # DML-права выдаются treasury_user (treasury и Treasury подключаются под treasury_user). При появлении treasury_user — добавить в additional_app_users.
+    additional_app_users: []
+    app_users: "{{ [treasury_user] + (additional_app_users | default([])) | unique }}"
+
+    # default_databases намеренно пуст: без явного db_name или db_list плейбук не трогает БД.
+    # Сводка (21 БД: прежние 18 + 3 новых), только для справки. keycloak в старом default не был — есть в restore.yaml.
+    #   (новые) treasury_safe_deal_adapter, treasury_lp_adapter, cryptopro_service, nodes_btc
+    #   (прежние) treasury_treasury_adapter, treasury_contract, treasury_audit, hsm, treasury_aml, treasury_api,
+    #   treasury_csp, nodes_eth, nodes_tron, treasury_aml, treasury_auth_provider, treasury_csp,
+    #   treasury_notification, treasury_otp, treasury_rates, treasury_report, treasury_web, treasury_onboarding
+    # Переопределение: db_name=... или db_list=['a','b']
+    default_databases: []
+
+  pre_tasks:
+    - name: Определить список баз данных для обработки
+      ansible.builtin.set_fact:
+        db_list: "{{ db_list | default(default_databases) }}"
+      when: db_name is not defined or db_name == '' or db_name is none
+
+    - name: Определить список баз данных из db_name (если указана одна БД)
+      ansible.builtin.set_fact:
+        db_list: "{{ [db_name] }}"
+      when: db_name is defined and db_name != '' and db_name is not none
+
+    - name: Проверить, что список БД не пуст
+      ansible.builtin.fail:
+        msg: "ОШИБКА: Список баз данных пуст. Укажите db_name или db_list через --extra-vars"
+      when: db_list is not defined or db_list | length == 0
+
+    - name: Показать список БД для обработки
+      ansible.builtin.debug:
+        msg: "Будет обработано {{ db_list | length }} баз данных: {{ db_list | join(', ') }}"
+
+  roles:
+    - schema_flyway

@@ -1,0 +1,34 @@
+# cert-monitoring — prod
+# Плейбук: playbooks/docker_app_cert_monitoring.yml | inventory: [cert-monitoring]
+# Запуск: ./scripts/run/run_docker_app.sh deploy cert-monitoring --prod --limit estate-prod-gitlab
+#
+# Секреты в Vault: mount ansible, path cert-monitoring (CLI: vault kv put ansible/cert-monitoring ...)
+# Имена ключей в секрете — docker_app_vault_key_map ниже (значения задаются в Vault, не в git).
+
+docker_app_vault_mount_point: ansible
+docker_app_vault_path: cert-monitoring
+
+docker_app_vault_key_map:
+  TELEGRAM_BOT_TOKEN: TELEGRAM_BOT_TOKEN
+
+docker_app_registry: registry.example.com/platform/base-images
+
+docker_app:
+  slug: cert-monitoring
+  image: "{{ docker_app_registry }}/cert-monitoring:2.0"
+  app_version: "2.0"
+  telegram_chat_ids: "-1003166833121"
+  check_interval_seconds: 43200
+  early_warning_days: 30
+  warning_days: 21
+  critical_warning_days: 7
+  ssl_timeout: 10
+  log_level: INFO
+  monitored_hosts: "gitlab.example.com,argocd.example.com,lk.example.com,lk-dt.example.com,web.example.com,web-treasury.example.com,hsm-adapter.example.com,policy-gateway.example.com,cryptopro.example.com,vault.example.com"
+  excluded_hosts_from_alerts: ""
+  telegram_egress:
+    enabled: true
+    network_name: telegram-vps-egress
+    extra_hosts:
+      - name: api.telegram.org
+        ip: 172.30.100.2

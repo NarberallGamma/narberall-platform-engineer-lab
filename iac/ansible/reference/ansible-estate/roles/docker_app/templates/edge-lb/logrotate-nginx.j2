@@ -1,0 +1,19 @@
+# Managed by Ansible (docker_app edge-lb)
+# Nginx + vault-upstream sidecar logs: {{ docker_app_base_dir }}/edge-lb/logs/
+
+{{ docker_app_base_dir }}/edge-lb/logs/nginx/*.log
+{{ docker_app_base_dir }}/edge-lb/logs/nginx/*/*.log
+{{ docker_app_base_dir }}/edge-lb/logs/vault-upstream/vault-upstream.log
+{
+    su root root
+    {{ edge_lb_logrotate_frequency | default('daily') }}
+    rotate {{ edge_lb_logrotate_rotate | default(14) }}
+    maxage {{ edge_lb_logrotate_maxage | default(14) }}
+    dateext
+    dateformat -%Y%m%d
+    missingok
+    compress
+    compresscmd /bin/gzip
+    compressoptions "-1"
+    copytruncate
+}

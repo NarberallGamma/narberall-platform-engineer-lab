@@ -1,0 +1,158 @@
+# Inventory: cloud VMs plus VMware lab group. Copy to hosts.ini (gitignored).
+# Default remote user/key: ansible + /ansible/.ssh/ansible_ssh_key (control node / CI).
+# Override from a workstation in the run script / ansible-playbook, for example:
+#   -e ansible_user=admin --ssh-key /path/to/admin_ssh_key --ssh-agent
+#   -e ansible_user=ubuntu --limit redis.example.com,redis-01.example.com ...
+#   -e ansible_user=root --limit jsm-dev.example.com ...
+
+[all:vars]
+ansible_user=ansible
+ansible_ssh_private_key_file=/ansible/.ssh/ansible_ssh_key
+ansible_ssh_common_args='-o IdentitiesOnly=yes'
+
+# GitLab (standalone)
+[gitlab]
+app-06.example.com ansible_host=10.10.1.241
+
+# App servers
+[app]
+app-02.example.com ansible_host=10.10.1.11
+app-03.example.com ansible_host=10.10.1.39
+app-05.example.com ansible_host=10.10.1.24
+
+# Nextcloud dev
+[nextcloud_dev]
+nextcloud-dev.example.com ansible_host=10.10.1.22
+
+# Nextcloud prod: nginx nextcloud.example.com.conf — upstream .8/.10 активные, .20 backup
+[nextcloud_prod_cluster]
+nextcloud-prod-oc1.example.com ansible_host=10.10.3.8
+nextcloud-prod-oc2.example.com ansible_host=10.10.3.10
+nextcloud-prod-oc3.example.com ansible_host=10.10.3.20
+
+# Nextcloud Clients Regul (cloud.example.com)
+[nextcloud_regul]
+app-02.example.com
+
+# Docker-хосты (Nextcloud infra)
+[docker_hosts]
+docker-01.example.com ansible_host=10.10.3.4
+docker-02.example.com ansible_host=10.10.3.7
+
+# ServiceDesk prod (группа sd_prod — не sd-prod.example.com, чтобы не совпадало с именем хоста)
+[sd_prod]
+sd-prod.example.com ansible_host=10.10.1.73
+
+# Kafka (prod)
+[kafka]
+kafka-prod.example.com ansible_host=10.10.1.41
+
+# BLESK app
+[blesk]
+blesk-01.example.com ansible_host=10.10.1.245
+
+# ContentCapture (1C OCR)
+[contentcapture_prod]
+cc-01.example.com ansible_host=10.10.1.42
+
+# JSM / ServiceDesk dev
+[jsm_dev]
+jsm-dev.example.com ansible_host=10.10.1.31
+
+# LLM dev
+[llm_dev]
+llm-dev-01-old.example.com ansible_host=10.10.2.98
+llm-dev-01.example.com ansible_host=10.10.2.18
+
+# PostgreSQL / DB (1C, Jira, Nextcloud и др.)
+[db_platform]
+db-01.example.com ansible_host=10.10.2.17
+db-02.example.com ansible_host=10.10.1.40
+db-03.example.com ansible_host=10.10.2.9
+dbm-01.example.com ansible_host=10.10.2.251
+dbsl-01.example.com ansible_host=10.10.2.153
+
+# PostgreSQL prod cluster (Managed RDS / Patroni)
+[postgresql_prod]
+postgresql-prod-01-member-0.example.com ansible_host=10.10.11.97
+postgresql-prod-01-member-1.example.com ansible_host=10.10.11.113
+postgresql-prod-01-member-2.example.com ansible_host=10.10.11.249
+
+# Redis (группа redis_cluster — не redis, чтобы не совпадало с хостом redis)
+[redis_cluster]
+redis.example.com ansible_host=10.10.11.8
+redis-01.example.com ansible_host=10.10.11.114
+
+# 1C
+[1c]
+1c-lic.example.com ansible_host=10.10.2.14
+
+# Proxy (platform)
+[proxy]
+proxy-01.example.com ansible_host=10.10.12.21
+proxy-02.example.com ansible_host=10.10.12.41
+
+# Infra: LB, мониторинг, backup, тесты
+[infra]
+lb-01.example.com ansible_host=10.10.1.17
+nessus-01.example.com ansible_host=10.10.1.20
+spectr.example.com ansible_host=10.10.1.27
+elk.example.com ansible_host=10.10.1.18
+veeam.example.com ansible_host=10.10.1.51
+test-teleport.example.com ansible_host=10.10.1.252
+
+# CS Scanner ALL
+[cs_scanner]
+cs-scanner-all.example.com ansible_host=10.10.1.240
+
+# External hosts (documentation range 203.0.113.0/24)
+[external]
+mtproto.example.com ansible_host=203.0.113.10
+
+# VMware lab project (not the same cloud as [app]). No ansible user on guest init: ubuntu and admin.
+[vmware]
+1c-db-test.example.com ansible_host=10.10.15.10
+
+[vmware:vars]
+ansible_user=ubuntu
+
+# Подготовка (prepare_servers, EDR agent и др.): имена хостов, ansible_host — в секциях выше
+[prepare]
+app-02.example.com
+app-03.example.com
+app-05.example.com
+app-06.example.com
+blesk-01.example.com
+cc-01.example.com
+cs-scanner-all.example.com
+db-01.example.com
+db-02.example.com
+db-03.example.com
+dbm-01.example.com
+dbsl-01.example.com
+docker-01.example.com
+docker-02.example.com
+elk.example.com
+jsm-dev.example.com
+kafka-prod.example.com
+lb-01.example.com
+llm-dev-01.example.com
+1c-lic.example.com
+mtproto.example.com
+nessus-01.example.com
+nextcloud-dev.example.com
+nextcloud-prod-oc1.example.com
+nextcloud-prod-oc2.example.com
+nextcloud-prod-oc3.example.com
+postgresql-prod-01-member-0.example.com
+postgresql-prod-01-member-1.example.com
+postgresql-prod-01-member-2.example.com
+proxy-01.example.com
+proxy-02.example.com
+redis.example.com
+redis-01.example.com
+sd-prod.example.com
+spectr.example.com
+test-teleport.example.com
+veeam.example.com
+1c-db-test.example.com

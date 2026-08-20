@@ -1,0 +1,6 @@
+---
+- hosts: neo4j
+  vars:
+    db_type: "neo4j"
+  roles:
+    - hosts

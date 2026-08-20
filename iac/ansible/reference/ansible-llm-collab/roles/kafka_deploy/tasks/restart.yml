@@ -1,0 +1,9 @@
+---
+# Только явный тег kafka_restart (вместе с never — не в общем прогоне без тегов)
+- name: Принудительный пересоздание контейнеров Kafka
+  community.docker.docker_compose_v2:
+    project_src: "{{ kafka_app_root }}"
+    project_name: "{{ kafka_compose_project_name }}"
+    state: present
+    recreate: always
+  tags: [never, kafka_restart]

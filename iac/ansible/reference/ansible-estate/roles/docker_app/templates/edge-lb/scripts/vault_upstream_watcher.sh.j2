@@ -1,0 +1,114 @@
+#!/bin/sh
+# Managed by Ansible (docker_app edge-lb)
+# Sidecar: active Vault leader upstream для nginx OSS (без Plus).
+# Probe: GET /v1/sys/health?standbyok=false -> только HTTP 200 = active.
+# При смене набора active: nginx -t && nginx -s reload в контейнере {{ edge_lb_vault_upstream_sidecar_nginx_container }}.
+
+set -eu
+
+PROBE_PATH="{{ edge_lb_vault_upstream_sidecar_probe_path | default('/v1/sys/health?standbyok=false') }}"
+PROBE_TIMEOUT="{{ edge_lb_vault_upstream_sidecar_probe_timeout | default(3) }}"
+INTERVAL="{{ edge_lb_vault_upstream_sidecar_interval | default(5) }}"
+ACTIVE_FILE="/data/vault_upstream/vault_active_upstream.conf"
+STATE_FILE="/data/vault_upstream/.vault_active_upstream.state"
+BACKENDS_FILE="/config/backends.list"
+LOG_FILE="/logs/vault-upstream.log"
+NGINX_CONTAINER="${NGINX_CONTAINER:-{{ edge_lb_vault_upstream_sidecar_nginx_container | default('edge-lb-nginx') }}}"
+
+log_msg() {
+  # ISO8601 UTC, формат близкий к nginx access/error log
+  ts="$(date -u '+%Y/%m/%d:%H:%M:%S +0000')"
+  printf '%s [vault-upstream] %s\n' "$ts" "$1" >> "$LOG_FILE"
+  printf '%s [vault-upstream] %s\n' "$ts" "$1"
+}
+
+probe_node() {
+  ip="$1"
+  port="$2"
+  url="http://${ip}:${port}${PROBE_PATH}"
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --connect-timeout "$PROBE_TIMEOUT" --max-time "$PROBE_TIMEOUT" "$url" 2>/dev/null || echo "000")"
+  echo "$code"
+}
+
+build_active_upstream() {
+  tmp="$(mktemp)"
+  active_list=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="$(echo "$line" | sed 's/#.*//; s/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [ -z "$line" ] && continue
+    ip="${line%%:*}"
+    rest="${line#*:}"
+    port="${rest%%:*}"
+    name="${rest#*:}"
+    [ -z "$port" ] && port="8200"
+    [ "$name" = "$port" ] && name="$ip"
+    code="$(probe_node "$ip" "$port")"
+    if [ "$code" = "200" ]; then
+      printf '    server %s:%s;  # active %s probe=%s\n' "$ip" "$port" "$name" "$PROBE_PATH" >> "$tmp"
+      active_list="${active_list}${active_list:+,}${ip}:${port}(${name})"
+    fi
+  done < "$BACKENDS_FILE"
+
+  if [ ! -s "$tmp" ]; then
+    rm -f "$tmp"
+    log_msg "ERROR no active Vault backends (probe 200). Keeping previous upstream if any."
+    return 1
+  fi
+
+  {
+    echo "# Managed by vault-upstream sidecar. Do not edit manually."
+    echo "# Active only: GET ${PROBE_PATH} -> 200"
+    cat "$tmp"
+  } > "${tmp}.out"
+  rm -f "$tmp"
+  new_state="$(cat "${tmp}.out")"
+  old_state=""
+  [ -f "$STATE_FILE" ] && old_state="$(cat "$STATE_FILE")"
+
+  if [ -f "$ACTIVE_FILE" ] && cmp -s "$ACTIVE_FILE" "${tmp}.out"; then
+    echo "$new_state" > "$STATE_FILE"
+    rm -f "${tmp}.out"
+    return 2
+  fi
+
+  if [ "$new_state" = "$old_state" ] && [ -n "$old_state" ]; then
+    log_msg "ACTIVE_FILE drift vs STATE (likely redeploy bootstrap); resync upstream"
+  fi
+
+  old_active=""
+  [ -f "$ACTIVE_FILE" ] && old_active="$(grep -E '^\s*server ' "$ACTIVE_FILE" 2>/dev/null | tr '\n' ' ' || true)"
+  if [ -z "$old_active" ] && [ -f "$STATE_FILE" ]; then
+    old_active="$(grep -E '^\s*server ' "$STATE_FILE" 2>/dev/null | tr '\n' ' ' || true)"
+  fi
+
+  mv "${tmp}.out" "$ACTIVE_FILE"
+  echo "$new_state" > "$STATE_FILE"
+
+  new_active="$(grep -E '^\s*server ' "$ACTIVE_FILE" | tr '\n' ' ')"
+  log_msg "leader/upstream change: old=[${old_active:-none}] new=[${new_active}] active=${active_list}"
+
+  if docker exec "$NGINX_CONTAINER" nginx -t 2>>"$LOG_FILE"; then
+    docker exec "$NGINX_CONTAINER" nginx -s reload 2>>"$LOG_FILE"
+    log_msg "nginx -t ok, reload issued (container ${NGINX_CONTAINER})"
+  else
+    log_msg "ERROR nginx -t failed after upstream write; reload skipped"
+    return 1
+  fi
+  return 0
+}
+
+mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$ACTIVE_FILE")"
+touch "$LOG_FILE"
+
+log_msg "started interval=${INTERVAL}s probe=${PROBE_PATH} backends=$(wc -l < "$BACKENDS_FILE" 2>/dev/null || echo 0)"
+
+while true; do
+  rc=0
+  build_active_upstream || rc=$?
+  if [ "$rc" = "2" ]; then
+    :
+  elif [ "$rc" != "0" ]; then
+    log_msg "WARN upstream update skipped (rc=${rc})"
+  fi
+  sleep "$INTERVAL"
+done

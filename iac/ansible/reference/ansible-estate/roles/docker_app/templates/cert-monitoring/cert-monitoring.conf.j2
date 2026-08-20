@@ -1,0 +1,21 @@
+# SSL Certificate Monitoring — managed by Ansible (docker_app)
+# Секреты (TELEGRAM_BOT_TOKEN): Vault → .env
+TELEGRAM_CHAT_IDS="{{ app_item.value.telegram_chat_ids | default('') }}"
+
+TELEGRAM_CONNECT_TIMEOUT="{{ app_item.value.telegram_connect_timeout | default(docker_app_telegram_connect_timeout) }}"
+TELEGRAM_TOTAL_TIMEOUT="{{ app_item.value.telegram_total_timeout | default(docker_app_telegram_total_timeout) }}"
+TELEGRAM_RETRY_ATTEMPTS="{{ app_item.value.telegram_retry_attempts | default(docker_app_telegram_retry_attempts) }}"
+TELEGRAM_RETRY_DELAY_SECONDS="{{ app_item.value.telegram_retry_delay_seconds | default(docker_app_telegram_retry_delay_seconds) }}"
+
+EARLY_WARNING_DAYS="{{ app_item.value.early_warning_days | default(30) }}"
+WARNING_DAYS="{{ app_item.value.warning_days | default(21) }}"
+CRITICAL_WARNING_DAYS="{{ app_item.value.critical_warning_days | default(7) }}"
+SSL_TIMEOUT="{{ app_item.value.ssl_timeout | default(10) }}"
+LOG_LEVEL="{{ app_item.value.log_level | default('INFO') }}"
+
+MONITORED_HOSTS="{{ app_item.value.monitored_hosts | default('') }}"
+CHECK_INTERVAL_SECONDS="{{ app_item.value.check_interval_seconds | default(43200) }}"
+EXCLUDED_HOSTS_FROM_ALERTS="{{ app_item.value.excluded_hosts_from_alerts | default('') }}"
+
+APP_VERSION="{{ app_item.value.app_version | default('2.0') }}"
+DOCKER_IMAGE="{{ app_item.value.image }}"

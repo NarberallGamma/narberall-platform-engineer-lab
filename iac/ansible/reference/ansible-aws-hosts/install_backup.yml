@@ -1,0 +1,16 @@
+---
+- hosts: backup
+  vars:
+    disks:
+      aws:
+        - block: /dev/nvme0n1
+          part: /dev/nvme0n1p1
+          fs: ext4
+          path: /backup
+          options: defaults,discard
+  roles:
+    - disks
+
+- hosts: backup
+  roles:
+    - { role: install-backup, become: yes }

@@ -1,0 +1,71 @@
+---
+db_type: "mysql"
+db_install_tools: false
+db_not_installed: true
+db_overwrite_global_mycnf: "yes"
+
+db_port: "3306"
+db_bind_address: '0.0.0.0'
+db_datadir: "{{ disks[provider][0].path }}"
+db_pid_file: /var/run/mysqld/mysqld.pid
+
+db_replication_username: "replicator"
+
+# For servers with 8GB ram
+db_key_buffer_size: "2G"
+db_max_allowed_packet: "512M"
+db_table_open_cache: "512"
+db_sort_buffer_size: "1M"
+db_read_buffer_size: "1M"
+db_read_rnd_buffer_size: "8M"
+db_myisam_sort_buffer_size: "64M"
+db_query_cache_size: "256M"
+db_max_connections: 151
+db_tmp_table_size: '64M'
+db_max_heap_table_size: '64M'
+db_join_buffer_size: '3M'
+db_innodb_buffer_pool_size: "2G"
+db_innodb_log_file_size: "500M" # max 25% of innodb_buffer_pool_size
+db_innodb_log_buffer_size: "8M"
+db_innodb_flush_log_at_trx_commit: 2 # write once per second
+db_mysqldump_max_allowed_packet: "64M"
+db_innodb_additional_mem_pool_size: "20M"
+db_innodb_lock_wait_timeout: 1800
+db_net_read_timeout: 120
+db_skip-name-resolve: true
+db_table_cache: 2048
+db_thread_cache_size: 16
+db_back_log: 100
+db_max_connect_errors: 10000
+db_open-files-limit: 20000
+db_interactive_timeout: 3600
+wait_timeout: 1800
+max_connections: 200
+key_buffer_size: "1G"
+connect_timeout: 120
+db_max_binlog_size: "100M"
+db_expire_logs_days: 7
+db_binlog_expire_logs_seconds: 604800
+db_log_error: /var/log/mysql/error.log
+db_syslog_tag: mysql
+db_wait_timeout: 1800
+db_skip_name_resolve: true
+db_open_files_limit: 20000
+db_connect_timeout: 120
+db_innodb_file_per_table: "1"
+db_log: ""
+db_slave_load_tmpdir: "/tmp"
+db_tmpdir: "/tmp"
+# Replication settings (replication is only enabled if master/user have values).
+db_server_id: "1"
+db_replication_role: ''
+db_replication_master: ''
+db_slow_query_log_enabled: yes
+db_slow_query_log_file: /var/log/mysql/slow.log
+db_slow_query_time: 2
+db_sql_mode: ''
+
+wip: true
+
+# advertised hostname suffix for Neo4j (see neo4j.conf.j2)
+db_env: prod

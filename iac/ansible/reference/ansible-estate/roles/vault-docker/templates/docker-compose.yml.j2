@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  vault:
+    image: {{ docker_registry }}/{{ vault_image }}
+    container_name: {{ inventory_hostname }}
+    restart: always
+    ports:
+      - "{{ vault_api_port }}:8200"
+      - "{{ vault_cluster_port }}:8201"
+    volumes:
+      - "{{ vault_data_path }}:/vault/data"
+      - "{{ vault_config_path }}:/vault/config"
+      - "/opt/vault/ssl:/vault/tls"
+      - "/opt/vault/logs:/vault/logs"
+    environment:
+      VAULT_ADDR: "http://127.0.0.1:8200"
+      VAULT_LOG_LEVEL: "{{ vault_log_level }}"
+    cap_add:
+      - IPC_LOCK
+    security_opt:
+      - "label:disable"
+    ulimits:
+      memlock: -1
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - vault-network
+
+networks:
+  vault-network:
+    driver: bridge

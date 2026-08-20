@@ -1,0 +1,23 @@
+---
+# Переопределить при необходимости (например для другого стенда)
+# nextcloud_webdav_url, nextcloud_container_name задаются в group_vars/nextcloud_groupfolders.yml
+#
+# Параллелизм: батчи async+async_status (MKCOL и occ allow/deny). Сколько задач в одном батче на одном хосте.
+# Значение 1 — последовательно без async. Ожидание async: nextcloud_async_* ниже.
+nextcloud_concurrency_mkcol: 1
+nextcloud_concurrency_occ: 1
+nextcloud_async_job_timeout_sec: 300
+nextcloud_async_status_retries: 300
+nextcloud_async_status_delay: 1
+#
+# Отрицательные флаги для occ после «--» при deny из матрицы (см. nextcloud_occ_deny_permissions в group_vars).
+nextcloud_occ_deny_permissions: "-read -write -create -delete -share"
+nextcloud_occ_edit_permissions: "+read +write +create +delete -- -share"
+# Маркер в matrix YAML (view): «все группы матрицы только RO». Текст см. group_vars/nextcloud_groupfolders.yml.
+nextcloud_occ_ro_permissions: "+read -- -write -create -delete -share"
+nextcloud_occ_view_permissions: "+read"
+nextcloud_matrix_ro_sentinel: "__NC_MATRIX_RO_ALL__"
+# Явный occ deny группам из объединения матрицы, не перечисленным во view/edit на этом пути (без наследования «лишним» группам). Строки occ_skip см. матрицу.
+nextcloud_occ_auto_deny_unlisted_matrix_groups: true
+# После всех попыток пути: при ответе occ «Path not found in folder» завершать шаг с кодом 0 (плейбук не падает).
+nextcloud_occ_ignore_path_not_found: true

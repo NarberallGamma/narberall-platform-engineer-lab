@@ -1,0 +1,54 @@
+[all]
+appsec-appsectrack-sbc  ansible_host=10.10.8.52
+appsec-owaspzap-sbc     ansible_host=10.10.8.13
+appsec-defectdojo-sbc   ansible_host=10.10.8.81
+appsec-semgrep-sbc      ansible_host=10.10.8.71
+gitlab-runner-dev-01    ansible_host=10.10.6.93
+gitlab-runner-dev-02    ansible_host=10.10.6.228
+gitlab-runner-dev-03    ansible_host=10.10.6.244
+elk-01                  ansible_host=10.10.6.59
+nexus                   ansible_host=10.10.6.87
+gitlab-prod             ansible_host=10.10.4.178
+gitlab                  ansible_host=10.10.6.70
+edr-proxy               ansible_host=10.10.1.37
+lb-waf-prod-01          ansible_host=10.10.9.165 eip=203.0.113.41
+lb-waf-prod-02          ansible_host=10.10.9.15  eip=203.0.113.42
+elk-01-prod             ansible_host=10.10.4.109
+monitoring-dev          ansible_host=10.10.6.174
+monitoring-prod         ansible_host=10.10.4.25
+vault-0001              ansible_host=10.10.6.15
+vault-0002              ansible_host=10.10.6.238
+vault-0003              ansible_host=10.10.6.170
+vault-prod-0001         ansible_host=10.10.4.92
+vault-prod-0002         ansible_host=10.10.4.173
+vault-prod-0003         ansible_host=10.10.4.130
+proxy01-estate           ansible_host=10.10.12.21
+proxy02-estate           ansible_host=10.10.12.41
+gitlab-preprod          ansible_host=10.10.7.96
+lb-waf-preprod-01       ansible_host=10.10.9.64  eip=203.0.113.43
+elk-01-preprod          ansible_host=10.10.7.17
+selenoid-01             ansible_host=10.10.6.58
+kafka-public-ift-0001      ansible_host=10.10.9.248 eip=203.0.113.11     ehost=kafka-ift-0001.example.com     kafka_host_id=0
+kafka-public-ift-0002      ansible_host=10.10.9.76  eip=203.0.113.12   ehost=kafka-ift-0002.example.com     kafka_host_id=1
+kafka-public-ift-0003      ansible_host=10.10.9.33  eip=203.0.113.13    ehost=kafka-ift-0003.example.com     kafka_host_id=2
+kafka-public-preprod-0001  ansible_host=10.10.9.45  eip=203.0.113.21   ehost=kafka-preprod-0001.example.com kafka_host_id=0
+kafka-public-preprod-0002  ansible_host=10.10.9.154 eip=203.0.113.22 ehost=kafka-preprod-0002.example.com kafka_host_id=1
+kafka-public-preprod-0003  ansible_host=10.10.9.161 eip=203.0.113.23   ehost=kafka-preprod-0003.example.com kafka_host_id=2
+kafka-public-prod-0001     ansible_host=10.10.9.207 eip=203.0.113.31  ehost=kafka-prod-0001.example.com    kafka_host_id=0
+kafka-public-prod-0002     ansible_host=10.10.9.122 eip=203.0.113.32   ehost=kafka-prod-0002.example.com    kafka_host_id=1
+kafka-public-prod-0003     ansible_host=10.10.9.38  eip=203.0.113.33 ehost=kafka-prod-0003.example.com    kafka_host_id=2
+loadtesting-locust         ansible_host=10.10.6.2
+harbor-01-dev              ansible_host=10.10.6.65
+postfix-prod-01            ansible_host=10.10.9.179
+postfix-prod-02            ansible_host=10.10.9.62
+
+[kafka]
+kafka-public-ift-0001
+kafka-public-ift-0002
+kafka-public-ift-0003
+kafka-public-preprod-0001
+kafka-public-preprod-0002
+kafka-public-preprod-0003
+kafka-public-prod-0001
+kafka-public-prod-0002
+kafka-public-prod-0003

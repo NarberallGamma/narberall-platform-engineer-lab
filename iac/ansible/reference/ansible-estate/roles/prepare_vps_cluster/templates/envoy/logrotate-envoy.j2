@@ -1,0 +1,17 @@
+# Managed by Ansible (prepare_vps_cluster)
+# TLS passthrough access log Envoy на {{ vps_envoy_log_dir }}
+
+{{ vps_envoy_log_dir }}/*.log
+{
+    su root root
+    {{ vps_envoy_logrotate_frequency }}
+    rotate {{ vps_envoy_logrotate_rotate }}
+    maxage {{ vps_envoy_logrotate_maxage }}
+    dateext
+    dateformat -%Y%m%d
+    missingok
+    compress
+    compresscmd /bin/gzip
+    compressoptions "-1"
+    copytruncate
+}

@@ -1,0 +1,147 @@
+---
+- name: Создание пользователя в удалённой PostgreSQL и выдача прав
+  hosts: localhost
+  connection: local
+  become: no
+  gather_facts: no
+#  no_log: true
+  vars:
+    vault_addr: "{{ lookup('env','VAULT_ADDR_DEV') }}"
+    vault_token: "{{ lookup('env','VAULT_TOKEN_DEV') }}"
+    pg_host: "10.10.7.168"
+    pg_port: 5432
+    pg_admin_user: root
+    pg_admin_password: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=secret/data/postgres_preprod:admin_password', url=vault_addr, token=vault_token) }}"
+    default_encoding: "UTF8"  # Кодировка по умолчанию
+    default_lc_collate: "en_US.UTF-8"  # Локаль для сортировки по умолчанию
+    default_lc_ctype: "en_US.UTF-8"  # Локаль для классификации символов по умолчанию
+
+    target_schema: public
+
+    db_users_readonly:
+      - name: tech_user_bi
+
+    db:
+      #preprod
+      - name: preprod_dictionaries
+        vault_path: secret/data/dictionary-app/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_notification
+        vault_path: secret/data/notification/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_monolith
+        vault_path: secret/data/platform/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_keycloak
+        vault_path: secret/data/keycloak/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_currencyrate
+        vault_path: secret/data/currency-rate/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_chat
+        vault_path: secret/data/chat-app/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_partner_app
+        vault_path: secret/data/partner-app/preprod-secret
+        vault_key: spring.datasource.password
+      - name: preprod_ai_agent
+        vault_path: secret/data/ai_agent/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_auth
+        vault_path: secret/data/auth/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_news_service
+        vault_path: secret/data/news-service/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_tariff
+        vault_path: secret/data/tariff/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_agreement
+        vault_path: secret/data/agreement/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_partner_app_partners
+        vault_path: secret/data/partner-app-partners/preprod-secret
+        vault_key: spring.datasource.password
+      - name: preprod_superset
+        vault_path: secret/data/postgres_preprod
+        vault_key: preprod_superset
+      - name: preprod_ai_assistant
+        vault_path: secret/data/ai_assistant/preprod
+        vault_key: spring.datasource.password
+      - name: preprod_bi_helper
+        vault_path: secret/data/bi-helper/preprod
+        vault_key: spring.datasource.password
+
+      #ift
+      - name: ift_dictionaries
+        vault_path: secret/data/dictionary-app/ift
+        vault_key: spring.datasource.password
+      - name: ift_notification
+        vault_path: secret/data/notification/ift
+        vault_key: spring.datasource.password
+      - name: ift_monolith
+        vault_path: secret/data/platform/ift
+        vault_key: spring.datasource.password
+      - name: ift_keycloak
+        vault_path: secret/data/keycloak/ift
+        vault_key: spring.datasource.password
+      - name: ift_currencyrate
+        vault_path: secret/data/currency-rate/ift
+        vault_key: spring.datasource.password
+      - name: ift_chat
+        vault_path: secret/data/chat-app/ift
+        vault_key: spring.datasource.password
+      - name: ift_partner_app
+        vault_path: secret/data/partner-app/ift-secret
+        vault_key: spring.datasource.password
+      - name: ift_ai_agent
+        vault_path: secret/data/ai_agent/ift
+        vault_key: spring.datasource.password
+      - name: ift_auth
+        vault_path: secret/data/auth/ift
+        vault_key: spring.datasource.password
+      - name: ift_news_service
+        vault_path: secret/data/news-service/ift
+        vault_key: spring.datasource.password
+      - name: ift_tariff
+        vault_path: secret/data/tariff/ift
+        vault_key: spring.datasource.password
+      - name: ift_agreement
+        vault_path: secret/data/agreement/ift
+        vault_key: spring.datasource.password
+      - name: ift_partner_app_partners
+        vault_path: secret/data/partner-app-partners/ift-secret
+        vault_key: spring.datasource.password
+      - name: ift_ai_assistant
+        vault_path: secret/data/ai_assistant/ift
+        vault_key: spring.datasource.password
+      - name: ift_bi_helper
+        vault_path: secret/data/bi-helper/ift
+        vault_key: spring.datasource.password
+
+    db_users:
+      - name: admin01
+        vault_path: secret/data/postgres_preprod
+        vault_key: admin01
+      - name: admin02
+        vault_path: secret/data/postgres_preprod
+        vault_key: admin02
+      - name: admin03
+        vault_path: secret/data/postgres_preprod
+        vault_key: admin03
+      - name: admin04
+        vault_path: secret/data/postgres_preprod
+        vault_key: admin04
+      - name: admin36
+        vault_path: secret/data/postgres_preprod
+        vault_key: admin36
+      - name: admin37
+        vault_path: secret/data/postgres_preprod
+        vault_key: admin37
+
+    users: root
+
+  roles:
+      - db-pass
+      - db
+      - db-readonly-users

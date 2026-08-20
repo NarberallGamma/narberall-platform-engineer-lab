@@ -18,9 +18,12 @@ flowchart TB
   API --> Out
 ```
 
-Existing proof (unchanged trees):
+The coded estate path is Ansible, not a laptop compose. [`../iac/ansible/reference/ansible-llm-collab/`](../iac/ansible/reference/ansible-llm-collab/) is the private GPU API **and** the collab plane on one inventory: Nextcloud groupfolders, n8n form/webhook GitOps, Kafka, CIS, plus GitLab / JSM / 1C / ContentCapture-class hosts. [Case 01](../case-studies/01-ai-llm-platform.md) is that story. Workstation compose (Ollama / SD / MCP) stays under `practice/`.
 
-- [Case 01](../case-studies/01-ai-llm-platform.md), [case 03](../case-studies/03-document-ai-pipeline.md)
+Existing proof:
+
+- [Case 01](../case-studies/01-ai-llm-platform.md) (estate Ansible), [case 03](../case-studies/03-document-ai-pipeline.md) (OCR pipeline)
+- Ansible GPU/LLM + collab: [`../iac/ansible/reference/ansible-llm-collab/`](../iac/ansible/reference/ansible-llm-collab/)
 - Compose: [`../practice/home-lab/reference/ai/llm-compose-kit/`](../practice/home-lab/reference/ai/llm-compose-kit/)
 - Lab GPU: [`../practice/home-lab/ai-lab.md`](../practice/home-lab/ai-lab.md)
 - Workstation MCP + CLI (Linux / macOS / WSL): [`../practice/workstation/`](../practice/workstation/), code [`../practice/workstation/reference/`](../practice/workstation/reference/)

@@ -1,0 +1,10 @@
+# Локальный запуск (scripts/run/ с опцией --local): плейбук на том же хосте.
+# connection=local, SSH не используется.
+
+[local]
+localhost ansible_connection=local
+
+[local:vars]
+ansible_user=root
+become=true
+become_method=sudo

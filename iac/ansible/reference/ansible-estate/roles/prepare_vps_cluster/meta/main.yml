@@ -1,0 +1,9 @@
+---
+galaxy_info:
+  role_name: prepare_vps_cluster
+  author: estate
+  description: Подготовка VPS blockchain egress (firewall, Envoy в Docker Compose)
+  license: proprietary
+  min_ansible_version: "2.14"
+
+dependencies: []

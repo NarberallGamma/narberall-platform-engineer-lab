@@ -1,0 +1,32 @@
+---
+# treasury-policy-gateway: bind-mount data/ (RocksDB + CryptoPro), bootstrap PREGEN без import archive.
+
+- name: "{{ docker_app.slug }} | каталоги data (bind mounts)"
+  ansible.builtin.file:
+    path: "{{ docker_app_base_dir }}/treasury-policy-gateway/{{ item.path }}"
+    state: directory
+    owner: "{{ treasury_policy_gateway_data_uid | default('10001') }}"
+    group: "{{ treasury_policy_gateway_data_gid | default('10001') }}"
+    mode: "{{ item.mode }}"
+  loop: "{{ treasury_policy_gateway_data_dirs }}"
+  loop_control:
+    label: "{{ item.path }}"
+  tags: [docker_app, deploy, treasury_policy_gateway]
+
+- name: "{{ docker_app.slug }} | bootstrap-cryptopro-keys.sh"
+  ansible.builtin.template:
+    src: treasury-policy-gateway/bootstrap-cryptopro-keys.sh
+    dest: "{{ docker_app_base_dir }}/treasury-policy-gateway/config/bootstrap-cryptopro-keys.sh"
+    mode: "0755"
+  notify: restart docker app compose
+  tags: [docker_app, deploy, treasury_policy_gateway]
+
+- name: "{{ docker_app.slug }} | kafka-ca.crt (prod DMS chain, не Vault)"
+  ansible.builtin.copy:
+    src: treasury-policy-gateway/kafka-ca-prod.crt
+    dest: "{{ docker_app_base_dir }}/treasury-policy-gateway/config/kafka-ca.crt"
+    mode: "0644"
+    owner: root
+    group: root
+  notify: restart docker app compose
+  tags: [docker_app, deploy, treasury_policy_gateway]

@@ -1,0 +1,18 @@
+---
+# KV v2 в Vault. Окружение: VAULT_ADDR, VAULT_TOKEN.
+kafka_vault_mount_point: "platform-infra"
+kafka_vault_path: "Ubuntu_servers"
+kafka_vault_key_cluster_id: "ansible_kafka_kraft_cluster_id"
+
+# Клиенты к брокеру: SASL + PLAIN и JAAS username/password (протокол задаётся kafka_sasl_tls_enabled / kafka_sasl_enabled).
+# Пароли брокера (PlainLoginModule) — ключи в секрете Ubuntu_servers.
+kafka_vault_key_sasl_admin_password: "ansible_kafka_sasl_admin_password"
+kafka_vault_key_sasl_platform_kafka_password: "ansible_kafka_sasl_platform_kafka_password"
+
+# Доп. пользователи: список задаётся в group_vars/kafka/main.yml (или include_vars в плейбуке), не дублировать здесь пустым списком.
+# AKHQ Web UI: пароль входа в UI (не путать с SASL брокера).
+kafka_akhq_enabled: false
+kafka_vault_key_akhq_ui_password: "ansible_kafka_akhq_ui_password"
+
+# Включить SASL_SSL на брокере (по умолчанию да; false — только PLAINTEXT, без паролей).
+kafka_sasl_enabled: true

@@ -1,0 +1,153 @@
+---
+# Подзадача: синхронизировать один воркфлоу (ключ _workflow_key) в n8n.
+# Вызывается из main.yml в цикле по n8n_workflows_to_sync.
+# Переменная _workflow_key — имя файла без .json в files/workflows/.
+
+- name: Загрузить JSON воркфлоу "{{ _workflow_key }}"
+  ansible.builtin.set_fact:
+    _workflow_json_raw: "{{ lookup('file', _workflow_file_path) }}"
+  vars:
+    _workflow_file_path: "{{ role_path }}/files/workflows/{{ _workflow_key }}.json"
+  register: _load_file
+  failed_when: _workflow_json_raw is not defined or _workflow_json_raw | length == 0
+
+- name: Распарсить JSON воркфлоу "{{ _workflow_key }}"
+  ansible.builtin.set_fact:
+    _workflow_body: "{{ _workflow_json_raw | from_json }}"
+  when: _workflow_json_raw is defined
+
+# set_fact + loop накапливает _wf_patched на весь play; при следующем include_tasks (следующий JSON)
+# | default([]) не сбрасывает факт — ноды предыдущего воркфлоу дописываются к текущему. Сбрасывать на каждую итерацию.
+- name: Сбросить накопитель нод для credentials
+  ansible.builtin.set_fact:
+    _wf_patched: []
+  when: _workflow_body is defined
+
+# Id credentials: роль n8n_init (Vault) или group_vars / -e. loop_var != item — иначе коллизия с внешним include_tasks.
+# Webhook: parameters.authentication — none|basicAuth|headerAuth|jwtAuth; credentials.httpHeaderAuth / jwtAuth.
+# SSH (n8n-nodes-base.ssh): credentials.sshPassword | sshPrivateKey (не «ssh»); при privateKey — parameters.authentication: privateKey.
+- name: Собрать ноды с id credentials (SSH / Webhook)
+  ansible.builtin.set_fact:
+    _wf_patched: "{{ _wf_patched | default([]) + [_wf_one] }}"
+  loop: "{{ _workflow_body.nodes | default([]) }}"
+  loop_control:
+    loop_var: n8n_wf_node
+    label: "{{ n8n_wf_node.get('name', n8n_wf_node.get('id', '?')) }}"
+  vars:
+    _wname: "{{ n8n_workflow_webhook_credential_name | default(n8n_workflow_jwt_credential_name) | default('n8n JWT') }}"
+    _wf_one: "{% if n8n_wf_node.get('type', '') == 'n8n-nodes-base.ssh' and n8n_workflow_ssh_credential_id | default('') | length > 0 and n8n_wf_node.get('parameters', {}).get('authentication', 'privateKey') == 'privateKey' %}{{ n8n_wf_node | combine({'credentials': {'sshPrivateKey': {'id': n8n_workflow_ssh_credential_id, 'name': n8n_workflow_ssh_credential_name | default('SSH Ansible Host') }}}, recursive=True) }}{% elif n8n_wf_node.get('type', '') == 'n8n-nodes-base.ssh' and n8n_workflow_ssh_credential_id | default('') | length > 0 and n8n_wf_node.get('parameters', {}).get('authentication', 'password') == 'password' %}{{ n8n_wf_node | combine({'credentials': {'sshPassword': {'id': n8n_workflow_ssh_credential_id, 'name': n8n_workflow_ssh_credential_name | default('SSH Ansible Host') }}}, recursive=True) }}{% elif n8n_wf_node.get('type', '') == 'n8n-nodes-base.webhook' and n8n_workflow_jwt_credential_id | default('') | length > 0 and n8n_wf_node.get('parameters', {}).get('authentication', 'headerAuth') == 'jwtAuth' %}{{ n8n_wf_node | combine({'credentials': {'jwtAuth': {'id': n8n_workflow_jwt_credential_id, 'name': _wname }}}, recursive=True) }}{% elif n8n_wf_node.get('type', '') == 'n8n-nodes-base.webhook' and n8n_workflow_jwt_credential_id | default('') | length > 0 %}{{ n8n_wf_node | combine({'credentials': {'httpHeaderAuth': {'id': n8n_workflow_jwt_credential_id, 'name': _wname }}}, recursive=True) }}{% else %}{{ n8n_wf_node }}{% endif %}"
+  when:
+    - _workflow_body is defined
+    - _workflow_body.nodes is defined
+    - ((n8n_workflow_ssh_credential_id | default('') | length) > 0) or ((n8n_workflow_jwt_credential_id | default('') | length) > 0)
+
+- name: Влить ноды с id credentials в тело воркфлоу
+  ansible.builtin.set_fact:
+    _workflow_body: "{{ _workflow_body | combine({'nodes': _wf_patched}, recursive=True) }}"
+  when: _wf_patched is defined and _wf_patched | length > 0
+
+# Export из UI/CLI с meta: meta не входит в схему Public API; для POST/PUT в теле не передавать.
+- name: Сформировать тело воркфлоу для API (без meta/pinData и т.д.)
+  ansible.builtin.set_fact:
+    _workflow_json_for_api: "{{ _workflow_body | dict2items | rejectattr('key', 'match', '^(meta|pinData|versionId|isArchived)$') | items2dict }}"
+  when: _workflow_body is defined
+
+- name: Получить список воркфлоу из n8n по имени "{{ _workflow_body.name }}"
+  ansible.builtin.uri:
+    url: "{{ n8n_base_url }}/api/v1/workflows?name={{ _workflow_body.name | urlencode }}"
+    method: GET
+    headers:
+      X-N8N-API-KEY: "{{ n8n_api_key }}"
+      Accept: "application/json"
+    return_content: true
+    status_code: [200]
+  register: _n8n_list
+  no_log: "{{ n8n_workflows_no_log | default(true) }}"
+  when: _workflow_body is defined
+
+- name: Найти id существующего воркфлоу по имени
+  ansible.builtin.set_fact:
+    _existing_workflow_id: "{{ (_n8n_list.json.data | default([]) | selectattr('name', 'equalto', _workflow_body.name) | map(attribute='id') | first) | default('') }}"
+  when: _n8n_list is defined and _n8n_list.json is defined
+
+# PUT: тело валидация по схеме OpenAPI; лишние поля (meta, pinData из export/GET) → 400.
+# Схема: GET полного воркфлоу, очистка ключей, merge с name/nodes/connections/settings из репо.
+- name: Скачать воркфлоу из n8n (тело для PUT)
+  ansible.builtin.uri:
+    url: "{{ n8n_base_url }}/api/v1/workflows/{{ _existing_workflow_id }}"
+    method: GET
+    headers:
+      X-N8N-API-KEY: "{{ n8n_api_key }}"
+      Accept: "application/json"
+    return_content: true
+    status_code: [200]
+  register: _n8n_get_current
+  no_log: "{{ n8n_workflows_no_log | default(true) }}"
+  when:
+    - _existing_workflow_id is defined
+    - _existing_workflow_id | length > 0
+
+# Public API: whitelist. id не включать в тело — только в path /workflows/{id}, иначе 400: request/body/id is read-only.
+- name: Собрать тело PUT (whitelist, без id в body)
+  ansible.builtin.set_fact:
+    _n8n_workflow_put_body: "{{ {
+      'name': _workflow_body['name'],
+      'nodes': _workflow_body['nodes'],
+      'connections': _workflow_body['connections'],
+      'settings': (_n8n_get_current.json['settings'] | default({})) | combine(_workflow_body['settings'] | default({}), recursive=True)
+    } | combine( {'staticData': _n8n_get_current.json['staticData']} if 'staticData' in _n8n_get_current.json else {} ) }}"
+  when: _n8n_get_current.json is defined
+
+- name: Обновить воркфлоу в n8n (PUT) "{{ _workflow_body.name }}"
+  ansible.builtin.uri:
+    url: "{{ n8n_base_url }}/api/v1/workflows/{{ _existing_workflow_id }}"
+    # Public API: полное тело; не использовать |to_json вместе с body_format: json.
+    method: PUT
+    headers:
+      X-N8N-API-KEY: "{{ n8n_api_key }}"
+      Content-Type: "application/json"
+    body: "{{ _n8n_workflow_put_body }}"
+    body_format: json
+    return_content: true
+    status_code: [200]
+  register: _n8n_patch
+  no_log: "{{ n8n_workflows_no_log | default(true) }}"
+  when:
+    - _existing_workflow_id is defined
+    - _existing_workflow_id | length > 0
+    - _n8n_workflow_put_body is defined
+
+# POST: тот же whitelist, что и для update (export может содержать лишние корневые ключи).
+# id, createdAt, updatedAt в files/workflows/*.json не указывать.
+- name: Создать воркфлоу в n8n (POST) "{{ _workflow_body.name }}"
+  ansible.builtin.uri:
+    url: "{{ n8n_base_url }}/api/v1/workflows"
+    method: POST
+    headers:
+      X-N8N-API-KEY: "{{ n8n_api_key }}"
+      Content-Type: "application/json"
+    body: "{{ {
+      'name': _workflow_json_for_api['name'],
+      'nodes': _workflow_json_for_api['nodes'],
+      'connections': _workflow_json_for_api['connections'],
+      'settings': _workflow_json_for_api['settings'] | default({})
+    } | combine( {'staticData': _workflow_json_for_api['staticData']} if 'staticData' in _workflow_json_for_api else {} ) }}"
+    body_format: json
+    status_code: [200, 201]
+  register: _n8n_post
+  no_log: "{{ n8n_workflows_no_log | default(true) }}"
+  when:
+    - _existing_workflow_id is defined
+    - _existing_workflow_id | length == 0
+
+- name: Итог — воркфлоу "{{ _workflow_body.name }}" обновлён
+  ansible.builtin.debug:
+    msg: "Воркфлоу «{{ _workflow_body.name }}» ({{ _workflow_key }}) обновлён в n8n (id={{ _existing_workflow_id }})."
+  when: _existing_workflow_id is defined and _existing_workflow_id | length > 0
+
+- name: Итог — воркфлоу "{{ _workflow_body.name }}" создан
+  ansible.builtin.debug:
+    msg: "Воркфлоу «{{ _workflow_body.name }}» ({{ _workflow_key }}) создан в n8n (id={{ _n8n_post.json.id | default('?') }}). Id SSH/JWT: Vault (n8n_init) или ноды вручную; активировать воркфлоу в UI."
+  when:
+    - _n8n_post is defined
+    - _n8n_post.json is defined

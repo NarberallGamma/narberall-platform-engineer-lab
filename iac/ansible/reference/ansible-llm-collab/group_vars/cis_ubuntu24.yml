@@ -1,0 +1,41 @@
+---
+# CIS Ubuntu 24 Benchmark — переменные для ansible-lockdown.ubuntu24_cis
+# Установка роли: ansible-galaxy install -r requirements.yml
+# Запуск: ansible-playbook playbooks/prepare_servers.yml --tags cis -e "enable_cis=true"
+
+# Уровень: Level 1 по умолчанию (Level 2 — агрессивнее, включать осознанно)
+ubtu24cis_level_1: true
+ubtu24cis_level_2: false
+
+# Не перезагружать автоматически — управляем перезагрузкой вручную
+skip_reboot: true
+ubtu24cis_disruption_high: false
+
+# ---------------------------------------------------------------------------
+# ВРЕМЕННО ОТКЛЮЧЁННЫЕ СЕКЦИИ (конфликт с текущим prepare_servers)
+# ---------------------------------------------------------------------------
+
+# Section 5 (SSH, PAM, sudo, account policies) — ВЫКЛЮЧЕНА
+# Конфликты:
+#   - 5.1.x: CIS пишет конфиги в /etc/ssh/sshd_config.d/, а ssh_pass_auth.yml
+#             их удаляет и выставляет PasswordAuthentication yes напрямую
+#   - 5.3.x: CIS перезаписывает /etc/pam.d/common-* через pam-auth-update,
+#             ломая pam_sss.so и pam_mkhomedir из sssd.yml
+#   - 5.2.x: CIS может конфликтовать с /etc/sudoers.d/domain-admins (NOPASSWD)
+# Включить обратно после переработки ssh_pass_auth.yml и sssd.yml под CIS-совместимый формат.
+ubtu24cis_section5: false
+
+# Section 4 (Firewall) — ВЫКЛЮЧЕНА
+# Конфликт: CIS включает UFW с default-deny-outbound, блокируя edr-vendor агент
+#           (edr-proxy.example.com:80 и :443).
+# Включить обратно после добавления UFW-правил для агента в роль prepare_servers.
+ubtu24cis_firewall_package: "none"
+
+# ---------------------------------------------------------------------------
+# Активные секции (1, 2, 3, 6, 7) — конфликтов нет
+# ---------------------------------------------------------------------------
+# Section 1: kernel modules, partitions, AppArmor, process hardening, banners
+# Section 2: удаление лишних сервисов, NTP
+# Section 3: сетевые параметры sysctl
+# Section 6: auditd, journald, rsyslog
+# Section 7: права на файлы

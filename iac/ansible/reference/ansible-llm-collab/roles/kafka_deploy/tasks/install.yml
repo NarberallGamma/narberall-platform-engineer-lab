@@ -1,0 +1,29 @@
+---
+- name: Каталоги приложения Kafka
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ kafka_app_root }}", mode: "0755" }
+    - { path: "{{ kafka_config_dir }}", mode: "0755" }
+
+# Bind mount ./data → /var/lib/kafka/data: процесс в контейнере — appuser uid/gid 1000; каталог на хосте не должен быть root-only 755.
+- name: Каталог данных Kafka (владелец uid/gid как в образе apache/kafka)
+  ansible.builtin.file:
+    path: "{{ kafka_data_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ kafka_container_user_uid }}"
+    group: "{{ kafka_container_user_gid }}"
+
+- name: Каталог ssl для keystore (SASL_SSL)
+  ansible.builtin.file:
+    path: "{{ kafka_config_dir }}/ssl"
+    state: directory
+    mode: "0750"
+  when: kafka_sasl_enabled | bool and kafka_sasl_tls_enabled | bool
+
+- name: TLS keystore для SASL_SSL
+  ansible.builtin.import_tasks: tls.yml
+  when: kafka_sasl_enabled | bool and kafka_sasl_tls_enabled | bool

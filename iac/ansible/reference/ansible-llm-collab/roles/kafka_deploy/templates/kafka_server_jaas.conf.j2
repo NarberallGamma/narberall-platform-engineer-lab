@@ -1,0 +1,16 @@
+{# PlainLoginModule: в JAAS точка с запятой только у последней опции модуля — иначе Line N: expected [controlFlag] #}
+KafkaServer {
+  org.apache.kafka.common.security.plain.PlainLoginModule required
+  username="{{ kafka_sasl_admin_username }}"
+  password="{{ kafka_sasl_admin_password }}"
+  user_{{ kafka_sasl_admin_username }}="{{ kafka_sasl_admin_password }}"
+{% set _extra = (kafka_sasl_extra_credentials | default({})) | dictsort %}
+{% if _extra | length > 0 %}
+  user_{{ kafka_sasl_platform_kafka_username }}="{{ kafka_sasl_platform_kafka_password }}"
+{% for user, pwd in _extra %}
+  user_{{ user }}="{{ pwd }}"{% if loop.last %};{% endif %}
+{% endfor %}
+{% else %}
+  user_{{ kafka_sasl_platform_kafka_username }}="{{ kafka_sasl_platform_kafka_password }}";
+{% endif %}
+};

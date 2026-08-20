@@ -4,7 +4,7 @@ NDA-safe narrative. Client names stay out. Scale and sector stay in. This is the
 
 **Same years, buyer language:** whatever the infra needs, in **days to a couple of weeks**, **documented**, **minimal windows**, **~99.9% SLA**. Audit then import. Park idle non-prod. OCR/LLM as a **multiplier** for accounting / analysts / developers. Cloud move is one of the things I do quickly when asked. Outcomes: [`for-business.md`](for-business.md). Diagrams: [`../architecture/`](../architecture/). Full domain and stack tables: [root README](../README.md#six-years-domains-apps-brokers-jvm).
 
-**Role on the market:** about **six years** (through 2026). Positioned as a **strong senior in my niches**: platform / cloud / loaded production, CI/CD, day-2 of serious applications — not a generalist who “also clicked AWS once.” AI/LLM delivery is an additional niche on the same ownership pattern.
+**Role on the market:** about **six years** (through 2026). Positioned as a **strong senior in my niches**: platform / cloud / loaded production, CI/CD, operate serious applications — not a generalist who “also clicked AWS once.” AI/LLM delivery is an additional niche on the same ownership pattern.
 
 Client trees and bank internals are not in this public lab. What follows is the shape of the work.
 
@@ -63,7 +63,7 @@ Same estate class as other **enterprise applications**: not a startup toy stack,
 
 ### Collaboration and internal platforms
 
-Day-2 of **Atlassian** (Jira / JSM / Confluence / Bitbucket-class: install, SSO-adjacent, backup, upgrade, “why is it swapping”) and **Nextcloud** (files, sharing, identity, storage growth, OnlyOffice / Mattermost next to it). **1C:Enterprise** (Windows app farm + PostgreSQL), **Teleport**, nginx/WAF, **AD / ADFS**, GitLab, **n8n**. These are the systems everyone notices when they are down and nobody budgets as “real production” until they are.
+Operate **Atlassian** (Jira / JSM / Confluence / Bitbucket-class: install, SSO-adjacent, backup, upgrade, “why is it swapping”) and **Nextcloud** (files, sharing, identity, storage growth, OnlyOffice / Mattermost next to it). **1C:Enterprise** (Windows app farm + PostgreSQL), **Teleport**, nginx/WAF, **AD / ADFS**, GitLab, **n8n**. These are the systems everyone notices when they are down and nobody budgets as “real production” until they are.
 
 ### Treasury / trade-finance / document platforms
 
@@ -71,7 +71,7 @@ Loaded **Kubernetes** (prod + preprod): **Helm + Argo CD**, **Vault / ESO**, **K
 
 ### Document AI and enterprise capture
 
-OCR and capture (ContentCapture-class) to structured JSON, then LLM extract, handoff to **1C** / ERP. Private GPU API so finance data does not go into a public chat. Cases 01 and 03 in the lab. Workstation side (same calendar, **any Unix-like OS**): MCP + async Replicate CLI under [`../practice/workstation/`](../practice/workstation/).
+OCR and capture (ContentCapture-class) to structured JSON, then LLM extract, handoff to **1C** / ERP. Private GPU API so finance data does not go into a public chat. The public Ansible tree keeps that API next to Nextcloud, n8n, Kafka, and the 1C/OCR hosts: [`../iac/ansible/reference/ansible-llm-collab/`](../iac/ansible/reference/ansible-llm-collab/), [case 01](../case-studies/01-ai-llm-platform.md). Case 03 is the document pipeline. Workstation side (same calendar, **any Unix-like OS**): MCP + async Replicate CLI under [`../practice/workstation/`](../practice/workstation/).
 
 ### Enterprise ITSM / EDO / CRM
 
@@ -83,7 +83,7 @@ Vendor ITSM/BPM-class Java on **Tomcat**, Nginx/IIS, **Patroni + etcd**, Oracle 
 
 ### Multi-tenant Kubernetes estates
 
-Many client platforms in parallel: **Deckhouse**, vanilla, OpenShift, cloud PaaS. **Helm + werf**, GitLab CI per environment. Compute from **bare metal / Proxmox** to AWS, Selectel, **Yandex Cloud**, **DigitalOcean**, Hetzner. **Supabase**, **Airflow**, **n8n**, **ClickHouse**, MongoDB, MySQL, **Harbor**, Ceph / MinIO in the same day-2 habit. Strict incident SLA: hot-fix and rollback the same day.
+Many client platforms in parallel: **Deckhouse**, vanilla, OpenShift, cloud PaaS. **Helm + werf**, GitLab CI per environment. Compute from **bare metal / Proxmox** to AWS, Selectel, **Yandex Cloud**, **DigitalOcean**, Hetzner. **Supabase**, **Airflow**, **n8n**, **ClickHouse**, MongoDB, MySQL, **Harbor**, Ceph / MinIO in the same operate habit. Strict incident SLA: hot-fix and rollback the same day.
 
 ---
 
@@ -115,7 +115,7 @@ Gates that fail closed on noise get bypassed. The job is a gate developers can l
 
 The path above ran on real CI, not a screenshot of a green tick.
 
-**Jenkins** — a lot of production time: controller, **plugins**, and **workers**. Classic pain is a farm of **dedicated build VMs** that rot (disk, JDK drift, “who installed that plugin”). I **moved that configuration onto Kubernetes**: workers as pods (scale with the queue, image in the registry, less snowflake metal), so builds got **faster** and day-2 got cheaper (no more babysitting a pile of worker boxes). Plugins stay in the picture (pipeline, Kubernetes executors, credentials, the usual estate) — the point is an operable Jenkins, not a museum of click-installed boxes.
+**Jenkins** — a lot of production time: controller, **plugins**, and **workers**. Classic pain is a farm of **dedicated build VMs** that rot (disk, JDK drift, “who installed that plugin”). I **moved that configuration onto Kubernetes**: workers as pods (scale with the queue, image in the registry, less snowflake metal), so builds got **faster** and ops got cheaper (no more babysitting a pile of worker boxes). Plugins stay in the picture (pipeline, Kubernetes executors, credentials, the usual estate) — the point is an operable Jenkins, not a museum of click-installed boxes.
 
 **GitLab CI and Argo CD** — even more of the last years. That pair is how I prefer to ship when the estate allows it:
 
@@ -143,7 +143,7 @@ Loaded systems are rarely “the app and Postgres.” The path I kept alive incl
 | **NATS** | Lighter bus; still needs HA and “who is subscribed” |
 | **Apache ActiveMQ Artemis** | Enterprise JMS-class broker next to Java estates |
 | **Redis** | Cache, sessions, locks, rate limits — treat eviction and persistence as product decisions |
-| **PostgreSQL** (incl. **Patroni + etcd**), MySQL, **MSSQL**, **Oracle**, MongoDB, **ClickHouse**, InfluxDB | Provision, backup, tune, long SQL, locks, replication |
+| **PostgreSQL** (incl. **Patroni + etcd** and **RDS**), MySQL, **MSSQL**, **Oracle**, MongoDB, **ClickHouse**, InfluxDB | Provision, backup, tune, long SQL, locks, replication. **Users as code:** Flyway/DDL owner vs app DML, extra RO (audit/BI) and RW (tools) grants, revoke without REASSIGN, `REPLICATION` for Debezium. Public tree: [`../iac/ansible/reference/ansible-estate/`](../iac/ansible/reference/ansible-estate/) (`estate_databases`), [case 10](../case-studies/10-ansible-estate.md) |
 | **Apache Superset**, **Supabase**, **Airflow**, **n8n**, **NiFi**, Camunda-class | BI, BaaS, jobs, automation, process/document flow |
 | S3 / OBS, **MinIO**, **Ceph**, **Harbor** | Object data, cluster stores, the image path CI promotes |
 
@@ -203,7 +203,7 @@ The programme was not theory-only. Coursework and labs included:
 |-------|-----------------------------|
 | **Cisco** | Switching, routing, campus LAN/WAN labs; the same seven-step troubleshooting loop used later on production incidents |
 | **Servers and networks** | Linux and Windows hosts, addressing, services, the unglamorous part of keeping a lab or small office online |
-| **Windows Server at IT companies** | During studies: real-company work on Windows Server estates (AD-adjacent, file/print, day-2), not only campus VMs |
+| **Windows Server at IT companies** | During studies: real-company work on Windows Server estates (AD-adjacent, file/print, keep them running), not only campus VMs |
 
 That is why hardware/OS depth and Cisco-style incident method in this lab are not a hobby add-on. They started in the degree and internships, then moved into platform work.
 
@@ -223,6 +223,8 @@ That is why hardware/OS depth and Cisco-style incident method in this lab are no
 - **CI catalog:** Terraform / guest init → Ansible → Vault → monitoring → docs, plus Java and other builds, publish, Sonar/Trivy/OSV, auto MR, deploy, revoke/cleanup. **Jenkins** (plugins, K8s workers) and **GitLab CI + Argo CD**. Detail: [`../iac/ci/`](../iac/ci/)
 - **Huawei compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport ECS in a root that catalogs sibling Terragrunt network state. Detail: [`../iac/terraform/cloud-ru-compute/`](../iac/terraform/cloud-ru-compute/)
 - **Payments identity Ansible:** Swarm autodeploy of AM / IG / Redis / Postgres, same roles for Kubernetes. Detail: [`../iac/ansible/reference/ansible-payments-idplat/`](../iac/ansible/reference/ansible-payments-idplat/)
+- **LLM + collab Ansible:** private llama.cpp API, Nextcloud ACL GitOps, n8n, Kafka, CIS, living estate inventory (GitLab, JSM, 1C, OCR). Detail: [`../iac/ansible/reference/ansible-llm-collab/`](../iac/ansible/reference/ansible-llm-collab/), [case 01](../case-studies/01-ai-llm-platform.md)
+- **Estate Ansible:** Huawei-class docker_app + Vault + hibernate; Kafka/EDR/Prometheus; Borg backup; AWS host roles; **RDS PostgreSQL users** (Flyway/DDL vs app DML, RO/RW, drop). Map: [`../iac/ansible/`](../iac/ansible/), [`../iac/ansible/reference/ansible-estate/`](../iac/ansible/reference/ansible-estate/), [case 10](../case-studies/10-ansible-estate.md)
 - **Education:** B.Sc. 09.03.02 Information Systems and Technologies, SPbSUT (Bonch-Bruevich); Cisco labs, campus servers/networks; Windows Server practice at IT companies during studies
 
 Cloud, Kubernetes, DBMS, SLA, and security defaults: [root README](../README.md) and [positioning](positioning.md).

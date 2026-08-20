@@ -1,0 +1,8 @@
+# Example cron on the backup runner (copy vars.example to vars first).
+# Host argument: target[:ssh_port[:proxy[:proxy_port]]]
+
+15 2 * * * /path/to/00-scripts/wrapper_ssh-agent.sh /path/to/00-scripts/borg_run_on.sh mysql-prod-0.estate.example.com borg_backup_mysql.sh 'MYSQL'
+30 2 * * * /path/to/00-scripts/wrapper_ssh-agent.sh /path/to/00-scripts/borg_run_on.sh mysql-prod-1.estate.example.com borg_backup_mysql.sh 'MYSQL'
+45 2 * * * /path/to/00-scripts/wrapper_ssh-agent.sh /path/to/00-scripts/borg_run_on.sh pg-prod-0.estate.example.com borg_backup_postgres.sh 'PG'
+0 3 * * * /path/to/00-scripts/wrapper_ssh-agent.sh /path/to/00-scripts/borg_run_on.sh redis-prod-0.estate.example.com borg_backup_redis.sh 'REDIS'
+15 3 * * * /path/to/00-scripts/wrapper_ssh-agent.sh /path/to/00-scripts/borg_run_on.sh app-prod-0.estate.example.com borg_backup_files.sh 'SYSTEM /etc,/var/spool/cron'

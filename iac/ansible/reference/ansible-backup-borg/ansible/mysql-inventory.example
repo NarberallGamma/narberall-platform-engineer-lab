@@ -1,0 +1,13 @@
+[mysql]
+mysql-prod-0.estate.example.com
+mysql-prod-1.estate.example.com
+mysql-staging-0.estate.example.com
+mysql-staging-1.estate.example.com
+report-mysql-prod-0.estate.example.com
+report-mysql-prod-1.estate.example.com
+report-mysql-staging-0.estate.example.com
+report-mysql-staging-1.estate.example.com
+app-mysql-1a.estate.example.com
+app-mysql-1b.estate.example.com
+mysql-cs-prod-0.estate.example.com
+mysql-cs-prod-1.estate.example.com

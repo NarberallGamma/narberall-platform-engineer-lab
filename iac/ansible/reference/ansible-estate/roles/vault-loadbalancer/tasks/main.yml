@@ -1,0 +1,101 @@
+---
+# Vault Load Balancer Role - Nginx для HA
+
+- name: Install Nginx and Keepalived
+  apt:
+    name: 
+      - nginx
+      - keepalived
+      - curl
+    state: present
+    update_cache: yes
+  tags: [nginx, keepalived, lb]
+
+- name: Create SSL directory
+  file:
+    path: "/etc/nginx/ssl"
+    state: directory
+    mode: '0755'
+  tags: [nginx, ssl]
+
+- name: Copy SSL certificates for Nginx
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: '0600'
+  loop:
+    - { src: "../../artifacts/{{ ssl_cert_path | basename }}", dest: "{{ ssl_cert_path }}" }
+    - { src: "../../artifacts/{{ ssl_key_path | basename }}", dest: "{{ ssl_key_path }}" }
+  tags: [nginx, ssl]
+
+- name: Generate Nginx configuration
+  template:
+    src: nginx-vault.conf.j2
+    dest: "/etc/nginx/sites-available/vault"
+    mode: '0644'
+  notify: restart nginx
+  tags: [nginx, config]
+
+- name: Generate Keepalived configuration
+  template:
+    src: keepalived.conf.j2
+    dest: "/etc/keepalived/keepalived.conf"
+    mode: '0644'
+  notify: restart keepalived
+  tags: [keepalived, config]
+
+- name: Enable Nginx site
+  file:
+    src: "/etc/nginx/sites-available/vault"
+    dest: "/etc/nginx/sites-enabled/vault"
+    state: link
+  notify: restart nginx
+  tags: [nginx, config]
+
+- name: Remove default Nginx site
+  file:
+    path: "/etc/nginx/sites-enabled/default"
+    state: absent
+  notify: restart nginx
+  tags: [nginx, config]
+
+- name: Restart Nginx to apply configuration
+  systemd:
+    name: nginx
+    state: restarted
+    daemon_reload: yes
+  tags: [nginx, service]
+
+- name: Start and enable Nginx
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  tags: [nginx, service]
+
+- name: Start and enable Keepalived
+  systemd:
+    name: keepalived
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  tags: [keepalived, service]
+
+- name: Wait for Nginx to be ready
+  uri:
+    url: "https://{{ ansible_host }}:{{ lb_port }}/nginx-health"
+    method: GET
+    validate_certs: no
+  register: nginx_health
+  until: nginx_health.status == 200
+  retries: 10
+  delay: 5
+  tags: [nginx, health]
+
+- name: Display Nginx status
+  debug:
+    msg: 
+      - "Nginx Load Balancer is ready"
+      - "Access via: https://{{ ansible_host }}:{{ lb_port }}"
+  tags: [nginx, status]

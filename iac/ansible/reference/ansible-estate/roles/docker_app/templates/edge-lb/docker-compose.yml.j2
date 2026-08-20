@@ -1,0 +1,57 @@
+services:
+  nginx:
+    image: {{ app_item.value.nginx_image }}
+    container_name: edge-lb-nginx
+    restart: always
+    network_mode: host
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/conf.d:/etc/nginx/conf.d:ro
+      - ./config/vault_upstream:/etc/nginx/vault_upstream:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./logs/nginx:/var/log/nginx
+    logging:
+      options:
+        max-size: "50m"
+        max-file: "1"
+
+  keepalived:
+    image: {{ app_item.value.keepalived_image }}
+    container_name: edge-lb-keepalived
+    restart: always
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_BIND_SERVICE
+    volumes:
+      - ./config/keepalived:/container/service/keepalived/assets
+      - ./logs/keepalived:/var/log/keepalived
+    depends_on:
+      - nginx
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+
+{% if edge_lb_vault_upstream_sidecar_enabled | default(false) %}
+  vault-upstream:
+    image: {{ edge_lb_vault_upstream_sidecar_image | default('alpine:3.20') }}
+    container_name: edge-lb-vault-upstream
+    restart: always
+    network_mode: host
+    volumes:
+      - ./config/vault_upstream:/data/vault_upstream
+      - ./config/vault_upstream:/config:ro
+      - ./scripts:/scripts:ro
+      - ./logs/vault-upstream:/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      NGINX_CONTAINER: "{{ edge_lb_vault_upstream_sidecar_nginx_container | default('edge-lb-nginx') }}"
+    entrypoint: ["/bin/sh", "/scripts/vault_upstream_entrypoint.sh"]
+    depends_on:
+      - nginx
+    logging:
+      options:
+        max-size: "20m"
+        max-file: "2"
+{% endif %}

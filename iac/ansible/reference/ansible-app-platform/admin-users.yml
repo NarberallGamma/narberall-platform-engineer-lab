@@ -1,0 +1,52 @@
+---
+  - name: Admin users on all hosts
+    hosts:
+      - all
+    become: yes
+    roles:
+      - admin-users
+    vars:
+      adminlist:
+        - admin
+        - admin01
+      adminremove: {}
+
+  - name: Admin users on monitoring-dev and elk*
+    hosts:
+      - monitoring-dev
+      - monitoring-prod
+      - elk-01-prod
+      - elk-01
+      - loadtesting-locust
+    become: yes
+    roles:
+      - admin-users
+    vars:
+      adminlist:
+        - admin01
+      adminremove: {}
+
+  - name: Admin users on appsec-appsectrack-sbc
+    hosts:
+      - appsec-appsectrack-sbc
+    become: yes
+    roles:
+      - admin-users
+    vars:
+      adminlist:
+        - admin
+      adminremove: {}
+
+  - name: Admin users for admin01 on appsec hosts
+    hosts:
+      - appsec-appsectrack-sbc
+      - appsec-semgrep-sbc
+      - appsec-defectdojo-sbc
+      - appsec-owaspzap-sbc
+    become: yes
+    roles:
+      - admin-users
+    vars:
+      adminlist:
+        - admin01
+      adminremove: {}

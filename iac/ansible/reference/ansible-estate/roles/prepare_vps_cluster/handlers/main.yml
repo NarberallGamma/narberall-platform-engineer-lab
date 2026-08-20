@@ -1,0 +1,20 @@
+---
+- name: Reload sshd
+  ansible.builtin.systemd:
+    name: ssh
+    state: reloaded
+  listen: reload sshd
+
+- name: Restart chrony
+  ansible.builtin.systemd:
+    name: chrony
+    state: restarted
+  listen: restart chrony
+
+- name: Restart envoy compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ vps_envoy_app_dir }}"
+    state: present
+    pull: "{{ vps_envoy_compose_pull }}"
+    recreate: always
+  listen: restart envoy compose

@@ -1,0 +1,5 @@
+---
+galaxy_info:
+  role_name: llm_dev_model_fetch
+  description: Загрузка GGUF модели с Hugging Face в {{ llm_dev_models_dir }}, манифест в {{ llm_dev_sources_dir }}
+dependencies: []

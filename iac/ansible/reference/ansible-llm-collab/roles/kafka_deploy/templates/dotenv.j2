@@ -1,0 +1,7 @@
+# Сгенерировано Ansible — переменные для контейнера (docker compose env_file: .env).
+# Не дублировать эти ключи в docker-compose.yml.
+CLUSTER_ID={{ kafka_cluster_id | to_json }}
+{% if kafka_sasl_enabled | bool and kafka_sasl_tls_enabled | bool %}
+KAFKA_SSL_KEYSTORE_PASSWORD={{ kafka_ssl_keystore_password | to_json }}
+KAFKA_SSL_KEY_PASSWORD={{ kafka_ssl_keystore_password | to_json }}
+{% endif %}

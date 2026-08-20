@@ -1,0 +1,33 @@
+---
+- name: Remote Ubuntu audit
+  hosts: servers
+  gather_facts: false
+
+  tasks:
+    - name: Check host availability
+      ansible.builtin.ping:
+
+    - name: Upload audit script
+      ansible.builtin.copy:
+        src: ./audit.sh
+        dest: /tmp/audit.sh
+        mode: '0755'
+
+    - name: Run audit script with delay
+      ansible.builtin.shell: "sleep 10 && sudo /tmp/audit.sh"
+      register: audit_output
+      args:
+        executable: /bin/bash
+
+    - name: Create local logs directory
+      delegate_to: localhost
+      run_once: true
+      ansible.builtin.file:
+        path: ./logs
+        state: directory
+
+    - name: Save audit output to local file
+      delegate_to: localhost
+      ansible.builtin.copy:
+        content: "{{ audit_output.stdout }}"
+        dest: "./logs/{{ inventory_hostname }}_audit.log"

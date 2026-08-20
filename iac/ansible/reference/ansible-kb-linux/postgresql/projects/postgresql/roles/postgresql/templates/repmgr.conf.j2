@@ -1,0 +1,10 @@
+node_id={{ node_id }}
+node_name={{ node_name | default(inventory_hostname) }}
+conninfo='host={{ ansible_host | default(inventory_hostname) }} user=postgres dbname=postgres connect_timeout=2'
+data_directory='/var/lib/postgresql/{{ pg_version }}/{{ pg_cluster }}'
+use_replication_slots=true
+monitoring_history=true
+monitor_interval_secs=2
+pg_bindir='/usr/lib/postgresql/{{ pg_version }}/bin/'
+repmgr_bindir='/usr/lib/postgresql/{{ pg_version }}/bin'
+location='{{ pg_location }}'

@@ -1,0 +1,129 @@
+---
+#- name: Purge all mysql packages
+#  become: yes
+#  apt:
+#    pkg: ['mysql*', 'mysql']
+#    state: absent
+#    purge: true
+#  when: db_not_installed
+#  ignore_errors: true
+
+- name: Install db repo keys
+  become: yes
+  apt_key:
+    keyserver: "{{ db_apt_keyserver }}"
+    id: "{{ db_apt_keyid }}"
+    state: present
+
+- name: Install db apt dependencies
+  become: yes
+  apt:
+    pkg: '{{ db_apt_dependencies }}'
+    state: present
+    update_cache: yes
+    cache_valid_time: 86400
+    allow_unauthenticated: yes
+
+- name: Install python packages
+  become: yes
+  pip:
+    name: "{{ db_pip_dependencies }}"
+    state: present
+
+- name: Install db apt repositories
+  become: yes
+  apt_repository:
+    repo: "{{ item }}"
+    state: present
+    update_cache: yes
+    filename: "{{ db_type }}"
+  register: db_install_packages
+  with_items: "{{ db_apt_repositories }}"
+
+- name: Create mysql user
+  user:
+    system: yes
+    name: mysql
+    shell: /bin/false
+    comment: MySQL Server
+    home: /var/lib/mysql
+
+- name: Hack for mounetd dir permissions
+  file:
+    path: "{{ db_datadir }}"
+    owner: mysql
+    group: mysql
+    state: directory
+
+- name: Install db server apt packages
+  become: yes
+  apt:
+    pkg: '{{ db_apt_packages }}'
+    state: present
+    allow_unauthenticated: yes
+
+#- name: Restore mounetd dir permissions
+#  file:
+#    path: "{{ db_datadir }}"
+#    owner: mysql
+#    group: mysql
+#    mode: '0750'
+#    state: directory
+
+- name: Install db tools
+  become: yes
+  apt:
+    name: '{{ db_apt_tools_packages }}'
+    state: present
+  when: db_install_tools
+
+# Stop automatically started db on first run and delete ib_logfile
+# in case a custom log file size is defined.
+- name: Stop db after inital installation (for cleanup)
+  become: yes
+#  when: db_not_installed
+  service:
+    name: "{{ db_service_name }}"
+    state: stopped
+
+- name: "Ensure the permissions for mounts  are set correctly"
+  file:
+    path: "{{ item.path }}"
+    owner: mysql
+    group: mysql
+    state: directory
+  with_items: "{{ disks[provider] }}"
+
+
+- name: "Ensure the permissions for dirs are set correctly"
+  file:
+    path: "{{ item }}"
+    owner: mysql
+    group: mysql
+    state: directory
+  with_items: ["{{ db_datadir }}/binlogs"]
+
+
+- name: Delete default innodb log files
+  become: yes
+#  when: db_not_installed
+  file:
+    path: '{{ db_datadir }}/ib_logfile[01]'
+    state: absent
+
+- name: Main configuration
+  register: _db_config_changed
+  template:
+    src: my.cnf.j2
+    dest: "{{ db_config_file }}"
+    owner: root
+    group: root
+    mode: 0644
+    force: "{{ db_overwrite_global_mycnf }}"
+
+- name: Start db
+  become: yes
+  service:
+    name: "{{ db_service_name }}"
+    enabled: yes
+    state: restarted

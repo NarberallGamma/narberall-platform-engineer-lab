@@ -13,7 +13,7 @@ Terraform creates (or imports) the thing. Ansible makes the guest operable. Appl
 | Folder | Owns |
 |--------|------|
 | [`../terraform/`](../terraform/) | Cloud APIs, state, guest init / cloud-init, Kubernetes as code |
-| [`../ansible/`](../ansible/) | Day-2 on the host (packages, harden, EDR, metrics) |
+| [`../ansible/`](../ansible/) | On the host (packages, harden, EDR, metrics) |
 | **this catalog** | Pipelines that call the two above, plus build / publish / deploy / revoke |
 
 ```text
@@ -45,7 +45,7 @@ flowchart LR
 
 Both are real production time. Neither is a keyword.
 
-**Jenkins** (a lot of earlier and mid estates): controller, **plugins**, credentials, pipeline libraries, and **workers**. Classic pain is a farm of dedicated build VMs that rot (disk, JDK drift, “who installed that plugin”). That configuration moved onto **Kubernetes**: workers as pods, scale with the queue, image in the registry, less snowflake metal. Builds got faster; day-2 got cheaper. The point is an operable Jenkins, not a museum of click-installed boxes. Same stages as below: build, scan, gate, publish, deploy, revoke.
+**Jenkins** (a lot of earlier and mid estates): controller, **plugins**, credentials, pipeline libraries, and **workers**. Classic pain is a farm of dedicated build VMs that rot (disk, JDK drift, “who installed that plugin”). That configuration moved onto **Kubernetes**: workers as pods, scale with the queue, image in the registry, less snowflake metal. Builds got faster; ops got cheaper. The point is an operable Jenkins, not a museum of click-installed boxes. Same stages as below: build, scan, gate, publish, deploy, revoke.
 
 **GitLab CI + Argo CD** (more of the recent work, and the preferred pair when the estate allows it):
 

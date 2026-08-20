@@ -1,0 +1,24 @@
+---
+- name: Проеряю существование директории
+  file:
+    path: /docker/prometheus/config
+    state: directory
+    recurse: yes
+    mode: '0755'
+
+- name: Копирую файл конфигурации прометея
+  copy:
+    src: prometheus.yml
+    dest: /docker/prometheus/config/prometheus.yml
+    mode: '0644'
+
+- name: Копирую композ файл
+  copy:
+    src: docker-compose.yml
+    dest: /docker/victoriametrics/docker-compose.yml
+    mode: '0644'
+
+- name: Запускаю докер-композ
+  command: docker-compose up -d
+  args:
+    chdir: /docker/victoriametrics

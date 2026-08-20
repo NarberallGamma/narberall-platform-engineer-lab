@@ -8,7 +8,7 @@ I design and ship platforms end to end: cloud project bootstrap (IAM, VPC, netwo
 
 The same ownership covers **greenfield** (empty cloud or rack → production) and **legacy** (hand-built estates → IaC, runbooks, monitoring, cheaper to run). A large share of that work was **loaded production**: high RPS, large user bases, **~99.9% annual SLA**, multi-zone HA, and changes that must not take the product down. Security is in the first delivery (hardening, EDR, least privilege, Vault / ESO, CI gates), not a later project. IaC and pipelines are split and laid out so developers, on-call, and **audit** can follow them. I ship in a **team with a lead** and as the **single platform owner** on one or several concurrent projects (reachable). On later engagements I **trained people and delegated** as a de facto lead while reporting to PMs, CTOs, and project-wide tech leads. About **six years** of that pattern: bank/SBP-class payments, blockchain, delivery e-commerce, 50+ microservice estates and heavy JVM monoliths. Full narrative: [`docs/experience.md`](docs/experience.md).
 
-This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terragrunt**, **Ansible day-2**, diagrams, and the portfolio site source.
+This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terragrunt**, **Ansible**, diagrams, and the portfolio site source.
 
 **Live site:** _(add URL after first deploy)_  
 **License:** MIT
@@ -25,6 +25,9 @@ This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terra
 | Engineer reviewing legacy-as-code | [`iac/cloud/vk-cloud.md`](iac/cloud/vk-cloud.md) then [`case-studies/05-legacy-estate-as-code.md`](case-studies/05-legacy-estate-as-code.md) |
 | Engineer reviewing Ansible / edge | [`iac/ansible/`](iac/ansible/) then [`iac/ansible/reference/ansible-edge/`](iac/ansible/reference/ansible-edge/) |
 | Engineer reviewing payments identity Ansible | [`iac/ansible/reference/ansible-payments-idplat/`](iac/ansible/reference/ansible-payments-idplat/) then [case 08](case-studies/08-payments-swarm-autodeploy.md) |
+| Engineer reviewing estate Ansible | [`iac/ansible/reference/ansible-estate/`](iac/ansible/reference/ansible-estate/) then [case 10](case-studies/10-ansible-estate.md) |
+| Engineer reviewing GPU/LLM Ansible | [`iac/ansible/reference/ansible-llm-collab/`](iac/ansible/reference/ansible-llm-collab/) then [case 01](case-studies/01-ai-llm-platform.md) |
+| Engineer reviewing Ansible kits (app, backup, AWS, KB) | [`iac/ansible/reference/`](iac/ansible/reference/) (`ansible-app-platform`, `ansible-backup-borg`, `ansible-aws-hosts`, `ansible-kb-linux`) |
 | Engineer reviewing CI (infra + builds + gates) | [`iac/ci/`](iac/ci/) then [`diagrams/iac/ci-turnkey.md`](diagrams/iac/ci-turnkey.md) |
 | Engineer reviewing OS / hardware depth | [`practice/home-lab/os-workstation.md`](practice/home-lab/os-workstation.md) |
 | Engineer reviewing MCP / local AI workstation | [`practice/workstation/`](practice/workstation/) then [`practice/workstation/reference/`](practice/workstation/reference/) (Linux, macOS, or WSL — same wrappers) |
@@ -33,7 +36,7 @@ This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terra
 iac/
   cloud/        # Experience by platform (keywords + links)
   terraform/    # Code, one folder per cloud
-  ansible/      # Day-2 Linux / Xray / payments identity + reference/ kits
+  ansible/      # Linux / Xray / LLM / estate / payments + reference/ kits
   ci/           # CI catalog: turnkey map + sanitized pipelines/
 practice/
   workstation/  # MCP + local/API models; bash/Docker kit, any OS
@@ -63,7 +66,7 @@ I regularly stand up infrastructure **from zero** in public clouds and on premis
 2. Compute and data: VMs, load balancers, managed DB, cache, object storage, messaging (Kafka-class)
 3. Kubernetes platforms I build and operate myself (see [clusters](#kubernetes-and-databases) below)
 4. Edge and identity-adjacent pieces: DNS (Cloudflare), CDN/ACM patterns, CI users and roles
-5. CI/CD into those clusters (**Jenkins** including VM→Kubernetes workers; **GitLab CI + Argo CD** for branch/tag GitOps), plus day-2 Linux/Ansible and observability
+5. CI/CD into those clusters (**Jenkins** including VM→Kubernetes workers; **GitLab CI + Argo CD** for branch/tag GitOps), plus Linux Ansible and observability
 
 **Cloud.ru note for international readers:** cloud.ru (and similar RU hyperscalers in this lab) is **Huawei Cloud class**. The resource model and day-to-day patterns closely follow **AWS** (VPC, ECS/EC2-class compute, CCE/EKS-class Kubernetes, RDS, OBS/S3, DMS/Kafka-class). That work is transferable AWS-shaped experience.
 
@@ -121,7 +124,7 @@ Speed is the offer: **whatever the estate needs**, documented, with **short wind
 
 ### How I work (team, solo, and de facto lead)
 
-About **six years** on the market. I position as a **strong senior in my niches** (platform, loaded production, CI/CD, day-2 of serious apps) — not a title on a badge.
+About **six years** on the market. I position as a **strong senior in my niches** (platform, loaded production, CI/CD, operate serious apps) — not a title on a badge.
 
 I have worked in a **large engineering organization with a dedicated lead**. Team delivery is normal and welcome: reviews, shared on-call, someone else owning product while I own platform.
 
@@ -169,7 +172,7 @@ Hiring usually cannot infer this from Terraform. The long form is [`docs/experie
 | **Kafka**, RabbitMQ, **NATS**, **Artemis**, **Debezium** | Lag, DLQ, disk, CDC. A broker that is “up” but not draining is an outage |
 | **Redis** | Cache, sessions, locks, eviction as a product decision |
 | **PostgreSQL** (incl. **Patroni + etcd**), MySQL, **MSSQL**, **Oracle**, MongoDB, **ClickHouse**, InfluxDB | Provision, backup, tune under load, long SQL, locks, replication |
-| **Apache Superset**, **Supabase**, **Airflow**, **n8n**, **NiFi**, Camunda-class BPM | BI, BaaS, jobs, automation, document/process flow. Day-2, not a click-demo |
+| **Apache Superset**, **Supabase**, **Airflow**, **n8n**, **NiFi**, Camunda-class BPM | BI, BaaS, jobs, automation, document/process flow. Operate, not a click-demo |
 | **50+ microservices** | Release graph, base images, traces, secrets/promotion so fifty pipelines stay shippable |
 | Heavy JVM **monoliths** (few backends) | **Tomcat**/servlet + JVM: thread pools vs JDBC, **heap dumps**, **thread dumps**, GC logs. Restarting the pod is not a strategy |
 
@@ -228,7 +231,7 @@ Troubleshooting follows a **Cisco-style seven-step** loop. Logs, metrics, and a 
 - Self-hosted / vanilla kubeadm-class on VMs or bare metal
 - Platform distributions: **OpenShift**, **Deckhouse**
 
-Same day-2 habits on all of them: deploy path, upgrades, capacity, backups adjacent to stateful workloads, incident response.
+Same operate habits on all of them: deploy path, upgrades, capacity, backups adjacent to stateful workloads, incident response.
 
 **Databases:** operate and **tune under load**, not only provision. Repeated production work:
 
@@ -241,8 +244,9 @@ Same day-2 habits on all of them: deploy path, upgrades, capacity, backups adjac
 | Load spread | Read replicas, connection balancers, app-side routing to the right role |
 | Balancers | In front of DB and app: health, draining, sticky vs stateless |
 | Sharding | When a single primary is the ceiling: key design, rebalance, avoid a cross-shard hot path |
+| Users and rights | Flyway/DDL owner vs application DML; extra read-only (audit/BI) and read-write (tools) grants; revoke without stealing OWNER. Coded on RDS PostgreSQL: [`iac/ansible/reference/ansible-estate/`](iac/ansible/reference/ansible-estate/) (`estate_databases`) |
 
-PostgreSQL and managed RDS-class engines appear in the published Terraform; the same ops pattern applies to other engines in private estates. Backup/restore is assumed; the hard part is staying fast and consistent while the product is already busy.
+PostgreSQL and managed RDS-class engines appear in the published Terraform; the same ops pattern applies to other engines in private estates. Backup/restore is assumed; the hard part is staying fast and consistent while the product is already busy. User lifecycle is Ansible, not a DBA ticket: [case 10](case-studies/10-ansible-estate.md).
 
 ### Security, secrets, and how the code is organized
 
@@ -272,7 +276,7 @@ All cloud write-ups and Terraform live under **[`iac/`](iac/)**.
 |-------|-----|
 | [`iac/cloud/`](iac/cloud/) | Experience by platform, with links into code |
 | [`iac/terraform/README.md`](iac/terraform/README.md) | Code navigation hub |
-| [`iac/ansible/`](iac/ansible/) | Day-2 Ansible map + kits under `iac/ansible/reference/` |
+| [`iac/ansible/`](iac/ansible/) | Ansible map + kits under `iac/ansible/reference/` |
 | [`iac/ci/`](iac/ci/) | **CI catalog:** turnkey map (Jenkins + GitLab CI, Java builds, gates, MR, revoke) |
 | [`iac/terraform/vmware/`](iac/terraform/vmware/) | **VCD greenfield:** catalog, guest init, DB-class VM, `vmware/vcd` |
 | [`iac/terraform/RESOURCES.md`](iac/terraform/RESOURCES.md) | Clouds × resource types in code |
@@ -292,7 +296,7 @@ flowchart TB
   subgraph iac [iac]
     Cloud[cloud/ experience]
     TF[terraform/ code]
-    ANS[ansible/ day-2]
+    ANS[ansible/]
     CI[ci/ one-button]
   end
   Cloud --> TF
@@ -356,7 +360,7 @@ flowchart LR
 
 LLMOps first (process speed), then cloud:
 
-- [AI / LLM platform](case-studies/01-ai-llm-platform.md)
+- [AI / LLM platform (private GPU API + collab Ansible)](case-studies/01-ai-llm-platform.md)
 - [Document AI / OCR pipeline](case-studies/03-document-ai-pipeline.md)
 - [Cloud platform turnkey / Terraform from zero](case-studies/02-cloud-platform-turnkey.md)
 - [Brownfield import into Terraform state](case-studies/04-terraform-brownfield-import.md)
@@ -365,6 +369,7 @@ LLMOps first (process speed), then cloud:
 - [Huawei-class compute catalog (split state)](case-studies/07-huawei-compute-catalog.md)
 - [SBP-class identity autodeploy (Swarm, then Kubernetes)](case-studies/08-payments-swarm-autodeploy.md)
 - [Selectel VPC + dedicated Proxmox](case-studies/09-selectel-vpc-and-dedicated.md)
+- [Huawei-class estate Ansible](case-studies/10-ansible-estate.md)
 
 ---
 

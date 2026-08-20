@@ -1,0 +1,2 @@
+# Managed by Ansible (docker_app). Секреты: Vault {{ docker_app_vault_mount_point }}/{{ docker_app_vault_path }}
+TELEGRAM_BOT_TOKEN={{ app_vault.TELEGRAM_BOT_TOKEN | default('') }}

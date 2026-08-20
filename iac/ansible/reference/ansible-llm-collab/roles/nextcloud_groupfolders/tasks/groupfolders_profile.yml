@@ -1,0 +1,29 @@
+---
+# Подстановка путей матрицы, groupfolder, WebDAV и опций из профиля по имени хоста инвентаря.
+# Переменные: nextcloud_matrix_profile_by_host (dict: hostname → nextcloud-dev|nextcloud-prod|regul), nextcloud_profile_map (dict профилей).
+# Если inventory_hostname нет в nextcloud_matrix_profile_by_host — групповые nextcloud_* (имя папки, WebDAV, матрица и т.д.) из профиля не подставляются; без переопределения в -e возможны ошибки задач.
+
+- name: Определить профиль nextcloud_groupfolders по inventory_hostname
+  ansible.builtin.set_fact:
+    _nc_gf_profile: "{{ nextcloud_matrix_profile_by_host[inventory_hostname] }}"
+  when:
+    - nextcloud_matrix_profile_by_host is defined
+    - nextcloud_matrix_profile_by_host | length > 0
+    - inventory_hostname in nextcloud_matrix_profile_by_host
+    - nextcloud_profile_map is defined
+    - nextcloud_matrix_profile_by_host[inventory_hostname] in nextcloud_profile_map
+
+- name: Применить поля из nextcloud_profile_map
+  ansible.builtin.set_fact:
+    nextcloud_groupfolder_name: "{{ nextcloud_profile_map[_nc_gf_profile].nextcloud_groupfolder_name }}"
+    nextcloud_matrix_file: "{{ nextcloud_profile_map[_nc_gf_profile].nextcloud_matrix_file }}"
+    nextcloud_webdav_url: "{{ nextcloud_profile_map[_nc_gf_profile].nextcloud_webdav_url }}"
+    nextcloud_container_name: >-
+      {{ nextcloud_profile_map[_nc_gf_profile].nextcloud_container_name
+      | default(nextcloud_container_name | default('app-server')) }}
+  when: _nc_gf_profile is defined
+
+- name: Сегмент WebDAV для корня groupfolder (пробелы → %20), для PROPFIND reapply
+  ansible.builtin.set_fact:
+    nextcloud_groupfolder_webdav_path_encoded: "{{ nextcloud_groupfolder_name | replace(' ', '%20') }}"
+  when: nextcloud_groupfolder_name is defined

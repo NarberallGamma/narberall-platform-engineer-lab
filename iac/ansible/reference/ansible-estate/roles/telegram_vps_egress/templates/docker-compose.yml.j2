@@ -1,0 +1,31 @@
+# Managed by Ansible (telegram_vps_egress)
+# Без publish портов на хост (nginx на :443 не затрагивается).
+
+services:
+  {{ telegram_vps_egress_container_name }}:
+    image: {{ telegram_vps_egress_image }}
+    container_name: {{ telegram_vps_egress_container_name }}
+    restart: unless-stopped
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    entrypoint:
+      - /usr/local/bin/envoy
+    command:
+      - -c
+      - /etc/envoy/envoy.yaml
+      - --service-cluster
+      - telegram-vps-egress
+      - --service-node
+      - {{ inventory_hostname }}
+    networks:
+      {{ telegram_vps_egress_network_name }}:
+        ipv4_address: {{ telegram_vps_egress_proxy_ip }}
+    logging:
+      driver: json-file
+      options:
+        max-size: "{{ telegram_vps_egress_docker_log_max_size }}"
+        max-file: "{{ telegram_vps_egress_docker_log_max_file }}"
+
+networks:
+  {{ telegram_vps_egress_network_name }}:
+    external: true

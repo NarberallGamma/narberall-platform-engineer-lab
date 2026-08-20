@@ -1,0 +1,74 @@
+---
+- name: "Создание баз данных PostgreSQL из списка"
+  hosts: localhost  # Или укажите целевой хост с PostgreSQL
+  become: false
+  gather_facts: no
+  vars:
+    postgresql_user: "root"  # Пользователь PostgreSQL с правами на создание БД
+    postgresql_password: "CHANGE_ME"  # Пароль пользователя
+    postgresql_host: "10.10.6.188"  # Хост PostgreSQL
+    postgresql_port: 5432  # Порт PostgreSQL
+    default_encoding: "UTF8"  # Кодировка по умолчанию
+    default_lc_collate: "en_US.UTF-8"  # Локаль для сортировки по умолчанию
+    default_lc_ctype: "en_US.UTF-8"  # Локаль для классификации символов по умолчанию
+    databases:  # Список баз данных для создания
+      - "demo_dictionaries"
+      - "demo_notification"
+      - "demo_monolith"
+      - "demo_keycloak"
+      - "demo_chat"
+      - "demo_currencyrate"
+      - "test_dictionaries"
+      - "test2_dictionaries"
+      - "test3_dictionaries"
+      - "test_notification"
+      - "test2_notification"
+      - "test3_notification"
+      - "test_monolith"
+      - "test2_monolith"
+      - "test3_monolith"
+      - "test_keycloak"
+      - "test2_keycloak"
+      - "test3_keycloak"
+      - "test_chat"
+      - "test2_chat"
+      - "test2_chat"
+      - "test_currencyrate"
+      - "test2_currencyrate"
+      - "test3_currencyrate"
+      - "dev_dictionaries"
+      - "dev2_dictionaries"
+      - "dev3_dictionaries"
+      - "dev_notification"
+      - "dev2_notification"
+      - "dev3_notification"
+      - "dev_monolith"
+      - "dev2_monolith"
+      - "dev3_monolith"
+      - "dev_keycloak"
+      - "dev2_keycloak"
+      - "dev3_keycloak"
+      - "dev_chat"
+      - "dev2_chat"
+      - "dev2_chat"
+      - "dev_currencyrate"
+      - "dev2_currencyrate"
+      - "dev3_currencyrate"
+  tasks:
+    - name: "Создание баз данных PostgreSQL"
+      community.general.postgresql_db:
+        name: "{{ item }}"
+        encoding: "{{ default_encoding }}"
+        lc_collate: "{{ default_lc_collate }}"
+        lc_ctype: "{{ default_lc_ctype }}"
+        login_user: "{{ postgresql_user }}"
+        login_password: "{{ postgresql_password }}"
+        login_host: "{{ postgresql_host }}"
+        login_port: "{{ postgresql_port }}"
+      loop: "{{ databases }}"
+      tags:
+        - create_db
+
+    - name: "Проверка успешного создания баз данных"
+      debug:
+        msg: "Базы данных успешно созданы: {{ databases }}"

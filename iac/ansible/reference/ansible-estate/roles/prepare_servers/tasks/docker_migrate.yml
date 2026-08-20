@@ -1,0 +1,164 @@
+---
+# Перенос данных Docker/containerd в docker_data_dir / containerd_data_dir до смены config.
+# Идемпотентность: маркер {{ docker_data_dir }}/.migrated_from_var_lib_docker
+# Старые каталоги переименовываются в docker_migrate_*_backup_path (см. итоговое сообщение в конце).
+
+- name: Инициализировать список бэкапов docker_migrate на этом прогоне
+  ansible.builtin.set_fact:
+    docker_migrate_backups_created: []
+  when: docker_migrate_data | bool
+  tags: [docker]
+
+- name: Проверить маркер миграции Docker data-root
+  ansible.builtin.stat:
+    path: "{{ docker_data_dir }}/.migrated_from_var_lib_docker"
+  register: docker_data_migrated_marker
+  tags: [docker]
+
+- name: Проверить наличие старого каталога Docker
+  ansible.builtin.stat:
+    path: /var/lib/docker
+  register: docker_old_lib_stat
+  tags: [docker]
+
+- name: Миграция Docker data-root (rsync /var/lib/docker -> {{ docker_data_dir }})
+  when:
+    - docker_migrate_data | bool
+    - docker_data_dir != "/var/lib/docker"
+    - not docker_data_migrated_marker.stat.exists
+    - docker_old_lib_stat.stat.isdir | default(false)
+  block:
+    - name: Остановить Docker перед переносом data-root
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - docker.socket
+        - docker
+      failed_when: false
+      tags: [docker]
+
+    - name: Каталог назначения Docker data-root
+      ansible.builtin.file:
+        path: "{{ docker_data_dir }}"
+        state: directory
+        mode: "0755"
+      tags: [docker]
+
+    - name: rsync /var/lib/docker -> {{ docker_data_dir }}
+      ansible.builtin.command:
+        argv:
+          - rsync
+          - -aHAX
+          - /var/lib/docker/
+          - "{{ docker_data_dir }}/"
+      changed_when: true
+      tags: [docker]
+
+    - name: Маркер завершённой миграции Docker data-root
+      ansible.builtin.file:
+        path: "{{ docker_data_dir }}/.migrated_from_var_lib_docker"
+        state: touch
+        mode: "0644"
+      tags: [docker]
+
+    - name: Переименовать старый /var/lib/docker в бэкап
+      ansible.builtin.command:
+        argv:
+          - mv
+          - /var/lib/docker
+          - "{{ docker_migrate_docker_backup_path }}"
+      when: docker_old_lib_stat.stat.isdir | default(false)
+      register: docker_data_backup_rename
+      changed_when: true
+      tags: [docker]
+
+    - name: Запомнить путь бэкапа Docker data-root
+      ansible.builtin.set_fact:
+        docker_migrate_backups_created: "{{ docker_migrate_backups_created + [docker_migrate_docker_backup_path] }}"
+      when: docker_data_backup_rename is changed
+      tags: [docker]
+
+- name: Проверить маркер миграции containerd root
+  ansible.builtin.stat:
+    path: "{{ containerd_data_dir }}/.migrated_from_var_lib_containerd"
+  register: containerd_data_migrated_marker
+  tags: [docker]
+
+- name: Проверить наличие старого каталога containerd
+  ansible.builtin.stat:
+    path: /var/lib/containerd
+  register: containerd_old_lib_stat
+  tags: [docker]
+
+- name: Миграция containerd root (rsync /var/lib/containerd -> {{ containerd_data_dir }})
+  when:
+    - docker_migrate_data | bool
+    - containerd_data_dir != "/var/lib/containerd"
+    - not containerd_data_migrated_marker.stat.exists
+    - containerd_old_lib_stat.stat.isdir | default(false)
+  block:
+    - name: Остановить Docker и containerd перед переносом containerd root
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - docker.socket
+        - docker
+        - containerd
+      failed_when: false
+      tags: [docker]
+
+    - name: Каталог назначения containerd root
+      ansible.builtin.file:
+        path: "{{ containerd_data_dir }}"
+        state: directory
+        mode: "0711"
+      tags: [docker]
+
+    - name: rsync /var/lib/containerd -> {{ containerd_data_dir }}
+      ansible.builtin.command:
+        argv:
+          - rsync
+          - -aHAX
+          - /var/lib/containerd/
+          - "{{ containerd_data_dir }}/"
+      changed_when: true
+      tags: [docker]
+
+    - name: Маркер завершённой миграции containerd root
+      ansible.builtin.file:
+        path: "{{ containerd_data_dir }}/.migrated_from_var_lib_containerd"
+        state: touch
+        mode: "0644"
+      tags: [docker]
+
+    - name: Переименовать старый /var/lib/containerd в бэкап
+      ansible.builtin.command:
+        argv:
+          - mv
+          - /var/lib/containerd
+          - "{{ docker_migrate_containerd_backup_path }}"
+      when: containerd_old_lib_stat.stat.isdir | default(false)
+      register: containerd_data_backup_rename
+      changed_when: true
+      tags: [docker]
+
+    - name: Запомнить путь бэкапа containerd root
+      ansible.builtin.set_fact:
+        docker_migrate_backups_created: "{{ docker_migrate_backups_created + [docker_migrate_containerd_backup_path] }}"
+      when: containerd_data_backup_rename is changed
+      tags: [docker]
+
+- name: Итог docker_migrate — каталоги бэкапа и команда удаления
+  ansible.builtin.debug:
+    msg: |
+      Миграция Docker/containerd на {{ inventory_hostname }}: сохранены локальные бэкапы:
+      {% for p in docker_migrate_backups_created %}  {{ p }}
+      {% endfor %}
+      Проверить: docker ps && docker info | grep -i 'Docker Root Dir'
+      Удалить после успешной проверки: sudo rm -rf {{ docker_migrate_backups_created | join(' ') }}
+  when:
+    - docker_migrate_data | bool
+    - docker_migrate_backups_created | default([]) | length > 0
+  tags: [docker]

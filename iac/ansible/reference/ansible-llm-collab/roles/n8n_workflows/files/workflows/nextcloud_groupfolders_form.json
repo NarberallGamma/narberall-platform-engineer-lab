@@ -1,0 +1,93 @@
+{
+  "name": "Nextcloud Groupfolders (Form)",
+  "nodes": [
+    {
+      "id": "form-trigger-nextcloud",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [240, 300],
+      "parameters": {
+        "formTitle": "Nextcloud Groupfolders",
+        "formDescription": "Профиль (nextcloud-dev | nextcloud-prod | regul) задаёт матрицу, WebDAV/Vault и хост по умолчанию (Clients INTFS / Regul clients). Не включайте одновременно «всем клиентам» и «только ACL» — выберите один режим или стандартный прогон по одному клиенту.",
+        "formPath": "nextcloud-groupfolders",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "profile",
+              "fieldLabel": "Profile",
+              "fieldType": "text",
+              "placeholder": "nextcloud-dev, nextcloud-prod или regul",
+              "requiredField": true
+            },
+            {
+              "fieldName": "client_name",
+              "fieldLabel": "Client name",
+              "fieldType": "text",
+              "placeholder": "ООО Рога и Копыта (для режимов по одному клиенту)",
+              "requiredField": false
+            },
+            {
+              "fieldName": "reapply_all_clients",
+              "fieldLabel": "Переиграть права всем клиентам (--all-clients)",
+              "fieldType": "checkbox",
+              "requiredField": false
+            },
+            {
+              "fieldName": "permissions_only",
+              "fieldLabel": "Только переиграть ACL одному клиенту без MKCOL (--permissions-only)",
+              "fieldType": "checkbox",
+              "requiredField": false
+            }
+          ]
+        },
+        "respondWhen": "workflowFinishes",
+        "options": {
+          "respondWith": "formSubmittedText",
+          "formSubmittedText": "={{ 'Exit code: ' + String($json.code) + '<br><br><strong>stdout</strong><pre style=\\\"white-space:pre-wrap\\\">' + String($json.stdout).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre><br><strong>stderr</strong><pre style=\\\"white-space:pre-wrap\\\">' + String($json.stderr).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre><p>Full log: /ansible/artifacts/logs; n8n → Executions.</p>' }}"
+        }
+      },
+      "webhookId": "nextcloud-groupfolders"
+    },
+    {
+      "id": "ssh-execute-command",
+      "name": "Execute a command",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "operation": "execute",
+        "command": "={{(() => { const raw = $json; const p = String(raw.profile ?? '').trim(); const c = String(raw.client_name ?? raw['Client name'] ?? '').trim(); const rall = raw.reapply_all_clients === true || raw.reapply_all_clients === 1 || String(raw.reapply_all_clients).toLowerCase() === 'true' || String(raw.reapply_all_clients).toLowerCase() === 'on'; const ponl = raw.permissions_only === true || raw.permissions_only === 1 || String(raw.permissions_only).toLowerCase() === 'true' || String(raw.permissions_only).toLowerCase() === 'on'; let mode = 'standard'; if (rall) mode = 'reapply_all'; else if (ponl) mode = 'permissions_only'; const pref = '--profile \"' + p + '\" '; const base = 'sudo -u ansible /ansible/scripts/run/run_nextcloud_groupfolders.sh ' + pref; if (mode === 'reapply_all') return base + '--all-clients'; if (mode === 'permissions_only') return base + '--permissions-only \"' + c + '\"'; return base + '\"' + c + '\"'; })()}}",
+        "workingDirectory": "/"
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "name": "SSH Ansible Host"
+        }
+      },
+      "onError": "continue",
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Execute a command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

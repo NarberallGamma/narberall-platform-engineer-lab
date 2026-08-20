@@ -1,0 +1,71 @@
+# Переменные для группы [vps_cluster]: blockchain egress (Envoy, firewall, SSH).
+# Применяются автоматически к хостам vps_cluster; playbook: prepare_vps_cluster.yml
+#
+# Предварительное условие: прогон prepare_servers (Docker в /docker/system, enable_docker: true).
+
+# --- Включатели блоков роли prepare_vps_cluster ---
+enable_vps_docker_check: true
+enable_vps_admin_user: true
+enable_vps_ssh: true
+enable_vps_firewall: true
+enable_vps_envoy: true
+# Access log TLS passthrough: {{ vps_docker_apps_base_dir }}/envoy/logs/access.log + logrotate
+enable_vps_envoy_logging: true
+enable_vps_chrony: true
+
+# --- Admin-пользователь VPS ---
+vps_admin_username: admin_vps
+vps_admin_password_length: 30
+# true: сгенерировать новый пароль при каждом прогоне и перезаписать credentials в artifacts
+vps_admin_regenerate_password: false
+# Открытые SSH-ключи (добавляются в authorized_keys, можно несколько)
+vps_admin_ssh_public_keys:
+  - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA admin@example.com"
+
+# --- SSH (по умолчанию: любой IP, root разрешён) ---
+# vps_ssh_disable_root_login: запретить вход root по SSH (sshd PermitRootLogin no)
+vps_ssh_disable_root_login: false
+# vps_ssh_restrict_source_ips: ufw allow 22 только с vps_ssh_allowed_source_cidrs
+vps_ssh_restrict_source_ips: false
+vps_ssh_allowed_source_cidrs:
+  - "203.0.113.21/32"  # estate-prod-gitlab, public egress
+  - "10.10.16.62/32"      # estate-prod-gitlab, internal
+  - "203.0.113.22/32"     # estate-preprod-gitlab, public egress
+  - "10.10.18.189/32"     # estate-preprod-gitlab, internal
+  - "203.0.113.23/32"      # estate-prod Kubernetes pod public egress
+  - "10.10.14.0/24"       # estate-prod Kubernetes node subnet
+
+# --- Firewall: источники трафика от Kubernetes / estate ---
+# Публичные IP NAT cloud.ru (egress из кластера к VPS). Формат CIDR.
+# Также добавлены внутренние источники, которые могут приходить к VPS через GRE/IPsec.
+vps_k8s_egress_source_cidrs:
+  - "203.0.113.23/32"      # estate-prod Kubernetes pod public egress
+  - "172.16.0.0/24"      # estate-prod pod CIDR, observed platform pods
+  - "172.16.1.0/24"      # estate-prod pod CIDR, observed platform pods
+  - "10.10.14.0/24"       # estate-prod Kubernetes node subnet
+  - "203.0.113.21/32"  # estate-prod-gitlab, public egress
+  - "10.10.16.62/32"      # estate-prod-gitlab, internal
+  - "203.0.113.22/32"     # estate-preprod-gitlab, public egress
+  - "10.10.18.189/32"     # estate-preprod-gitlab, internal
+
+vps_firewall_allow_outgoing: true
+vps_envoy_listen_port: 443
+
+# --- Docker Compose: каталог приложений на хосте ---
+vps_docker_apps_base_dir: "/docker/apps"
+
+# --- Envoy (TLS passthrough, SNI dynamic forward proxy) ---
+vps_envoy_app_name: "envoy"
+vps_envoy_image: "envoyproxy/envoy:v1.32.3"
+vps_envoy_container_name: "envoy-egress"
+vps_envoy_admin_port: 9901
+vps_envoy_compose_pull: "always"
+
+# --- Envoy access log (файл + logrotate, как /docker/nginx/logs на proxy01mosvkc) ---
+# vps_envoy_access_log_to_stdout: true  # дублировать в docker logs
+# vps_envoy_logrotate_rotate: 7
+# vps_envoy_logrotate_maxage: 7
+
+# --- NTP (chrony) ---
+vps_chrony_servers:
+  - "pool.ntp.org"

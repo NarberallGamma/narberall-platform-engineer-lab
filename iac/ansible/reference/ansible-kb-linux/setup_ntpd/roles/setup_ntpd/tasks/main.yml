@@ -1,0 +1,30 @@
+---
+
+- name: update cache
+  apt:
+    update_cache: yes
+  ignore_errors: yes
+  async: 120
+  poll: 10
+
+- name: setup ntpd
+  apt:
+    state: present
+    name: "{{ packages }}"
+    install_recommends: no
+  vars:
+    packages:
+    - ntp
+  async: 120
+  poll: 10
+
+- name: configure ntpd
+  template:
+    src: ntp.conf
+    dest: "{{ ntp_conf_dir }}/ntp.conf"
+    owner: root
+    group: root
+    mode: 0644
+    force: yes
+  notify:
+  - restart ntpd

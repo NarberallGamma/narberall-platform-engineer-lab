@@ -1,0 +1,38 @@
+# cryptopro — docker app (prod VM cryptopro-01).
+# Safe Deal: подпись через CryptoPro CSP; сертификат импортируется через Swagger после deploy (не из playbook).
+# TLS на edge-lb (vhost cryptopro.example.com, не web.example.com WAF).
+# Плейбук: playbooks/docker_app_cryptopro.yml | inventory: [cryptopro_vm]
+#
+# Секреты: Vault mount secret, path cryptopro-service-app.
+
+docker_app_vault_mount_point: secret
+docker_app_vault_path: cryptopro-service-app
+docker_app_vault_key_map:
+  SPRING_DATASOURCE_USERNAME: spring.datasource.username
+  SPRING_DATASOURCE_PASSWORD: spring.datasource.password
+  SPRING_FLYWAY_USER: spring.flyway.user
+  SPRING_FLYWAY_PASSWORD: spring.flyway.password
+
+docker_app_base_dir: /docker/apps
+docker_app_compose_pull: always
+
+docker_app:
+  slug: cryptopro
+  app_image: registry.example.com/treasury/tools/cryptopro-service:0.0.2
+  host_port: 8084
+  healthcheck_port: 8084
+  logging_level_root: INFO
+
+cryptopro_data_uid: "0"
+cryptopro_data_gid: "0"
+cryptopro_data_dirs:
+  - { path: data/cprocsp, mode: "0755" }
+
+# PostgreSQL prod RDS
+cryptopro_db_host: "10.10.16.30"
+cryptopro_db_name: cryptopro_service
+cryptopro_db_sslmode: require
+
+# Публичный URL (edge-lb vhost TBD)
+cryptopro_public_domain: cryptopro.example.com
+cryptopro_public_path_prefix: /api/v0/cryptopro-service/

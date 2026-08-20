@@ -1,0 +1,23 @@
+---
+- name: Каталог drop-in конфигов systemd-resolved
+  ansible.builtin.file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    mode: "0755"
+  when: dns_servers | length > 0
+
+- name: Прописать корпоративные DNS
+  ansible.builtin.copy:
+    dest: /etc/systemd/resolved.conf.d/corporate-dns.conf
+    mode: "0644"
+    content: |
+      # Managed by ansible (sec-stack). Default cloud resolver does not know
+      # the internal zone example.com.
+      [Resolve]
+      DNS={{ dns_servers | join(' ') }}
+      Domains=~.
+  when: dns_servers | length > 0
+  notify: Restart systemd-resolved
+
+- name: Применить настройки resolved сразу
+  ansible.builtin.meta: flush_handlers

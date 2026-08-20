@@ -1,0 +1,7 @@
+---
+kafka_docker_dir: "/docker/kafka"
+kafka_configs_dir: "{{ kafka_docker_dir }}/config"
+kafka_certs_dir: "{{ kafka_docker_dir }}/certs"
+kafka_data_dir: "{{ kafka_docker_dir }}/data"
+
+kafka_image: "apache/kafka:4.0.0"

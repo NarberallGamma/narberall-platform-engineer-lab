@@ -1,0 +1,3 @@
+---
+provider: aws
+db_env: prod

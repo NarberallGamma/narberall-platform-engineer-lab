@@ -1,0 +1,38 @@
+services:
+  cryptopro:
+    image: {{ docker_app.app_image }}
+    container_name: cryptopro
+    # Без user: как k8s preprod (securityContext {}). entrypoint образа инициализирует
+    # /var/opt/cprocsp из /opt/cprocsp/defaults — только от root.
+    ports:
+      - "{{ docker_app.host_port }}:8080"
+    env_file:
+      - .env
+    environment:
+      - SPRING_PROFILES_ACTIVE=production
+      - SERVER_PORT=8080
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
+      - SPRING_APPLICATION_NAME=cryptopro-service-app
+      - SPRING_CLOUD_VAULT_ENABLED=false
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://{{ cryptopro_db_host }}:5432/{{ cryptopro_db_name }}?sslmode={{ cryptopro_db_sslmode }}
+      - SPRING_FLYWAY_URL=jdbc:postgresql://{{ cryptopro_db_host }}:5432/{{ cryptopro_db_name }}?sslmode={{ cryptopro_db_sslmode }}
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=*
+      - LOGGING_LEVEL_ROOT={{ docker_app.logging_level_root | default('INFO') }}
+      - LOGGING_LEVEL_ORG_HIBERNATE_SQL=WARN
+      - LOGGING_LEVEL_ORG_HIBERNATE_TYPE=WARN
+    volumes:
+      - ./data/cprocsp:/var/opt/cprocsp
+    tmpfs:
+      - /tmp:rw,exec,size=100m
+    restart: always
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl -sf http://127.0.0.1:8080/actuator/health >/dev/null
+          || wget -qO- http://127.0.0.1:8080/actuator/health >/dev/null
+          || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s

@@ -1,0 +1,4 @@
+# SOPS-файлы содержат шифроблобы с длинными строками — линтить их бессмысленно
+# (yaml[line-length] падал на secrets.sops.yml).
+exclude_paths:
+  - inventory/group_vars/sec_stack/secrets.sops.yml

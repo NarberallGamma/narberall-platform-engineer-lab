@@ -1,0 +1,84 @@
+---
+# Bootstrap пользователя estate-cert-orchestrator на целевых хостах (nginx, gitlab SSL targets).
+# Аналог setup_bootstrap_users.yml: sudo NOPASSWD, authorized_keys с from= GitLab orchestrator host.
+#
+# Запуск:
+#   ./scripts/run/run_setup_cert_orchestrator_ssh_user.sh --preprod --limit estate-preprod-hsm-adapter,estate-preprod-lb-1
+#   ./scripts/run/run_setup_cert_orchestrator_ssh_user.sh --prod --all
+#
+# Переменные: group_vars/cert_orchestrator_ssh_targets.yml
+- name: Bootstrap SSH user for cert-orchestrator on target hosts
+  hosts: cert_orchestrator_ssh_targets
+  gather_facts: yes
+  become: yes
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/cert_orchestrator_ssh_targets.yml"
+
+  tasks:
+    - name: Проверить, задан cert_orchestrator_ssh_public_key
+      ansible.builtin.assert:
+        that:
+          - cert_orchestrator_ssh_public_key | default('') | length > 0
+        fail_msg: "Задайте cert_orchestrator_ssh_public_key в group_vars/cert_orchestrator_ssh_targets.yml"
+
+    - name: Проверить, существует ли пользователь {{ cert_orchestrator_ssh_user }}
+      ansible.builtin.command: "getent passwd {{ cert_orchestrator_ssh_user }}"
+      register: cert_orchestrator_user_check
+      failed_when: false
+      changed_when: false
+
+    - name: Положить открытый ключ на хост (из group_vars)
+      ansible.builtin.copy:
+        content: "{{ cert_orchestrator_ssh_public_key }}\n"
+        dest: /tmp/bootstrap_cert_orchestrator.pub
+        mode: "0600"
+
+    - name: Копировать setup_ansible_user.sh на хост
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../scripts/setup_ansible_user.sh"
+        dest: /tmp/setup_cert_orchestrator_user.sh
+        mode: "0755"
+
+    - name: Убрать CR из setup_cert_orchestrator_user.sh (CRLF → LF)
+      ansible.builtin.shell: "sed -i 's/\\r$//' /tmp/setup_cert_orchestrator_user.sh"
+      args:
+        executable: /bin/bash
+
+    - name: Запустить setup (создание пользователя и/или смена пароля)
+      ansible.builtin.command: >-
+        /tmp/setup_cert_orchestrator_user.sh
+        {{ cert_orchestrator_ssh_user }}
+        /tmp/bootstrap_cert_orchestrator.pub
+        {{ (cert_orchestrator_user_check.rc != 0 or setup_cert_orchestrator_set_password | default(false) | bool) | ternary('yes', 'no') }}
+      when:
+        - cert_orchestrator_user_check is defined
+        - (cert_orchestrator_user_check.rc != 0) or (setup_cert_orchestrator_set_password | default(false) | bool)
+
+    - name: Убедиться, что authorized_keys содержит ключ с ограничением from=
+      ansible.builtin.authorized_key:
+        user: "{{ cert_orchestrator_ssh_user }}"
+        key: "{{ cert_orchestrator_ssh_public_key }}"
+        state: present
+        exclusive: true
+        key_options: "{{ 'from=\"' + cert_orchestrator_authorized_key_from + '\"' if (cert_orchestrator_authorized_key_from | default('') | length > 0) else omit }}"
+
+    - name: Запросить удаление /tmp на хостах
+      ansible.builtin.command: "true"
+      changed_when: true
+      notify: cleanup cert orchestrator bootstrap tmp
+      when: setup_cert_orchestrator_cleanup_tmp | default(true) | bool
+
+    - name: Выполнить хендлеры удаления /tmp
+      ansible.builtin.meta: flush_handlers
+      when: setup_cert_orchestrator_cleanup_tmp | default(true) | bool
+
+  handlers:
+    - name: Удалить bootstrap-файлы cert-orchestrator в /tmp
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/ansible_user_credentials.txt
+        - /tmp/bootstrap_cert_orchestrator.pub
+        - /tmp/setup_cert_orchestrator_user.sh
+      listen: cleanup cert orchestrator bootstrap tmp

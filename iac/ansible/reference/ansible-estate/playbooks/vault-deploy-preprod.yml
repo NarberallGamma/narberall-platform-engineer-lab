@@ -1,0 +1,107 @@
+---
+# Vault HA Cluster Deployment Playbook
+# Развертывание отказоустойчивого Vault кластера с Load Balancer
+
+- name: Deploy Vault HA Cluster
+  hosts: vault_cluster
+  become: yes
+  gather_facts: yes
+  
+  pre_tasks:
+    - name: Load vault cluster variables
+      include_vars: ../group_vars/preprod/vault_cluster.yml
+    
+    - name: Set node_id for current host
+      set_fact:
+        node_id: "{{ vault_nodes | selectattr('hostname', 'equalto', inventory_hostname) | map(attribute='node_id') | first | default(inventory_hostname) }}"
+    
+    - name: Display deployment info
+      debug:
+        msg: 
+          - "Deploying Vault node: {{ inventory_hostname }}"
+          - "Node ID: {{ node_id }}"
+          - "Vault Image: {{ docker_registry }}/{{ vault_image }}"
+          - "Data Path: {{ vault_data_path }}"
+  
+  roles:
+    - vault-docker
+  
+  post_tasks:
+    - name: Display Vault deployment status
+      debug:
+        msg: "Vault {{ inventory_hostname }} deployed successfully"
+
+- name: Deploy Vault Load Balancers
+  hosts: vault_lb
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Load vault cluster variables
+      include_vars: ../group_vars/preprod/vault_cluster.yml
+    
+    - name: Display LB deployment info
+      debug:
+        msg:
+          - "Deploying Load Balancer: {{ inventory_hostname }}"
+          - "Direct IP: {{ ansible_host }}"
+          - "Vault Domain: {{ vault_domain }}"
+          - "Note: Using direct IP access (no Virtual IP in cloud environment)"
+  
+  roles:
+    - vault-loadbalancer
+  
+  post_tasks:
+    - name: Display LB status
+      debug:
+        msg: 
+          - "Load Balancer {{ inventory_hostname }} is ready"
+          - "Access via: https://{{ ansible_host }}:{{ lb_port }}"
+          - "Health check: https://{{ ansible_host }}:{{ lb_port }}/nginx-health"
+
+- name: Verify Vault Cluster Deployment
+  hosts: localhost
+  gather_facts: no
+  
+  pre_tasks:
+    - name: Load vault cluster variables
+      include_vars: ../group_vars/preprod/vault_cluster.yml
+  
+  tasks:
+    - name: Test Vault cluster through Virtual IP
+      uri:
+        url: "https://{{ vault_virtual_ip }}/v1/sys/health"
+        method: GET
+        validate_certs: no
+        status_code: [200, 429, 472, 501, 503]
+      register: vip_health
+      retries: 5
+      delay: 10
+    
+    - name: Test Vault cluster through domain
+      uri:
+        url: "https://{{ vault_domain }}/v1/sys/health"
+        method: GET
+        validate_certs: no
+        status_code: [200, 429, 472, 501, 503]
+      register: domain_health
+      retries: 5
+      delay: 10
+      ignore_errors: yes
+    
+    - name: Display cluster status
+      debug:
+        msg: 
+          - "=== VAULT CLUSTER DEPLOYMENT COMPLETE ==="
+          - "Virtual IP ({{ vault_virtual_ip }}): {{ 'OK' if vip_health.status in [200, 429, 472, 501, 503] else 'FAILED' }}"
+          - "Domain ({{ vault_domain }}): {{ 'OK' if domain_health.status in [200, 429, 472, 501, 503] else 'FAILED' }}"
+          - "Cluster Status: {{ vip_health.json.initialized | default('unknown') }}"
+          - "Sealed Status: {{ vip_health.json.sealed | default('unknown') }}"
+          - "Next Step: Run vault-init.yml to initialize and unseal the cluster"
+
+    - name: Display next steps
+      debug:
+        msg:
+          - "=== DEPLOYMENT COMPLETE ==="
+          - "Vault cluster is deployed but not initialized"
+          - "Next step: Run './scripts/preprod/run-vault.sh init' to initialize the cluster"

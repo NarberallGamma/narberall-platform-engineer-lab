@@ -1,0 +1,169 @@
+---
+# Vault Docker Role - развертывание Vault нод в Docker контейнерах
+
+- name: Install Docker
+  apt:
+    name: 
+      - docker.io
+      - docker-compose
+    state: present
+    update_cache: yes
+  tags: [docker, vault]
+
+- name: Start and enable Docker service
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  tags: [docker, vault]
+
+- name: Add current user to docker group
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+  tags: [docker, vault]
+
+- name: Login to Docker registry
+  docker_login:
+    registry: "{{ docker_registry }}"
+    username: "{{ docker_registry_username }}"
+    password: "{{ docker_registry_password }}"
+  tags: [docker, vault]
+
+- name: Create Vault directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ vault_data_path }}"
+    - "{{ vault_config_path }}"
+    - "/opt/vault/ssl"
+    - "/opt/vault/logs"
+  tags: [vault, directories]
+
+- name: Fix ownership of Vault directories
+  file:
+    path: "/opt/vault"
+    state: directory
+    owner: "root"
+    group: "root"
+    recurse: yes
+  tags: [vault, directories]
+
+- name: Copy SSL certificates for Vault
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: "../../artifacts/{{ ssl_cert_path | basename }}", dest: "/opt/vault/ssl/{{ ssl_cert_path | basename }}" }
+    - { src: "../../artifacts/{{ ssl_key_path | basename }}", dest: "/opt/vault/ssl/{{ ssl_key_path | basename }}" }
+  when: ssl_cert_path is defined
+  tags: [vault, ssl]
+
+- name: Generate Vault configuration
+  template:
+    src: vault-config.hcl.j2
+    dest: "{{ vault_config_path }}/config.hcl"
+    mode: '0644'
+  notify: restart vault
+  tags: [vault, config]
+
+- name: Pull Vault Docker image
+  docker_image:
+    name: "{{ docker_registry }}/{{ vault_image }}"
+    source: pull
+    force_source: yes
+  tags: [docker, vault]
+
+- name: Ensure correct ownership before starting container
+  file:
+    path: "/opt/vault"
+    state: directory
+    owner: "root"
+    group: "root"
+    recurse: yes
+    mode: '0755'
+  tags: [vault, docker]
+
+- name: Set correct ownership for data directory
+  file:
+    path: "{{ vault_data_path }}"
+    state: directory
+    owner: "100"
+    group: "100"
+    recurse: yes
+    mode: '0755'
+  tags: [vault, docker]
+
+- name: Force fix permissions on data directory
+  command: chown -R 100:100 /opt/vault/data
+  changed_when: false
+  tags: [vault, docker]
+
+- name: Stop existing Vault container
+  docker_container:
+    name: "{{ inventory_hostname }}"
+    state: absent
+  ignore_errors: yes
+  tags: [vault, docker]
+
+- name: Start Vault container
+  docker_container:
+    name: "{{ inventory_hostname }}"
+    image: "{{ docker_registry }}/{{ vault_image }}"
+    state: started
+    restart_policy: always
+    ports:
+      - "{{ vault_api_port }}:8200"
+      - "{{ vault_cluster_port }}:8201"
+    volumes:
+      - "{{ vault_data_path }}:/vault/data"
+      - "{{ vault_config_path }}:/vault/config"
+      - "/opt/vault/ssl:/vault/tls"
+      - "/opt/vault/logs:/vault/logs"
+    env:
+      VAULT_ADDR: "http://127.0.0.1:8200"
+      VAULT_LOG_LEVEL: "{{ vault_log_level }}"
+    capabilities:
+      - IPC_LOCK
+    security_opts:
+      - "label:disable"
+    ulimits:
+      - "memlock:-1"
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+  tags: [vault, docker]
+
+- name: Wait for Vault to be ready
+  uri:
+    url: "http://{{ ansible_host }}:{{ vault_api_port }}/v1/sys/health"
+    method: GET
+    status_code: [200, 429, 472, 501, 503]
+  register: vault_health
+  until: vault_health.status in [200, 429, 472, 501, 503]
+  retries: 20
+  delay: 5
+  tags: [vault, health]
+
+- name: Display Vault status
+  debug:
+    msg: 
+      - "Vault {{ inventory_hostname }} is running"
+      - "Status: {{ vault_health.json.sealed | default('unknown') }}"
+      - "Initialized: {{ vault_health.json.initialized | default('unknown') }}"
+  tags: [vault, health]
+
+- name: Generate docker-compose.yml for manual management
+  template:
+    src: docker-compose.yml.j2
+    dest: "/opt/vault/docker-compose.yml"
+    mode: '0644'
+  tags: [vault, docker-compose]

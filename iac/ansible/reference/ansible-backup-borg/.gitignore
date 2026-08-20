@@ -1,0 +1,8 @@
+vars
+ansible/authorized_keys
+ansible/mysql-passwords.yml
+ansible/mysql-inventory
+ansible/hosts.ini
+*.retry
+.vault_pass
+.vault_pass.txt

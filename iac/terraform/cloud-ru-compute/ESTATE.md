@@ -87,7 +87,7 @@ network {
 - RDS: ignore `db` (provider requires password; live password is not in git)
 - New VMs: `key_pair = local.key_pairs.ecs_prod` (or ecs_dev / ecs_preprod). Terraform does not push a key onto an already-running host
 - `do_not_import` map: NGFW ECS, EIPs, VIPs, custom route table, `live/` prefix
-- Apply was **not** used to rewrite the estate. Goal: clean plan, then day-2 through code
+- Apply was **not** used to rewrite the estate. Goal: clean plan, then Ansible on the hosts
 
 ## Remote state (one bucket, two prefixes)
 

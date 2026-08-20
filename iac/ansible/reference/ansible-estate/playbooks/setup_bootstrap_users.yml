@@ -1,0 +1,182 @@
+---
+# Bootstrap пользователей ansible и gitlab-runner на серверах.
+# Запускать с control node против хостов из инвентаря.
+# Копирует открытые ключи из group_vars (ansible_ssh_public_key, gitlab_runner_ssh_public_key),
+# копирует и выполняет setup_*_user.sh с правами sudo, забирает созданные файлы из /tmp на control node.
+# Хендлер удаления /tmp файлов на хостах вызывается при setup_bootstrap_cleanup_tmp: true.
+- name: Bootstrap пользователей ansible и gitlab-runner на серверах
+  hosts: all
+  gather_facts: yes
+  become: yes
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/all.yml"
+
+  tasks:
+    - name: Создать каталог для артефактов на control node
+      ansible.builtin.file:
+        path: "{{ setup_bootstrap_fetch_dest }}/{{ inventory_hostname }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      run_once: false
+      changed_when: false
+
+    - name: Проверить, существует ли пользователь ansible
+      ansible.builtin.command: getent passwd ansible
+      register: ansible_user_check
+      failed_when: false
+      changed_when: false
+      when: setup_bootstrap_run_ansible | default(true) | bool
+
+    - name: Положить открытый ключ ansible на хост (из group_vars)
+      ansible.builtin.copy:
+        content: "{{ ansible_ssh_public_key }}\n"
+        dest: /tmp/bootstrap_ansible.pub
+        mode: "0600"
+      when:
+        - setup_bootstrap_run_ansible | default(true) | bool
+        - ansible_ssh_public_key | default('') | length > 0
+
+    - name: Копировать setup_ansible_user.sh на хост
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../scripts/setup_ansible_user.sh"
+        dest: /tmp/setup_ansible_user.sh
+        mode: "0755"
+      when:
+        - setup_bootstrap_run_ansible | default(true) | bool
+        - ansible_ssh_public_key | default('') | length > 0
+
+    - name: Убрать CR из setup_ansible_user.sh (CRLF → LF)
+      ansible.builtin.shell: "sed -i 's/\\r$//' /tmp/setup_ansible_user.sh"
+      args:
+        executable: /bin/bash
+      when:
+        - setup_bootstrap_run_ansible | default(true) | bool
+        - ansible_ssh_public_key | default('') | length > 0
+
+    - name: Запустить setup_ansible_user.sh (создание пользователя и/или смена пароля)
+      ansible.builtin.command: /tmp/setup_ansible_user.sh ansible /tmp/bootstrap_ansible.pub {{ (ansible_user_check.rc != 0 or setup_bootstrap_set_password | default(false) | bool) | ternary('yes', 'no') }}
+      when:
+        - setup_bootstrap_run_ansible | default(true) | bool
+        - ansible_ssh_public_key | default('') | length > 0
+        - ansible_user_check is defined
+        - (ansible_user_check.rc != 0) or (setup_bootstrap_set_password | default(false) | bool)
+
+    - name: Убедиться, что у пользователя ansible ключ из переменной (добавить или заменить; ротация — exclusive заменяет все ключи)
+      ansible.builtin.authorized_key:
+        user: ansible
+        key: "{{ ansible_ssh_public_key }}"
+        state: present
+        exclusive: true
+        key_options: "{{ 'from=\"' + ansible_authorized_key_from + '\"' if (ansible_authorized_key_from | default('') | length > 0) else omit }}"
+      when:
+        - setup_bootstrap_run_ansible | default(true) | bool
+        - ansible_ssh_public_key | default('') | length > 0
+
+    - name: Пропустить ansible — не задан ansible_ssh_public_key
+      ansible.builtin.debug:
+        msg: "Задайте ansible_ssh_public_key в group_vars/all.yml и запустите плейбук снова."
+      when:
+        - setup_bootstrap_run_ansible | default(true) | bool
+        - ansible_ssh_public_key | default('') | length == 0
+
+    - name: Проверить, существует ли пользователь gitlab-runner
+      ansible.builtin.command: getent passwd gitlab-runner
+      register: gitlab_runner_user_check
+      failed_when: false
+      changed_when: false
+      when: setup_bootstrap_run_gitlab_runner | default(true) | bool
+
+    - name: Положить открытый ключ gitlab-runner на хост (из group_vars)
+      ansible.builtin.copy:
+        content: "{{ (gitlab_runner_ssh_public_key | default(ansible_ssh_public_key)) }}\n"
+        dest: /tmp/bootstrap_gitlab_runner.pub
+        mode: "0600"
+      when:
+        - setup_bootstrap_run_gitlab_runner | default(true) | bool
+        - (gitlab_runner_ssh_public_key | default(ansible_ssh_public_key)) | length > 0
+
+    - name: Копировать setup_gitlab_runner_user.sh на хост
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../scripts/setup_gitlab_runner_user.sh"
+        dest: /tmp/setup_gitlab_runner_user.sh
+        mode: "0755"
+      when:
+        - setup_bootstrap_run_gitlab_runner | default(true) | bool
+        - (gitlab_runner_ssh_public_key | default(ansible_ssh_public_key)) | length > 0
+
+    - name: Убрать CR из setup_gitlab_runner_user.sh (CRLF → LF)
+      ansible.builtin.shell: "sed -i 's/\\r$//' /tmp/setup_gitlab_runner_user.sh"
+      args:
+        executable: /bin/bash
+      when:
+        - setup_bootstrap_run_gitlab_runner | default(true) | bool
+        - (gitlab_runner_ssh_public_key | default(ansible_ssh_public_key)) | length > 0
+
+    - name: Запустить setup_gitlab_runner_user.sh (создание пользователя и/или смена пароля)
+      ansible.builtin.command: /tmp/setup_gitlab_runner_user.sh gitlab-runner /tmp/bootstrap_gitlab_runner.pub {{ (gitlab_runner_user_check.rc != 0 or setup_bootstrap_set_password | default(false) | bool) | ternary('yes', 'no') }}
+      when:
+        - setup_bootstrap_run_gitlab_runner | default(true) | bool
+        - (gitlab_runner_ssh_public_key | default(ansible_ssh_public_key)) | length > 0
+        - gitlab_runner_user_check is defined
+        - (gitlab_runner_user_check.rc != 0) or (setup_bootstrap_set_password | default(false) | bool)
+
+    - name: Убедиться, что у пользователя gitlab-runner ключ из переменной
+      ansible.builtin.authorized_key:
+        user: gitlab-runner
+        key: "{{ gitlab_runner_ssh_public_key | default(ansible_ssh_public_key) }}"
+        state: present
+        exclusive: true
+        key_options: "{{ 'from=\"' + gitlab_runner_authorized_key_from + '\"' if (gitlab_runner_authorized_key_from | default('') | length > 0) else omit }}"
+      when:
+        - setup_bootstrap_run_gitlab_runner | default(true) | bool
+        - (gitlab_runner_ssh_public_key | default(ansible_ssh_public_key)) | length > 0
+
+    - name: Пропустить gitlab-runner — не задан открытый ключ
+      ansible.builtin.debug:
+        msg: "Задайте gitlab_runner_ssh_public_key (или ansible_ssh_public_key) в group_vars/all.yml."
+      when:
+        - setup_bootstrap_run_gitlab_runner | default(true) | bool
+        - (gitlab_runner_ssh_public_key | default(ansible_ssh_public_key)) | length == 0
+
+    - name: Забрать ansible credentials с хоста на control node
+      ansible.builtin.fetch:
+        src: /tmp/ansible_user_credentials.txt
+        dest: "{{ setup_bootstrap_fetch_dest }}/{{ inventory_hostname }}/ansible_user_credentials.txt"
+        flat: true
+        fail_on_missing: false
+      when:
+        - setup_bootstrap_run_ansible | default(true) | bool
+        - setup_bootstrap_fetch_dest | length > 0
+
+    - name: Забрать gitlab-runner credentials с хоста на control node
+      ansible.builtin.fetch:
+        src: /tmp/gitlab_runner_user_credentials.txt
+        dest: "{{ setup_bootstrap_fetch_dest }}/{{ inventory_hostname }}/gitlab_runner_user_credentials.txt"
+        flat: true
+        fail_on_missing: false
+      when:
+        - setup_bootstrap_run_gitlab_runner | default(true) | bool
+        - setup_bootstrap_fetch_dest | length > 0
+
+    - name: Запросить удаление /tmp на хостах (по флагу или group_vars)
+      ansible.builtin.command: "true"
+      changed_when: true
+      notify: "cleanup bootstrap tmp on host"
+      when: setup_bootstrap_cleanup_tmp | default(false) | bool
+
+    - name: Выполнить хендлеры удаления /tmp
+      ansible.builtin.meta: flush_handlers
+      when: setup_bootstrap_cleanup_tmp | default(false) | bool
+
+  handlers:
+    - name: Удалить bootstrap-файлы в /tmp на хосте
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/ansible_user_credentials.txt
+        - /tmp/gitlab_runner_user_credentials.txt
+        - /tmp/bootstrap_ansible.pub
+        - /tmp/bootstrap_gitlab_runner.pub
+      listen: "cleanup bootstrap tmp on host"

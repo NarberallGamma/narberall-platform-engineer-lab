@@ -1,0 +1,14 @@
+---
+# Local Envoy на GitLab: Telegram API -> VPS cluster (failover).
+# Переменные: group_vars/telegram_vps_egress.yml (vars_files в плейбуке).
+
+- name: Deploy Telegram VPS egress proxy
+  hosts: telegram_vps_egress
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/telegram_vps_egress.yml"
+
+  roles:
+    - telegram_vps_egress

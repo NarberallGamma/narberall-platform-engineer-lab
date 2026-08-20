@@ -1,0 +1,50 @@
+---
+  - set_fact: 
+        admingroups: wheel
+    when: ansible_distribution == "CentOS"
+
+  - set_fact:
+        admingroups: sudo
+    when: ansible_distribution == "Ubuntu"
+
+  - debug: var="ansible_os_family"
+  
+  - debug: var="admingroups"
+
+  - name: Creating user accounts
+    user: name={{ item }} shell=/bin/bash groups={{ admingroups }}
+    with_items: "{{ adminlist }}"
+    tags: adminacct
+    
+  - name: Installing keys
+    authorized_key: user={{ item }} key="{{ lookup('file', item + '.pub.example')}}" exclusive=true
+    with_items: "{{ adminlist }}"
+    tags: adminacct, adminacct-updatekey
+   
+  - name: Enabling sudo without password
+    lineinfile: "dest=/etc/sudoers line='%{{ admingroups }}  ALL=(ALL)   NOPASSWD: ALL' regexp='^#?%{{ admingroups }}' backup=yes"
+    tags: adminacct
+
+  - name: Installing default env to /etc/profile.d/bash_colored.sh
+    template:
+      src: bash_colored.sh
+      dest: /etc/profile.d/bash_colored.sh
+      owner: root
+      group: root
+      mode: 0555
+
+#  - name: 
+#    template:
+#      src: "{{ item }}"
+#      dest: /etc/profile.d/
+#      owner: root
+#      mode: 755
+#    with_fileglob:
+#      - /path/to/admin-users/templates/profile.d/*
+    
+  - name: Removing deprecated admin accounts
+    user: name={{ item }} state=absent remove=yes
+    with_items: "{{ adminremove }}"
+    tags:
+      - adminacct
+      - adminremove

@@ -1,0 +1,26 @@
+# remove leftover vendor user, monitoring package, and apt list
+# if crontab still has vendor backup wrappers, uncomment the last task
+# 05 00 * * * /root/scripts/backups/confs_default.sh > /dev/null 2>&1
+# 15 00 * * * /root/scripts/backups/xtrabackup_default.sh > /dev/null 2>&1
+---
+- hosts: allhosts
+  tasks:
+    - name: remove user 'legacy_ops'
+      user:
+        name: 'legacy_ops'
+        state: absent
+        remove: yes
+
+    - name: remove leftover monitoring package essm
+      apt:
+        name: 'essm'
+        state: absent
+        purge: yes
+
+    - name: remove leftover vendor apt repository
+      file:
+        name: /etc/apt/sources.list.d/legacy-ops.list
+        state: absent
+
+#    - name: comment leftover vendor backup crontab lines
+#      shell: "sed -ri '/_default.sh/s/^/#/g' /var/spool/cron/crontabs/root"

@@ -1,0 +1,6 @@
+{# docker compose подставляет $VAR из .env; секреты с $ экранировать как $$ #}
+REG_RU_DNS_USERNAME={{ app_vault.REG_RU_DNS_USERNAME | default('') | replace('$', '$$') }}
+REG_RU_DNS_PASSWORD={{ app_vault.REG_RU_DNS_PASSWORD | default('') | replace('$', '$$') }}
+TELEGRAM_BOT_TOKEN={{ app_vault.TELEGRAM_BOT_TOKEN | default('') | replace('$', '$$') }}
+TELEGRAM_CHAT_IDS={{ app_vault.TELEGRAM_CHAT_IDS | default(app_item.value.telegram_chat_ids | default('')) | replace('$', '$$') }}
+K8S_TOKEN={{ app_vault.K8S_TOKEN | default('') | replace('$', '$$') }}

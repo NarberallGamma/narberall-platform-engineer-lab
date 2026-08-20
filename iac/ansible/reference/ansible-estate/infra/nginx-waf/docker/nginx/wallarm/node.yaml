@@ -1,0 +1,10 @@
+---
+hostname: lb-waf-prod-01
+uuid: [ключ на сервере] (выдается в консоли Wallarm)
+secret: [ключ на сервере] (выдается в консоли Wallarm)  
+api:
+  host: api.webmonitorx.ru
+  ca_verify: false
+  port: 443
+sub_type: all
+regtoken: [ключ на сервере] (выдается в консоли Wallarm)

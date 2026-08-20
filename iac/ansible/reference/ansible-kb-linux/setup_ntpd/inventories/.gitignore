@@ -1,0 +1,3 @@
+*.yml
+!*.yml.example
+hosts.ini

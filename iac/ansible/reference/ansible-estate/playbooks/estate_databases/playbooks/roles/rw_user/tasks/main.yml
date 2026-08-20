@@ -1,0 +1,94 @@
+---
+# Read-write дополнительная учётка: CONNECT + GRANT DML на существующие объекты (без OWNER, без CREATE на схеме).
+# OWNER объектов остаётся у schema_flyway / treasury_user; для DDL используется schema_flyway_setup.
+# default_privileges_for_role: только источник FOR ROLE в ALTER DEFAULT PRIVILEGES (не назначение владельца).
+# Требует: community.postgresql, community.general.
+
+- name: Установить py3-psycopg2 для модулей community.postgresql
+  community.general.apk:
+    name: py3-psycopg2
+    state: present
+
+- name: Создать или обновить RW-пользователя PostgreSQL (с паролем)
+  community.postgresql.postgresql_user:
+    name: "{{ rw_user }}"
+    password: "{{ rw_password }}"
+    state: present
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+  when: manage_password | default(true) | bool
+
+- name: Проверить наличие RW-пользователя (grants-only, пароль не меняется)
+  community.postgresql.postgresql_query:
+    query: "SELECT 1 AS ok FROM pg_roles WHERE rolname = '{{ rw_user }}';"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+  register: rw_user_exists_check
+  when: not (manage_password | default(true) | bool)
+
+- name: Прервать, если RW-пользователь не найден
+  ansible.builtin.fail:
+    msg: "Роль {{ rw_user }} не существует. Создать учётку в облаке перед grants-only (manage_password=false)."
+  when:
+    - not (manage_password | default(true) | bool)
+    - (rw_user_exists_check.query_result | default([]) | length) == 0
+
+- name: Выдать CONNECT на каждую БД (кластерный уровень)
+  community.postgresql.postgresql_query:
+    query: "GRANT CONNECT ON DATABASE {{ item }} TO {{ rw_user }};"
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: postgres
+  loop: "{{ db_list }}"
+
+- name: Выдать RW-права (GRANT DML) во всех пользовательских схемах каждой БД
+  community.postgresql.postgresql_query:
+    query: |
+      DO $$
+      DECLARE
+        r RECORD;
+        v_rw TEXT := '{{ rw_user }}';
+        v_defrole TEXT := '{{ default_privileges_for_role }}';
+      BEGIN
+        FOR r IN
+          SELECT nspname
+          FROM pg_catalog.pg_namespace
+          WHERE nspname NOT LIKE 'pg_%' AND nspname != 'information_schema'
+          ORDER BY 1
+        LOOP
+          EXECUTE format('GRANT USAGE ON SCHEMA %I TO %I', r.nspname, v_rw);
+          EXECUTE format('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA %I TO %I', r.nspname, v_rw);
+          EXECUTE format('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA %I TO %I', r.nspname, v_rw);
+          EXECUTE format('GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA %I TO %I', r.nspname, v_rw);
+          EXECUTE format(
+            'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I GRANT ALL PRIVILEGES ON TABLES TO %I',
+            v_defrole, r.nspname, v_rw
+          );
+          EXECUTE format(
+            'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I GRANT ALL PRIVILEGES ON SEQUENCES TO %I',
+            v_defrole, r.nspname, v_rw
+          );
+          EXECUTE format(
+            'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I GRANT ALL PRIVILEGES ON FUNCTIONS TO %I',
+            v_defrole, r.nspname, v_rw
+          );
+        END LOOP;
+      END $$;
+    login_host: "{{ pg_host }}"
+    login_user: "{{ pg_admin_user }}"
+    login_password: "{{ pg_admin_password }}"
+    login_port: "{{ pg_port }}"
+    login_db: "{{ item }}"
+  loop: "{{ db_list }}"
+
+- name: Итог
+  ansible.builtin.debug:
+    msg: "RW {{ rw_user }}: GRANT DML + CONNECT (без OWNER, без CREATE) для БД {{ db_list | join(', ') }}"

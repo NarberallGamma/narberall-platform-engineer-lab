@@ -1,0 +1,262 @@
+---
+# Legacy-миграция: host nginx + keepalived -> docker edge-lb (/docker/apps/edge-lb)
+#
+# Порядок (краткий downtime на 443 и VIP):
+#   1) Выложить конфиги edge-lb, скопировать TLS из /etc/nginx/ssl
+#   2) Извлечь keepalived auth_pass из legacy конфига
+#   3) Остановить host nginx и keepalived
+#   4) docker compose up (nginx + keepalived, host network)
+#   5) verify: /nginx-health, Vault /v1/sys/health через VIP и domain
+#   6) prod: vault-upstream sidecar (лог {{ docker_app_base_dir }}/edge-lb/logs/vault-upstream/vault-upstream.log)
+#
+# Prod: сначала BACKUP (estate-prod-lb-2), затем MASTER (estate-prod-lb-1)
+#
+# Запуск:
+#   ./scripts/run/run_migrate_edge_lb_legacy.sh --prod --limit estate-prod-lb-2
+#   ./scripts/run/run_migrate_edge_lb_legacy.sh --preprod --limit estate-preprod-lb-1
+#
+# Только подготовка файлов без stop legacy / compose:
+#   ... -- --tags prepare
+#
+# Переменные: group_vars/edge-lb.yml
+# Переключатель: edge_lb_legacy_migration_enabled (false после migrate на стенде)
+
+- name: Migrate legacy LB to docker edge-lb
+  hosts: edge_lb
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../group_vars/edge-lb.yml"
+
+  vars:
+    edge_lb_app_dir: "{{ docker_app_base_dir }}/edge-lb"
+    edge_lb_migrate_legacy_ssl: true
+
+  pre_tasks:
+    - name: Проверить, что legacy-миграция включена в group_vars
+      ansible.builtin.assert:
+        that:
+          - edge_lb_legacy_migration_enabled | default(false) | bool
+        fail_msg: >-
+          Legacy-миграция отключена (edge_lb_legacy_migration_enabled: false в group_vars/edge-lb.yml).
+          Migrate на этом стенде завершён. Для нового стенда: true и раскомментировать migration vars в group_vars.
+      tags: [always]
+
+    - name: Проверить legacy nginx
+      ansible.builtin.stat:
+        path: /etc/nginx/sites-enabled/vault
+      register: edge_lb_legacy_nginx_site
+      tags: [prepare, migrate, verify]
+
+    - name: Migration info
+      ansible.builtin.debug:
+        msg:
+          - "Host: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "VIP: {{ edge_lb_virtual_ip }}"
+          - "Vault domain: {{ edge_lb_vault_domain }}"
+          - "Legacy SSL: {{ edge_lb_legacy_ssl_source_dir }}/{{ edge_lb_cert_basename }}.crt"
+          - "Target: {{ edge_lb_app_dir }}/"
+          - "Vault backends: {{ edge_lb_vault_backends | map(attribute='ip') | join(', ') }}"
+      tags: [prepare, migrate, verify]
+
+  tasks:
+    - name: Извлечь keepalived auth_pass из legacy (если не задан в vars)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        grep -E '^\s*auth_pass' /etc/keepalived/keepalived.conf | awk '{print $2}' | tr -d '"' | head -1
+      args:
+        executable: /bin/bash
+      register: edge_lb_legacy_auth_pass
+      changed_when: false
+      failed_when: false
+      when: edge_lb_keepalived_auth_pass | default('') | length == 0
+      tags: [prepare, migrate]
+
+    - name: Установить keepalived auth_pass из legacy
+      ansible.builtin.set_fact:
+        edge_lb_keepalived_auth_pass: "{{ edge_lb_legacy_auth_pass.stdout | trim }}"
+      when:
+        - edge_lb_keepalived_auth_pass | default('') | length == 0
+        - edge_lb_legacy_auth_pass.stdout | default('') | length > 0
+      tags: [prepare, migrate]
+
+    - name: Проверить legacy TLS-сертификаты
+      ansible.builtin.stat:
+        path: "{{ edge_lb_legacy_ssl_source_dir }}/{{ edge_lb_cert_basename }}.{{ item }}"
+      register: edge_lb_legacy_cert_stat
+      loop:
+        - crt
+        - key
+      tags: [prepare, migrate]
+
+    - name: Убедиться, что legacy TLS существует
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "Не найден {{ edge_lb_legacy_ssl_source_dir }}/{{ edge_lb_cert_basename }}.{{ item.item }}"
+      loop: "{{ edge_lb_legacy_cert_stat.results }}"
+      loop_control:
+        label: "{{ edge_lb_cert_basename }}.{{ item.item }}"
+      tags: [prepare, migrate]
+
+    - name: Подготовить edge-lb (конфиги без compose up)
+      ansible.builtin.include_role:
+        name: docker_app
+      vars:
+        docker_app_compose_up: false
+        edge_lb_migrate_legacy_ssl: true
+      tags: [prepare, migrate]
+
+    - name: Бэкап legacy nginx site
+      ansible.builtin.copy:
+        src: /etc/nginx/sites-available/vault
+        dest: "/etc/nginx/sites-available/vault.backup.{{ ansible_date_time.iso8601_basic_short }}"
+        remote_src: true
+        mode: "0644"
+      when: edge_lb_legacy_nginx_site.stat.exists | default(false)
+      tags: [migrate]
+
+    - name: Бэкап legacy keepalived.conf
+      ansible.builtin.copy:
+        src: /etc/keepalived/keepalived.conf
+        dest: "/etc/keepalived/keepalived.conf.backup.{{ ansible_date_time.iso8601_basic_short }}"
+        remote_src: true
+        mode: "0644"
+      tags: [migrate]
+
+    - name: Остановить и отключить host nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: stopped
+        enabled: false
+      tags: [migrate]
+
+    - name: Остановить и отключить host keepalived
+      ansible.builtin.systemd:
+        name: keepalived
+        state: stopped
+        enabled: false
+      tags: [migrate]
+
+    - name: Убедиться, что host nginx не слушает 443
+      ansible.builtin.shell: |
+        set -euo pipefail
+        if ss -tlnp 2>/dev/null | grep ':443 ' | grep -qv docker; then
+          ss -tlnp | grep ':443 ' || true
+          exit 1
+        fi
+      args:
+        executable: /bin/bash
+      changed_when: false
+      tags: [migrate, verify]
+
+    - name: Запустить edge-lb compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ edge_lb_app_dir }}"
+        state: present
+        pull: "{{ docker_app_compose_pull }}"
+      tags: [migrate]
+
+    - name: Дождаться nginx-health локально
+      ansible.builtin.uri:
+        url: "https://127.0.0.1/nginx-health"
+        validate_certs: false
+        status_code: 200
+      register: edge_lb_local_health
+      retries: 15
+      delay: 3
+      until: edge_lb_local_health is succeeded
+      tags: [migrate, verify]
+
+    - name: Проверить VIP на интерфейсе (если MASTER или единственная нода)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        ip -br a | grep -q '{{ edge_lb_virtual_ip }}'
+      args:
+        executable: /bin/bash
+      register: edge_lb_vip_check
+      changed_when: false
+      failed_when: false
+      tags: [verify, migrate]
+
+    - name: Проверить Vault health через VIP
+      ansible.builtin.uri:
+        url: "https://{{ edge_lb_virtual_ip }}/v1/sys/health?standbyok=false"
+        validate_certs: false
+        status_code: [200, 429, 472, 501, 503]
+      register: edge_lb_vip_vault_health
+      retries: 10
+      delay: 5
+      until: edge_lb_vip_vault_health is succeeded
+      tags: [verify, migrate]
+
+    - name: Проверить Vault health через domain
+      ansible.builtin.uri:
+        url: "https://{{ edge_lb_vault_domain }}/v1/sys/health?standbyok=false"
+        validate_certs: true
+        status_code: [200, 429, 472, 501, 503]
+      register: edge_lb_domain_vault_health
+      retries: 10
+      delay: 5
+      until: edge_lb_domain_vault_health is succeeded
+      tags: [verify, migrate]
+
+    - name: Проверить Vault UI root
+      ansible.builtin.uri:
+        url: "https://{{ edge_lb_vault_domain }}/"
+        validate_certs: true
+        status_code: [200, 307]
+      register: edge_lb_ui_check
+      retries: 10
+      delay: 5
+      until: edge_lb_ui_check is succeeded
+      tags: [verify, migrate]
+
+    - name: Дождаться лога vault-upstream sidecar
+      ansible.builtin.wait_for:
+        path: "{{ edge_lb_app_dir }}/logs/vault-upstream/vault-upstream.log"
+        timeout: 90
+        state: present
+      when: edge_lb_vault_upstream_sidecar_enabled | default(false) | bool
+      tags: [verify, migrate]
+
+    - name: Проверить active upstream (только leader в pool)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        f="{{ edge_lb_app_dir }}/config/vault_upstream/vault_active_upstream.conf"
+        count="$(grep -cE '^\s*server ' "$f" || true)"
+        echo "active_servers=${count}"
+        grep -E '^\s*server ' "$f" || true
+        test "$count" -ge 1
+        {% if (edge_lb_vault_backends | length) > 1 %}
+        test "$count" -eq 1
+        {% endif %}
+      args:
+        executable: /bin/bash
+      register: edge_lb_active_upstream_check
+      changed_when: false
+      when: edge_lb_vault_upstream_sidecar_enabled | default(false) | bool
+      tags: [verify, migrate]
+
+    - name: Итог миграции
+      ansible.builtin.debug:
+        msg:
+          - "edge-lb: {{ edge_lb_app_dir }}"
+          - "VIP {{ edge_lb_virtual_ip }} on host: {{ 'yes' if edge_lb_vip_check.rc == 0 else 'check manually (BACKUP node may not hold VIP)' }}"
+          - "nginx-health local: OK"
+          - "Vault VIP health: HTTP {{ edge_lb_vip_vault_health.status }}"
+          - "Vault domain health: HTTP {{ edge_lb_domain_vault_health.status }}"
+          - "Vault UI: HTTP {{ edge_lb_ui_check.status }}"
+          - "TLS certs: {{ edge_lb_ssl_dir }}"
+          - "Legacy host nginx/keepalived: stopped, disabled"
+          - "vault-upstream sidecar: {{ 'enabled, log ' ~ edge_lb_app_dir ~ '/logs/vault-upstream/vault-upstream.log' if edge_lb_vault_upstream_sidecar_enabled | default(false) else 'disabled (single backend)' }}"
+          - "{{ edge_lb_active_upstream_check.stdout_lines | default([]) | join(' | ') if edge_lb_active_upstream_check is defined else '' }}"
+      tags: [verify, migrate]
+
+    - name: Итог миграции (cert-orchestrator)
+      ansible.builtin.debug:
+        msg:
+          - "После migrate: ssl_dir cert-orchestrator для {{ inventory_hostname }} ({{ ansible_host }}) -> {{ edge_lb_ssl_dir }}"
+          - "Redeploy cert-orchestrator на GitLab после обновления target_nginx_hosts"
+      tags: [verify, migrate]

@@ -1,0 +1,4 @@
+*.retry
+inventories/*.yml
+!inventories/*.yml.example
+inventories/hosts.ini

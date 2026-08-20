@@ -1,0 +1,76 @@
+---
+# Роль llm_dev_init: секреты для LLM dev из Vault или из -e / group_vars.
+
+# Тег always: при частичном --tags (например только llm_dev_deploy) задачи с наследованием тегов роли не выполняются,
+# а assert ниже с tags: [always] — выполняется; тогда секрет из Vault не подставляется. См. тег always у set_fact.
+- name: Загрузить API-ключ llama-server из Vault
+  ansible.builtin.set_fact:
+    llm_dev_api_key: "{{ _vault.secret[llm_dev_vault_key_server_api_key] }}"
+  vars:
+    _vault: "{{ lookup('community.hashi_vault.vault_kv2_get', llm_dev_vault_path, engine_mount_point=llm_dev_vault_mount_point) }}"
+  no_log: true
+  tags: [always]
+  when: >
+    llm_dev_enable_api_key | bool and
+    (llm_dev_api_key is not defined or (llm_dev_api_key | default('') | string | length) == 0)
+
+- name: Загрузить HF token из Vault
+  ansible.builtin.set_fact:
+    llm_dev_hf_token: "{{ _vault.secret[llm_dev_vault_key_hf_token] }}"
+  vars:
+    _vault: "{{ lookup('community.hashi_vault.vault_kv2_get', llm_dev_vault_path, engine_mount_point=llm_dev_vault_mount_point) }}"
+  no_log: true
+  tags: [always]
+  when: >
+    (
+      llm_dev_enable_hf_token | bool or
+      (
+        llm_dev_model_fetch_enabled | default(false) | bool and
+        (
+          llm_dev_model_fetch_hf_token_from_vault | default(false) | bool or
+          llm_dev_model_fetch_requires_hf_token | default(false) | bool
+        )
+      )
+    ) and
+    (llm_dev_hf_token is not defined or (llm_dev_hf_token | default('') | string | length) == 0)
+
+- name: Загрузить WEBUI_SECRET_KEY из Vault
+  ansible.builtin.set_fact:
+    llm_dev_webui_secret_key: "{{ _vault.secret[llm_dev_vault_key_webui_secret_key] }}"
+  vars:
+    _vault: "{{ lookup('community.hashi_vault.vault_kv2_get', llm_dev_vault_path, engine_mount_point=llm_dev_vault_mount_point) }}"
+  no_log: true
+  tags: [always]
+  when: >
+    llm_dev_open_webui_enabled | bool and
+    (llm_dev_webui_secret_key is not defined or (llm_dev_webui_secret_key | default('') | string | length) == 0)
+
+- name: Проверить API-ключ при включённой защите
+  ansible.builtin.assert:
+    that:
+      - llm_dev_api_key is defined
+      - (llm_dev_api_key | default('') | string | length) > 0
+    fail_msg: >-
+      При llm_dev_enable_api_key задать llm_dev_api_key или ключ {{ llm_dev_vault_key_server_api_key }} в Vault {{ llm_dev_vault_path }} (mount {{ llm_dev_vault_mount_point }}).
+  when: llm_dev_enable_api_key | bool
+  tags: [always]
+
+- name: Проверить HF token при включённой передаче в .env
+  ansible.builtin.assert:
+    that:
+      - llm_dev_hf_token is defined
+      - (llm_dev_hf_token | default('') | string | length) > 0
+    fail_msg: >-
+      При llm_dev_enable_hf_token задать llm_dev_hf_token или ключ {{ llm_dev_vault_key_hf_token }} в Vault {{ llm_dev_vault_path }}.
+  when: llm_dev_enable_hf_token | bool
+  tags: [always]
+
+- name: Проверить WEBUI_SECRET_KEY при включённом Open WebUI
+  ansible.builtin.assert:
+    that:
+      - llm_dev_webui_secret_key is defined
+      - (llm_dev_webui_secret_key | default('') | string | length) > 0
+    fail_msg: >-
+      При llm_dev_open_webui_enabled задать ключ {{ llm_dev_vault_key_webui_secret_key }} в Vault {{ llm_dev_vault_path }} или -e llm_dev_webui_secret_key=...
+  when: llm_dev_open_webui_enabled | bool
+  tags: [always]

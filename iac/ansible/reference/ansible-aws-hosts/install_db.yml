@@ -1,0 +1,95 @@
+---
+- hosts: mysql
+  vars:
+    db_type: "mysql"
+    disks:
+      aws:
+        - block: /dev/nvme0n1
+          part: /dev/nvme0n1p1
+          fs: ext4
+          path: /var/lib/mysql
+          options: defaults,discard
+  roles:
+    - disks
+    - db
+
+- hosts: mariadb
+  vars:
+    db_type: "mariadb"
+    disks:
+      aws:
+        - block: /dev/nvme0n1
+          part: /dev/nvme0n1p1
+          fs: ext4
+          path: /var/lib/mysql
+          options: defaults,discard
+  roles:
+    - disks
+    - db
+
+- hosts: mysql8, mysql8-cs, mt5report_mysql8
+  vars:
+    db_type: "mysql8"
+    disks:
+      aws:
+        - block: /dev/nvme0n1
+          part: /dev/nvme0n1p1
+          fs: ext4
+          path: /var/lib/mysql
+          options: defaults,discard
+  roles:
+    - disks
+    - db
+
+- hosts: mysql8-mt4report
+  vars:
+    db_type: "mysql8"
+    disks:
+      aws:
+        - block: /dev/nvme1n1
+          part: /dev/nvme1n1p1
+          fs: ext4
+          path: /var/lib/mysql
+          options: defaults,discard
+  roles:
+    - disks
+    - db
+
+- hosts: rethinkdb
+  vars:
+   db_type: "rethinkdb"
+   disks:
+     aws:
+       - block: /dev/nvme0n1
+         part: /dev/nvme0n1p1
+         fs: ext4
+         path: /var/lib/rethinkdb
+         options: defaults,discard
+  roles:
+    - disks
+    - db
+
+- hosts: proxysql
+  vars:
+    db_type: "proxysql"
+  roles:
+    - db
+
+- hosts: neo4j
+  vars:
+    db_type: "neo4j"
+    disks:
+      aws:
+        - block: /dev/nvme0n1
+          part: /dev/nvme0n1p1
+          fs: ext4
+          path: /var/lib/neo4j
+          options: defaults,discard
+        - block: /dev/nvme1n1
+          part: /dev/nvme1n1p1
+          fs: ext4
+          path: /mnt/neo4j_backups
+          options: defaults,discard
+  roles:
+    - disks
+    - db

@@ -1,0 +1,9 @@
+---
+# Handlers for Vault Docker role
+
+- name: restart vault
+  docker_container:
+    name: "{{ inventory_hostname }}"
+    state: started
+    restart_policy: always
+  listen: restart vault

@@ -1,0 +1,26 @@
+---
+- name: Подготовка серверов и вступление в домен
+  hosts: prepare
+  gather_facts: yes
+  become: yes
+
+  pre_tasks:
+    - name: Подключить переменные prepare_servers
+      ansible.builtin.include_vars:
+        file: ../group_vars/prepare_servers.yml
+      tags: [always]
+
+    - name: Подключить переменные GitLab (перекрытие prepare_servers)
+      ansible.builtin.include_vars:
+        file: ../group_vars/gitlab.yml
+      when: inventory_hostname in groups.get('gitlab', [])
+      tags: [always]
+
+    - name: Подключить переменные teleport_k8s (перекрытие prepare_servers)
+      ansible.builtin.include_vars:
+        file: ../group_vars/teleport_k8s.yml
+      when: inventory_hostname in groups.get('teleport_k8s', [])
+      tags: [always]
+
+  roles:
+    - role: prepare_servers

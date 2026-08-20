@@ -1,0 +1,17 @@
+---
+# Список воркфлоу для синхронизации: имя файла (без .json) в files/n8n_workflows/workflows/
+# и опционально имя в n8n (если не задано — берётся из name в JSON).
+n8n_workflows_to_sync: []
+# Пример: n8n_workflows_to_sync: [nextcloud_groupfolders_webhook, nextcloud_groupfolders_form]
+
+# Базовый URL n8n (без завершающего слэша). Задаётся в group_vars.
+# n8n_base_url: "https://n8n.x.example.com"
+
+# Скрывать URL/ключ и тело запросов в логе. Для разбора 400/500: -e n8n_workflows_no_log=false
+n8n_workflows_no_log: true
+
+# Подписи в JSON воркфлоу (рядом с id; не из Vault). Должны совпадать с именем credential в n8n.
+n8n_workflow_ssh_credential_name: "SSH Ansible Host"
+# id воркфлоу — n8n_workflow_jwt_credential_id; имя для Webhook (httpHeaderAuth / jwtAuth): в n8n «Header Auth …».
+n8n_workflow_jwt_credential_name: "n8n JWT"
+n8n_workflow_webhook_credential_name: "Header Auth Nextcloud Groupfolders"

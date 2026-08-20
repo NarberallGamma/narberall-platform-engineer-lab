@@ -1,0 +1,20 @@
+---
+# Роль n8n_workflows: синхронизация воркфлоу из репо в n8n через REST API.
+# Ожидает: n8n_api_key (роль n8n_init), n8n_base_url, n8n_workflows_to_sync.
+# Для каждого элемента из n8n_workflows_to_sync загружается JSON из files/n8n_workflows/workflows/<name>.json,
+# ищется воркфлоу в n8n по имени и создаётся (POST) или обновляется (PUT).
+
+- name: Проверить n8n_base_url
+  ansible.builtin.assert:
+    that: n8n_base_url is defined and n8n_base_url | length > 0
+    fail_msg: 'Задать n8n_base_url в group_vars (например https://n8n.x.example.com).'
+  tags: always
+
+- name: Синхронизировать воркфлоу в n8n (sync_workflows)
+  ansible.builtin.include_tasks: sync_workflows.yml
+  loop: "{{ n8n_workflows_to_sync }}"
+  loop_control:
+    label: "{{ item }}"
+  vars:
+    _workflow_key: "{{ item }}"
+  when: n8n_workflows_to_sync | length > 0

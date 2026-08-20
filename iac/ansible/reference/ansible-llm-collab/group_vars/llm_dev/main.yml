@@ -1,0 +1,217 @@
+# Плейбук: playbooks/llm_dev_deploy.yml, группа инвентаря: llm_dev
+# Запуск: ./scripts/run/run_llm_dev.sh --limit llm-dev-01.example.com
+#
+# =============================================================================
+# Целевое железо (2026-06, миграция с vGPU L4-8Q)
+# =============================================================================
+# Flavor VK Cloud PA2: GPU1-16-48-V100-1 — 16 vCPU, 48 GiB RAM, 1× Tesla V100 16 GiB VRAM (полный GPU).
+# Старый стенд: vGPU-8-16-L4-8Q (8 vCPU, 16 GiB RAM, 8 GiB VRAM); на 8 GiB VRAM потолок -c 32768 q8_0.
+# Подготовка хоста: prepare_servers (enable_docker + enable_nvidia_gpu) или llm_dev_gpu_host_prepare_enabled.
+#
+llm_dev_target_flavor: "GPU1-16-48-V100-1"
+llm_dev_target_gpu_vram_gib: 16
+llm_dev_target_host_ram_gib: 48
+llm_dev_target_host_vcpus: 16
+# =============================================================================
+# Vault (KV Ubuntu_servers / platform-infra)
+# =============================================================================
+#   - ansible_llm_dev_server_api_key — если llm_dev_enable_api_key: true
+#   - ansible_llm_dev_hf_token — если llm_dev_enable_hf_token: true или загрузка модели с Vault (см. llm_dev_model_fetch_*)
+#   - ansible_llm_dev_webui_secret_key — если llm_dev_open_webui_enabled: true (WEBUI_SECRET_KEY)
+#
+# =============================================================================
+# Модель GGUF (скачивание ролью llm_dev_model_fetch)
+# =============================================================================
+# Пресеты и источники HF задаются здесь: llm_dev_model_preset + llm_dev_model_catalog (не в defaults роли).
+# ТЗ: ключ пресета qwen9b_q4_k_m (префикс qwen9b).
+# Qwen3.5-9B — один GGUF на квант:
+#   Q4_K_M (~5.89 GiB) — по умолчанию: запас VRAM под контекст и KV, обычно быстрее токен/с на 8 ГБ.
+#   Q5_K_M (~6.86 GiB) — тяжелее по VRAM, выше качество веса; при нехватке памяти / просадке скорости — вернуться на Q4 или снизить llm_dev_ctx_size.
+# Переключение Q4↔Q5: в пресете ниже одинаково заменить имя в hf_files и в local_filename на нужный gguf (тот же hf_repo).
+# Ручной режим: llm_dev_model_preset: "" и переменные llm_dev_model_hf_*; при llm_dev_model_fetch_enabled: false задать llm_dev_model_filename вручную (файл в {{ llm_dev_models_dir }}).
+# Итоговый -m: {{ llm_dev_models_dir }}/<local_filename>; несколько шардов — первый файл = -m.
+# Манифест: {{ llm_dev_sources_dir }}/model_manifest.yml
+# После смены файла модели: при необходимости llm_dev_model_force_download: true или очистить {{ llm_dev_models_dir }}.
+#
+# =============================================================================
+# Таймауты Ansible (долгие шаги: GGUF через curl, docker compose pull/up)
+# =============================================================================
+# ansible_ssh_timeout — параметр ansible.builtin.ssh (сек.): чтение с сокета при уже установленном SSH (длинная загрузка GGUF).
+# Для docker compose pull/up — async на задачах community.docker.docker_compose_v2 (ниже).
+#
+llm_dev_ansible_ssh_timeout_seconds: 14400
+llm_dev_compose_async_seconds: 10800
+llm_dev_compose_poll_seconds: 15
+# docker compose up (роли llm_dev_deploy / llm_dev_nginx): пересоздание контейнеров при каждом прогоне (не только docker restart).
+llm_dev_compose_recreate: "always"
+
+# Подготовка GPU-хоста (роль prepare_nvidia_gpu) из плейбука llm_dev_deploy — без полного prepare_servers.
+# На новой ВМ PA2: false после успешного prepare_servers (docker + nvidia).
+llm_dev_gpu_host_prepare_enabled: false
+
+llm_dev_model_fetch_enabled: true
+llm_dev_model_preset: "qwen9b_q4_k_m"
+llm_dev_model_force_download: false
+llm_dev_model_fetch_hf_token_from_vault: false
+llm_dev_model_fetch_requires_hf_token: false
+
+# Каталог пресетов (hf_repo, hf_revision, hf_files, local_filename) — единственное место выбора артефакта для llm_dev_model_fetch.
+llm_dev_model_catalog:
+  qwen9b_q4_k_m:
+    description: >-
+      ТЗ: ключ qwen9b_q4_k_m. Сейчас: Qwen3.5-9B GGUF Q4_K_M (один файл; hf_repo и имя файла — ниже).
+    hf_repo: "bartowski/Qwen_Qwen3.5-9B-GGUF"
+    hf_revision: "main"
+    hf_files:
+      - "Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+    local_filename: "Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+  qwen25_7b_instruct_q4_k_m:
+    description: >-
+      Алиас qwen9b_q4_k_m (то же содержимое); устаревшее имя ключа.
+    hf_repo: "bartowski/Qwen_Qwen3.5-9B-GGUF"
+    hf_revision: "main"
+    hf_files:
+      - "Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+    local_filename: "Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+
+# Имя GGUF в docker-compose (-m /models/...). Обязательно при частичных тегах (llm_dev_config, llm_dev_ouroboros)
+# без llm_dev_model_fetch: иначе подставится defaults роли deploy (model.gguf).
+# Должно совпадать с local_filename активного пресета (qwen9b_q4_k_m). При смене пресета — обновить здесь.
+llm_dev_model_filename: "Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+
+llm_dev_app_root: "/docker/apps/llm-dev"
+llm_dev_models_dir: "{{ llm_dev_app_root }}/models"
+
+llm_dev_sources_dir: "{{ llm_dev_app_root }}/sources"
+
+# После загрузки проверять наличие GGUF перед compose (рекомендуется true при включённом fetch)
+llm_dev_assert_model_present: true
+
+llm_dev_vault_mount_point: "platform-infra"
+llm_dev_vault_path: "Ubuntu_servers"
+llm_dev_vault_key_server_api_key: "ansible_llm_dev_server_api_key"
+llm_dev_vault_key_hf_token: "ansible_llm_dev_hf_token"
+llm_dev_vault_key_webui_secret_key: "ansible_llm_dev_webui_secret_key"
+
+llm_dev_enable_api_key: false
+llm_dev_enable_hf_token: false
+
+# --- Стек приложения (llama + Open WebUI) ---
+# Образы перенесены с ghcr.io/ggerganov/llama.cpp на ghcr.io/ggml-org/llama.cpp (см. docs/docker.md в репозитории llama.cpp).
+llm_dev_llama_image: "ghcr.io/ggml-org/llama.cpp:server-cuda"
+llm_dev_llama_server_binary: "/app/llama-server"
+
+llm_dev_compose_project_name: "llm-dev"
+llm_dev_env_file_name: ".env"
+llm_dev_compose_restart_policy: unless-stopped
+llm_dev_compose_pull: "missing"
+
+llm_dev_listen_port: 8080
+# --- llama-server: V100 16 GiB VRAM, GGUF Q4_K_M, KV q8_0 ---
+# Compose: -m /models/<llm_dev_model_filename>, --host/--port, -c, -ngl, --api-key (опц.).
+llm_dev_llama_listen_host: "0.0.0.0"
+llm_dev_llama_host_bind_address: "127.0.0.1"
+llm_dev_llama_host_port: "{{ llm_dev_listen_port }}"
+# Контекст KV (-c). V100 16 GiB + Q4_K_M + q8_0: 262144 (n_ctx_train Qwen3.5-9B). При OOM → 196608 → 131072 → 104448 → 65536 → 32768.
+# L4-8Q (8 GiB): потолок 32768 q8_0.
+llm_dev_ctx_size: 262144
+llm_dev_gpu_layers: 99
+# KV q8_0 (качество долгого контекста). Веса — только Q4_K_M в GGUF. batch 256 — меньше пик VRAM на длинном prefill.
+llm_dev_llama_extra_args_list:
+  - "--cache-type-k"
+  - "q8_0"
+  - "--cache-type-v"
+  - "q8_0"
+  - "--batch-size"
+  - "256"
+  - "--ubatch-size"
+  - "256"
+  - "--parallel"
+  - "1"
+  - "--threads"
+  - "14"
+  - "--threads-batch"
+  - "14"
+  - "--flash-attn"
+  - "auto"
+  - "--metrics"
+# Одной строкой (устаревший способ / быстрый хак): добавится после списка.
+llm_dev_llama_extra_args: ""
+
+# =============================================================================
+# Ouroboros Desktop / OpenAI без role=system (роль llm_dev_ouroboros_compat)
+# =============================================================================
+# Проблема: встроенный шаблон Qwen в GGUF требует system первым -> 400
+# "System message must be at the beginning" (клиенты вроде Ouroboros шлют только user/assistant).
+# Ouroboros: patched official Qwen3.5-9B chat template (HF minus «system must be at beginning»).
+# Файл: roles/llm_dev_ouroboros_compat/files/qwen35_9b_ouroboros_patched_chat_template.jinja
+# Включить: true + --tags "llm_dev_ouroboros,llm_dev_config". Отключить: false (шаблон из GGUF).
+llm_dev_ouroboros_compat_enabled: true
+llm_dev_ouroboros_compat_dir: "{{ llm_dev_app_root }}/chat-templates"
+llm_dev_ouroboros_compat_template_filename: "qwen35_9b_ouroboros_patched_chat_template.jinja"
+llm_dev_ouroboros_compat_container_mount: "/chat-templates"
+
+llm_dev_open_webui_enabled: true
+llm_dev_open_webui_image: "ghcr.io/open-webui/open-webui:main"
+llm_dev_open_webui_env_file_name: "open-webui.env"
+llm_dev_open_webui_host_bind_address: "127.0.0.1"
+llm_dev_open_webui_host_port: 8081
+
+# Публичный базовый URL Open WebUI (HTTPS за nginx)
+llm_dev_open_webui_public_url: "https://llm-dev-01.example.com"
+
+# --- Публичное имя TLS / логов ---
+llm_dev_public_server_name: "llm-dev-01.example.com"
+
+# --- nginx в Docker (отдельный compose, host network — по образцу /docker/nginx на proxy-01.example.com) ---
+llm_dev_nginx_enabled: true
+llm_dev_nginx_root: "{{ llm_dev_app_root }}/nginx-proxy"
+llm_dev_nginx_image: "nginx:1.27-bookworm"
+llm_dev_nginx_compose_project_name: "llm-dev-nginx"
+llm_dev_nginx_restart_policy: always
+
+# Адрес bind для listen (как listen 10.10.12.13:443 на proxy); для одной ВМ часто задаётся IP интерфейса или 0.0.0.0
+llm_dev_nginx_listen_ip: "{{ ansible_host }}"
+
+# Каталог PEM на хосте: {{ llm_dev_nginx_root }}/certs/corp.example.com/ → /docker/apps/llm-dev/nginx-proxy/certs/corp.example.com/
+llm_dev_nginx_ssl_cert_subdir: "corp.example.com"
+llm_dev_nginx_ssl_cert_file: "wildcert.pem"
+llm_dev_nginx_ssl_cert_key_file: "wildkey.pem"
+
+# Опционально: локальный каталог на контрол-ноде с PEM для ansible.builtin.copy на хост (подкаталог под certs/{{ llm_dev_nginx_ssl_cert_subdir }}/)
+llm_dev_nginx_ssl_sync_src: ""
+
+llm_dev_nginx_assert_certs_present: true
+
+llm_dev_nginx_log_max_size: "50m"
+llm_dev_nginx_log_max_file: "1"
+
+llm_dev_nginx_client_max_body_size: "50m"
+llm_dev_nginx_proxy_read_timeout: "3600s"
+llm_dev_nginx_proxy_connect_timeout: "75s"
+
+llm_dev_nginx_ssl_protocols: "TLSv1.2 TLSv1.3"
+
+# --- Префиксы URL (nginx): снаружи и upstream llama (OpenAI-совместимый путь на llama — обычно /v1/) ---
+# Примеры: path_api="/gateway/llm/v1/", llama_upstream_openai_prefix="/v1/" — клиенты бьют в /gateway/llm/v1/..., на бэкенд уходит /v1/...
+llm_dev_nginx_path_api: "/v1/"
+llm_dev_nginx_llama_upstream_openai_prefix: "/v1/"
+# WebUI: "/" — корень vhost; иначе префикс, например "/chat/" (слэш в конце не обязателен в values — нормализуется).
+llm_dev_nginx_path_webui: "/"
+
+# =============================================================================
+# Лимиты cgroup Docker (cpus / mem_limit / memswap_limit)
+# Целевой хост: GPU1-16-48-V100-1 — 16 vCPU, 48 GiB RAM (не vGPU L4-8Q).
+# Сумма cpus ≈ 15.5 (14 + 1 + 0.5). memswap_limit = mem_limit.
+# VRAM лимитируется моделью/KV (-c, q8_0), не этими полями.
+# =============================================================================
+llm_dev_container_limits_enabled: true
+llm_dev_llama_cpus: "14.0"
+llm_dev_llama_mem_limit: "40g"
+llm_dev_llama_memswap_limit: "40g"
+llm_dev_open_webui_cpus: "1.0"
+llm_dev_open_webui_mem_limit: "4096m"
+llm_dev_open_webui_memswap_limit: "4096m"
+llm_dev_nginx_cpus: "0.5"
+llm_dev_nginx_mem_limit: "256m"
+llm_dev_nginx_memswap_limit: "256m"

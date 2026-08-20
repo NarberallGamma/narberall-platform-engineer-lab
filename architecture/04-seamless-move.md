@@ -7,7 +7,7 @@ The lab already has **both sides** as sanitized code (do not treat this as a fin
 - Today-shaped OpenStack IaaS: [`../iac/terraform/vkcloud/`](../iac/terraform/vkcloud/)
 - Target-shaped Huawei / AWS-class: [`../iac/terraform/cloud-ru-huawei/`](../iac/terraform/cloud-ru-huawei/), [`../iac/terraform/cloud-ru-compute/`](../iac/terraform/cloud-ru-compute/)
 
-A **planned** move (VK Cloud / NOVA-class → Huawei-class Advanced) uses that pair: inventory, dual-run or replica, DNS cut, freeze measured in hours. Users keep the same URLs. That is the same habit as the ~99.9% SLA migrations already described in the root README.
+A **planned** move (VK Cloud / NOVA-class → Huawei-class Advanced) uses that pair: inventory, dual-run or replica, DNS cut, freeze measured in hours. Users keep the same URLs. Host inventory and scrape stay Ansible ([case 10](../case-studies/10-ansible-estate.md)); cluster GitOps stays Helm ([case 11](../case-studies/11-helm-estate.md), [`../iac/helm/apps/`](../iac/helm/apps/)). That is the same habit as the ~99.9% SLA migrations already described in the root README.
 
 ```mermaid
 flowchart LR

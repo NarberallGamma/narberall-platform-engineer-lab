@@ -1,0 +1,4 @@
+.git
+.gitlab-ci.yml
+.helm
+.werf_secret_key

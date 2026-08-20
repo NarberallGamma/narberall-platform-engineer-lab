@@ -1,0 +1,8 @@
+configVersion: 1
+project: werf-monorepo-sample
+deploy:
+  helmChartDir: {{ env "HELM_DIRECTORY" }}
+
+---
+image: s3_cache_proxy
+from: nginxinc/nginx-s3-gateway

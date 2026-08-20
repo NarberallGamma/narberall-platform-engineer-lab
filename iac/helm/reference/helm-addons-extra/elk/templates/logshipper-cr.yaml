@@ -1,0 +1,46 @@
+{{- range .Values.logshipper.loggingconfigs }}
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: ClusterLoggingConfig
+metadata:
+  name: {{ .name }}
+spec:
+  type: KubernetesPods
+  kubernetesPods:
+    {{- toYaml .kubernetesPods | nindent 4 }}
+  logFilter:
+    {{- toYaml .logFilter | nindent 4 }}
+  destinationRefs:
+    - {{ .dref }}
+{{- end }}
+{{- range .Values.logshipper.logdestinations }}
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: ClusterLogDestination
+metadata:
+  name: {{ .name }}
+spec:
+  type: Elasticsearch
+  extraLabels:
+    data: "{{`{{ parsed_data }}`}}"
+  elasticsearch:
+    endpoint: {{ printf "https://%s-es-cluster.%s.svc.cluster.local:9200" $.Chart.Name $.Values.werf.namespace }}
+    index: {{ .index }}
+    auth:
+      strategy: Basic
+      user: elastic
+      password: {{ (pluck $.Values.global.env $.Values.auth | first | default $.Values.auth._default) | b64enc }}
+    tls:
+      verifyCertificate: false
+      verifyHostname: false
+{{- end }}
+### CRD for Logstash
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: ClusterLogDestination
+metadata:
+  name: elk-ls
+spec:
+  type: Logstash
+  logstash:
+    endpoint: {{ printf "https://%s-ls-tcp.%s.svc.cluster.local:12345" $.Chart.Name $.Values.werf.namespace }}

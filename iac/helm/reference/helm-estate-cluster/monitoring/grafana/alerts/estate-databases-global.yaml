@@ -1,0 +1,298 @@
+# Alert rules for dashboard "Estate / Databases / Global" (uid: estate_databases_global).
+# Panel 1: PostgreSQL ds_psql = estate-prod-postgresql-estate-web (UID ffjo3xgrf6yo0d, Grafana variable ds_psql).
+# Panel 2 (estate_ledger_adapter): wallet_tx uses created_at and send_at (not updated_at); same in alert refId D.
+# Panel 1 (estate_web COMPLETED + balance): excluded request_id placeholders in refId A and D.
+# wallet_tx FATAL_ERROR: excluded bid_id placeholders (lab/test) in refId A and D.
+# Rule 1 (estate_web COMPLETED + balance): A-C as a counter; D + E use the same tx_detail / reduce last as wallet_tx (column is not metric).
+# Rule 2 (wallet_tx): A-C + D + E, see below.
+# Grafana PostgreSQL alerting: time_series (time + text column + value). E is instant for annotation templates. tx_detail: string_agg with E'\n' and a bullet prefix so plain-text mail (platform.email.*) stays line-readable.
+# Rule 1: WARN when at least one COMPLETED request still has token_balance >= 1 (dust filter).
+# noDataState: OK: missing data/series must not raise DatasourceNoData; notify only when the query returns a value and the threshold fires.
+# execErrState: OK: query errors (Prometheus timeout, datasource down) must not raise DatasourceError; notify only on a metric threshold.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Estate Databases Global
+    folder: Alerting
+    interval: 1m
+    rules:
+      - uid: estate_web_completed_nonzero_balance_warn
+        title: Estate / Databases / Global - COMPLETED rows with token_balance ≥ 1 (possible stale balance)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: ffjo3xgrf6yo0d
+            model:
+              datasource:
+                type: postgres
+                uid: ffjo3xgrf6yo0d
+              editorMode: code
+              format: time_series
+              intervalMs: 1000
+              maxDataPoints: 43200
+              rawQuery: true
+              rawSql: |
+                SELECT
+                  NOW() AS "time",
+                  COUNT(*)::double precision AS value
+                FROM public.request AS r
+                INNER JOIN public.balance b ON r.id = b.request_id
+                WHERE r.status = 'COMPLETED'
+                  AND b.token_balance >= 1
+                  AND r.id NOT IN (
+                    '00000000-0000-4000-8000-000000000001'
+                  )
+              refId: A
+              sql:
+                columns:
+                  - parameters: []
+                    type: function
+                groupBy:
+                  - property:
+                      type: string
+                    type: groupBy
+                limit: 50
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 0'
+          - refId: D
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: ffjo3xgrf6yo0d
+            model:
+              datasource:
+                type: postgres
+                uid: ffjo3xgrf6yo0d
+              editorMode: code
+              format: time_series
+              intervalMs: 1000
+              maxDataPoints: 43200
+              rawQuery: true
+              rawSql: |
+                SELECT
+                  NOW() AS "time",
+                  COALESCE(
+                    (
+                      SELECT string_agg(
+                        format(
+                          '• request_id=%s transit_wallet=%s token_balance=%s status_date=%s',
+                          x.id::text,
+                          COALESCE(x.transit_wallet::text, 'null'),
+                          x.token_balance::text,
+                          to_char(x.status_date, 'YYYY-MM-DD HH24:MI:SS TZ')
+                        ),
+                        E'\n'
+                        ORDER BY x.status_date DESC NULLS LAST, x.id::text
+                      )
+                      FROM (
+                        SELECT r.id, r.transit_wallet, b.token_balance, r.status_date
+                        FROM public.request AS r
+                        INNER JOIN public.balance b ON r.id = b.request_id
+                        WHERE r.status = 'COMPLETED'
+                          AND b.token_balance >= 1
+                          AND r.id NOT IN (
+                            '00000000-0000-4000-8000-000000000001'
+                          )
+                        ORDER BY r.status_date DESC NULLS LAST, r.id
+                        LIMIT 25
+                      ) AS x
+                    ),
+                    ''
+                  ) AS "tx_detail",
+                  1.0::double precision AS value
+              refId: D
+              sql:
+                columns:
+                  - parameters: []
+                    type: function
+                groupBy:
+                  - property:
+                      type: string
+                    type: groupBy
+                limit: 50
+          - refId: E
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: E
+              reducer: last
+              expression: D
+        dashboardUid: estate_databases_global
+        panelId: 1
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: {{ printf "%s" "estate_web: COMPLETED requests still show token_balance ≥ 1 (balance may not have synced). Rows (up to 25, request_id / transit_wallet / token_balance / status_date): {{ with index $values \"E\" }}{{ if index .Labels \"tx_detail\" }}{{ index .Labels \"tx_detail\" }}{{ else }}{{ $value }}{{ end }}{{ else }}{{ $value }}{{ end }}." | quote }}
+          description: {{ printf "%s" "Stale-balance cases (same filter as panel 1): {{ with index $values \"E\" }}{{ if index .Labels \"tx_detail\" }}{{ index .Labels \"tx_detail\" }}{{ else }}{{ $value }}{{ end }}{{ else }}{{ $value }}{{ end }}. Often correlate with adapter transit_wallet at zero or delayed balance refresh. Investigate estate_ledger_adapter.public.transit_wallet, estate-ledger-adapter update-balances, then estate_web / estate_contract public.balance for the affected request_id. Dashboard Estate / Databases / Global." | quote }}
+        labels:
+          dashboard: "Estate / Databases / Global"
+          severity: warning
+      - uid: estate_adapter_wallet_tx_fatal_warn
+        title: Estate / Databases / Global - ledger adapter wallet_tx FATAL_ERROR
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: cfjv6d9key8zka
+            model:
+              datasource:
+                type: postgres
+                uid: cfjv6d9key8zka
+              editorMode: code
+              format: time_series
+              intervalMs: 1000
+              maxDataPoints: 43200
+              rawQuery: true
+              rawSql: |
+                SELECT
+                  NOW() AS "time",
+                  COUNT(*)::double precision AS value
+                FROM public.wallet_tx
+                WHERE status = 'FATAL_ERROR'
+                  AND (tx_type = 'TRC20_TRANSFER' OR tx_type = 'ERC20_TRANSFER')
+                  AND bid_id NOT IN (
+                    '00000000-0000-4000-8000-000000000002',
+                    '00000000-0000-4000-8000-000000000003',
+                    '00000000-0000-4000-8000-000000000004',
+                    '00000000-0000-4000-8000-000000000005',
+                    '00000000-0000-4000-8000-000000000006',
+                    '00000000-0000-4000-8000-000000000007'
+                  )
+              refId: A
+              sql:
+                columns:
+                  - parameters: []
+                    type: function
+                groupBy:
+                  - property:
+                      type: string
+                    type: groupBy
+                limit: 50
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 0'
+          - refId: D
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: cfjv6d9key8zka
+            model:
+              datasource:
+                type: postgres
+                uid: cfjv6d9key8zka
+              editorMode: code
+              format: time_series
+              intervalMs: 1000
+              maxDataPoints: 43200
+              rawQuery: true
+              rawSql: |
+                SELECT
+                  NOW() AS "time",
+                  COALESCE(
+                    (
+                      SELECT string_agg(
+                        format(
+                          '• transaction id=%s type=%s bid_id=%s entered FATAL_ERROR at %s (DB time)',
+                          x.id::text,
+                          COALESCE(x.tx_type::text, 'unknown'),
+                          COALESCE(x.bid_id::text, 'null'),
+                          to_char(COALESCE(x.send_at, x.created_at), 'YYYY-MM-DD HH24:MI:SS TZ')
+                        ),
+                        E'\n'
+                        ORDER BY COALESCE(x.send_at, x.created_at) DESC NULLS LAST, x.bid_id::text, x.id::text
+                      )
+                      FROM (
+                        SELECT id, tx_type, bid_id, send_at, created_at
+                        FROM public.wallet_tx
+                        WHERE status = 'FATAL_ERROR'
+                          AND (tx_type = 'TRC20_TRANSFER' OR tx_type = 'ERC20_TRANSFER')
+                          AND bid_id NOT IN (
+                            '00000000-0000-4000-8000-000000000002',
+                            '00000000-0000-4000-8000-000000000003',
+                            '00000000-0000-4000-8000-000000000004',
+                            '00000000-0000-4000-8000-000000000005',
+                            '00000000-0000-4000-8000-000000000006',
+                            '00000000-0000-4000-8000-000000000007'
+                          )
+                        ORDER BY COALESCE(send_at, created_at) DESC NULLS LAST, bid_id, id
+                        LIMIT 25
+                      ) AS x
+                    ),
+                    ''
+                  ) AS "tx_detail",
+                  1.0::double precision AS value
+              refId: D
+              sql:
+                columns:
+                  - parameters: []
+                    type: function
+                groupBy:
+                  - property:
+                      type: string
+                    type: groupBy
+                limit: 50
+          - refId: E
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: E
+              reducer: last
+              expression: D
+        dashboardUid: estate_databases_global
+        panelId: 2
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          # Annotations: Grafana templates inside printf; quoted for Helm tpl. Row text is Label tx_detail on reduce E (do not use a column named metric).
+          summary: {{ printf "%s" "Ledger adapter: on-chain transfer(s) failed with FATAL_ERROR. Details (tx id, type, bid_id, timestamp from DB, up to 25 rows): {{ with index $values \"E\" }}{{ if index .Labels \"tx_detail\" }}{{ index .Labels \"tx_detail\" }}{{ else }}{{ $value }}{{ end }}{{ else }}{{ $value }}{{ end }}. Please verify transaction status in the personal / back-office UI." | quote }}
+          description: {{ printf "%s" "What happened: record(s) in estate_ledger_adapter.public.wallet_tx reached status FATAL_ERROR (ERC20/TRC20 transfers). Each line below is one failing transaction with bid_id and the time stored in the database. Please confirm status in the customer or operations UI (personal account / back-office). Technical detail: {{ with index $values \"E\" }}{{ if index .Labels \"tx_detail\" }}{{ index .Labels \"tx_detail\" }}{{ else }}{{ $value }}{{ end }}{{ else }}{{ $value }}{{ end }}. Dashboard Estate / Databases / Global - panel wallet_tx FATAL_ERROR (estate_ledger_adapter)." | quote }}
+        labels:
+          dashboard: "Estate / Databases / Global"
+          severity: warning

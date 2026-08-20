@@ -1,0 +1,456 @@
+# Alert rules for dashboard "Kafka (DMS) - CloudEye" (uid: 61384089-7711-487c-8bde-68a540d66a86).
+# Metrics: prometheus-cloudeye-exporter (job=cloudeye-exporter). Datasource UID: PBFA97CFB590B2093.
+# noDataState: OK: missing metrics (scrape/CES gap) must not raise DatasourceNoData; notify only when the query returns a value and the threshold fires.
+# execErrState: OK: query errors (Prometheus timeout, datasource down) must not raise DatasourceError; notify only on a metric threshold.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Kafka DMS CloudEye
+    folder: Alerting
+    interval: 30s
+    rules:
+      - uid: kafka_dms_consumer_lag_warn
+        title: Kafka DMS - Total Consumer Lag > 100
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(sbercloud_sys_dms_messages_remained{job="cloudeye-exporter", kafka_groups!~"estate-web-ws-.*"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 100'
+        dashboardUid: 61384089-7711-487c-8bde-68a540d66a86
+        panelId: 134
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Kafka DMS total consumer lag exceeds 100 messages"
+          description: "sum(sbercloud_sys_dms_messages_remained) excluding estate-web-ws-* groups. Dashboard: Total Consumer Lag."
+        labels:
+          dashboard: "Kafka (DMS) - CloudEye"
+          severity: warning
+
+      - uid: kafka_dms_consumer_lag_crit
+        title: Kafka DMS - Total Consumer Lag > 300
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(sbercloud_sys_dms_messages_remained{job="cloudeye-exporter", kafka_groups!~"estate-web-ws-.*"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 300'
+        dashboardUid: 61384089-7711-487c-8bde-68a540d66a86
+        panelId: 134
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Kafka DMS total consumer lag exceeds 300 messages"
+          description: "sum(sbercloud_sys_dms_messages_remained) excluding estate-web-ws-* groups. Dashboard: Total Consumer Lag."
+        labels:
+          dashboard: "Kafka (DMS) - CloudEye"
+          severity: critical
+
+      - uid: kafka_dms_brokers_online_low
+        title: Kafka DMS - Brokers Online < 3
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(sbercloud_sys_dms_broker_alive{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B < 3'
+        dashboardUid: 61384089-7711-487c-8bde-68a540d66a86
+        panelId: 46
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Kafka DMS fewer than 3 brokers online"
+          description: "sum(sbercloud_sys_dms_broker_alive) < 3. Dashboard: Brokers Online."
+        labels:
+          dashboard: "Kafka (DMS) - CloudEye"
+          severity: critical
+
+      - uid: kafka_dms_partitions_usage_warn
+        title: Kafka DMS - Current Partitions Usage > 60%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_dms_current_partitions_usage{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 60'
+        dashboardUid: 61384089-7711-487c-8bde-68a540d66a86
+        panelId: 105
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Kafka DMS partition limit usage above 60%"
+          description: "max(sbercloud_sys_dms_current_partitions_usage). Dashboard: Current Partitions Usage."
+        labels:
+          dashboard: "Kafka (DMS) - CloudEye"
+          severity: warning
+
+      - uid: kafka_dms_partitions_usage_crit
+        title: Kafka DMS - Current Partitions Usage > 85%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_dms_current_partitions_usage{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 85'
+        dashboardUid: 61384089-7711-487c-8bde-68a540d66a86
+        panelId: 105
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Kafka DMS partition limit usage above 85%"
+          description: "max(sbercloud_sys_dms_current_partitions_usage). Dashboard: Current Partitions Usage."
+        labels:
+          dashboard: "Kafka (DMS) - CloudEye"
+          severity: critical
+
+      - uid: kafka_dms_disk_usage_warn
+        title: Kafka DMS - Disk Usage > 60%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_dms_broker_disk_usage{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 60'
+        dashboardUid: 61384089-7711-487c-8bde-68a540d66a86
+        panelId: 83
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Kafka DMS broker disk usage above 60%"
+          description: "max(sbercloud_sys_dms_broker_disk_usage). Dashboard: Disk Usage."
+        labels:
+          dashboard: "Kafka (DMS) - CloudEye"
+          severity: warning
+
+      - uid: kafka_dms_disk_usage_crit
+        title: Kafka DMS - Disk Usage > 85%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_dms_broker_disk_usage{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 85'
+        dashboardUid: 61384089-7711-487c-8bde-68a540d66a86
+        panelId: 83
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Kafka DMS broker disk usage above 85%"
+          description: "max(sbercloud_sys_dms_broker_disk_usage). Dashboard: Disk Usage."
+        labels:
+          dashboard: "Kafka (DMS) - CloudEye"
+          severity: critical
+
+      # Per-broker CPU/RAM: empty Prometheus (scrape/CES gap) stays noDataState OK, otherwise Grafana sends DatasourceNoData and [no value] in labels.
+      - uid: kafka_dms_broker_memory_warn
+        title: Kafka DMS - Memory Usage > 70% (per broker)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max by (kafka_broker) (sbercloud_sys_dms_broker_memory_usage{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 70'
+        dashboardUid: 61384089-7711-487c-8bde-68a540d66a86
+        panelId: 82
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: "Kafka DMS broker memory usage > 70% on {{ "{{" }} {{ "$" }}{{ "labels.kafka_broker" }} {{ "}}" }}"
+          description: "sbercloud_sys_dms_broker_memory_usage. Broker: {{ "{{" }} {{ "$" }}{{ "labels.kafka_broker" }} {{ "}}" }}."
+        labels:
+          dashboard: "Kafka (DMS) - CloudEye"
+          severity: warning
+
+      - uid: kafka_dms_broker_memory_crit
+        title: Kafka DMS - Memory Usage > 90% (per broker)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max by (kafka_broker) (sbercloud_sys_dms_broker_memory_usage{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 90'
+        dashboardUid: 61384089-7711-487c-8bde-68a540d66a86
+        panelId: 82
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: "Kafka DMS broker memory usage > 90% on {{ "{{" }} {{ "$" }}{{ "labels.kafka_broker" }} {{ "}}" }}"
+          description: "sbercloud_sys_dms_broker_memory_usage. Broker: {{ "{{" }} {{ "$" }}{{ "labels.kafka_broker" }} {{ "}}" }}."
+        labels:
+          dashboard: "Kafka (DMS) - CloudEye"
+          severity: critical
+
+      - uid: kafka_dms_broker_cpu_warn
+        title: Kafka DMS - CPU Usage > 70% (per broker)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max by (kafka_broker) (sbercloud_sys_dms_broker_cpu_usage{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 70'
+        dashboardUid: 61384089-7711-487c-8bde-68a540d66a86
+        panelId: 81
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: "Kafka DMS broker CPU usage > 70% on {{ "{{" }} {{ "$" }}{{ "labels.kafka_broker" }} {{ "}}" }}"
+          description: "sbercloud_sys_dms_broker_cpu_usage. Broker: {{ "{{" }} {{ "$" }}{{ "labels.kafka_broker" }} {{ "}}" }}."
+        labels:
+          dashboard: "Kafka (DMS) - CloudEye"
+          severity: warning
+
+      - uid: kafka_dms_broker_cpu_crit
+        title: Kafka DMS - CPU Usage > 90% (per broker)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max by (kafka_broker) (sbercloud_sys_dms_broker_cpu_usage{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 90'
+        dashboardUid: 61384089-7711-487c-8bde-68a540d66a86
+        panelId: 81
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: "Kafka DMS broker CPU usage > 90% on {{ "{{" }} {{ "$" }}{{ "labels.kafka_broker" }} {{ "}}" }}"
+          description: "sbercloud_sys_dms_broker_cpu_usage. Broker: {{ "{{" }} {{ "$" }}{{ "labels.kafka_broker" }} {{ "}}" }}."
+        labels:
+          dashboard: "Kafka (DMS) - CloudEye"
+          severity: critical

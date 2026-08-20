@@ -1,0 +1,91 @@
+{{- $app_urls := pluck .Values.global.cluster .Values.app.app_urls | first }}
+{{- $app_url := pluck .Values.werf.env $app_urls | first | default $app_urls._default | first }}
+{{- $app_url := printf "https://%s" (include "fl.value" (list $ . $app_url.host)) }}
+{{- $name := $.Chart.Name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-crons-one-job
+spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ $name }}-crons-one-job
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        checksum/config-crons: {{ include (print $.Template.BasePath "/05-cm-crons.yaml") . | sha256sum }}
+        checksum/envs: {{ include (print $.Template.BasePath "/15-envs.yaml") . | sha256sum }}
+        checksum/appurl: {{ $app_url | sha256sum }}
+      labels:
+        app: {{ $name }}-crons-one-job
+        part-of: {{ $.Chart.Name }}-crons
+        prometheus.deckhouse.io/custom-target: {{ $.Chart.Name }}-crons-one-job
+    spec:
+{{- if eq $.Values.werf.env "production" }}
+      priorityClassName: production-high
+{{- end }}
+      imagePullSecrets:
+      - name: registrysecret
+      volumes:
+        - name: crontab
+          configMap:
+            name: {{ $.Chart.Name }}-crons
+      containers:
+      - name: php
+        image: {{ index .Values.werf.image "app-cron-one-job" }}
+        command: ["/usr/local/bin/supercronic"]
+        workingDir: /app
+        ports:
+        - containerPort: 9746
+          name: http-metrics
+        args:
+          - "-prometheus-listen-address"
+          - "0.0.0.0:9746"
+          - "-json"
+          - "/app/crontab"
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/kill","-SIGQUIT","1"]
+        volumeMounts:
+        - name: crontab
+          mountPath: /app/crontab
+          subPath: crontab
+{{- include "resources_crons" $ | indent 8}}
+        env:
+        - name: APP_URL
+          value: {{ $app_url | quote }}
+        envFrom:
+          - configMapRef:
+              name: {{ $.Chart.Name }}-env
+          - secretRef:
+              name: {{ $.Chart.Name }}-env
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ $name }}-crons-one-job
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: {{ $name }}-crons-one-job
+  updatePolicy:
+    updateMode: "Off"
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}-crons-one-job
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: {{ $name }}-crons-one-job

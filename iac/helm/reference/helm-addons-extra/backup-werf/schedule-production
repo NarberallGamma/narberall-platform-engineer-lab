@@ -1,0 +1,74 @@
+# -*- mode: crontab -*-
+# vi: set ft=crontab :
+#
+# Production runner. Same job mix as the live estate, hosts rewritten.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""
+
+# kube-master etcd
+10 2 * * * /app/00-scripts/borg_run_on.sh 10.10.20.21 borg_backup_etcd.sh
+
+# mysql-report-0 binlog
+1 * * * * /app/00-scripts/borg_run_on.sh mysql-report-0.estate.example.com borg_backup_files.sh 'BINLOG /var/lib/mysql/binlogs/mysql8-bin.*'
+
+# mysql-report-1 xtrabackup + binlog
+11 22 * * * /app/00-scripts/borg_run_on.sh mysql-report-1.estate.example.com borg_backup_xtrabackup.sh 'MYSQL --defaults-file "~/.my.cnf"'
+10 * * * * /app/00-scripts/borg_run_on.sh mysql-report-1.estate.example.com borg_backup_files.sh 'BINLOG /var/lib/mysql/binlogs/mysql8-bin.*'
+
+# mysql-app-0 binlog
+21 * * * * /app/00-scripts/borg_run_on.sh mysql-app-0.estate.example.com borg_backup_files.sh 'BINLOG /var/lib/mysql/binlogs/mysql8-bin.*'
+
+# mysql-app-1 xtrabackup + binlog
+28 22 * * * /app/00-scripts/borg_run_on.sh mysql-app-1.estate.example.com borg_backup_xtrabackup.sh 'MYSQL --defaults-file "~/.my.cnf"'
+46 * * * * /app/00-scripts/borg_run_on.sh mysql-app-1.estate.example.com borg_backup_files.sh 'BINLOG /var/lib/mysql/binlog*'
+
+# mysql-app-2 binlog
+49 * * * * /app/00-scripts/borg_run_on.sh mysql-app-2.estate.example.com borg_backup_files.sh 'BINLOG /var/lib/mysql/binlog*'
+
+# mysql-legacy-0 binlog
+45 * * * * /app/00-scripts/borg_run_on.sh mysql-legacy-0.estate.example.com borg_backup_files.sh 'BINLOG /mnt/binlogs --prune "--keep-within=7d"'
+
+# mysql-legacy-1 xtrabackup + binlog
+51 22 * * * /app/00-scripts/borg_run_on.sh mysql-legacy-1.estate.example.com borg_backup_xtrabackup.sh 'MYSQL --defaults-file "/etc/mysql/mysql.conf.d/mysqld.cnf" --add-innobackupex-option "--no-server-version-check" --prune "--keep-within=7d"'
+31 * * * * /app/00-scripts/borg_run_on.sh mysql-legacy-1.estate.example.com borg_backup_files.sh 'BINLOG /mnt/binlogs --prune "--keep-within=7d"'
+
+# mysql-reserve (no binlog)
+51 23 * * * /app/00-scripts/borg_run_on.sh mysql-reserve-0.estate.example.com borg_backup_xtrabackup.sh 'MYSQL --defaults-file "/etc/mysql/mysql.conf.d/mysqld.cnf"'
+
+# mysql-cs-0 binlog
+34 * * * * /app/00-scripts/borg_run_on.sh mysql-cs-0.estate.example.com borg_backup_files.sh 'BINLOG /var/lib/mysql/binlogs --prune "--keep-within=7d"'
+
+# mysql-cs-1 xtrabackup + binlog
+54 22 * * * /app/00-scripts/borg_run_on.sh mysql-cs-1.estate.example.com borg_backup_xtrabackup.sh 'MYSQL --defaults-file "~/.my.cnf" --add-innobackupex-option "--no-server-version-check" --prune "--keep-within=7d"'
+31 * * * * /app/00-scripts/borg_run_on.sh mysql-cs-1.estate.example.com borg_backup_files.sh 'BINLOG /var/lib/mysql/binlogs --prune "--keep-within=7d"'
+
+# partners mongodb
+5 1 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo.sh 'MONGO-PARTNERS --host mongodb-partners.production.svc.cluster.local --port 27017 --password "/root/secrets/.mongo-partners-pass" --user backup --authenticationDatabase admin --prune "--keep-within=7d" --skip-hostname-prefix'
+
+# transactions mongodb
+10 1 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo.sh 'MONGO-TRANSACTIONS --host mongodb-transactions.production.svc.cluster.local --port 27017 --password "/root/secrets/.mongo-transactions-pass" --user backup --authenticationDatabase admin --prune "--keep-within=7d" --skip-hostname-prefix'
+
+# kyc mongodb
+15 1 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo.sh 'MONGO-KYC --host mongodb-kyc.production.svc.cluster.local --port 27017 --password "/root/secrets/.mongo-kyc-pass" --user backup --authenticationDatabase admin --prune "--keep-within=7d" --skip-hostname-prefix'
+
+# trading mongodb
+20 1 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo.sh 'MONGO-TRADING --host mongodb-trading.production.svc.cluster.local --port 27017 --password "/root/secrets/.mongo-trading-pass" --user backup --authenticationDatabase admin --prune "--keep-within=7d" --skip-hostname-prefix'
+
+# promotions mongodb
+25 1 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo.sh 'MONGO-PROMOTIONS --host mongodb-promotions.production.svc.cluster.local --port 27017 --password "/root/secrets/.mongo-promotions-pass" --user backup --authenticationDatabase admin --prune "--keep-within=7d" --skip-hostname-prefix'
+
+# clients mongodb
+30 1 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo.sh 'MONGO-CLIENTS --host mongodb-clients.production.svc.cluster.local --port 27017 --password "/root/secrets/.mongo-clients-pass" --user backup --authenticationDatabase admin --prune "--keep-within=7d" --skip-hostname-prefix'
+
+# audit mongodb
+35 1 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo.sh 'MONGO-AUDIT --host mongodb-audit-rs0.production.svc.cluster.local --port 27017 --password "/root/secrets/.mongo-audit-pass" --user backup --authenticationDatabase admin --prune "--keep-within=7d" --skip-hostname-prefix'
+
+# trading5 mongodb
+50 1 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo.sh 'MONGO-TRADING5 --host mongodb-trading5.production.svc.cluster.local --port 27017 --password "/root/secrets/.mongo-trading5-pass" --user backup --authenticationDatabase admin --prune "--keep-within=7d" --skip-hostname-prefix'
+
+# kafka mongodb
+0 2 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo.sh 'MONGO-KAFKA --host mongodb-kafka-rs0.production.svc.cluster.local --port 27017 --password "/root/secrets/.mongo-kafka-pass" --user backup --authenticationDatabase admin --prune "--keep-within=7d" --skip-hostname-prefix'
+
+# neo4j
+0 23 * * 6 /app/00-scripts/borg_run_on.sh neo4j-members-0.estate.example.com borg_backup_neo4j.sh NEO4J-MEMBERS graph.db
+0 23 * * 6 /app/00-scripts/borg_run_on.sh neo4j-commissions-0.estate.example.com borg_backup_neo4j.sh NEO4J-COMMISSIONS graph.db

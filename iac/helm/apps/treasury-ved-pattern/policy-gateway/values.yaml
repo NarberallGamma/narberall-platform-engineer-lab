@@ -1,0 +1,272 @@
+fullnameOverride: policy-gateway
+
+global:
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+  env:
+    PLACEHOLDER: "managed-by-vault-external-secrets"
+
+# One PVC: RocksDB + CryptoPro via subPath.
+# storageClassName: "ssd". Explicit empty class: storageClassName: "-"
+# Large dgtry_mk_* trees: 8Gi ext4 hits the inode cap (~512k) during key import. 32Gi gives ~2M inodes.
+# Raising size on an existing PVC does not add inodes: scale to 0, delete the PVC, redeploy.
+# Before the first deploy after a schema change, delete leftover PVCs.
+persistence:
+  enabled: true
+  storageClassName: "ssd"
+  accessModes:
+    - ReadWriteOnce
+  size: 32Gi
+  claimName: &pvc_data policy-gateway-pvc
+  lookupVolumeName: true
+  finalizers:
+    - kubernetes.io/pvc-protection
+  annotations: {}
+
+application:
+  enabled: true
+  replicaCount: 1
+  # ReadWriteOnce: Recreate avoids two pods attaching one volume (Multi-Attach).
+  strategy:
+    type: Recreate
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+
+  podSecurityContext:
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+
+  service:
+    enabled: true
+    port: 8080
+    targetPort: 8080
+    type: ClusterIP
+
+  podAnnotations:
+    sidecar.istio.io/inject: "true"
+    sidecar.istio.io/proxyCPU: "100m"
+    sidecar.istio.io/proxyMemory: "128Mi"
+
+  serviceAccount:
+    authDelegator: true
+
+  extraEnvFrom:
+    - secretRef:
+        name: policy-gateway-vault-secrets
+
+  env:
+    server.forward-headers-strategy: framework
+
+    spring.application.name: policy-gateway-app
+    spring.cloud.vault.uri: "https://vault.example.com"
+    spring.cloud.vault.authentication: KUBERNETES
+    spring.cloud.vault.kubernetes.role: app
+    spring.cloud.vault.kubernetes.service-account-token-file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    spring.cloud.vault.kubernetes-path: kubernetes
+
+    spring.cloud.openfeign.client.config.default.logger-level: basic
+
+    spring.kafka.bootstrap-servers: "kafka-0.example.com:9093,kafka-1.example.com:9093,kafka-2.example.com:9093"
+    spring.kafka.properties.security.protocol: SASL_SSL
+    spring.kafka.properties.sasl.mechanism: PLAIN
+    spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="estate_user" password="${kafkaClientPassword}";
+    spring.kafka.properties.ssl.endpoint.identification.algorithm: ""
+    spring.kafka.properties.ssl.keystore.type: JKS
+    spring.kafka.properties.ssl.keystore.location: /tmp/kafka-truststore/kafka-truststore.jks
+    spring.kafka.properties.ssl.keystore.password: changeit
+    spring.kafka.properties.ssl.truststore.type: JKS
+    spring.kafka.properties.ssl.truststore.location: /tmp/kafka-truststore/kafka-truststore.jks
+    spring.kafka.properties.ssl.truststore.password: changeit
+    spring.kafka.consumer.security.protocol: SASL_SSL
+    spring.kafka.consumer.sasl.mechanism: PLAIN
+    spring.kafka.consumer.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="estate_user" password="${kafkaClientPassword}";
+    spring.kafka.consumer.ssl.endpoint.identification.algorithm: ""
+    spring.kafka.consumer.ssl.keystore.type: JKS
+    spring.kafka.consumer.ssl.keystore.location: /tmp/kafka-truststore/kafka-truststore.jks
+    spring.kafka.consumer.ssl.keystore.password: changeit
+    spring.kafka.consumer.ssl.truststore.type: JKS
+    spring.kafka.consumer.ssl.truststore.location: /tmp/kafka-truststore/kafka-truststore.jks
+    spring.kafka.consumer.ssl.truststore.password: changeit
+    spring.kafka.consumer.custom:
+      replication-group-id: policy-gateway-group-replica-0
+    spring.kafka.consumer.auto-offset-reset: earliest
+    spring.kafka.producer.security.protocol: SASL_SSL
+    spring.kafka.producer.sasl.mechanism: PLAIN
+    spring.kafka.producer.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="estate_user" password="${kafkaClientPassword}";
+    spring.kafka.producer.ssl.endpoint.identification.algorithm: ""
+    spring.kafka.producer.ssl.keystore.type: JKS
+    spring.kafka.producer.ssl.keystore.location: /tmp/kafka-truststore/kafka-truststore.jks
+    spring.kafka.producer.ssl.keystore.password: changeit
+    spring.kafka.producer.ssl.truststore.type: JKS
+    spring.kafka.producer.ssl.truststore.location: /tmp/kafka-truststore/kafka-truststore.jks
+    spring.kafka.producer.ssl.truststore.password: changeit
+    kafka.producer.compression-type: none
+
+    treasury.policy-gateway:
+      features:
+        transaction-policy: false
+        vaults-registry: false
+        user-account: false
+      bitcoin.network: TESTNET
+      dgtry:
+        mode: PREGEN
+        checksum: "ANY"
+        recovery-public-key: ""
+        recovery-public-key-any: true
+      rocksdb:
+        data-dir: /service/data
+        db-key: "NONE"
+
+    file-storage:
+      s3:
+        url: https://estate-policy-gateway.obs.example.com
+        protocol: HTTPS
+        region: example-1
+        bucket: estate-policy-gateway
+        addressing-style: virtual
+
+    # Feign URLs used at process start. cert-verifier is not part of this slice.
+    cert-verifier-service.url: http://cert-verifier-application:8080
+    pki-gateway-service.url: http://pki-gateway-application:8080
+
+    management.endpoints.web.exposure.include: "*"
+
+    logging.level.root: INFO
+    logging.level.com.example.estate: INFO
+    logging.level.org.apache.kafka: INFO
+    logging.level.org.springframework.kafka: INFO
+    logging.level.feign_util_logger: INFO
+
+  extraVolumes:
+    - name: bootstrap-script
+      configMap:
+        name: policy-gateway-bootstrap-script
+        defaultMode: 0755
+    - name: kafka-ca-cert
+      secret:
+        secretName: kafka-ca-cert
+    - name: kafka-truststore
+      emptyDir: {}
+    - name: policy-gateway-data
+      persistentVolumeClaim:
+        claimName: *pvc_data
+
+  extraVolumeMounts:
+    - name: kafka-ca-cert
+      mountPath: /tmp/kafka-ca.crt
+      subPath: ca.crt
+      readOnly: true
+    - name: kafka-truststore
+      mountPath: /tmp/kafka-truststore
+    - name: policy-gateway-data
+      mountPath: /service/data
+      subPath: data
+    - name: policy-gateway-data
+      mountPath: /var/opt/cprocsp/users/cprouser
+      subPath: cprocsp/users/cprouser
+    - name: policy-gateway-data
+      mountPath: /var/opt/cprocsp/keys/cprouser
+      subPath: cprocsp/keys/cprouser
+    - name: policy-gateway-data
+      mountPath: /var/opt/cprocsp/dsrf
+      subPath: cprocsp/dsrf
+
+  extraEnv:
+    - name: JAVA_TOOL_OPTIONS
+      value: "-Djdk.tls.namedGroups=secp256r1,secp384r1,secp521r1,ffdhe2048,ffdhe3072 -Djavax.net.ssl.trustStore=/tmp/kafka-truststore/kafka-truststore.jks -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS -Djavax.net.ssl.keyStore=/tmp/kafka-truststore/kafka-truststore.jks -Djavax.net.ssl.keyStorePassword=changeit -Djavax.net.ssl.keyStoreType=JKS -Dcom.sun.net.ssl.checkRevocation=false -Djdk.tls.allowUnsafeServerCertChange=true -Djavax.net.ssl.checkRevocation=false -Dcom.sun.jndi.ldap.object.disableEndpointIdentification=true -Djdk.tls.client.enableStatusRequestExtension=false"
+    - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+      value: "kafka-0.example.com:9093,kafka-1.example.com:9093,kafka-2.example.com:9093"
+    - name: SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL
+      value: "SASL_SSL"
+    - name: SPRING_KAFKA_PROPERTIES_SASL_MECHANISM
+      value: "PLAIN"
+    - name: SPRING_KAFKA_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
+      value: ""
+    - name: SPRING_KAFKA_CONSUMER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
+      value: ""
+    - name: SPRING_KAFKA_PRODUCER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
+      value: ""
+    - name: SPRING_KAFKA_ADMIN_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
+      value: ""
+
+  # Init list comes from templates/_initcontainers.tpl (import keys + PREGEN in one bootstrap).
+  initContainersTemplate: policy-gateway.initContainers
+
+  # Unpack keys.tar.gz from the hsm-bootstrap image (PVC restore). Default off in comments; sample shows the switch.
+  keysImport:
+    enabled: true
+    force: false
+    archivePath: /archives/keys.tar.gz
+    image:
+      repository: example.registry/estate/hsm-bootstrap
+      tag: "0.1.0"
+      pullPolicy: IfNotPresent
+
+  # PREGEN bootstrap (CryptoPro). Used when keysImport.enabled is false.
+  bootstrap:
+    dgtryMode: PREGEN
+    image:
+      repository: example.registry/csp/cryptopro
+      tag: latest
+      pullPolicy: IfNotPresent
+
+  image:
+    repository: example.registry/estate/policy-gateway
+    tag: "3.0.2"
+    pullPolicy: IfNotPresent
+
+  livenessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 90
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  readinessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  containerPorts:
+    - name: http
+      containerPort: 8080
+      protocol: TCP
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      kubernetes.io/tls-acme: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$1
+      nginx.ingress.kubernetes.io/x-forwarded-prefix: /api/v0/policy-gateway/
+    hosts:
+      - host: web.example.com
+        paths:
+          - path: /api/v0/policy-gateway/(.*)
+            pathType: ImplementationSpecific
+    tls:
+      - secretName: wildcard-tls
+        hosts:
+          - web.example.com
+
+  resources:
+    requests:
+      cpu: 188m
+      memory: 384Mi
+    limits:
+      cpu: 750m
+      memory: 768Mi

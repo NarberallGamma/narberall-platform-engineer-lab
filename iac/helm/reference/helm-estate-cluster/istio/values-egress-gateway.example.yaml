@@ -1,0 +1,44 @@
+# HA excerpt for upstream istio/gateway (not vendored here).
+# Install example:
+#   helm upgrade --install istio-egressgateway istio/gateway \
+#     -n istio-system --version 1.27.3 \
+#     -f values-egress-gateway.example.yaml
+#
+# The istio/gateway chart defaults autoscaling.enabled=true and minReplicas=1.
+# Then replicaCount is ignored and HPA keeps 1 pod. For a fixed 2 replicas:
+# set autoscaling.enabled=false and replicaCount: 2
+# (same idea as istiod autoscaleMin/Max=2).
+
+name: istio-egressgateway
+replicaCount: 2
+
+autoscaling:
+  enabled: false
+
+labels:
+  app: istio-egressgateway
+  istio: egressgateway
+
+service:
+  type: ClusterIP
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: istio
+                operator: In
+                values:
+                  - egressgateway
+          topologyKey: topology.kubernetes.io/zone
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

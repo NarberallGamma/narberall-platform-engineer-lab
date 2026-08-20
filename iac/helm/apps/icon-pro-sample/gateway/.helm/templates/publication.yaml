@@ -1,0 +1,401 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    ingress.kubernetes.io/ssl-redirect: "true"
+  name: publication
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: {{ .Values.domain }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /managers
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-mobile
+            port:
+              number: 80
+        path: /m
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /operator
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /auth
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /client
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /agent
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /controller
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /dictionary
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /api/login
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /api/oauth2/revoke
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /swagger-ui
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /v3
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-front
+            port:
+              number: 80
+        path: /lk
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /partners-profile
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: monolith
+            port:
+              number: 8080
+        path: /actuator
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-keycloak
+            port:
+              number: 8080
+        path: /realms
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /chats
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /currency
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: dictionary-app
+            port:
+              number: 8080
+        path: /dictionary/api/v1
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /external
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /settings
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /api/v2/invites
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /offer/api/
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /api/v2/marks
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /api/v1/client-managers
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: dictionary-app
+            port:
+              number: 8080
+        path: /userprofile/api/v1
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: spring-boot-admin
+            port:
+              number: 8080
+        path: /spring-boot-admin
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /monolith/actuator/info
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /settings/actuator/info
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /chat/actuator/info
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /notification/actuator/info
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /notification/api/v1
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /agent-lk/actuator/info
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /currency-rate/actuator/info
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /agreement
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /dictionary-app/actuator/info
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /gateway/actuator/info
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /api/v1/
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /monolith
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /bi-helper
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /oauth
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /ws/notification
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /shop-line
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-line-front
+            port:
+              number: 80
+        path: /lk/shop-line
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /shop-line-operator
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /news-service
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-front-news
+            port:
+              number: 80
+        path: /lk/news
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /shop-line-operator
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: monolith
+            port:
+              number: 8080
+        path: /aiAgent
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: ai-agent
+            port:
+              number: 8080
+        path: /ai-agent
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /shop-line
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /shop-line-client
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /shop-line-partner
+        pathType: ImplementationSpecific
+      - backend:
+          service:
+            name: shop-gateway
+            port:
+              number: 80
+        path: /api/v5/orders
+        pathType: ImplementationSpecific
+  tls:
+  - hosts:
+    - {{ .Values.domain }}
+    secretName: tls

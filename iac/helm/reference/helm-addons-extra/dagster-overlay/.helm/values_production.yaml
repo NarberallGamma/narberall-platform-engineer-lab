@@ -1,0 +1,85 @@
+dagster:
+  dagsterWebserver:
+    workspace:
+      enabled: true
+      servers:
+        - host: "dagit-analytics"
+          port: 3030
+          name: "dagit-analytics"
+
+  priorityClassName: production-medium
+
+  pipelineRun:
+    image:
+      repository: "example.registry/platform/user-code"
+    tag: CHANGE_ME
+    pullPolicy: Always
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/auth-signin: "https://$host/dex-authenticator/sign_in"
+      nginx.ingress.kubernetes.io/auth-url: "https://dagster-dex-authenticator.analytics.svc.cluster.local/dex-authenticator/auth"
+      nginx.ingress.kubernetes.io/auth-response-headers: X-Auth-Request-User,X-Auth-Request-Email,Authorization
+    labels: {}
+    dagsterWebserver:
+      host: "dagster.example.com"
+      path: "/"
+      pathType: Prefix
+      tls:
+        enabled: true
+        clusterissuer: letsencrypt
+        secretName: dagster-tls
+
+  dagsterDaemon:
+    runCoordinator:
+      enabled: false
+    runMonitoring:
+      enabled: false
+      startTimeoutSeconds: 180
+    runRetries:
+      enabled: false
+
+  telemetry:
+    enabled: false
+
+  dagster-user-deployments:
+    enabled: true
+    enableSubchart: false
+    deployments: []
+
+  postgresql:
+    enabled: true
+    image:
+      repository: "library/postgres"
+      tag: "9.6.21"
+      pullPolicy: IfNotPresent
+    master:
+      priorityClassName: production-medium
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/sts
+                operator: Exists
+      tolerations:
+      - effect: NoExecute
+        operator: Equal
+        key: dedicated
+        value: sts
+    slave:
+      priorityClassName: production-medium
+
+  rabbitmq:
+    enabled: false
+    priorityClassName: production-medium
+
+  redis:
+    enabled: false
+    internal: false
+    slave:
+      priorityClassName: production-medium
+    master:
+      priorityClassName: production-medium

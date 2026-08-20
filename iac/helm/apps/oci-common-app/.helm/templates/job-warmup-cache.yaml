@@ -1,0 +1,165 @@
+{{- $env := .Values.werf.env }}
+{{- $fake := ternary "-fake" "" (contains "feature" $.Values.werf.env) }}
+{{- $run_warmup := ne $.Values.global.cluster_type "reserve" }}
+{{- $asp_env  := $.Values.envs.ASPNETCORE_ENVIRONMENT | list $ . | include "fl.value" }}
+
+{{- $tenants_app_api := .Values.tenants.app_api | list $ . | include "fl.value" }}
+
+{{- $mssql_host := ternary "mssql.feature.svc.cluster.local" (.Values.mssql.host | list $ . | include "fl.value") (.Values.werf.env | contains "feature")}}
+{{- $mssql_host_ro := ternary "mssql.feature.svc.cluster.local" (.Values.mssql.host_ro | list $ . | include "fl.value") (.Values.werf.env | contains "feature")}}
+
+{{- $mssql_store_database      := .Values.mssql.dbs.store.name     | list $ . | include "fl.value" }}
+{{- $mssql_store_user          := .Values.mssql.dbs.store.user     | list $ . | include "fl.value" }}
+{{- $mssql_store_user_password := .Values.mssql.dbs.store.password | list $ . | include "fl.value" }}
+
+{{- $etcd_enabled     := ( pluck .Values.global.cluster_context .Values.etcd.enabled  | first | default $.Values.etcd.enabled._default ) }}
+{{- $etcd_host        := ( pluck .Values.global.cluster_context .Values.etcd.host     | first | default $.Values.etcd.host._default ) }}
+{{- $etcd_username    := ( pluck .Values.global.cluster_context .Values.etcd.username | first | default $.Values.etcd.username._default ) }}
+{{- $etcd_password    := ( pluck .Values.global.cluster_context .Values.etcd.password | first | default $.Values.etcd.password._default ) }}
+
+{{- $rabbitmq_host          := .Values.rabbitmq.host     | list $ . | include "fl.value" }}
+{{- $rabbitmq_port          := .Values.rabbitmq.port     | list $ . | include "fl.value" }}
+{{- $rabbitmq_user          := .Values.rabbitmq.user     | list $ . | include "fl.value" }}
+{{- $rabbitmq_user_password := .Values.rabbitmq.password | list $ . | include "fl.value" }}
+
+{{- $chHost     := .Values.clickhouse.host     | list $ . | include "fl.value" }}
+{{- $chUser     := .Values.clickhouse.user     | list $ . | include "fl.value" }}
+{{- $chPassword := .Values.clickhouse.password | list $ . | include "fl.value" }}
+{{- $chDB       := .Values.clickhouse.db       | list $ . | include "fl.value" }}
+{{- $chPort     := .Values.clickhouse.port     | list $ . | include "fl.value" }}
+
+{{- $git_short_commit_hash := .Values.werf.commit.hash | trunc 8 }}
+
+{{- $elasticSearchnodeUri  := .Values.logger.elasticSearchnodeUri  | list $ . | include "fl.value" }}
+{{- $elasticSearchUser     := .Values.logger.elasticSearchUser     | list $ . | include "fl.value" }}
+{{- $elasticSearchPassword := .Values.logger.elasticSearchPassword | list $ . | include "fl.value" }}
+{{- $index_name := .Values.global.index_name | required "global.index_name: required" | replace "/" "-" | lower }}
+{{- $elasticUri := printf $elasticSearchnodeUri $elasticSearchUser $elasticSearchPassword }}
+{{- $loggerDisableMaskedLogs := .Values.logger.disableMaskedLogs | list $ . | include "fl.value" }}
+
+{{- $container_resources := index .Values.resources.jobs $env | default .Values.resources.jobs._default | toYaml | nindent 10 }}
+{{- if $run_warmup }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-warmup-cache-job
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "99"
+spec:
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+{{- if eq $.Values.werf.env "production" }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.example.com/production
+                    operator: Exists
+{{- end }}
+      restartPolicy: Never
+      imagePullSecrets:
+      - name: registrysecret
+      volumes:
+      - name: config
+        configMap:
+          name: {{ .Chart.Name }}-hook-config
+      containers:
+      - name: warmup-cache
+        image: {{ .Values.werf.image.app }}
+        resources: {{ $container_resources }}
+        args: ["warmup"]
+        env:
+        - name: APP_NAME
+          value: "app-api"
+        - name: GIT_SHORT_COMMIT_HASH
+          value: "{{ $git_short_commit_hash }}"
+        - name: Redis__Configuration
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Chart.Name }}-hook-env
+              key: Redis__Configuration
+        {{- include "common.env.custom" $ | indent 8 }}
+        volumeMounts:
+        - name: config
+          mountPath: /app/appsettings.{{ $asp_env }}.json
+          subPath: appsettings.Env.json
+{{- if eq $.Values.werf.env "production" }}
+      tolerations:
+        - effect: NoExecute
+          key: dedicated
+          operator: Equal
+          value: production
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-hook-config
+  labels:
+    app: {{ .Chart.Name }}-hook-config
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-99"
+data:
+  appsettings.Env.json: |
+    {
+    "CatalogCacheFeatures":{
+        "Compression":{
+            "Enabled": true,
+            "Threshold": 4096
+        }
+    },
+      "Logger": {
+            "ElasticIndexFormat": "{{ $env | contains "feature" | ternary $index_name $env }}-app-api-v1",
+            "ElasticHost": "{{ $elasticUri }}",
+            "DisableMaskedLogs": "{{ $loggerDisableMaskedLogs }}"
+          },
+      "Tenants": {
+            "AppApi": "{{ $tenants_app_api }}"
+          },
+      "ConnectionStrings": {
+            "StoreRO": "Server={{ $mssql_host_ro }}; Database={{ $mssql_store_database }}; User Id={{ $mssql_store_user }}; Password={{ $mssql_store_user_password }}; Max Pool Size=100; Connection Timeout=30; MultiSubnetFailover=Yes; TrustServerCertificate=True; ApplicationIntent=ReadOnly",
+            "StoreRW": "Server={{ $mssql_host }}; Database={{ $mssql_store_database }}; User Id={{ $mssql_store_user }}; Password={{ $mssql_store_user_password }}; Max Pool Size=100; Connection Timeout=30; MultiSubnetFailover=Yes; TrustServerCertificate=True;",
+            "Clickhouse": "Host={{ $chHost }};Port={{ $chPort }};Database={{ $chDB }};Username={{ $chUser }};Password={{ $chPassword }};Compression=true;TrustServerCertificate=True"
+        },
+      "Redis": {
+            "KeyPrefix": "app_api_{{ $env }}"
+        },
+      "Rabbit": {
+            "Host": "{{ $rabbitmq_host }}",
+            "Port": {{ $rabbitmq_port }},
+            "Login": "{{ $rabbitmq_user }}",
+            "Pass": "{{ $rabbitmq_user_password }}",
+            "AutomaticRecovery": true
+          },
+      "Grpc": {
+            "Notification": "dns:///notifications{{ $fake }}:5006",
+            "Confirmations": "dns:///confirmations{{ $fake }}:5006",
+            "Chat": "dns:///chat{{ $fake }}:5006",
+            "Marketing": "dns:///marketing{{ $fake }}:5006",
+            "Consumers": "dns:///consumers{{ $fake }}:5006",
+            "Delivery": "dns:///delivery-api{{ $fake }}:5006",
+            "Payments": "dns:///payments{{ $fake }}:5006",
+            "Reports": "dns:///reports{{ $fake }}:5006",
+            "Catalog": "dns:///product-catalog{{ $fake }}:5006",
+            "Inventory": "dns:///inventory{{ $fake }}:5006"
+          }
+    }
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Chart.Name }}-hook-env
+  labels:
+    app: {{ .Chart.Name }}-hook-env
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-99"
+stringData:
+  Redis__Configuration: {{ list $ $.Values.redis | include "common.redis.configuration" }}
+{{- end }}

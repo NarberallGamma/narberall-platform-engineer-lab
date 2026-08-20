@@ -1,0 +1,69 @@
+{{- $_ := set . "WORKDIR" "/app" }}
+project: dashboard
+configVersion: 1
+---
+image: builder
+from: node:20.11.0-buster-slim
+docker:
+  WORKDIR: {{ .WORKDIR }}
+git:
+- add: /
+  to: {{ .WORKDIR }}
+  excludePaths:
+  - .helm
+  - .gitlab-ci.yml
+  - .vscode
+  - .husky
+  - README.md
+  - Makefile
+  - docs
+  stageDependencies:
+    install:
+    - '**/package.json'
+    - '**/pnpm-lock.yaml'
+    setup:
+    - '**/*'
+shell:
+  beforeInstall:
+  - corepack enable
+  - corepack prepare pnpm@latest --activate
+  install:
+  - cd {{ .WORKDIR }}
+  - pnpm install --frozen-lockfile
+  beforeSetup:
+  - cd {{ .WORKDIR }}
+
+
+---
+artifact: static
+fromImage: builder
+shell:
+  setup:
+  - cd {{ .WORKDIR }}/apps/web
+{{- if eq (env "WERF_ENV") "production" }}
+  - pnpm build:production
+{{- else if eq (env "WERF_ENV") "stage" }}
+  - pnpm build:stage
+{{- else }}
+  - pnpm build:development
+{{- end}}
+
+---
+image: nginx
+from: nginx:1.18
+import:
+- artifact: static
+  add: /{{ .WORKDIR }}/apps/web/dist
+  to: /{{ .WORKDIR }}/apps/web
+  before: install
+
+---
+image: awscopy
+from: amazon/aws-cli:2.9.2
+docker:
+  ENTRYPOINT: /bin/bash
+import:
+- artifact: static
+  add: /{{ .WORKDIR }}/apps/web/dist
+  to: /{{ .WORKDIR }}/apps/web
+  before: install

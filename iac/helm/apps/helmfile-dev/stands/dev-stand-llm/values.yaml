@@ -1,0 +1,13 @@
+k8s_namespace: dev-stand
+
+persistence:
+  enabled: true
+  storageClassName: standard
+  size: 50Gi
+
+# Optional DEV aliases when a private git / registry has no cluster DNS.
+hostAliases:
+  - ip: "10.10.4.10"
+    hostnames:
+      - git.example.com
+      - registry.example.com

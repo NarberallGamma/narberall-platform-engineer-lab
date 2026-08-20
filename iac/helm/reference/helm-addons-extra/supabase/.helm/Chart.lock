@@ -1,0 +1,6 @@
+dependencies:
+- name: supabase
+  repository: https://teochenglim.github.io/helm-charts/
+  version: 0.1.2
+digest: sha256:5b8bc5731e4ee1e571995833ecac5c7f168a41d9d9051de77cc866bf86ae945d
+generated: "2025-08-20T14:35:36.855574+05:00"

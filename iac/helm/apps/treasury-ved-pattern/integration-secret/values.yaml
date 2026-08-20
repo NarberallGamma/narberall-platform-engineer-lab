@@ -1,0 +1,264 @@
+fullnameOverride: estate-integration
+
+global:
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+  env:
+    PLACEHOLDER: "managed-by-vault-external-secrets"
+
+# Partner API TLS: binaries live in a Kubernetes Secret. An init container copies them into emptyDir (/opt/partner/tls/certs). Same idea as the Kafka truststore path. Source is a Secret, not a PVC.
+partnerTls:
+  secretName: &partner_tls_secret estate-integration-tls-files
+  secretOptional: &partner_tls_optional false
+
+application:
+  enabled: true
+  replicaCount: 1
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+
+  podSecurityContext:
+    fsGroup: 1001
+    runAsUser: 1001
+    runAsGroup: 1001
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: estate-integration
+                app.kubernetes.io/instance: estate-integration
+            topologyKey: kubernetes.io/hostname
+
+  service:
+    enabled: true
+    port: 8080
+    targetPort: 8080
+    type: ClusterIP
+
+  podAnnotations:
+    sidecar.istio.io/inject: "true"
+    sidecar.istio.io/proxyCPU: "100m"
+    sidecar.istio.io/proxyMemory: "128Mi"
+
+  podLabels:
+    prometheus.io/scrape: "true"
+
+  serviceAccount:
+    authDelegator: true
+
+  extraEnvFrom:
+    - secretRef:
+        name: estate-integration-vault-secrets
+
+  env:
+    server:
+      forward-headers-strategy: framework
+
+    spring:
+      application:
+        name: estate-integration-app
+      cloud:
+        openfeign:
+          client:
+            config:
+              default:
+                logger-level: full
+        vault:
+          uri: 'https://vault.example.com'
+          authentication: KUBERNETES
+          kubernetes:
+            role: app
+            service-account-token-file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            kubernetes-path: kubernetes
+      datasource:
+        url: jdbc:postgresql://10.10.0.10:5432/estate_integration?sslmode=require
+      flyway:
+        url: jdbc:postgresql://10.10.0.10:5432/estate_integration?sslmode=require
+      kafka:
+        bootstrap-servers: "kafka-0.example.com:9093,kafka-1.example.com:9093,kafka-2.example.com:9093"
+        properties:
+          security.protocol: SASL_SSL
+          sasl.mechanism: PLAIN
+          sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="app_user" password="${kafkaClientPassword}";
+          ssl.endpoint.identification.algorithm: ""
+          ssl.truststore.location: /tmp/kafka-truststore/kafka-truststore.jks
+          ssl.truststore.password: changeit
+          ssl.truststore.type: JKS
+
+    management:
+      # zipkin:
+      #   tracing:
+      #     endpoint: http://jaeger-collector.jaeger.svc.cluster.local:9411/api/v2/spans
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+
+    logging:
+      level:
+        com.example.estate.integration.api.PartnerApiClient: DEBUG
+
+    partner:
+      logging:
+        excluded-methods: "getBalanceReport"
+      agreement-text: "CHANGE_ME client confirms the transfer under the nominated-account agreement"
+      smart-contract-title-template: "Request ${directionName} ${hid} contract ${unk} date ${contractDate}"
+      oauth:
+        tls:
+          enabled: true
+          pfx-path: file:/opt/partner/tls/certs/client.pfx
+          trust-store-path: file:/opt/partner/tls/certs/truststore.jks
+      payment-purpose:
+        main: "CHANGE_ME transfer under contract ${contractUnk}. VAT not applicable."
+        fee: "CHANGE_ME platform fee. VAT not applicable."
+
+  extraVolumes:
+    - name: kafka-ca-cert
+      secret:
+        secretName: kafka-ca-cert
+    - name: kafka-truststore
+      emptyDir: {}
+    - name: partner-tls-material
+      secret:
+        secretName: *partner_tls_secret
+        optional: *partner_tls_optional
+    - name: partner-tls-workdir
+      emptyDir: {}
+
+  extraVolumeMounts:
+    - name: kafka-ca-cert
+      mountPath: /tmp/kafka-ca.crt
+      subPath: ca.crt
+      readOnly: true
+    - name: kafka-truststore
+      mountPath: /tmp/kafka-truststore
+    - name: partner-tls-workdir
+      mountPath: /opt/partner/tls/certs
+
+  extraEnv:
+    - name: JAVA_TOOL_OPTIONS
+      value: "-Djdk.tls.namedGroups=secp256r1,secp384r1,secp521r1,ffdhe2048,ffdhe3072 -Djavax.net.ssl.trustStore=/tmp/kafka-truststore/kafka-truststore.jks -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS -Djavax.net.ssl.keyStore=/tmp/kafka-truststore/kafka-truststore.jks -Djavax.net.ssl.keyStorePassword=changeit -Djavax.net.ssl.keyStoreType=JKS -Dcom.sun.net.ssl.checkRevocation=false -Djdk.tls.allowUnsafeServerCertChange=true -Djavax.net.ssl.checkRevocation=false -Dcom.sun.jndi.ldap.object.disableEndpointIdentification=true -Djdk.tls.client.enableStatusRequestExtension=false"
+    - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+      value: "kafka-0.example.com:9093,kafka-1.example.com:9093,kafka-2.example.com:9093"
+    - name: SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL
+      value: "SASL_SSL"
+    - name: SPRING_KAFKA_PROPERTIES_SASL_MECHANISM
+      value: "PLAIN"
+    - name: SPRING_KAFKA_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
+      value: ""
+  initContainers:
+    - name: partner-tls-bootstrap
+      image: example.registry/platform/base-images/eclipse-temurin:11-jre
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          mkdir -p /opt/partner/tls/certs
+          shopt -s nullglob
+          for f in /in/*; do
+            # Secret mount exposes keys as symlinks to ..data/*; cp -a keeps broken links in emptyDir.
+            cp -L "$f" "/opt/partner/tls/certs/$(basename "$f")"
+          done
+          if compgen -G "/opt/partner/tls/certs/*" > /dev/null; then
+            chown -R 1001:1001 /opt/partner/tls/certs
+            chmod -R u+rwX /opt/partner/tls/certs
+          fi
+          ls -la /opt/partner/tls/certs
+      volumeMounts:
+        - name: partner-tls-material
+          mountPath: /in
+          readOnly: true
+        - name: partner-tls-workdir
+          mountPath: /opt/partner/tls/certs
+    - name: create-truststore
+      image: example.registry/platform/base-images/eclipse-temurin:11-jre
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+          cp "$JAVA_HOME/lib/security/cacerts" /tmp/kafka-truststore/kafka-truststore.jks
+          keytool -storepasswd -keystore /tmp/kafka-truststore/kafka-truststore.jks -storepass changeit -new changeit
+          keytool -import -noprompt -trustcacerts \
+            -file /tmp/kafka-ca.crt \
+            -alias kafka-ca \
+            -keystore /tmp/kafka-truststore/kafka-truststore.jks \
+            -storepass changeit \
+            -storetype JKS
+          echo "Kafka CA certificate imported successfully into system truststore"
+      volumeMounts:
+        - name: kafka-ca-cert
+          mountPath: /tmp/kafka-ca.crt
+          subPath: ca.crt
+          readOnly: true
+        - name: kafka-truststore
+          mountPath: /tmp/kafka-truststore
+
+  image:
+    repository: "example.registry/estate/integration-adapter"
+    tag: "3.7.0"
+    pullPolicy: IfNotPresent
+
+  livenessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 90
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  readinessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  containerPorts:
+    - name: http
+      containerPort: 8080
+      protocol: TCP
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      kubernetes.io/tls-acme: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$1
+      nginx.ingress.kubernetes.io/x-forwarded-prefix: /api/v0/estate-integration/
+    hosts:
+      - host: web.example.com
+        paths:
+          - path: /api/v0/estate-integration/(.*)
+            pathType: ImplementationSpecific
+    tls:
+      - secretName: wildcard-tls
+        hosts:
+          - web.example.com
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi

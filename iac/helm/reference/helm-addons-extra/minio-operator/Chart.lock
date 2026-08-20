@@ -1,0 +1,9 @@
+dependencies:
+- name: operator
+  repository: file://charts/operator
+  version: 7.1.1
+- name: console
+  repository: file://charts/console
+  version: 0.1.0
+digest: sha256:42cab2b99a453d794e149748a1f9e4bf50db43183943c85ccfcf36b7cbb63f86
+generated: "2025-07-11T17:43:49.981518+05:00"

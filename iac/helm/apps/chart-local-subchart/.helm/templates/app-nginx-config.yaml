@@ -1,0 +1,218 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-nginx
+  annotations:
+    werf.io/weight: "-110"
+data:
+  logs.js: |-
+    function body_json(r) {
+      try {
+        JSON.parse(r.requestText);
+      } catch (e) {
+        if (r.requestText === undefined) {
+          return '""';
+        }
+        return '"' + r.requestText + '"';
+      }
+      return JSON.stringify(JSON.parse(r.requestText));
+    }
+    function headers_json(r) {
+      return JSON.stringify(r.headersIn);
+    }
+    export default {body_json, headers_json};
+
+  nginx.conf: |-
+    load_module modules/ngx_http_js_module.so;
+
+    user nginx;
+    #daemon off;
+    worker_processes  1;
+
+    error_log  /dev/stderr;
+    pid        /var/run/nginx.pid;
+
+    worker_rlimit_nofile 200000;
+    timer_resolution 200ms;
+
+    events {
+      worker_connections 50000;
+      use epoll;
+    }
+
+    http {
+      js_import logs.js;
+      js_set $headers_json logs.headers_json;
+      js_set $body_json logs.body_json;
+
+      include       /etc/nginx/mime.types;
+      server_names_hash_bucket_size  128;
+      client_header_timeout   10m;
+      client_body_timeout     10m;
+      send_timeout            10m;
+      types_hash_max_size 2048;
+      access_log off;
+
+      set_real_ip_from 0.0.0.0/0;
+      real_ip_header X-Forwarded-For;
+
+      log_format main escape=none
+        '{'
+          '"time": "$time_iso8601",'
+          '"request_id": "$request_id",'
+          '"remote_addr": "$remote_addr", '
+          '"remote_user": "$remote_user", '
+          '"bytes_received": $request_length,'
+          '"bytes_sent": $bytes_sent,'
+          '"protocol": "$server_protocol",'
+          '"scheme": "$scheme",'
+          '"method": "$request_method",'
+          '"host": "$host",'
+          '"request_uri": "$request_uri",'
+          '"request_query": "$args",'
+          '"request_body": $body_json,'
+          '"referrer": "$http_referer",'
+          '"user_agent": "$http_user_agent",'
+          '"request_time": $request_time,'
+          '"status": $status,'
+          '"vhost": "$server_name",'
+          '"nginx_upstream_addr": "$upstream_addr",'
+          '"nginx_upstream_bytes_received": "$upstream_bytes_received",'
+          '"nginx_upstream_response_time": "$upstream_response_time",'
+          '"nginx_upstream_status": "$upstream_status",'
+          '"location": "$log_location",'
+          '"headers": $headers_json '
+        '}';
+
+      sendfile on;
+
+      keepalive_timeout 65;
+      keepalive_requests 100;
+      tcp_nodelay on;
+      tcp_nopush on;
+
+      resolver d8-kube-dns.kube-system.svc.cluster.local valid=5s ipv6=off;
+
+      server_tokens off;
+
+      proxy_redirect off;
+      proxy_read_timeout 300;
+      proxy_connect_timeout 300;
+
+      gzip on;
+      gzip_http_version 1.0;
+      gzip_comp_level 4;
+      gzip_proxied any;
+      gzip_vary off;
+      gzip_types text/plain text/css application/x-javascript text/xml application/xml application/rss+xml application/atom+xml text/javascript application/javascript application/json text/mathml;
+      gzip_min_length  1000;
+      gzip_disable     "msie6";
+
+      variables_hash_max_size 1024;
+      variables_hash_bucket_size 64;
+      types_hash_bucket_size 64;
+
+      # upstreams
+      upstream backend-fpm {
+        server 127.0.0.1:9000;
+      }
+
+      # some maps
+      map $http_x_forwarded_proto $thescheme {
+        default $scheme;
+        https https;
+        http http;
+      }
+
+      map $thescheme $phphttps {
+        https on;
+        http "";
+      }
+
+      # Vhosts
+      server {
+        listen 80 default_server;
+
+        server_name _;
+        charset utf-8;
+
+        client_max_body_size 200m;
+
+        server_tokens off;
+        server_name_in_redirect  off;
+        fastcgi_intercept_errors on;
+        underscores_in_headers on;
+
+        access_log /dev/stdout main;
+        error_log /dev/stderr;
+
+        set $log_location "undef";
+        root /app;
+        index index.php index.html index.htm;
+
+        location ~* ^.+\.(png|jpg|jpeg|gif|svg|js|mp3|ogg|mpe?g|avi|zip|gz|bz2?|rar|swf|ico|css)$ {
+          set $log_location "static";
+          gzip_vary on;
+          expires 30d;
+          etag on;
+        }
+        location = /favicon.ico {
+          set $log_location "static";
+          log_not_found off;
+        }
+
+        location / {
+          set $log_location "root";
+          if (!-e $request_filename ) {
+            rewrite ^(.*)$ /index.php?q=$1;
+          }
+        }
+
+        location ~ \.php$ {
+          set $log_location "php";
+          fastcgi_pass backend-fpm;
+          fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+          include fastcgi_params;
+          fastcgi_param REMOTE_ADDR $remote_addr;
+        }
+
+        location = /_tech/ngx-status {
+          set $log_location "tech-nginx";
+          access_log off;
+          allow 127.0.0.1;
+          allow 10.0.0.0/8;
+          allow 172.16.0.0/12;
+          allow 192.168.0.0/16;
+          deny all;
+          stub_status;
+        }
+        location = /_tech/php-status {
+          set $log_location "tech-php";
+          access_log off;
+          allow 127.0.0.1;
+          allow 10.0.0.0/8;
+          allow 172.16.0.0/12;
+          allow 192.168.0.0/16;
+          deny all;
+          fastcgi_pass backend-fpm;
+          fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+          include fastcgi_params;
+          fastcgi_param REMOTE_ADDR $remote_addr;
+        }
+        location = /_tech/php-ping {
+          set $log_location "tech-php";
+          access_log off;
+          allow 127.0.0.1;
+          allow 10.0.0.0/8;
+          allow 172.16.0.0/12;
+          allow 192.168.0.0/16;
+          deny all;
+          fastcgi_pass backend-fpm;
+          fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+          include fastcgi_params;
+          fastcgi_param REMOTE_ADDR $remote_addr;
+        }
+
+      }
+    }

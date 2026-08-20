@@ -1,0 +1,61 @@
+# OpenObserve 0.70.1 excerpt. Vendor templates are not in git.
+# HA 2x router/ingester/querier, 60d compact retention, NATS on, dex off.
+
+replicaCount:
+  ingester: 2
+  querier: 2
+  router: 2
+  alertmanager: 1
+  alertquerier: 0
+  compactor: 1
+  zplane: 0
+  reportserver: 0
+  actions: 1
+  sreagent: 0
+
+config:
+  ZO_COMPACT_DATA_RETENTION_DAYS: "60"
+  ZO_WEB_URL: "https://openobserve.example.com"
+  ZO_S3_SERVER_URL: "https://obs.example.com"
+  ZO_S3_BUCKET_NAME: "estate-example-openobserve"
+  # DSN and root password: Vault / ESO, not values.
+
+minio:
+  enabled: false
+
+nats:
+  enabled: true
+  config:
+    cluster:
+      enabled: true
+      replicas: 3
+    jetstream:
+      enabled: true
+      fileStore:
+        enabled: true
+        pvc:
+          enabled: true
+          size: 20Gi
+          storageClassName: "ssd"
+
+enterprise:
+  enabled: true
+  dex:
+    enabled: false
+
+ingress:
+  enabled: true
+  hosts:
+    - host: openobserve.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: wildcard-tls
+      hosts:
+        - openobserve.example.com
+
+externalSecret:
+  enabled: true
+  vaultPath: secret/openobserve
+  secretName: openobserve-vault-secrets

@@ -1,0 +1,75 @@
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: CustomPrometheusRules
+metadata:
+  labels:
+    component: rules
+    prometheus: main
+  name: aws
+spec:
+  groups:
+  - name: aws
+    rules:
+    - alert: FailedReplication
+      labels:
+        severity_level: "4"
+      annotations:
+        summary: Replication failed S3
+        descriptions: |-
+          Replication failed S3 {{`{{$labels.source_bucket}}`}}} to S3 {{`{{$labels.destination_bucket}}`}}
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: service,exported_job
+      for: 30m
+      expr: |
+        rate(aws_s3_operations_failed_replication_sum{source_bucket!~".*test.*", destination_bucket!~".*test.*"}[10m]) > 1
+    - alert: PendingReplication
+      labels:
+        severity_level: "4"
+      annotations:
+        summary: Pending replication S3
+        descriptions: |-
+          Pending replication S3 {{`{{$labels.source_bucket}}`}} on S3 {{`{{$labels.destination_bucket}}`}}
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: service,exported_job
+      for: 30m
+      expr: |
+        aws_s3_operations_pending_replication_maximum{source_bucket!~".*test.*", destination_bucket!~".*test.*"} > 1
+{{- if eq .Values.werf.env "dev" }}
+    - alert: AWSBillingCostIncrease
+      labels:
+        severity_level: "4"
+      annotations:
+        summary: AWS Billing Cost Increase
+        descriptions: |-
+          AWS cost by {{`{{$labels.service_name}}`}} for account {{`{{$labels.linked_account}}`}} has been increased very sharp
+          check it here https://grafana.example.com/d/de5a5pmxa7h1ce/aws-billing-dashboard?orgId=1&var-account={{`{{$labels.linked_account}}`}}
+        plk_protocol_version: "1"
+        incident_flow: "client"
+      expr: |
+        rate(aws_billing_estimated_charges_maximum{currency="USD"}[12h]) > 0.05 and delta(aws_billing_estimated_charges_maximum{currency="USD"}[12h]) > 100
+    - alert: AWSBillingCostIncreaseDaily
+      labels:
+        severity_level: "4"
+      annotations:
+        summary: AWS daily cost for all accounts is {{`{{ $value }}`}}
+        descriptions: |-
+          AWS daily cost for all accounts is {{`{{ $value }}`}}
+          check it here https://grafana.example.com/d/de5a5pmxa7h1ce/aws-billing-dashboard?orgId=1&var-account={{`{{$labels.linked_account}}`}}
+        plk_protocol_version: "1"
+        incident_flow: "client"
+      expr: |
+        sum(increase(aws_billing_estimated_charges_maximum{currency="USD"}[1d])) > 2200
+    - alert: AbsentMetricsFromCloudWatchExporter
+      labels:
+        severity_level: "4"
+      annotations:
+        summary: metrics from cloudwatch-exporter is absent more than 15 min
+        descriptions: |-
+          check logs 'kubectl -n cloudwatch-exporter logs -l app=cloudwatch-exporter'
+        plk_protocol_version: "1"
+        incident_flow: "client"
+      expr: |
+        absent_over_time(aws_billing_estimated_charges_maximum[15m])
+{{- end }}

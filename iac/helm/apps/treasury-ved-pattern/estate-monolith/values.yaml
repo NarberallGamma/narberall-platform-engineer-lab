@@ -1,0 +1,71 @@
+# Defaults. Overlay CRs stay gated. Vendor subcharts stay off until helm dependency build.
+# Replace placeholders before a real install. Live passwords stay out of git.
+
+fullnameOverride: ""
+
+global:
+  imagePullSecrets:
+    - name: regcred
+
+serviceAccount:
+  create: false
+  name: ""
+
+# Subchart aliases. Workloads render only after helm dependency build against shared libs.
+# Extra gRPC and websocket Services in templates/ do not wait on these flags.
+estate-chain-eth:
+  enabled: false
+estate-ledger:
+  enabled: false
+estate-onboarding:
+  enabled: false
+estate-contract:
+  enabled: false
+estate-web-ws:
+  enabled: false
+operator-ui:
+  enabled: false
+
+# Zalando postgresql CR. Production estate used managed RDS. This path is the DEMO stand.
+postgresql:
+  enabled: false
+  enableExternalService: false
+  spec:
+    teamId: lab
+    numberOfInstances: 1
+    enableLogicalBackup: true
+    enableConnectionPooler: true
+    allowedSourceRanges: null
+    postgresql:
+      version: "14"
+    users:
+      lab_user: []
+    volume:
+      size: 10Gi
+
+# In-cluster Strimzi Kafka CR. The DEMO stand left this off and used the Bitnami kafka subchart.
+kafkaHA:
+  enabled: false
+  user:
+    create: false
+    name: estate-kafka-user
+  spec: {}
+
+# Bitnami kafka 12.17.5 pin. charts/kafka-12.17.5.tgz stays out of git.
+kafka:
+  enabled: false
+
+# AKHQ 0.3.1 pin. charts/akhq-0.3.1.tgz stays out of git.
+akhq:
+  enabled: false
+
+# codecentric keycloak 17.0.2 pin. charts/keycloak-17.0.2.tgz stays out of git.
+keycloak:
+  enabled: false
+
+# HashiCorp vault 0.28.1 pin. charts/vault-0.28.1.tgz stays out of git.
+vault:
+  enabled: false
+
+kafkaConnect: []
+kafkaConnector: []

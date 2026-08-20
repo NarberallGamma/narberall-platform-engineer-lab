@@ -1,0 +1,13 @@
+# Generated identity material. Never commit live keys or trust anchors.
+dev/ca.crt
+dev/ca.key
+dev/issuer.crt
+dev/issuer.key
+preprod/ca.crt
+preprod/ca.key
+preprod/issuer.crt
+preprod/issuer.key
+prod/ca.crt
+prod/ca.key
+prod/issuer.crt
+prod/issuer.key

@@ -32,6 +32,8 @@ Private source trees on this pattern had 200+ units. The lab shows a standalone 
 
 Resource types: [`../terraform/RESOURCES.md`](../terraform/RESOURCES.md)
 
+Cluster Helm: [`../helm/`](../helm/).
+
 ## Keywords
 
 AWS, Terraform, Terragrunt, VPC, EC2, EKS, Karpenter, RDS, ElastiCache, IAM, S3, CloudFront, ACM, CI/CD, Kubernetes, observability

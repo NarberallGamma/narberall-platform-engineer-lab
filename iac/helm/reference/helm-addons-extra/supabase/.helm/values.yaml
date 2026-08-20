@@ -1,0 +1,362 @@
+supabase:
+##
+  db:
+    enabled: true
+    resources:
+      limits:
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    imagePullSecrets:
+    - name: registrysecret
+    livenessProbe:
+      exec:
+        command:
+          - pg_isready
+          - -U
+          - postgres
+      initialDelaySeconds: 3
+    persistence:
+      enabled: true
+      storageClassName: local
+      annotations: {}
+      size: 8Gi
+      accessModes:
+        - ReadWriteOnce
+      class: ""
+##
+  studio:
+    enabled: true
+    environment:
+      SUPABASE_PUBLIC_URL: https://supabase.example.com/
+      STUDIO_DEFAULT_ORGANIZATION: "Lab"
+      STUDIO_DEFAULT_PROJECT: "Project 1"
+      NEXT_PUBLIC_ENABLE_LOGS: "true"
+    resources:
+      limits:
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    imagePullSecrets:
+    - name: registrysecret
+    livenessProbe:
+      httpGet:
+        path: /api/profile
+        port: 3000
+      initialDelaySeconds: 3
+##
+  auth:
+    enabled: true
+    environment:
+      GOTRUE_SMTP_PORT: "25"
+      API_EXTERNAL_URL: https://supabase.example.com/
+      GOTRUE_SITE_URL: https://supabase.example.com/
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+    resources:
+      limits:
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    imagePullSecrets:
+    - name: registrysecret
+##
+  rest:
+    enabled: true
+    resources:
+      limits:
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    imagePullSecrets:
+    - name: registrysecret
+##
+  realtime:
+    enabled: true
+    resources:
+      limits:
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    imagePullSecrets:
+    - name: registrysecret
+    livenessProbe:
+      httpGet:
+        path: /
+        port: 4000
+      initialDelaySeconds: 3
+##
+  meta:
+    enabled: true
+    resources:
+      limits:
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    imagePullSecrets:
+    - name: registrysecret
+
+  storage:
+    enabled: true
+    imagePullSecrets:
+    - name: registrysecret
+    livenessProbe:
+      httpGet:
+        path: /status
+        port: 5000
+      initialDelaySeconds: 3
+    persistence:
+      enabled: false
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    resources:
+      limits:
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+##
+  imgproxy:
+    enabled: true
+    environment:
+      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
+    livenessProbe:
+      exec:
+        command:
+          - imgproxy
+          - health
+      initialDelaySeconds: 3
+    persistence:
+      enabled: false
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    resources:
+      limits:
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    imagePullSecrets:
+    - name: registrysecret
+##
+  kong:
+    enabled: true
+    imagePullSecrets:
+    - name: registrysecret
+    environment:
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
+      KONG_LOG_LEVEL: info
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        nginx.ingress.kubernetes.io/whitelist-source-range: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+      tls:
+        - secretName: wildcard.example.com
+          hosts:
+            - supabase.example.com
+      hosts:
+        - host: supabase.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    resources:
+      limits:
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 1Gi
+##
+  analytics:
+    enabled: true
+    resources:
+      limits:
+        memory: 768Mi
+      requests:
+        cpu: 100m
+        memory: 512Mi
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    imagePullSecrets:
+    - name: registrysecret
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 4000
+      initialDelaySeconds: 3
+##
+  vector:
+    enabled: true
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 9001
+      initialDelaySeconds: 3
+    volumeMounts:
+      - name: pod-logs
+        mountPath: /var/log/pods
+    volumes:
+      - name: pod-logs
+        hostPath:
+          path: /var/log/pods
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    imagePullSecrets:
+    - name: registrysecret
+##
+  functions:
+    enabled: true
+    resources:
+      limits:
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
+    tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated
+      value: worker
+    imagePullSecrets:
+    - name: registrysecret
+
+  minio:
+    enabled: false

@@ -1,0 +1,480 @@
+# Werf injects image tags and env at converge. Placeholders let helm template run locally
+# after helm dependency build against the OCI library.
+werf:
+  env: stage
+  commit:
+    hash: 00000000deadbeef
+  image:
+    app: example.registry/app-api:CHANGE_ME
+    nginx: example.registry/app-nginx:CHANGE_ME
+
+# cluster_context is not werf.env. A DR cluster can share production env names
+# and still pick a different bucket / etcd / sentry host.
+global:
+  cluster_context: _default
+  cluster_type: primary
+  index_name: stage
+
+common:
+  images:
+    rediscli: example.registry/redis:7-alpine
+
+app:
+  replicas:
+    _default: 2
+    stage: 2
+    production: 2
+  replicas_counter:
+    _default: 2
+    stage: 2
+    production: 4
+  replicas_storefront:
+    _default: 2
+    stage: 2
+    production: 4
+  replicas_kiosk:
+    _default: 2
+    stage: 2
+    production: 3
+  replicas_jobs:
+    _default: 1
+    stage: 1
+    production: 1
+  ports:
+    http: 80
+    grpc: 5006
+    http-hangfire: 5007
+  vpa_update_mode:
+    _default: "Off"
+    stage: "Auto"
+    production: "Off"
+  vpa_update_mode_counter:
+    _default: "Off"
+    stage: "Auto"
+    production: "Off"
+  vpa_update_mode_storefront:
+    _default: "Off"
+    stage: "Auto"
+    production: "Off"
+  vpa_update_mode_kiosk:
+    _default: "Off"
+    stage: "Auto"
+    production: "Off"
+  vpa_update_mode_jobs:
+    _default: "Off"
+    stage: "Off"
+    production: "Off"
+  intercom:
+    environment:
+      stage: stage
+      production: production
+
+envs:
+  ASPNETCORE_ENVIRONMENT:
+    _default: Features
+    stage: Stage
+    production: Production
+  GIT_SHORT_COMMIT_HASH: "{{ $.Values.werf.commit.hash | trunc 8 }}"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://opentelemetry-collector.observability.svc.cluster.local:4318"
+  OTEL_LOG_LEVEL:
+    _default: warn
+    stage: info
+    production: info
+
+aws:
+  bucket:
+    _default: app-stage
+    production: app-production
+    production-dr: app-dr
+  subdir:
+    _default: "store/{{ $.Values.werf.env }}"
+    production-dr: "store/production"
+  endpoint:
+    _default: us-east-2
+    production: us-east-2
+    production-dr: us-west-1
+
+tenants:
+  app_api:
+    _default: 00000000-0000-4000-8000-000000000001
+    stage: 00000000-0000-4000-8000-000000000002
+    production: 00000000-0000-4000-8000-000000000003
+
+ecommerce:
+  default_host:
+    _default: "https://{{ $.Values.werf.env }}.example.com/api"
+    production: https://store.example.com/api
+  short_url_host:
+    _default: "https://{{ $.Values.werf.env }}.link.example.com"
+    production: https://link.example.com
+
+logger:
+  elasticSearchnodeUri: "http://%s:%s@elk-es-http.elk:9200"
+  elasticSearchUser: elastic
+  disableMaskedLogs:
+    _default: true
+    production: false
+
+clickhouse:
+  host:
+    _default: clickhouse
+    stage: clickhouse.example.com
+  port:
+    _default: 8123
+    stage: 8443
+  user:
+    _default: app
+    stage: default
+  db: app
+  protocol:
+    _default: http
+    stage: https
+
+mssql:
+  host: mssql
+  host_ro:
+    _default: mssql
+    stage: mssql-ro
+  port: 1433
+  secret_name: admin-database-cred
+  dbs:
+    store:
+      name:
+        _default: "retail-{{ $.Values.werf.env }}"
+        stage: stage_retail
+        production: retail
+      user: retailapi-kubernetes-user
+    hangfire:
+      name:
+        _default: "hangfire-{{ $.Values.werf.env }}"
+        stage: stage_hangfire
+        production: hangfire
+      user: hangfire-kubernetes-user
+
+review_jobs:
+  mssql:
+    dbs:
+      store:
+        db_name: stage_retail
+        db_name_new: "retail-{{ $.Values.werf.env }}"
+      hangfire:
+        db_name: stage_hangfire
+        db_name_new: "hangfire-{{ $.Values.werf.env }}"
+
+rabbitmq:
+  port: 5672
+  host: rabbitmq
+  user: rabbitmq
+
+redis:
+  host:
+    _default: redis
+    production: redis-cluster
+  port: 6379
+  connectTimeout: 200
+  connectRetry: 0
+  syncTimeout:
+    _default: 2000
+    production: 10000
+  asyncTimeout:
+    _default: 2000
+    production: 10000
+  ssl:
+    production: false
+
+redis_flush_command:
+  _default: "redis-cli -h %h -p %p --scan | grep -vE ''^app_api_{{ $.Values.werf.env }}:catalog'' | xargs -r redis-cli -h %h -p %p del"
+  production: "redis-cli --cluster call --cluster-only-masters %h:%p --scan | grep -vE ''^app_api_{{ $.Values.werf.env }}:catalog'' | xargs -r redis-cli --cluster call --cluster-only-masters %h:%p del"
+
+memory_cache:
+  is_enabled: true
+  size_limit: 102400
+  ttl: "00:01:00"
+  enabled_for_actions:
+    - "consumer.carousel.list"
+    - "consumer.category.list"
+    - "consumer.catalog.product.list"
+    - "consumer.store.info"
+
+resources:
+  app:
+    _default:
+      requests:
+        cpu: 20m
+        memory: 300Mi
+      limits:
+        memory: 1Gi
+    stage:
+      requests:
+        cpu: 200m
+        memory: 2Gi
+      limits:
+        memory: 2Gi
+    production:
+      requests:
+        cpu: 2
+        memory: 4Gi
+      limits:
+        memory: 4Gi
+  storefront:
+    _default:
+      requests:
+        cpu: 20m
+        memory: 300Mi
+      limits:
+        memory: 1Gi
+    stage:
+      requests:
+        cpu: 200m
+        memory: 2Gi
+      limits:
+        memory: 2Gi
+    production:
+      requests:
+        cpu: 4
+        memory: 8Gi
+      limits:
+        memory: 8Gi
+  kiosk:
+    _default:
+      requests:
+        cpu: 20m
+        memory: 300Mi
+      limits:
+        memory: 768Mi
+    stage:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        memory: 1Gi
+    production:
+      requests:
+        cpu: 750m
+        memory: 5Gi
+      limits:
+        memory: 5Gi
+  counter:
+    _default:
+      requests:
+        cpu: 20m
+        memory: 300Mi
+      limits:
+        memory: 1200Mi
+    stage:
+      requests:
+        cpu: 200m
+        memory: 2Gi
+      limits:
+        memory: 2Gi
+    production:
+      requests:
+        cpu: 2
+        memory: 3Gi
+      limits:
+        memory: 3Gi
+  jobs:
+    _default:
+      requests:
+        cpu: 20m
+        memory: 300Mi
+      limits:
+        memory: 1Gi
+    stage:
+      requests:
+        cpu: 200m
+        memory: 2Gi
+      limits:
+        memory: 2Gi
+    production:
+      requests:
+        cpu: 2
+        memory: 4Gi
+      limits:
+        memory: 4Gi
+
+hpa:
+  app:
+    _default:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 2
+      metrics:
+        - resource:
+            name: cpu
+            target:
+              averageUtilization: 60
+              type: Utilization
+          type: Resource
+        - resource:
+            name: memory
+            target:
+              averageUtilization: 80
+              type: Utilization
+          type: Resource
+    production:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 4
+      metrics:
+        - resource:
+            name: cpu
+            target:
+              averageUtilization: 60
+              type: Utilization
+          type: Resource
+        - resource:
+            name: memory
+            target:
+              averageUtilization: 80
+              type: Utilization
+          type: Resource
+  counter:
+    _default:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 2
+      metrics:
+        - resource:
+            name: cpu
+            target:
+              averageUtilization: 60
+              type: Utilization
+          type: Resource
+        - resource:
+            name: memory
+            target:
+              averageUtilization: 75
+              type: Utilization
+          type: Resource
+    production:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 8
+      metrics:
+        - resource:
+            name: cpu
+            target:
+              averageUtilization: 60
+              type: Utilization
+          type: Resource
+        - resource:
+            name: memory
+            target:
+              averageUtilization: 75
+              type: Utilization
+          type: Resource
+  storefront:
+    _default:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 2
+      metrics:
+        - resource:
+            name: cpu
+            target:
+              averageUtilization: 70
+              type: Utilization
+          type: Resource
+        - resource:
+            name: memory
+            target:
+              averageUtilization: 70
+              type: Utilization
+          type: Resource
+    production:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 6
+      metrics:
+        - resource:
+            name: cpu
+            target:
+              averageUtilization: 70
+              type: Utilization
+          type: Resource
+        - resource:
+            name: memory
+            target:
+              averageUtilization: 70
+              type: Utilization
+          type: Resource
+  kiosk:
+    _default:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 2
+      CPUaverageUtilization: 70
+    production:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 4
+  jobs:
+    _default:
+      enabled: false
+
+rate_limiting:
+  monitor_mode:
+    _default: true
+    production: true
+  client_rate_limit:
+    _default: 10
+  client_rate_limit_period:
+    _default: 1s
+
+report_csv_options:
+  parent_dealer_id:
+    _default: 210001
+    production: 210100
+  dealers:
+    _default:
+      - id: 210002
+        name: "Lab Store 1"
+        code: 111
+      - id: 210003
+        name: "Lab Store 2"
+        code: 222
+    production:
+      - id: 210101
+        name: "Store North"
+        code: 301
+      - id: 210102
+        name: "Store South"
+        code: 302
+
+brands_split_dealer_ids_options:
+  dealer_ids:
+    _default: [210001]
+    production: [210100, 210101]
+
+atm_payment_method_options:
+  customer_holder_dealer_ids:
+    _default: [210010]
+    production: [210080, 210081]
+
+caregivers:
+  disabled:
+    _default: false
+
+images:
+  dumper: example.registry/mssql/server:2019
+
+etcd:
+  enabled:
+    _default: true
+    production: true
+    production-dr: true
+  host:
+    _default: etcd-stage-headless.etcd
+    production: etcd-production-headless.etcd
+    production-dr: etcd-dr-headless.etcd
+  username:
+    _default: readwrite
+    production: readwrite
+    production-dr: readwrite
+
+sentry:
+  host:
+    _default: http://CHANGE_ME@sentry.example.svc.cluster.local/1
+    production: https://CHANGE_ME@sentry.example.com/1
+    production-dr: https://CHANGE_ME@sentry.example.com/1

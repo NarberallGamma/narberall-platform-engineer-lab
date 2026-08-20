@@ -1,0 +1,39 @@
+# Feed side of the same DEV namespace. Same chart, several CronJob releases
+# with a one-minute schedule shift so pollers do not stampede.
+releases:
+  - name: feed-api
+    namespace: dev-stand
+    createNamespace: false
+    chart: ../../charts/feed-api
+    values:
+      - values-feed-api.yaml
+
+  - name: feed-rss-alpha
+    namespace: dev-stand
+    createNamespace: false
+    chart: ../../charts/feed-rss
+    values:
+      - values-feed-rss.yaml
+      - values:
+          schedule: "0,5,10,15,20,25,30,35,40,45,50,55 * * * *"
+          rssSource: "source_alpha"
+
+  - name: feed-rss-bravo
+    namespace: dev-stand
+    createNamespace: false
+    chart: ../../charts/feed-rss
+    values:
+      - values-feed-rss.yaml
+      - values:
+          schedule: "1,6,11,16,21,26,31,36,41,46,51,56 * * * *"
+          rssSource: "source_bravo"
+
+  - name: feed-rss-charlie
+    namespace: dev-stand
+    createNamespace: false
+    chart: ../../charts/feed-rss
+    values:
+      - values-feed-rss.yaml
+      - values:
+          schedule: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"
+          rssSource: "source_charlie"

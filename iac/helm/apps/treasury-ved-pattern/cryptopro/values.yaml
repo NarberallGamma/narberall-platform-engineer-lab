@@ -1,0 +1,165 @@
+fullnameOverride: cryptopro
+
+global:
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+  env:
+    PLACEHOLDER: "managed-by-vault-external-secrets"
+
+# Volume for the CryptoPro CSP directory in the pod.
+# PVC is created once (lookup + helm.sh/resource-policy: keep). When the claim already exists,
+# set persistence.cprocsp.create: false and keep the same claimName in extraVolumes.
+persistence:
+  enabled: true
+  storageClass: "ssd"
+  accessMode: ReadWriteOnce
+  finalizers:
+    - kubernetes.io/pvc-protection
+  annotations: {}
+  cprocsp:
+    create: true
+    claimName: &pvc_cprocsp cprocsp-pvc
+    size: 100Mi
+
+application:
+  enabled: true
+  replicaCount: 1
+  # ReadWriteOnce: Recreate avoids two pods attaching one volume (Multi-Attach).
+  strategy:
+    type: Recreate
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: cryptopro
+                app.kubernetes.io/instance: cryptopro
+            topologyKey: kubernetes.io/hostname
+
+  service:
+    enabled: true
+    port: 8080
+    targetPort: 8080
+    type: ClusterIP
+
+  podAnnotations:
+    sidecar.istio.io/inject: "true"
+    sidecar.istio.io/proxyCPU: "100m"
+    sidecar.istio.io/proxyMemory: "128Mi"
+
+  podLabels:
+    prometheus.io/scrape: "true"
+
+  serviceAccount:
+    authDelegator: true
+
+  extraEnvFrom:
+    - secretRef:
+        name: cryptopro-vault-secrets
+
+  extraVolumes:
+    - name: cprocsp
+      persistentVolumeClaim:
+        claimName: *pvc_cprocsp
+
+  extraVolumeMounts:
+    - name: cprocsp
+      mountPath: /var/opt/cprocsp
+
+  env:
+    server:
+      forward-headers-strategy: framework
+
+    spring:
+      application:
+        name: cryptopro-app
+      cloud:
+        vault:
+          uri: "https://vault.example.com"
+          authentication: KUBERNETES
+          kubernetes:
+            role: app
+            service-account-token-file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            kubernetes-path: kubernetes
+      datasource:
+        url: jdbc:postgresql://10.10.0.10:5432/cryptopro_service?sslmode=require
+      flyway:
+        url: jdbc:postgresql://10.10.0.10:5432/cryptopro_service?sslmode=require
+
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+
+    logging:
+      level:
+        org.hibernate.sql: WARN
+        org.hibernate.type: WARN
+        org.springframework.data.jpa.repository.query: INFO
+        org.springframework.web: INFO
+
+  image:
+    repository: example.registry/estate/cryptopro
+    tag: "0.0.2"
+    pullPolicy: IfNotPresent
+
+  livenessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 90
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  readinessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  containerPorts:
+    - name: http
+      containerPort: 8080
+      protocol: TCP
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      kubernetes.io/tls-acme: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$1
+      nginx.ingress.kubernetes.io/x-forwarded-prefix: /api/v0/cryptopro/
+    hosts:
+      - host: web.example.com
+        paths:
+          - path: /api/v0/cryptopro/(.*)
+            pathType: ImplementationSpecific
+    tls:
+      - secretName: wildcard-tls
+        hosts:
+          - web.example.com
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi

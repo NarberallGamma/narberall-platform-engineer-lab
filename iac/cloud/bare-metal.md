@@ -16,6 +16,7 @@ This is the same turnkey sequence as AWS or Huawei-class, minus the managed cont
 ## Related code
 
 - Guest/K8s samples: [`../terraform/proxmox/`](../terraform/proxmox/), [`../terraform/openstack-selectel/`](../terraform/openstack-selectel/)
+- Cluster Helm: [`../helm/`](../helm/)
 - Delivery story: [turnkey from zero](../../case-studies/02-cloud-platform-turnkey.md)
 
 ## Keywords

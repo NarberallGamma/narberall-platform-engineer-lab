@@ -1,0 +1,24 @@
+- hosts: all
+  become: true
+  tasks:
+  - name: restic user
+    user:
+      name: restic
+      shell: /bin/bash
+  - name: restic user .ssh dir
+    file: path="~restic/.ssh" state=directory owner='restic' group='restic'
+  - name: restic user key
+    template:
+      src: "./authorized_keys"
+      dest: "~restic/.ssh/authorized_keys"
+      owner: restic
+      group: restic
+      mode: '0400'
+  - name: restic at sudoers
+    template:
+      src: "./sudoers-restic"
+      dest: "/etc/sudoers.d/restic"
+      validate: '/usr/sbin/visudo -cf %s'
+      mode: 0440
+      owner: root
+      group: root

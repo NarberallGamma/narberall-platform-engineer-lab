@@ -1,0 +1,12 @@
+This release is a thin Vault wrap. server, injector, csi, and ui stay off.
+
+ClusterSecretStore: {{ .Values.externalSecrets.clusterSecretStore.name }}
+ServiceAccount: {{ .Values.externalSecrets.serviceAccount.name }} (namespace {{ include "vault.namespace" . }})
+Vault address: {{ .Values.externalSecrets.vaultAddress }}
+
+Check:
+  kubectl get clustersecretstore {{ .Values.externalSecrets.clusterSecretStore.name }}
+  kubectl get serviceaccount {{ .Values.externalSecrets.serviceAccount.name }} -n {{ include "vault.namespace" . }}
+  kubectl get clusterrolebinding {{ .Values.externalSecrets.serviceAccount.name }}-auth
+
+Kubernetes auth in Vault must allow role {{ .Values.externalSecrets.auth.role }} on mount {{ .Values.externalSecrets.auth.mountPath }}.

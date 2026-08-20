@@ -1,0 +1,168 @@
+sonarqube:
+  deploymentType: "StatefulSet"
+  edition: enterprise
+  ingress:
+    enabled: true
+    hosts:
+      - name: sonarqube.example.com
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    tls:
+    - secretName: example-com-wildcard-tls
+  image:
+    pullSecrets:
+      - name: registrysecret
+
+  service:
+    name: sonarqube
+    type: ClusterIP
+    externalPort: 9000
+    internalPort: 9000
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 0
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop: ["ALL"]
+
+  readinessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    failureThreshold: 6
+    timeoutSeconds: 1
+  livenessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    failureThreshold: 6
+    timeoutSeconds: 1
+  startupProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 24
+    timeoutSeconds: 1
+
+  initContainers:
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 0
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+    resources: {}
+
+  initSysctl:
+    enabled: true
+    vmMaxMapCount: 524288
+    fsFileMax: 131072
+    nofile: 131072
+    nproc: 8192
+    securityContext:
+      privileged: true
+      runAsUser: 0
+
+  initFs:
+    enabled: true
+    securityContext:
+      privileged: false
+      runAsNonRoot: false
+      runAsUser: 0
+      runAsGroup: 0
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+        add: ["CHOWN"]
+
+  resources:
+    limits:
+      cpu: 800m
+      memory: 6144M
+      ephemeral-storage: 512000M
+    requests:
+      cpu: 400m
+      memory: 2048M
+      ephemeral-storage: 1536M
+
+  persistence:
+    enabled: true
+    annotations: {}
+    storageClass: gp3
+    accessMode: ReadWriteOnce
+    size: 20Gi
+    uid: 1000
+    guid: 0
+
+  jdbcOverwrite:
+    enabled: true
+    jdbcUrl: "jdbc:postgresql://sonarqube.cluster-example.us-east-2.rds.amazonaws.com:5432/sonarDB"
+    jdbcUsername: "sonarUser"
+
+  postgresql:
+    enabled: false
+    global:
+      imageRegistry: ""
+    image:
+      registry: ""
+      pullSecrets:
+        - registrysecret
+
+    service:
+      port: 5432
+    resources:
+      limits:
+        cpu: 2
+        memory: 2Gi
+      requests:
+        cpu: 100m
+        memory: 200Mi
+    persistence:
+      enabled: true
+      accessMode: ReadWriteOnce
+      size: 20Gi
+      storageClass: "gp3"
+    securityContext:
+      enabled: true
+      fsGroup: 1001
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 1001
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+    volumePermissions:
+      enabled: false
+      securityContext:
+        runAsUser: 0
+    shmVolume:
+      chmod:
+        enabled: false
+    serviceAccount:
+      enabled: false
+
+  sonarqubeFolder: /opt/sonarqube
+
+  tests:
+    image: ""
+    enabled: true
+    resources:
+      limits:
+        cpu: 500m
+        memory: 200M
+
+  serviceAccount:
+    create: false
+    annotations: {}
+
+  extraConfig:
+    secrets: []
+    configmaps: []

@@ -7,7 +7,7 @@ idplat_postgres_db_am: "{{ am_db_name }}"
 idplat_postgres_image: idplat.postgres:16.3-alpine3.20
 idplat_postgres_env:
   POSTGRES_USER: user
-  POSTGRES_PASSWORD: password1
+  POSTGRES_PASSWORD: CHANGE_ME
   POSTGRES_DB: db1
 idplat_postgres_healthcheck_disable: true  # !!!
 idplat_postgres_port: 5432

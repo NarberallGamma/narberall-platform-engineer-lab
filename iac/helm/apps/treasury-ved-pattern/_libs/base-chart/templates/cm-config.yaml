@@ -1,0 +1,17 @@
+{{- if and (or ( .Values.config ) ( .Values.configImport )) ( .Values.configPath ) ( .Values.configFileName ) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  {{- if .Values.namespace }}
+  namespace: {{ .Values.namespace }}
+  {{- end }}
+  name: {{ include "base-chart.fullname" . }}-config
+  labels:
+    {{- include "base-chart.labels" . | nindent 4 }}
+data:
+  {{- if .Values.config }}
+  {{ .Values.configFileName | nindent 2 }}: |- {{ toYaml .Values.config | nindent 4 }}
+  {{- else}}
+  {{ .Values.configFileName | nindent 2 }}: |- {{ .Values.configImport | nindent 4 }}
+  {{- end}}
+{{- end }}     

@@ -1,0 +1,52 @@
+# Istio istiod overlay (official istio/istiod chart).
+# Namespace: istio-system.
+# No Istio ingress or egress gateway in this release.
+# Sidecar auto-inject is opt-in via namespace label.
+# meshID and a private image hub were not set on this install.
+# Chart defaults apply: empty meshID, hub registry.istio.io/release.
+# A private mirror would be example.registry/istio with tag 1.30.3
+# and meshID mesh-platform.
+#
+# Coexistence with a cluster ingress-nginx addon:
+# - no Istio ingress/egress gateway in this release
+# - global sidecar auto-inject disabled
+# - mesh policies (PeerAuthentication, egress) live in the estate cluster kit
+
+global:
+  proxy:
+    autoInject: disabled
+
+meshConfig:
+  enableAutoMtls: true
+  outboundTrafficPolicy:
+    mode: ALLOW_ANY
+  defaultConfig:
+    proxyStatsMatcher:
+      inclusionRegexps:
+        - ".*circuit_breakers.*"
+        - ".*upstream_rq_retry.*"
+        - ".*upstream_rq_pending.*"
+
+# Istio 1.30.3 istiod reads these at the chart root (not under `pilot:`).
+# Nested `pilot.*` keys are ignored by this chart schema.
+# replicaCount 1 + autoscaleEnabled false: the chart skips PDB (needs >1 replica).
+replicaCount: 1
+autoscaleEnabled: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+sidecarInjectorWebhook:
+  enabled: true
+  rewriteAppHTTPProbe: true
+
+telemetry:
+  enabled: true
+  v2:
+    enabled: true
+    prometheus:
+      enabled: true

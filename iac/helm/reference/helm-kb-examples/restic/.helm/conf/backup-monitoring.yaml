@@ -1,0 +1,34 @@
+exceptions:
+  # Environment-specific exceptions (e.g., production, development)
+  production:
+    # Exceptions for bucket "bucket1"
+    bucket1:
+      # Hostname-based exceptions
+      hostname:
+        # Disable checks for the host "server1"
+        "server1": "disable"
+
+      # Backup ID-based exceptions
+      backup_id:
+        # Disable checks for the backup with short ID "abcd1234"
+        "abcd1234": "disable"
+
+      # Path-based exceptions
+      path:
+        # Disable checks for path "/var/logs"
+        "/var/logs": "disable"
+
+  # Global hostname exceptions
+  disabled_hostnames:
+    # Disable checks for hosts "test-server" and "backup-server"
+    - "test-server"
+    - "backup-server"
+
+  # Tag-based exceptions
+  ignored_tags:
+    # Ignore all backups with the tag "POSTGRESQL-PRODUCTION" before September 1, 2024
+    "POSTGRESQL-PRODUCTION": "2024-09-01"
+    # Ignore all backups with the tag "MONGO-DEV-BACKUP" before October 15, 2024
+    "MONGO-DEV-BACKUP": "2024-10-15"
+    # Ignore all backups with the tag "DAILY-SNAPSHOT" before November 1, 2024
+    "DAILY-SNAPSHOT": "2024-11-01"

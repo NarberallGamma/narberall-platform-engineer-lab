@@ -1,0 +1,16 @@
+apiVersion: v2
+name: eck-operator
+description: Elastic Cloud on Kubernetes (ECK) operator
+kubeVersion: ">=1.20.0-0"
+type: application
+version: 0.1.0
+
+dependencies:
+  - name: eck-operator
+    version: "3.1.0"
+    repository: "https://helm.elastic.co"
+    export-values:
+      - parent: werf.repo
+        child: image.repository
+      - parent: werf.tag.eck-operator
+        child: image.tag

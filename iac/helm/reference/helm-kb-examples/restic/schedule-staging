@@ -1,0 +1,14 @@
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# monitoring
+30 8 * * * /app/check_backups.py -c /app/conf/backup-monitoring.yaml
+# etcd staging-kube-master-0
+0 1 * * * /app/00-scripts/restic_run_on.sh 10.10.10.10 backup_bucket_etcd_staging_backup restic_backup_kube_master.sh
+# mongo mongodb namespace
+0 2 * * * /app/00-scripts/restic_backup_mongo_ext.sh MONGODB-STAGING --bucket backup_bucket_mongodb_staging_backup --host "rs0/mongo01-mongodb-0.mongo01-mongodb-headless.mongodb.svc.cluster.local:27017,mongo01-mongodb-1.mongo01-mongodb-headless.mongodb.svc.cluster.local:27017" --add-mongodump-option="--readPreference secondary"
+# postgresql backup
+0 3 * * * /app/00-scripts/restic_run_on.sh 10.10.10.11 backup_bucket_postgresql_staging_backup restic_backup_postgres_stdout.sh 'POSTGRESQL-STAGING --user postgres --do-su-under-user'
+10 * * * * /app/00-scripts/restic_run_on.sh 10.10.10.11 backup_bucket_wal_staging_backup restic_backup_wals_patroni.sh 'WAL-STAGING /var/backup/pgsql/wal 60'
+20 * * * * /app/00-scripts/restic_run_on.sh 10.10.10.12 backup_bucket_wal_staging_backup restic_backup_wals_patroni.sh 'WAL-STAGING /var/backup/pgsql/wal 60'
+# gitlab
+0 5 * * * /app/00-scripts/restic_run_on.sh 10.10.10.13 backup_bucket_gitlab_backup restic_backup_gitlab.sh

@@ -1,0 +1,4 @@
+replicaCount: 2
+env:
+  PROFILES: demo
+domain: demo.example.com

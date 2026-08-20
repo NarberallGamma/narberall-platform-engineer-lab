@@ -1,0 +1,36 @@
+{{- range .Values.loadbalancers }}
+{{- if .enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- toYaml $.Values.labels | nindent 4 }}
+    environment: {{ $.Values.environment }}
+    topology.kubernetes.io/zone: {{ .zone }}
+  annotations:
+    # Cloud ELB pattern: one L4 balancer per zone, bandwidth {{ .bandwidth }},
+    # algorithm {{ $.Values.elb.algorithm }}, TCP health check
+    # (delay {{ $.Values.elb.healthCheck.delay }}s, timeout {{ $.Values.elb.healthCheck.timeout }}s,
+    # retries {{ $.Values.elb.healthCheck.maxRetries }}).
+    # Vendor autocreate / flavor / charge-mode keys are not copied.
+    cloud.example.com/elb-zone: {{ .zone | quote }}
+    cloud.example.com/elb-class: {{ $.Values.elb.class | quote }}
+spec:
+  type: {{ $.Values.service.type }}
+  externalTrafficPolicy: {{ $.Values.service.externalTrafficPolicy }}
+  ports:
+    - name: {{ $.Values.service.ports.http.targetPort }}
+      port: {{ $.Values.service.ports.http.port }}
+      targetPort: {{ $.Values.service.ports.http.targetPort }}
+      protocol: {{ $.Values.service.ports.http.protocol }}
+    - name: {{ $.Values.service.ports.https.targetPort }}
+      port: {{ $.Values.service.ports.https.port }}
+      targetPort: {{ $.Values.service.ports.https.targetPort }}
+      protocol: {{ $.Values.service.ports.https.protocol }}
+  selector:
+    {{- toYaml $.Values.selector | nindent 4 }}
+{{- end }}
+{{- end }}

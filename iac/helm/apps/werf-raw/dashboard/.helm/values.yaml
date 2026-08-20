@@ -1,0 +1,31 @@
+portal:
+  ingressclassname:
+    _default: nginx
+    production: nginx
+  host:
+    _default: '%s.k8s.example.com'
+    dev: dev.example.com
+    stage: stage.example.com
+    production: app.example.com
+  replicas:
+    _default: 1
+    production: 3
+  root_path: /app
+  job:
+    upload_dir: /app/apps/web
+    endpoint: 'cdn.example.com'
+    s3_endpoint: 'https://s3.example.com'
+    bucket: 'app-dashboard'
+    region: auto
+
+resources:
+  nginx:
+    _default:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 256Mi
+
+registry:
+  secret_name: registrysecret

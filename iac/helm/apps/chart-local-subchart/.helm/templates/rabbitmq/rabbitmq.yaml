@@ -1,0 +1,83 @@
+{{- with .Values.rabbitmq }}
+{{- if include "fl.isTrue" (list $ . .enabled) }}
+
+{{ $cluster_name := (printf "%s-rmq" $.Chart.Name) }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: {{ $cluster_name }}
+  labels:
+    app: {{ $cluster_name }}
+  annotations:
+    werf.io/weight: "-200"
+spec:
+  replicas: {{ include "fl.value" (list $ . .replicas) }}
+  {{- include "imagePullSecrets" $ | indent 2 }}
+  {{- include "rabbitmq.affinity" (list $ . $cluster_name) | indent 2 }}
+  {{- include "tolerations" $ | indent 2 }}
+  override:
+    service:
+      metadata:
+        annotations:
+          prometheus.deckhouse.io/port: "15692"
+        labels:
+          prometheus.deckhouse.io/target: rabbitmq
+    statefulSet:
+      spec:
+        template:
+          spec:
+            containers:
+            - name: rabbitmq
+              volumeMounts:
+              - mountPath: /etc/rabbitmq/rabbitmq_definitions.json
+                name: definitions
+                subPath: rabbitmq_definitions.json
+            volumes:
+            - name: definitions
+              configMap:
+                name: {{ $cluster_name }}
+  {{- with .persistence }}
+  persistence:
+    storage: {{ include "fl.value" (list $ . .storage) }}
+    {{- if .storageClassName }}
+    storageClassName: {{ include "fl.value" (list $ . .storageClassName) }}
+    {{- end }}
+  {{- end }}
+  rabbitmq:
+    additionalConfig: |
+      log.console = true
+      log.console.formatter = json
+      {{- include "fl.value" (list $ . .additionalConfig) | nindent 6 }}
+  resources: {{ include "fl.value" (list $ . .resources) | nindent 12 }}
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ $cluster_name }}
+  annotations:
+    werf.io/weight: "-200"
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: StatefulSet
+    name: {{ $cluster_name }}
+  updatePolicy:
+    updateMode: "Off"
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $cluster_name }}
+  annotations:
+    werf.io/weight: "-200"
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: {{ $cluster_name }}
+
+{{- end }}
+{{- end }}

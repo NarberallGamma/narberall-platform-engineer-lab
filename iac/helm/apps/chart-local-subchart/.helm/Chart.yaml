@@ -1,0 +1,16 @@
+apiVersion: v2
+name: orders-app
+description: Orders app chart. Postgres comes from a small local subchart, not a Bitnami tree.
+type: application
+version: 0.1.0
+appVersion: "1.0"
+dependencies:
+  - name: common-postgresql
+    alias: postgresql
+    version: ~0
+    condition: postgresql.enabled
+    tags:
+      - postgresql
+    export-values:
+      - parent: werf
+        child: werf

@@ -1,0 +1,205 @@
+app:
+  replicas:
+    _default: 1
+    prodlike: 3
+    production: 3
+
+envs:
+  config:
+    DB_HOST:
+      _default: catalog-api-psql
+      prodlike: "pg-patroni.example.svc"
+      production: "pg-patroni.example.svc"
+    DB_NAME:
+      _default: catalog_api
+      preprod: catalog_api
+      prodlike: catalog_api
+      production: catalog_api
+    DB_PORT:
+      _default: 5432
+      prodlike: 5000
+      production: 5000
+    APP_ENV:
+      _default: preprod
+      preprod: preprod
+      prodlike: prod
+      production: prod
+    RABBITMQ_HOST:
+      _default: "orders-rmq.platform-preprod.svc.cluster.local"
+      preprod: "orders-rmq.platform-preprod.svc.cluster.local"
+      prodlike: "orders-rmq.platform-prodlike.svc.cluster.local"
+      production: "orders-rmq.platform-production.svc.cluster.local"
+    RABBITMQ_PORT:
+      _default: 5672
+      preprod: 5672
+      prodlike: 5672
+      production: 5672
+    RABBITMQ_USER:
+      _default: catalog
+      preprod: catalog
+      prodlike: catalog
+      production: catalog
+    RABBITMQ_VHOST:
+      _default: catalog
+      preprod: catalog
+      prodlike: catalog
+      production: catalog
+    API_TIMEOUT:
+      _default: 60
+      prodlike: 60
+      production: 60
+    CACHE_TYPE:
+      _default: "array"
+      prodlike: "redis"
+      production: "redis"
+    CACHE_DEFAULT_TTL:
+      _default: 3600
+      prodlike: 3600
+      production: 3600
+
+ingresses:
+  main:
+    enabled: true
+    name: "{{ $.Chart.Name }}"
+    host:
+      _default: 'catalog-api-preprod.example.com'
+      prodlike: "catalog-api-prodlike.example.com"
+      production: "catalog-api.example.com"
+    tls:
+      secretName:
+        _default: "wildcard.example.com"
+        prodlike: "wildcard.example.com"
+        production: "wildcard.example.com"
+    annotations:
+      _default: |
+        nginx.ingress.kubernetes.io/proxy-body-size: 128m
+        nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+        nginx.ingress.kubernetes.io/enable-cors: "true"
+        nginx.ingress.kubernetes.io/cors-allow-origin: "https://*.example.com, http://*.example.com"
+
+resources:
+  nginx:
+    _default:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 256Mi
+    prodlike:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 256Mi
+    production:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 256Mi
+  php:
+    _default:
+      requests:
+        cpu: 1
+        memory: 1Gi
+      limits:
+        memory: 1Gi
+    prodlike:
+      requests:
+        cpu: 1
+        memory: 1Gi
+      limits:
+        memory: 1Gi
+    production:
+      requests:
+        cpu: 1
+        memory: 1Gi
+      limits:
+        memory: 1Gi
+  php_exporter:
+    _default:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 64Mi
+  cron:
+    _default:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 128Mi
+
+
+migrations:
+  enabled: true
+postgres:
+  clusters:
+    catalog-api:
+      enabled:
+        _default: true
+        prodlike: true
+        production: false
+      user: catalog_api
+      database:
+        _default: catalog_api
+        prodlike: catalog_api
+        production: catalog_api
+  storage: 10Gi
+  storageClassName: local
+
+imagePullSecrets: |
+  - name: registrysecret
+
+priorityClassName:
+  _default: production-low
+  prodlike: production-low
+  production: production-medium
+
+nodeSelector:
+  _default: |
+    node-role/app: ""
+  prodlike: |
+    node-role/app: ""
+  production: |
+    node-role/app: ""
+
+tolerations:
+  _default: |
+    - effect: NoExecute
+      key: dedicated
+      operator: Equal
+      value: app
+  prodlike: |
+    - effect: NoExecute
+      key: dedicated
+      operator: Equal
+      value: app
+  production: |
+    - effect: NoExecute
+      key: dedicated
+      operator: Equal
+      value: app
+
+rabbitmq:
+  enabled: true
+  custom:
+    vhosts: ['catalog'] 
+    users:
+      catalog:
+        tags:
+        - policymaker
+        - monitoring
+        - management
+        permissions:
+        - vhostname: "/"
+          permission:
+            write: '.*'
+            configure: '.*'
+            read: '.*'
+        - vhostname: "catalog"
+          permission:
+            write: '.*'
+            configure: '.*'
+            read: '.*'

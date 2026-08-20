@@ -1,0 +1,20 @@
+# Per-stand overlay for feed-api. Secrets stay example-only.
+persistence:
+  size: 2Gi
+
+# Bridge process runs as a separate pod in the live estate. Keep it off here.
+env:
+  - name: BRIDGE_ENABLED
+    value: "0"
+  - name: BRIDGE_MAX_AGENTS
+    value: "2"
+  - name: BRIDGE_AGENT_TIMEOUT
+    value: "600"
+  - name: BRIDGE_QUEUE_MAX
+    value: "100"
+  - name: BRIDGE_DEDUP_WINDOW
+    value: "60"
+
+secrets:
+  WEBHOOK_URL: "http://203.0.113.10:8000/api/v1/custom_response"
+  CALLBACK_URL: "http://203.0.113.10:8000/api/v1/callback"

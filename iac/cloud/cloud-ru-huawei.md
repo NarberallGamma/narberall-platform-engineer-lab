@@ -34,6 +34,8 @@ Inventory and import notes for the compute catalog: [`../terraform/cloud-ru-comp
 
 Resource types: [`../terraform/RESOURCES.md`](../terraform/RESOURCES.md)
 
+Cluster Helm: [`../helm/`](../helm/).
+
 ## Keywords
 
 Huawei Cloud, cloud.ru, Terraform, Terragrunt, VPC, ECS, CCE, Kubernetes, RDS, Kafka, OBS, IAM, brownfield import, remote state, modules, multi-env

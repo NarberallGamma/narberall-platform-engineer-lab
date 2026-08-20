@@ -1,0 +1,5 @@
+apiVersion: v2
+name: postgres
+description: Single-node PostgreSQL 15 for a DEV autostand (contrast sample)
+version: 1.0.0
+appVersion: "15"

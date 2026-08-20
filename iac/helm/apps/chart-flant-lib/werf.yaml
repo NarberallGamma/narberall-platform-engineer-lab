@@ -1,0 +1,26 @@
+project: catalog-api
+configVersion: 1
+
+---
+image: php
+from: php:8.4-fpm
+
+---
+image: nginx
+from: nginx:1.27-alpine
+
+---
+image: php_fpm_exporter
+from: flant/php-fpm-exporter:v0.3.3
+
+---
+image: init
+from: alpine:3.17
+
+---
+image: postgres
+from: postgres:15
+
+---
+image: cron
+fromImage: php

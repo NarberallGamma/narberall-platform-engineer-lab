@@ -8,13 +8,14 @@ The habit is the same on old repos and new ones: **infrastructure, builds, publi
 
 Sanitized pipeline **code** lands under [`pipelines/`](pipelines/) as it is cleaned. This page is the **full map**. One host-lifecycle example is already there; the rest of the shapes below are described first on purpose.
 
-Terraform creates (or imports) the thing. Ansible makes the guest operable. Application pipelines build and gate the artefact. **CI is the button** that runs the right slice. The three IaC folders are siblings:
+Terraform creates (or imports) the thing. Ansible makes the guest operable. Helm / Argo bootstrap lives in [`../helm/`](../helm/) ([case 11](../../case-studies/11-helm-estate.md)); **CI is still the button** that runs the right slice. Application pipelines build and gate the artefact. The IaC folders are siblings:
 
 | Folder | Owns |
 |--------|------|
 | [`../terraform/`](../terraform/) | Cloud APIs, state, guest init / cloud-init, Kubernetes as code |
 | [`../ansible/`](../ansible/) | On the host (packages, harden, EDR, metrics) |
-| **this catalog** | Pipelines that call the two above, plus build / publish / deploy / revoke |
+| [`../helm/`](../helm/) | Cluster package, GitOps, Argo bootstrap |
+| **this catalog** | Pipelines that call those, plus build / publish / deploy / revoke |
 
 ```text
 iac/ci/                 # this hub (the story lives here)

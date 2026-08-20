@@ -1,0 +1,51 @@
+# Three LoadBalancer Services. ingress-nginx Service stays disabled.
+# Zones are generic. Vendor autocreate keys live as comments in the template.
+
+loadbalancers:
+  - name: elb-zone-a
+    zone: zone-a
+    bandwidth: 2000
+    enabled: true
+  - name: elb-zone-b
+    zone: zone-b
+    bandwidth: 2000
+    enabled: true
+  - name: elb-zone-c
+    zone: zone-c
+    bandwidth: 2000
+    enabled: true
+
+namespace: ingress-nginx
+environment: lab
+
+elb:
+  class: performance
+  algorithm: ROUND_ROBIN
+  bandwidthMbps: 2000
+  healthCheck:
+    enabled: true
+    protocol: TCP
+    delay: 5
+    timeout: 10
+    maxRetries: 3
+
+service:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  ports:
+    http:
+      port: 80
+      targetPort: http
+      protocol: TCP
+    https:
+      port: 443
+      targetPort: https
+      protocol: TCP
+
+selector:
+  app.kubernetes.io/name: ingress-nginx
+  app.kubernetes.io/component: controller
+
+labels:
+  app.kubernetes.io/name: ingress-nginx
+  app.kubernetes.io/component: controller

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: web-ws
+description: Websocket worker umbrella. Kafka SASL_SSL truststore is built in values initContainers.
+type: application
+version: 0.1.0
+appVersion: "3.0.1"
+
+dependencies:
+  - name: base-chart
+    version: 0.2.1
+    repository: "file://../_libs/base-chart"
+    alias: application
+    condition: application.enabled

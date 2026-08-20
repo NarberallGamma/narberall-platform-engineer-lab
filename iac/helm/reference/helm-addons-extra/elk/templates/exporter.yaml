@@ -1,0 +1,108 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ printf "%s-exporter" .Chart.Name }}
+  labels:
+    app: {{ printf "%s-exporter" .Chart.Name }}
+spec:
+  replicas: {{ include "fl.value" (list $ . .Values.exporter.replicas) }}
+  selector:
+    matchLabels:
+      app: {{ printf "%s-exporter" .Chart.Name }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: {{ printf "%s-exporter" .Chart.Name }}
+    spec:
+      nodeSelector: {{ include "fl.value" (list $ . .Values.exporter.nodeSelector) | nindent 8 }}
+      tolerations: {{ include "fl.value" (list $ . .Values.exporter.tolerations) | nindent 8 }}
+      restartPolicy: {{ .Values.restartPolicy }}
+      imagePullSecrets:
+        - name: registrysecret
+      securityContext: {{ include "fl.value" (list $ . .Values.exporter.securityContext) | nindent 8 }}
+      containers:
+      - name: exporter
+        image: {{ index .Values.werf.image "elasticsearch-exporter" }}
+        command:
+          - elasticsearch_exporter
+          - --es.uri=https://$(ELASTICSEARCH_USERNAME):$(ELASTICSEARCH_PASSWORD)@$(ELASTICSEARCH_HOST):$(ELASTICSEARCH_PORT)
+          - --es.all
+          - --es.snapshots
+          - --es.timeout=30s
+          - --es.ssl-skip-verify
+          - --web.listen-address=:9114
+          - --web.telemetry-path=/metrics
+        securityContext:
+          capabilities:
+            drop:
+              - SETPCAP
+              - MKNOD
+              - AUDIT_WRITE
+              - CHOWN
+              - NET_RAW
+              - DAC_OVERRIDE
+              - FOWNER
+              - FSETID
+              - KILL
+              - SETGID
+              - SETUID
+              - NET_BIND_SERVICE
+              - SYS_CHROOT
+              - SETFCAP
+          readOnlyRootFilesystem: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 512Mi
+        ports:
+          - containerPort: 9114
+            name: http
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+        env:
+          - name: ELASTICSEARCH_HOST
+            value: {{ printf "%s-es-http" .Chart.Name }}
+          - name: ELASTICSEARCH_PORT
+            value: "9200"
+          - name: ELASTICSEARCH_USERNAME
+            value: elastic
+          - name: ELASTICSEARCH_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: elastic
+                name: {{ printf "%s-es-elastic-user" .Chart.Name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s-exporter" .Chart.Name }}
+  annotations:
+    prometheus.deckhouse.io/sample-limit: "5000"
+  labels:
+    prometheus.deckhouse.io/custom-target: {{ printf "%s-exporter" .Chart.Name }}
+spec:
+  ports:
+  - port: 9114
+    targetPort: 9114
+    protocol: TCP
+    name: http-metrics
+  selector:
+    app: {{ printf "%s-exporter" .Chart.Name }}

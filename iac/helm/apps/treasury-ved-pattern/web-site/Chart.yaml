@@ -1,0 +1,18 @@
+apiVersion: v2
+name: web-site
+description: Static nginx site umbrella. base-chart comes from a remote Helm repo, not a local file:// copy.
+type: application
+version: 0.1.0
+appVersion: "1.0"
+
+keywords:
+  - website
+  - static
+  - nginx
+
+dependencies:
+  - name: base-chart
+    version: "^0.2.1"
+    repository: "https://charts.example.com"
+    alias: application
+    condition: application.enabled

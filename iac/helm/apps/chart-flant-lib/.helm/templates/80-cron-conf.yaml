@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $.Chart.Name }}-cron-conf
+data:
+  crontab: |
+{{ (.Files.Get "schedules/crontab") | indent 4 }}

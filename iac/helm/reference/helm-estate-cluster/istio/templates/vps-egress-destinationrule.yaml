@@ -1,0 +1,31 @@
+{{- if .Values.vpsEgress.enabled }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ .Values.vpsEgress.destinationRule.name }}
+  namespace: {{ .Values.vpsEgress.destinationRule.namespace }}
+  labels:
+    app.kubernetes.io/component: vps-egress
+    environment: {{ .Values.environment }}
+spec:
+  host: {{ .Values.vpsEgress.serviceEntry.host | quote }}
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        connectTimeout: {{ .Values.vpsEgress.destinationRule.connectTimeout }}
+    outlierDetection:
+      consecutiveGatewayErrors: {{ .Values.vpsEgress.destinationRule.outlierDetection.consecutiveGatewayErrors }}
+      consecutive5xxErrors: {{ .Values.vpsEgress.destinationRule.outlierDetection.consecutive5xxErrors }}
+      interval: {{ .Values.vpsEgress.destinationRule.outlierDetection.interval }}
+      baseEjectionTime: {{ .Values.vpsEgress.destinationRule.outlierDetection.baseEjectionTime }}
+      maxEjectionPercent: {{ .Values.vpsEgress.destinationRule.outlierDetection.maxEjectionPercent }}
+      minHealthPercent: {{ .Values.vpsEgress.destinationRule.outlierDetection.minHealthPercent }}
+    loadBalancer:
+      localityLbSetting:
+        enabled: true
+        failoverPriority:
+          {{- range .Values.vpsEgress.destinationRule.failoverPriority }}
+          - {{ . | quote }}
+          {{- end }}
+{{- end }}

@@ -1,0 +1,120 @@
+dagster:
+  dagsterWebserver:
+    workspace:
+      enabled: true
+      servers:
+        - host: "dagit-backend-backend"
+          port: 3030
+          name: "dagster-repo-backend"
+        - host: "dagit-qa-backend"
+          port: 3030
+          name: "dagster-repo-qa"
+
+    nodeSelector:
+      node-role.kubernetes.io/prod-nodes: ""
+    tolerations:
+      - effect: NoExecute
+        key: dedicated
+        operator: Equal
+        value: production
+
+  priorityClassName: production-medium
+
+  pipelineRun:
+    image:
+      repository: "example.registry/platform/user-code"
+    tag: CHANGE_ME
+    pullPolicy: Always
+
+  runLauncher:
+    type: K8sRunLauncher
+    config:
+      k8sRunLauncher:
+        runK8sConfig:
+          podSpecConfig:
+            nodeSelector:
+              node-role.kubernetes.io/dagster: ""
+            tolerations:
+              - effect: NoExecute
+                key: dedicated
+                operator: Equal
+                value: dagster
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/auth-signin: "https://$host/dex-authenticator/sign_in"
+      nginx.ingress.kubernetes.io/auth-url: "https://dagster-dex-authenticator.production.svc.cluster.local/dex-authenticator/auth"
+      nginx.ingress.kubernetes.io/auth-response-headers: X-Auth-Request-User,X-Auth-Request-Email,Authorization
+      nginx.ingress.kubernetes.io/whitelist-source-range: 203.0.113.0/24,198.51.100.0/24
+    labels: {}
+    dagsterWebserver:
+      host: "dagster-aws.example.com"
+      path: "/"
+      pathType: Prefix
+      tls:
+        enabled: true
+        clusterissuer: letsencrypt
+        secretName: dagster-tls
+
+  dagsterDaemon:
+    runCoordinator:
+      enabled: false
+    runMonitoring:
+      enabled: false
+      startTimeoutSeconds: 180
+    runRetries:
+      enabled: false
+    nodeSelector:
+      node-role.kubernetes.io/prod-nodes: ""
+    tolerations:
+      - effect: NoExecute
+        key: dedicated
+        operator: Equal
+        value: production
+
+  telemetry:
+    enabled: false
+
+  dagster-user-deployments:
+    enabled: true
+    enableSubchart: false
+    deployments: []
+
+  postgresql:
+    enabled: true
+    image:
+      repository: "library/postgres"
+      tag: "9.6.21"
+      pullPolicy: IfNotPresent
+    master:
+      priorityClassName: production-high
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/sts
+                operator: Exists
+      tolerations:
+      - effect: NoExecute
+        operator: Equal
+        key: dedicated
+        value: sts
+    slave:
+      priorityClassName: production-high
+    persistence:
+      size: 30Gi
+
+  rabbitmq:
+    enabled: false
+    priorityClassName: production-high
+
+  redis:
+    enabled: false
+    internal: false
+    slave:
+      priorityClassName: production-high
+    master:
+      priorityClassName: production-high

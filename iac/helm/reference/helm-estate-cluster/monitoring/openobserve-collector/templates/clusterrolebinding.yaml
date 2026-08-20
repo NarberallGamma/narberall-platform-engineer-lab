@@ -1,0 +1,14 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "openobserve-collector.fullname" . }}
+  labels:
+    {{- include "openobserve-collector.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "openobserve-collector.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "openobserve-collector.serviceAccountName" . }}
+    namespace: {{ include "openobserve-collector.namespace" . }}

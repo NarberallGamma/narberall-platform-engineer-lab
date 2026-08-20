@@ -1,0 +1,27 @@
+{{- if .Values.envs.configmap }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $.Chart.Name }}-env
+  labels:
+    app: {{ $.Chart.Name }}
+  annotations:
+    werf.io/weight: "-110"
+data:
+  {{- include "fl.generateConfigMapEnvVars" (list $ . .Values.envs.configmap) | nindent 2 }}
+{{- end }} {{/* if */}}
+
+{{- if .Values.envs.secret }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $.Chart.Name }}-env
+  labels:
+    app: {{ $.Chart.Name }}
+  annotations:
+    werf.io/weight: "-110"
+stringData:
+  {{- include "fl.generateConfigMapEnvVars" (list $ . .Values.envs.secret) | nindent 2 }}
+{{- end }} {{/* if */}}

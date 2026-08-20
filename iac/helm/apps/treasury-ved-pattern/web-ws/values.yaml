@@ -1,0 +1,174 @@
+fullnameOverride: estate
+
+global:
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+  env:
+    PLACEHOLDER: "managed-by-vault-external-secrets"
+
+application:
+  enabled: true
+  replicaCount: 1
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+
+  service:
+    enabled: true
+    port: 8080
+    targetPort: 8080
+    type: ClusterIP
+
+  podAnnotations:
+    sidecar.istio.io/inject: "true"
+    sidecar.istio.io/proxyCPU: "100m"
+    sidecar.istio.io/proxyMemory: "128Mi"
+
+  serviceAccount:
+    authDelegator: true
+
+  # envFrom for External Secrets Operator
+  extraEnvFrom:
+    - secretRef:
+        name: web-ws-vault-secrets
+
+  env:
+    JAVA_EXT: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005
+    JAVA_MEM: -Xmx128M
+    MICROMETER_TRACING_SERVICE_NAME: web-ws-app
+    server:
+      forward-headers-strategy: framework
+    spring:
+      application:
+        name: web-ws-app
+      kafka:
+        bootstrap-servers: "kafka-0.example.com:9093,kafka-1.example.com:9093,kafka-2.example.com:9093"
+        properties:
+          security.protocol: SASL_SSL
+          sasl.mechanism: PLAIN
+          sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="estate_user" password="${kafkaClientPassword}";
+          ssl.endpoint.identification.algorithm: ""
+          ssl.truststore.location: /tmp/kafka-truststore/kafka-truststore.jks
+          ssl.truststore.password: changeit
+          ssl.truststore.type: JKS
+    management:
+      server:
+        port: 8085
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+
+  # Kafka CA for SASL_SSL. CA bytes stay in Secret kafka-ca-cert, not in this chart.
+  # Build a JKS truststore at pod start: copy Java cacerts, then import the Kafka CA.
+  extraVolumes:
+    - name: kafka-ca-cert
+      secret:
+        secretName: kafka-ca-cert
+    - name: kafka-truststore
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: kafka-ca-cert
+      mountPath: /tmp/kafka-ca.crt
+      subPath: ca.crt
+      readOnly: true
+    - name: kafka-truststore
+      mountPath: /tmp/kafka-truststore
+  initContainers:
+    - name: create-truststore
+      image: example.registry/platform/base-images/eclipse-temurin:11-jre
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          # copy the JVM cacerts file (default public CAs)
+          JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+          cp "$JAVA_HOME/lib/security/cacerts" /tmp/kafka-truststore/kafka-truststore.jks
+          # keep the well-known cacerts password (changeit)
+          keytool -storepasswd -keystore /tmp/kafka-truststore/kafka-truststore.jks -storepass changeit -new changeit
+          # import the Kafka CA into that truststore
+          keytool -import -noprompt -trustcacerts \
+            -file /tmp/kafka-ca.crt \
+            -alias kafka-ca \
+            -keystore /tmp/kafka-truststore/kafka-truststore.jks \
+            -storepass changeit \
+            -storetype JKS
+          echo "Kafka CA certificate imported successfully into system truststore"
+      volumeMounts:
+        - name: kafka-ca-cert
+          mountPath: /tmp/kafka-ca.crt
+          subPath: ca.crt
+          readOnly: true
+        - name: kafka-truststore
+          mountPath: /tmp/kafka-truststore
+
+  image:
+    repository: "example.registry/platform/web-ws-app"
+    tag: "3.7.0"
+    pullPolicy: IfNotPresent
+
+  # probes for the GitOps health check
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: metrics
+    initialDelaySeconds: 15
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: metrics
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  containerPorts:
+    - name: http
+      containerPort: 8080
+      protocol: TCP
+    - name: metrics
+      containerPort: 8085
+      protocol: TCP
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      kubernetes.io/tls-acme: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$1
+      nginx.ingress.kubernetes.io/x-forwarded-prefix: /api/v0/web-ws/
+      nginx.ingress.kubernetes.io/enable-cors: "true"
+      nginx.ingress.kubernetes.io/cors-allow-origin: "https://app.example.com"
+      nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD"
+      nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Accept,Accept-Language,Origin,Referer,Access-Control-Request-Method,Access-Control-Request-Headers,x-tenant-id"
+      nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+      nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range,Content-Disposition,Content-Type"
+      nginx.ingress.kubernetes.io/cors-max-age: "3600"
+    hosts:
+      - host: web.example.com
+        paths:
+          - path: /api/v0/web-ws/(.*)
+            pathType: ImplementationSpecific
+    tls:
+      - secretName: wildcard-tls
+        hosts:
+          - web.example.com
+
+  resources:
+    requests:
+      cpu: 75m
+      memory: 192Mi
+    limits:
+      cpu: 375m
+      memory: 768Mi

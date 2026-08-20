@@ -1,0 +1,5 @@
+apiVersion: v2
+name: kafka
+description: Single-node KRaft Kafka plus UI for a DEV autostand (contrast sample)
+version: 1.0.0
+appVersion: "3.7.2"

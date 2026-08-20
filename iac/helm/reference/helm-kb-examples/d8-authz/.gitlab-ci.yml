@@ -1,0 +1,21 @@
+stages:
+  - deploy
+
+.base_deploy:
+  script:
+    - type multiwerf && source <(multiwerf use 1.1 beta)
+    - type werf && source <(werf ci-env gitlab)
+    - werf deploy --stages-storage :local
+                  --values=$VALUES
+  when: manual
+  tags:
+    - werf
+
+Deploy to Staging:
+  extends: .base_deploy
+  stage: deploy
+  environment:
+    name: staging
+  variables:
+    WERF_KUBE_CONTEXT: estate-dev
+    VALUES: ".helm/values.yaml"

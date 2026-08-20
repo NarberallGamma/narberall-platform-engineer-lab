@@ -1,0 +1,62 @@
+{{ $values := .Values.s3_cache_proxy }}
+{{ $name := $values.name}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+spec:
+  type: ClusterIP
+  ports:
+{{- range $port := ( pluck .Values.werf.env $values.ports | first | default $values.ports._default ) }}
+  - name: {{ $port.name }}-service
+    port: {{ $port.number }}
+{{- end }}
+  selector:
+    app: {{ $name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+  annotations:
+    pod-reloader.deckhouse.io/secret-reload: {{ $name }}
+spec:
+  replicas: {{ pluck .Values.werf.env $values.replicas | first | default $values.replicas._default }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/s3-cache-proxy-config.yaml") . | sha256sum }}
+      labels:
+        app: {{ $name }}
+    spec:
+{{ include "priorityClassName" . | indent 6 }}
+{{ include "affinity" (list . $name) | indent 6 }}
+{{ include "tolerations" . | indent 6 }}
+      imagePullSecrets:
+      - name: registrysecret
+      containers:
+      - name: {{ $name }}
+        image: {{ .Values.werf.image.s3_cache_proxy }}
+        ports:
+          {{- range $port := ( pluck .Values.werf.env $values.ports | first | default $values.ports._default ) }}
+            - containerPort: {{ $port.number }}
+              name: {{ $port.name }}
+          {{- end }}
+        volumeMounts: {{- toYaml $values.volumeMounts | default "" | nindent 8 }}
+        envFrom:
+          - secretRef:
+              name: {{ $name }}
+        resources:
+{{ toYaml (pluck .Values.werf.env $values.resources | first | default $values.resources._default) | indent 10 }}
+      volumes:
+        {{- toYaml $values.volumes | default "" | nindent 8 }}
+  strategy:
+    type: Recreate

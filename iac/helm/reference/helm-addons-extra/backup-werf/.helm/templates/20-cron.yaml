@@ -1,0 +1,51 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cron-{{ .Values.werf.env }}
+  labels:
+    app: backup-cron
+spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backup-cron
+  template:
+    metadata:
+      labels:
+        app: backup-cron
+      annotations:
+        checksum/ssh-key: {{ include (print .Template.BasePath "/05-secret-ssh-key.yaml") . | sha256sum }}
+        checksum/secrets: {{ include (print .Template.BasePath "/10-secrets.yaml") . | sha256sum }}
+    spec:
+      imagePullSecrets:
+      - name: regcred
+      volumes:
+      - name: ssh-key
+        secret:
+          secretName: ssh-key
+          defaultMode: 256
+      - name: secrets
+        secret:
+          secretName: backup-secrets
+          defaultMode: 256
+      containers:
+      - name: cron
+        image: {{ .Values.werf.image.backup }}
+{{- include "resources_crons" . | indent 8 }}
+        command: ["/usr/local/bin/dumb-init"]
+        args:
+          - '--'
+          - 'bash'
+          - '-c'
+          - '/app/entrypoint.sh {{ .Values.werf.env }}'
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: ssh-key
+          mountPath: "/root/.ssh/.borg"
+          subPath: .borg
+        - name: secrets
+          mountPath: "/root/secrets"

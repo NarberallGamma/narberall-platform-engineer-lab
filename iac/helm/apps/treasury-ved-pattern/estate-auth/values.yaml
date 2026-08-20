@@ -1,0 +1,238 @@
+fullnameOverride: estate
+
+global:
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+  env:
+    PLACEHOLDER: "managed-by-vault-external-secrets"
+
+application:
+  enabled: true
+  replicaCount: 1
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+  # preferred pod anti-affinity for high availability
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: estate-auth
+                app.kubernetes.io/instance: estate
+            topologyKey: kubernetes.io/hostname
+
+  service:
+    enabled: true
+    port: 8080
+    targetPort: 8080
+    type: ClusterIP
+
+  podAnnotations:
+    sidecar.istio.io/inject: "true"
+    sidecar.istio.io/proxyCPU: "100m"
+    sidecar.istio.io/proxyMemory: "128Mi"
+
+  serviceAccount:
+    authDelegator: true
+
+  # extra envFrom sources (External Secrets Operator target)
+  extraEnvFrom:
+    - secretRef:
+        name: estate-auth-vault-secrets
+
+  # service-specific environment (flattened to a Secret by base-chart envify)
+  env:
+    JAVA_EXT: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005
+    server:
+      forward-headers-strategy: framework
+
+    spring:
+      # Vault application name
+      application:
+        name: estate-auth-app
+      # issuer for OIDC discovery (must match the web app issuer-uri, including port)
+      security:
+        oauth2:
+          authorizationserver:
+            issuer: "http://estate-auth-application:8080"
+      cloud:
+        openfeign:
+          client:
+            config:
+              default:
+                logger-level: full
+        vault:
+          uri: 'https://vault.example.com'
+          authentication: KUBERNETES
+          kubernetes:
+            role: app
+            service-account-token-file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            kubernetes-path: kubernetes
+      datasource:
+        url: jdbc:postgresql://10.10.0.10:5432/estate_auth?sslmode=require
+      flyway:
+        url: jdbc:postgresql://10.10.0.10:5432/estate_auth?sslmode=require
+      kafka:
+        bootstrap-servers: "kafka-0.kafka.example.com:9093,kafka-1.kafka.example.com:9093,kafka-2.kafka.example.com:9093"
+        properties:
+          security.protocol: SASL_SSL
+          sasl.mechanism: PLAIN
+          sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="estate_user" password="${kafkaClientPassword}";
+          ssl.endpoint.identification.algorithm: ""
+          ssl.truststore.location: /tmp/kafka-truststore/kafka-truststore.jks
+          ssl.truststore.password: CHANGE_ME
+          ssl.truststore.type: JKS
+    # JWT token configuration
+    jwt:
+      accessTokenTimeToLiveSeconds: 28800
+      refreshTokenTimeToLiveMinutes: 28900
+    management:
+      server:
+        port: 8085
+      # tracing:
+      #   zipkin:
+      #     endpoint: http://jaeger.example.svc.cluster.local:9411/api/v2/spans
+      endpoints:
+        web:
+          exposure:
+            include: "*"
+    # in-cluster service dependencies
+    onboarding-service:
+      url: "http://onboarding-service-application:8080"
+    otp-service:
+      url: "http://otp-service-application:8080"
+    # expired-authorization cleaner
+    expired-authorization-cleaner:
+      cron: "0 0/5 * * * ?"
+      pool-size: 5
+  # Kafka CA for the SASL_SSL handshake
+  extraVolumes:
+    - name: kafka-ca-cert
+      secret:
+        secretName: kafka-ca-cert
+    - name: kafka-truststore
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: kafka-ca-cert
+      mountPath: /tmp/kafka-ca.crt
+      subPath: ca.crt
+      readOnly: true
+    - name: kafka-truststore
+      mountPath: /tmp/kafka-truststore
+  extraEnv:
+    - name: JAVA_TOOL_OPTIONS
+      value: "-Djavax.net.ssl.trustStore=/tmp/kafka-truststore/kafka-truststore.jks -Djavax.net.ssl.trustStorePassword=CHANGE_ME -Djavax.net.ssl.trustStoreType=JKS -Djavax.net.ssl.keyStore=/tmp/kafka-truststore/kafka-truststore.jks -Djavax.net.ssl.keyStorePassword=CHANGE_ME -Djavax.net.ssl.keyStoreType=JKS -Dcom.sun.net.ssl.checkRevocation=false -Djdk.tls.allowUnsafeServerCertChange=true -Djavax.net.ssl.checkRevocation=false -Dcom.sun.jndi.ldap.object.disableEndpointIdentification=true -Djdk.tls.client.enableStatusRequestExtension=false"
+    - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+      value: "kafka-0.kafka.example.com:9093,kafka-1.kafka.example.com:9093,kafka-2.kafka.example.com:9093"
+    - name: SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL
+      value: "SASL_SSL"
+    - name: SPRING_KAFKA_PROPERTIES_SASL_MECHANISM
+      value: "PLAIN"
+    - name: SPRING_KAFKA_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
+      value: ""
+    - name: SPRING_KAFKA_CONSUMER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
+      value: ""
+    - name: SPRING_KAFKA_PRODUCER_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
+      value: ""
+  initContainers:
+    - name: create-truststore
+      image: example.registry/base-images/eclipse-temurin:11-jre
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          # copy the JVM cacerts store (includes the default CA set)
+          JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+          cp "$JAVA_HOME/lib/security/cacerts" /tmp/kafka-truststore/kafka-truststore.jks
+          # keep the store password as the JVM default (changeit), then set CHANGE_ME
+          keytool -storepasswd -keystore /tmp/kafka-truststore/kafka-truststore.jks -storepass changeit -new CHANGE_ME
+          # import the Kafka CA into that store
+          keytool -import -noprompt -trustcacerts \
+            -file /tmp/kafka-ca.crt \
+            -alias kafka-ca \
+            -keystore /tmp/kafka-truststore/kafka-truststore.jks \
+            -storepass CHANGE_ME \
+            -storetype JKS
+          echo "Kafka CA certificate imported into the JVM truststore"
+      volumeMounts:
+        - name: kafka-ca-cert
+          mountPath: /tmp/kafka-ca.crt
+          subPath: ca.crt
+          readOnly: true
+        - name: kafka-truststore
+          mountPath: /tmp/kafka-truststore
+
+  image:
+    repository: "example.registry/app/estate-auth"
+    tag: "3.7.0"
+    pullPolicy: IfNotPresent
+
+  # health checks used by Argo CD
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: metrics
+    initialDelaySeconds: 15
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: metrics
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  containerPorts:
+    - name: http
+      containerPort: 8080
+      protocol: TCP
+    - name: metrics
+      containerPort: 8085
+      protocol: TCP
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      kubernetes.io/tls-acme: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$1
+      nginx.ingress.kubernetes.io/x-forwarded-prefix: /api/v0/estate-auth/
+      nginx.ingress.kubernetes.io/enable-cors: "true"
+      nginx.ingress.kubernetes.io/cors-allow-origin: "https://app.example.com, http://localhost:3001,http://localhost:3009"
+      nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD"
+      nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Accept,Accept-Language,Origin,Referer,Access-Control-Request-Method,Access-Control-Request-Headers,x-tenant-id"
+      nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+      nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range,Content-Disposition,Content-Type"
+      nginx.ingress.kubernetes.io/cors-max-age: "3600"
+      nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    hosts:
+      - host: auth.example.com
+        paths:
+          - path: /api/v0/estate-auth/(.*)
+            pathType: ImplementationSpecific
+    tls:
+      - secretName: wildcard-tls
+        hosts:
+          - auth.example.com
+
+  resources:
+    requests:
+      cpu: 188m
+      memory: 384Mi
+    limits:
+      cpu: 750m
+      memory: 768Mi

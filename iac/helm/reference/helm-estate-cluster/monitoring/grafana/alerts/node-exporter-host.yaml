@@ -1,0 +1,558 @@
+# Alert rules for Node Exporter Full dashboard (uid: rYdddlPWk).
+# Host metrics + disk usage (formerly separate node-exporter-disk file): single group Node Exporter Host Health.
+# Job match: external-node-exporter|node-exporter-kubernetes.
+# Datasource UID: PBFA97CFB590B2093.
+# Uptime under 1h after reboot (same condition as former "Recent reboot" title; single rule to avoid duplicate alerts).
+# noDataState: OK: missing series must not raise DatasourceNoData; notify only when the query returns a value and the threshold fires.
+# execErrState: OK: query errors (Prometheus timeout, datasource down) must not raise DatasourceError; notify only on a metric threshold.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Node Exporter Host Health
+    folder: Alerting
+    interval: 1m
+    rules:
+      - uid: node_exp_recent_reboot
+        title: Node Exporter - Uptime < 1 hour (recent reboot)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                node_time_seconds{job=~"external-node-exporter|node-exporter-kubernetes"}
+                - node_boot_time_seconds{job=~"external-node-exporter|node-exporter-kubernetes"}
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B < 3600'
+        dashboardUid: rYdddlPWk
+        panelId: 15
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: 'Uptime below 1 hour on {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }} (recent reboot)'
+          description: "node_time_seconds - node_boot_time_seconds < 3600. Dashboard: Uptime."
+        labels:
+          dashboard: "Node Exporter Full"
+          severity: critical
+
+      - uid: node_exp_ram_used_warn
+        title: Node Exporter - RAM Used > 80%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                clamp_min(
+                  (
+                    1
+                    - (
+                      node_memory_MemAvailable_bytes{job=~"external-node-exporter|node-exporter-kubernetes"}
+                      / node_memory_MemTotal_bytes{job=~"external-node-exporter|node-exporter-kubernetes"}
+                    )
+                  ) * 100,
+                  0
+                )
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 80'
+        dashboardUid: rYdddlPWk
+        panelId: 16
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: 'RAM used above 80% on {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }}'
+          description: "1 - MemAvailable/MemTotal. Dashboard: RAM Used."
+        labels:
+          dashboard: "Node Exporter Full"
+          severity: warning
+
+      - uid: node_exp_ram_used_crit
+        title: Node Exporter - RAM Used > 90%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                clamp_min(
+                  (
+                    1
+                    - (
+                      node_memory_MemAvailable_bytes{job=~"external-node-exporter|node-exporter-kubernetes"}
+                      / node_memory_MemTotal_bytes{job=~"external-node-exporter|node-exporter-kubernetes"}
+                    )
+                  ) * 100,
+                  0
+                )
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 90'
+        dashboardUid: rYdddlPWk
+        panelId: 16
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: 'RAM used above 90% on {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }}'
+          description: "1 - MemAvailable/MemTotal. Dashboard: RAM Used."
+        labels:
+          dashboard: "Node Exporter Full"
+          severity: critical
+
+      - uid: node_exp_sys_load_warn
+        title: Node Exporter - Sys Load > 70%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                node_load1{job=~"external-node-exporter|node-exporter-kubernetes"} * 100
+                / on(instance, job) group_left count by (instance, job)(node_cpu_seconds_total{mode="idle",job=~"external-node-exporter|node-exporter-kubernetes"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 70'
+        dashboardUid: rYdddlPWk
+        panelId: 155
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: 'Normalized load1 above 70% on {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }}'
+          description: "load1 * 100 / CPU count. Dashboard: Sys Load."
+        labels:
+          dashboard: "Node Exporter Full"
+          severity: warning
+
+      - uid: node_exp_sys_load_crit
+        title: Node Exporter - Sys Load > 90%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                node_load1{job=~"external-node-exporter|node-exporter-kubernetes"} * 100
+                / on(instance, job) group_left count by (instance, job)(node_cpu_seconds_total{mode="idle",job=~"external-node-exporter|node-exporter-kubernetes"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 90'
+        dashboardUid: rYdddlPWk
+        panelId: 155
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: 'Normalized load1 above 90% on {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }}'
+          description: "load1 * 100 / CPU count. Dashboard: Sys Load."
+        labels:
+          dashboard: "Node Exporter Full"
+          severity: critical
+
+      - uid: node_exp_cpu_busy_warn
+        title: Node Exporter - CPU Busy > 70%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                100 * (
+                  1
+                  - avg by (instance, job)(
+                    rate(node_cpu_seconds_total{mode="idle",job=~"external-node-exporter|node-exporter-kubernetes"}[5m])
+                  )
+                )
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 70'
+        dashboardUid: rYdddlPWk
+        panelId: 20
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: 'CPU busy above 70% on {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }}'
+          description: "100 * (1 - avg idle rate). Dashboard: CPU Busy."
+        labels:
+          dashboard: "Node Exporter Full"
+          severity: warning
+
+      - uid: node_exp_cpu_busy_crit
+        title: Node Exporter - CPU Busy > 90%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                100 * (
+                  1
+                  - avg by (instance, job)(
+                    rate(node_cpu_seconds_total{mode="idle",job=~"external-node-exporter|node-exporter-kubernetes"}[5m])
+                  )
+                )
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 90'
+        dashboardUid: rYdddlPWk
+        panelId: 20
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: 'CPU busy above 90% on {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }}'
+          description: "100 * (1 - avg idle rate). Dashboard: CPU Busy."
+        labels:
+          dashboard: "Node Exporter Full"
+          severity: critical
+
+      - uid: node_exp_tcp_retrans_warn
+        title: Node Exporter - TCP Retransmits > 5/s
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                rate(
+                  node_netstat_Tcp_RetransSegs{job=~"external-node-exporter|node-exporter-kubernetes"}[5m]
+                )
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 5'
+        dashboardUid: rYdddlPWk
+        panelId: 324
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: 'TCP segment retransmit rate above 5/s on {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }}'
+          description: "rate(node_netstat_Tcp_RetransSegs[5m]). Dashboard: TCP Retransmits."
+        labels:
+          dashboard: "Node Exporter Full"
+          severity: warning
+
+      - uid: node_exp_tcp_retrans_crit
+        title: Node Exporter - TCP Retransmits > 20/s
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                rate(
+                  node_netstat_Tcp_RetransSegs{job=~"external-node-exporter|node-exporter-kubernetes"}[5m]
+                )
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 20'
+        dashboardUid: rYdddlPWk
+        panelId: 324
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: 'TCP segment retransmit rate above 20/s on {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }}'
+          description: "rate(node_netstat_Tcp_RetransSegs[5m]). Dashboard: TCP Retransmits."
+        labels:
+          dashboard: "Node Exporter Full"
+          severity: critical
+
+      - uid: node_disk_usage_warn
+        title: Disk usage >= 65% (WARN)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                round(
+                  (
+                    (node_filesystem_size_bytes{job=~"external-node-exporter|node-exporter-kubernetes",device!~"rootfs"}
+                     - node_filesystem_avail_bytes{job=~"external-node-exporter|node-exporter-kubernetes",device!~"rootfs"})
+                    / node_filesystem_size_bytes{job=~"external-node-exporter|node-exporter-kubernetes",device!~"rootfs"}
+                  ) * 1000
+                ) / 10
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A >= 65'
+        dashboardUid: rYdddlPWk
+        panelId: 152
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Disk usage >= 65% on {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }} {{ "{{" }} {{ "$" }}{{ "labels.mountpoint" }} {{ "}}" }}"
+          description: "Instance: {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }}. Mount: {{ "{{" }} {{ "$" }}{{ "labels.mountpoint" }} {{ "}}" }}. Usage: {{ "{{" }} {{ "$" }}{{ "values.A.Value" }} {{ "}}" }}% (WARN >= 65%). Free space low."
+          usage_raw: "{{ "{{" }} {{ "$" }}{{ "values.A.Value" }} {{ "}}" }}"
+        labels:
+          dashboard: "Node Exporter Full"
+          severity: warning
+
+      - uid: node_disk_usage_critical
+        title: Disk usage >= 85% (CRITICAL)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                round(
+                  (
+                    (node_filesystem_size_bytes{job=~"external-node-exporter|node-exporter-kubernetes",device!~"rootfs"}
+                     - node_filesystem_avail_bytes{job=~"external-node-exporter|node-exporter-kubernetes",device!~"rootfs"})
+                    / node_filesystem_size_bytes{job=~"external-node-exporter|node-exporter-kubernetes",device!~"rootfs"}
+                  ) * 1000
+                ) / 10
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A >= 85'
+        dashboardUid: rYdddlPWk
+        panelId: 152
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Disk usage >= 85% on {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }} {{ "{{" }} {{ "$" }}{{ "labels.mountpoint" }} {{ "}}" }}"
+          description: "Instance: {{ "{{" }} {{ "$" }}{{ "labels.instance" }} {{ "}}" }}. Mount: {{ "{{" }} {{ "$" }}{{ "labels.mountpoint" }} {{ "}}" }}. Usage: {{ "{{" }} {{ "$" }}{{ "values.A.Value" }} {{ "}}" }}% (CRITICAL >= 85%). Free space critically low."
+          usage_raw: "{{ "{{" }} {{ "$" }}{{ "values.A.Value" }} {{ "}}" }}"
+        labels:
+          dashboard: "Node Exporter Full"
+          severity: critical

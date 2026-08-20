@@ -1,0 +1,49 @@
+{{- if not (eq .Values.global.env "operator") }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-sentinel-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-sentinel-proxy
+  template:
+    metadata:
+      labels:
+        app: redis-sentinel-proxy
+    spec:
+      imagePullSecrets:
+      - name: "registrysecret"
+      containers:
+      - name: redis-sentinel-proxy
+        image: example.registry/redis-sentinel-proxy:1.0.0
+        imagePullPolicy: Always
+        command: ["/usr/local/bin/redis-sentinel-proxy", "-master", "mymaster", "-sentinel", "rfs-redis:26379"]
+        ports:
+        - containerPort: 9999
+        livenessProbe:
+          initialDelaySeconds: 40
+          periodSeconds: 1
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+          exec:
+            command: ["redis-cli", "-p", "9999", "ping"]
+        readinessProbe:
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 10
+          exec:
+            command: ["redis-cli", "-p", "9999", "ping"]
+        resources:
+          requests:
+            cpu: 20m
+            memory: 20Mi
+          limits:
+            cpu: 2000m
+            memory: 1000Mi
+{{- end }}

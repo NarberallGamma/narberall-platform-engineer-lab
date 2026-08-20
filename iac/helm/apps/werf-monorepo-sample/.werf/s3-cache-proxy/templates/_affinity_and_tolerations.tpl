@@ -1,0 +1,1 @@
+../../common-templates/_affinity_and_tolerations.tpl

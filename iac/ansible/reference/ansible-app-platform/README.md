@@ -31,7 +31,7 @@ ansible-app-platform/
 |-------|----------------|
 | `kafka` + `kafka-mtls-cert.sh` | KRaft broker with PEM mTLS, SCRAM on the client listener, Vault sidecar that refreshes the EIP cert, cron restart when the PEM changes. |
 | `db` / `db-pass` / `db-readonly-users` / `db-v1` | Vault-backed Postgres user lifecycle: owner NOLOGIN roles, TUZ passwords, SET ROLE, default privileges, readonly SELECT. Full stand lists, not one demo DB. |
-| `monitoring_deploy` | Prometheus scrape of the estate plus Kubernetes SD and blackbox probes. Compose stack with VictoriaMetrics. |
+| `monitoring_deploy` | Prometheus scrape of the estate plus Kubernetes SD and blackbox probes. Compose stack with VictoriaMetrics. I query that stack through the Prom / VM HTTP APIs the same way I edit Grafana views in the Helm overlay ([`../../../helm/reference/helm-estate-cluster/monitoring/`](../../../helm/reference/helm-estate-cluster/monitoring/), [`../../../../architecture/05-sre.md`](../../../../architecture/05-sre.md), [`../../../../docs/sre/`](../../../../docs/sre/)). |
 | `node_exporter` | CentOS rpm path and Debian tarball path, systemd / upstart / sysv, textfile collector scripts. |
 | `edr` | Concept roll-out of a vendor agent `.deb` with `/etc/hosts` pin. The package stays local. |
 | `hardering.yml` | Original filename spelling. Role walks cron.d / daily / hourly / monthly / weekly and sets mode `0744`. |
@@ -67,7 +67,7 @@ ansible-playbook -i inventory.ini db-dev.yaml
 | `hardering_cron` | Find cron files and set mode `0744` |
 | `edr` | `/etc/hosts` pin, copy local `.deb`, `apt` install with edr-vendor env |
 | `kafka` | Dirs, server/client properties, example PEMs, compose, log-clean cron |
-| `monitoring_deploy` | Prometheus config + VictoriaMetrics compose up |
+| `monitoring_deploy` | Prometheus config + VictoriaMetrics compose up. Query API same habit as the Helm Grafana overlay |
 | `node_exporter` | Exporter install for CentOS and Debian |
 | `db-pass` | Read or generate Vault passwords (`hvac`) |
 | `db` | Owner roles, DBs, TUZ and human users, grants, SET ROLE |
@@ -85,4 +85,4 @@ ansible-playbook -i inventory.ini db-dev.yaml
 
 ## Keywords
 
-Ansible, Kafka, mTLS, KRaft, Vault, EDR, Prometheus, VictoriaMetrics, node_exporter, PostgreSQL, HashiCorp Vault, Docker Compose
+Ansible, Kafka, mTLS, KRaft, Vault, EDR, Prometheus, VictoriaMetrics, Grafana, node_exporter, PostgreSQL, HashiCorp Vault, Docker Compose

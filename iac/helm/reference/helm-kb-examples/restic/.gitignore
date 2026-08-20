@@ -1,0 +1,4 @@
+.werf_secret_key
+secret-values.yaml
+authorized_keys
+

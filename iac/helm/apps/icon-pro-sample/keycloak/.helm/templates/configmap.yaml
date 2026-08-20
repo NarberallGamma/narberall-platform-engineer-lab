@@ -1,0 +1,9 @@
+{{- $realmexport := print .Values.contour "/realm-export.json" -}}
+apiVersion: v1
+data:
+  realm-export.json: |-
+    {{ .Files.Get $realmexport | nindent 6 }}
+kind: ConfigMap 
+metadata:
+  name: shop-keycloak
+type: Opaque

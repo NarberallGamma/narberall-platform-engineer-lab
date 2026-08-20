@@ -1,0 +1,6 @@
+dependencies:
+- name: flant-lib
+  repository: https://charts.flant.com/common/github
+  version: 1.1.1
+digest: sha256:60e320fbe5a24981ed6eaacbe2d7ec68ad316b46db5fcb57ad58d21517d824a9
+generated: "2023-04-28T12:18:59.438113+03:00"

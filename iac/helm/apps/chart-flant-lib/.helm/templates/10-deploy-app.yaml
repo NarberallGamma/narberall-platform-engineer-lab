@@ -1,0 +1,173 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ labels:
+   app: {{ .Chart.Name }}
+ annotations:
+   pod-reloader.deckhouse.io/auto: "true"
+ name: {{ .Chart.Name }}
+spec:
+  strategy:
+    type: RollingUpdate
+  replicas: {{ pluck .Values.werf.env .Values.app.replicas | first | default .Values.app.replicas._default }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+      annotations:
+        checksum/nginx-config: {{ include (print $.Template.BasePath "/20-nginx-conf.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/30-app-envs.yaml") . | sha256sum }}
+    spec:
+
+      {{- include "imagePullSecrets" . | indent 6 }}
+      {{- include "tolerations" . | indent 6 }}
+      {{- include "nodeSelector" . | indent 6 }}
+      {{- include "priorityClassName" . | indent 6 }}
+
+      initContainers:
+        {{ include "init-psql" . | indent 8 }}
+
+      containers:
+      - name: frontend
+        image: {{ .Values.werf.image.nginx }}
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/bash", "-c", "sleep 5; nginx -s quit"]
+        resources:
+          {{ toYaml (pluck .Values.werf.env .Values.resources.nginx | first | default .Values.resources.nginx._default) | nindent 10 }}
+        ports:
+          - containerPort: 80
+            name: http
+            protocol: TCP
+        volumeMounts:
+          - name: {{ $.Chart.Name }}-nginx-conf
+            mountPath: /etc/nginx/nginx.conf
+            subPath: nginx.conf
+          - name: {{ $.Chart.Name }}-nginx-conf
+            mountPath: /etc/nginx/logs.js
+            subPath: logs.js
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /keep-alive
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /keep-alive
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+
+      - name: backend
+        image: {{ .Values.werf.image.php }}
+        command:
+          - "sh"
+          - "-c"
+          - "php-fpm -F"
+        resources:
+          {{ toYaml (pluck .Values.werf.env .Values.resources.php | first | default .Values.resources.php._default) | nindent 10 }}
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /api/v1/keep-alive
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /api/v1/keep-alive
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+        volumeMounts:  
+          - mountPath: /usr/local/etc/php-fpm.conf
+            name: {{ $.Chart.Name }}-php
+            subPath: php-fpm.conf
+          - mountPath: /usr/local/etc/php/php.ini
+            name: {{ $.Chart.Name }}-php
+            subPath: php.ini
+        ports:
+          - containerPort: 9000
+            name: fcgi
+            protocol: TCP
+        envFrom:
+          - secretRef:
+              name: {{ $.Chart.Name }}-env
+      - name: php-fpm-exporter
+        image: {{ .Values.werf.image.php_fpm_exporter }}
+        command:
+          - /php-fpm-exporter
+          - --addr
+          - 0.0.0.0:9132
+
+        resources:
+          {{ toYaml (pluck .Values.werf.env .Values.resources.php_exporter | first | default .Values.resources.php_exporter._default) | nindent 10 }}
+        ports:
+          - containerPort: 9132
+            name: http-metrics
+            protocol: TCP
+      volumes:
+        - name: {{ $.Chart.Name }}-php
+          configMap:
+            name: {{ $.Chart.Name }}-php
+        - name: {{ $.Chart.Name }}-nginx-conf
+          configMap:
+            name: {{ $.Chart.Name }}-nginx-conf
+        - name: {{ $.Chart.Name }}-env
+          secret:
+            secretName: {{ $.Chart.Name }}-env
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Chart.Name }}
+  labels:
+    prometheus.deckhouse.io/target: php-fpm
+spec:
+  selector:
+    app: {{ $.Chart.Name }}
+  ports:
+    - name: http
+      port: 80
+    - name: http-metrics
+      port: 9132
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ $.Chart.Name }}
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: {{ $.Chart.Name }}
+  updatePolicy:
+    updateMode: "Off"
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Chart.Name }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: {{ $.Chart.Name }}

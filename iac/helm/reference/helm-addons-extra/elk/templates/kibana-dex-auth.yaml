@@ -1,0 +1,15 @@
+---
+apiVersion: deckhouse.io/v1
+kind: DexAuthenticator
+metadata:
+  name: kibana-kb-http
+spec:
+  applicationDomain: {{ include "fl.value" (list $ . .Values.kibana.ingress.host) }}
+  sendAuthorizationHeader: false
+  applicationIngressCertificateSecretName: {{ include "fl.value" (list $ . .Values.kibana.ingress.secretName) }}
+  applicationIngressClassName: "infra"
+  keepUsersLoggedInFor: "720h"
+  allowedGroups:
+    - platform
+    - platform-staff
+    - platform-admin

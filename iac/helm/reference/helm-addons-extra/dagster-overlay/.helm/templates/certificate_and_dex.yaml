@@ -1,0 +1,26 @@
+{{ $dagithost := .Values.dagster.ingress.dagsterWebserver.host }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: dagster-tls
+spec:
+  secretName: dagster-tls
+  issuerRef:
+    kind: ClusterIssuer
+    name: {{ .Values.dagster.ingress.dagsterWebserver.tls.clusterissuer }}
+  commonName: {{ $dagithost }}
+  dnsNames:
+  - {{ $dagithost }}
+
+---
+apiVersion: deckhouse.io/v1
+kind: DexAuthenticator
+metadata:
+  name: dagster
+spec:
+  applicationDomain: {{ $dagithost }}
+  sendAuthorizationHeader: false
+  applicationIngressCertificateSecretName: dagster-tls
+  applicationIngressClassName: "nginx"
+  keepUsersLoggedInFor: "24h"

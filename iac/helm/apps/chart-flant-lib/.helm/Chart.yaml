@@ -1,0 +1,10 @@
+apiVersion: v2
+name: catalog-api
+description: PHP API chart. Shared helpers come from the flant-lib chart, not a local copy.
+type: application
+version: 0.1.0
+appVersion: "1.0"
+dependencies:
+  - name: flant-lib
+    version: ~1
+    repository: https://charts.flant.com/common/github

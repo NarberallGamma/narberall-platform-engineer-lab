@@ -9,5 +9,6 @@ This catalog publishes **pipeline shape**, not production CI trees.
 - Copy as `*.yml.example` / `Jenkinsfile.example`. Live `.gitlab-ci.yml` from a private repo stays private
 - Docs/LLM jobs: describe **local** models only; do not commit prompts that embed tenant facts
 - App / Java / Jenkins pipeline code waits for a later sanitize pass; this catalog may describe stages before the YAML lands
+- Helm / Argo secrets: no kubeconfig, repository or cluster secrets, or `secret-values.yaml`. Detail: [`../helm/SANITIZE.md`](../helm/SANITIZE.md)
 
 Terraform sanitize: [`../terraform/SANITIZE.md`](../terraform/SANITIZE.md).

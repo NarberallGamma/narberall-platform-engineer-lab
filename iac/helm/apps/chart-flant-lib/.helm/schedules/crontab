@@ -1,0 +1,1 @@
+0 */3 * * * php /app/bin/cli.php test:cron --env={{ .Values.werf.env }}

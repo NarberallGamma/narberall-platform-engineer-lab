@@ -1,0 +1,6 @@
+apiVersion: v2
+name: llm-api
+description: In-cluster LLM HTTP API (Ollama-compatible :11434) with a models PVC
+type: application
+version: 0.1.0
+appVersion: "1.0"

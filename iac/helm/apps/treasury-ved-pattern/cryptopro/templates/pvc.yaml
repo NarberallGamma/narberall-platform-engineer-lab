@@ -1,0 +1,29 @@
+{{- $claimName := .Values.persistence.cprocsp.claimName }}
+{{- $existingPvc := lookup "v1" "PersistentVolumeClaim" .Release.Namespace $claimName }}
+{{- if and .Values.persistence.enabled .Values.persistence.cprocsp.create (not $existingPvc) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $claimName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cryptopro.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cprocsp-persistence
+  annotations:
+    helm.sh/resource-policy: keep
+    argocd.argoproj.io/sync-options: Prune=false
+    {{- with .Values.persistence.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.persistence.finalizers }}
+  finalizers:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.accessMode | default "ReadWriteOnce" }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.cprocsp.size }}
+{{ include "cryptopro.pvc.storageClassSpec" .Values.persistence }}
+{{- end }}

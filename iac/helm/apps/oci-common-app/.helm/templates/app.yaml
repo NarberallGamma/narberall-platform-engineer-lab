@@ -1,0 +1,253 @@
+{{- $_ := set .Values.envs "SERVER_INSTANCE_TYPE" "portal" }}
+{{- $_ := set .Values.app "configSuffix" "" }}
+{{- include "app_overrides" . | fromYaml | list . | include "common.app.stateless.aspnet" }}
+
+{{- define "container_override" }}
+{{- $asp_env := .Values.envs.ASPNETCORE_ENVIRONMENT | list $ . | include "fl.value" }}
+livenessProbe: &health
+  # 45 seconds before restart and 20 seconds to recover
+  failureThreshold: 9
+  httpGet:
+    path: /
+    port: {{ .Values.app.ports.http | list $ . | include "fl.value" }}
+    scheme: HTTP
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  successThreshold: 1
+  timeoutSeconds: 5
+readinessProbe:
+  # 15 seconds to consider unready and 5 seconds to become ready
+  failureThreshold: 3
+  httpGet:
+    path: /
+    port: {{ .Values.app.ports.http | list $ . | include "fl.value" }}
+    scheme: HTTP
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  successThreshold: 1
+  timeoutSeconds: 5
+startupProbe:
+  # 150 seconds to wait before considering failed
+  failureThreshold: 10
+  httpGet:
+    path: /status/startup
+    port: {{ .Values.app.ports.http | list $ . | include "fl.value" }}
+    scheme: HTTP
+  initialDelaySeconds: 15
+  periodSeconds: 15
+  successThreshold: 1
+  timeoutSeconds: 10
+envFrom:
+  - secretRef:
+      name: {{ .Chart.Name }}-env
+volumeMounts:
+{{- if eq $asp_env "Features" }}
+- name: opentelemetry
+  mountPath: /var/log/opentelemetry/dotnet
+{{- end }}
+- name: config
+  mountPath: /app/appsettings.{{ $asp_env }}.json
+  subPath: appsettings.Env.json
+{{- end }}
+
+{{- define "app_overrides" }}
+{{- $redis_host := .Values.redis.host | list $ . | include "fl.value" }}
+{{- $redis_port := .Values.redis.port | list $ . | include "fl.value" }}
+
+{{- $rabbitmq_host := .Values.rabbitmq.host | list $ . | include "fl.value" }}
+{{- $rabbitmq_port := .Values.rabbitmq.port | list $ . | include "fl.value" }}
+app:
+  spec:
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 0
+    template:
+      spec:
+{{- if eq .Values.werf.env "production" }}
+        terminationGracePeriodSeconds: 240
+{{- end }}
+        initContainers:
+        {{- list . "redis"    $redis_host    $redis_port    | include "common.initContainer.waitPort" | indent 8 }}
+        {{- list . "rabbitmq" $rabbitmq_host $rabbitmq_port | include "common.initContainer.waitPort" | indent 8 }}
+        containers:
+        - {{ include "container_override" . | fromYaml | list $ | include "common.container.aspnet" | nindent 10 }}
+        volumes:
+        - configMap:
+            name: {{ $.Chart.Name }}{{ $.Values.app.configSuffix }}-config
+          name: config
+{{- $asp_env := .Values.envs.ASPNETCORE_ENVIRONMENT | list $ . | include "fl.value" }}
+{{- if eq $asp_env "Features" }}
+        - emptyDir:
+            sizeLimit: 256Mi
+          name: opentelemetry
+{{- end }}
+
+{{ if eq .Values.envs.SERVER_INSTANCE_TYPE "portal" }}
+svc:
+  metadata:
+    labels:
+      prometheus.deckhouse.io/custom-target: "app-api"
+    annotations:
+      prometheus.deckhouse.io/port: {{ $.Values.app.ports.http | list $ . | include "fl.valueQuoted" }}
+{{ end }}
+
+{{- end }}
+
+{{- $_ := unset .Values.envs "SERVER_INSTANCE_TYPE" }}
+---
+{{- $_ := set .Values.app "name" "app-api-counter" }}
+{{- $_ := set .Values.app "replicas" .Values.app.replicas_counter }}
+{{- $_ := set .Values.app "vpa_update_mode" .Values.app.vpa_update_mode_counter }}
+{{- $_ := set .Values.resources "app" .Values.resources.counter }}
+{{- $_ := set .Values.envs "SERVER_INSTANCE_TYPE" "counter" }}
+{{- $_ := set .Values.hpa "app" .Values.hpa.counter }}
+{{- $_ := set .Values.app "configSuffix" "-counter" }}
+
+{{- define "container_override_counter" }}
+{{- include "container_override" . }}
+{{- if eq .Values.werf.env "production" }}
+terminationGracePeriodSeconds: 240
+lifecycle:
+  preStop:
+    exec:
+      command: ["/bin/sh", "/app/dump.sh"]
+volumeMounts:
+- name: dotnet-dumps
+  mountPath: /var/dotnet-dump
+- name: tmp-dump
+  mountPath: /tmp-dump
+{{- end }}
+{{- end }}
+
+{{- define "app_overrides_counter"}}
+svc:
+  metadata:
+    labels:
+      prometheus.deckhouse.io/custom-target: "app-api-counter"
+    annotations:
+      prometheus.deckhouse.io/port: {{ $.Values.app.ports.http | list $ . | include "fl.valueQuoted" }}
+
+{{- include "app_overrides" . }}
+        containers:
+        - {{ include "container_override_counter" . | fromYaml | list $ | include "common.container.aspnet" | nindent 10 }}
+        volumes:
+        - configMap:
+            name: {{ $.Chart.Name }}{{ $.Values.app.configSuffix }}-config
+          name: config
+{{- $asp_env := .Values.envs.ASPNETCORE_ENVIRONMENT | list $ . | include "fl.value" }}
+{{- if eq $asp_env "Features" }}
+        - emptyDir:
+            sizeLimit: 256Mi
+          name: opentelemetry
+{{- end }}
+{{- if eq .Values.werf.env "production" }}
+        - name: dotnet-dumps
+          persistentVolumeClaim:
+            claimName: dotnet-dumps
+        - emptyDir:
+            sizeLimit: 4Gi
+          name: tmp-dump
+{{- end }}
+{{- end }}
+{{- include "app_overrides_counter" . | fromYaml | list . | include "common.app.stateless.aspnet" }}
+{{- $_ := unset .Values.envs "SERVER_INSTANCE_TYPE" }}
+
+---
+{{- $_ := set .Values.app "name" "app-api-storefront" }}
+{{- $_ := set .Values.app "replicas" .Values.app.replicas_storefront }}
+{{- $_ := set .Values.app "vpa_update_mode" .Values.app.vpa_update_mode_storefront }}
+{{- $_ := set .Values.resources "app" .Values.resources.storefront }}
+{{- $_ := set .Values.envs "SERVER_INSTANCE_TYPE" "storefront" }}
+{{- $_ := set .Values.hpa "app" .Values.hpa.storefront }}
+{{- $_ := set .Values.app "configSuffix" "-storefront" }}
+
+{{- define "app_overrides_storefront"}}
+svc:
+  metadata:
+    labels:
+      prometheus.deckhouse.io/custom-target: "app-api-storefront"
+    annotations:
+      prometheus.deckhouse.io/port: {{ $.Values.app.ports.http | list $ . | include "fl.valueQuoted" }}
+
+{{- include "app_overrides" .  }}
+        volumes:
+        - configMap:
+            name: {{ $.Chart.Name }}{{ $.Values.app.configSuffix }}-config
+          name: config
+{{- $asp_env := .Values.envs.ASPNETCORE_ENVIRONMENT | list $ . | include "fl.value" }}
+{{- if eq $asp_env "Features" }}
+        - emptyDir:
+            sizeLimit: 256Mi
+          name: opentelemetry
+{{- end }}
+{{- end }}
+{{- include "app_overrides_storefront" . | fromYaml | list . | include "common.app.stateless.aspnet" }}
+{{- $_ := unset .Values.envs "SERVER_INSTANCE_TYPE" }}
+
+---
+{{- $_ := set .Values.app "name" "app-api-kiosk" }}
+{{- $_ := set .Values.app "replicas" .Values.app.replicas_kiosk }}
+{{- $_ := set .Values.app "vpa_update_mode" .Values.app.vpa_update_mode_kiosk }}
+{{- $_ := set .Values.resources "app" .Values.resources.kiosk }}
+{{- $_ := set .Values.envs "SERVER_INSTANCE_TYPE" "kiosk" }}
+{{- $_ := set .Values.hpa "app" .Values.hpa.kiosk }}
+{{- $_ := set .Values.app "configSuffix" "-kiosk" }}
+
+{{- define "app_overrides_kiosk"}}
+svc:
+  metadata:
+    labels:
+      prometheus.deckhouse.io/custom-target: "app-api-kiosk"
+    annotations:
+      prometheus.deckhouse.io/port: {{ $.Values.app.ports.http | list $ . | include "fl.valueQuoted" }}
+
+{{- include "app_overrides" . }}
+        volumes:
+        - configMap:
+            name: {{ $.Chart.Name }}{{ $.Values.app.configSuffix }}-config
+          name: config
+{{- $asp_env := .Values.envs.ASPNETCORE_ENVIRONMENT | list $ . | include "fl.value" }}
+{{- if eq $asp_env "Features" }}
+        - emptyDir:
+            sizeLimit: 256Mi
+          name: opentelemetry
+{{- end }}
+
+{{- end }}
+{{- include "app_overrides_kiosk" . | fromYaml | list . | include "common.app.stateless.aspnet" }}
+{{- $_ := unset .Values.envs "SERVER_INSTANCE_TYPE" }}
+
+---
+{{- $_ := set .Values.app "name" "app-api-jobs" }}
+{{- $_ := set .Values.app "replicas" .Values.app.replicas_jobs }}
+{{- $_ := set .Values.app "vpa_update_mode" .Values.app.vpa_update_mode_jobs }}
+{{- $_ := set .Values.resources "app" .Values.resources.jobs }}
+{{- $_ := set .Values.envs "SERVER_INSTANCE_TYPE" "jobs" }}
+{{- $_ := set .Values.hpa "app" .Values.hpa.jobs }}
+{{- $_ := set .Values.app "configSuffix" "" }}
+
+{{- define "app_overrides_jobs"}}
+svc:
+  metadata:
+    labels:
+      prometheus.deckhouse.io/custom-target: "app-api-jobs"
+    annotations:
+      prometheus.deckhouse.io/port: {{ $.Values.app.ports.http | list $ . | include "fl.valueQuoted" }}
+
+{{- include "app_overrides" . }}
+        volumes:
+        - configMap:
+            name: {{ $.Chart.Name }}{{ $.Values.app.configSuffix }}-config
+          name: config
+{{- $asp_env := .Values.envs.ASPNETCORE_ENVIRONMENT | list $ . | include "fl.value" }}
+{{- if eq $asp_env "Features" }}
+        - emptyDir:
+            sizeLimit: 256Mi
+          name: opentelemetry
+{{- end }}
+
+{{- end }}
+{{- include "app_overrides_jobs" . | fromYaml | list . | include "common.app.stateless.aspnet" }}
+{{- $_ := unset .Values.envs "SERVER_INSTANCE_TYPE" }}

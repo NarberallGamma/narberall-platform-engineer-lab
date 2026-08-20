@@ -1,0 +1,33 @@
+{{- if .Values.vpsEgress.enabled }}
+{{- $hosts := dict }}
+{{- range .Values.vpsEgress.routes }}
+{{- if eq (include "istio.vpsEgress.routeEnabled" .) "true" }}
+{{- range .externalHosts }}
+{{- $_ := set $hosts . . }}
+{{- end }}
+{{- end }}
+{{- end }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ include "istio.vpsEgress.gatewayFullName" . }}
+  namespace: {{ .Values.vpsEgress.gateway.namespace }}
+  labels:
+    app.kubernetes.io/component: vps-egress
+    environment: {{ .Values.environment }}
+spec:
+  selector:
+    {{- toYaml .Values.vpsEgress.gateway.selector | nindent 4 }}
+  servers:
+    - port:
+        number: 443
+        name: tls-vps-egress
+        protocol: HTTPS
+      hosts:
+        {{- range keys $hosts | sortAlpha }}
+        - {{ . | quote }}
+        {{- end }}
+      tls:
+        mode: PASSTHROUGH
+{{- end }}

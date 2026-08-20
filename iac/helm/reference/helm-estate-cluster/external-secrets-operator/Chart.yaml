@@ -1,0 +1,6 @@
+apiVersion: v2
+name: external-secrets-operator
+description: Values wrapper for the upstream External Secrets Operator chart
+type: application
+version: 0.1.0
+appVersion: "0.9.11"

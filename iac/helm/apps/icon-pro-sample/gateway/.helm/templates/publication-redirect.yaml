@@ -1,0 +1,129 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/temporal-redirect: https://$host/lk$request_uri
+  name: publication-redirect
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: {{ .Values.domain }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /accounts
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /application-detail
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /applications
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /clients-company
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /companies
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /global-settings
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /help
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /instruction
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /login
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /news
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-front-news
+            port:
+              number: 80
+        path: /payer
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /registration
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /reset
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /shop-line
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /terms
+        pathType: Exact
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /personal-cabinet
+        pathType: Exact
+  tls:
+  - hosts:
+    - {{ .Values.domain }}
+    secretName: tls

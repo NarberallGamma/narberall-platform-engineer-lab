@@ -1,0 +1,47 @@
+{{- $route := .Values.route -}}
+{{- if $route.enabled -}}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "name" . }}
+  namespace: {{ .Release.Namespace }}
+  {{- with $route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "labels" . | nindent 4 }}
+    {{- with $route.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+{{- if $route.host }}
+  host: {{ $route.host }}
+{{- end }}
+  path: {{ $route.path }}
+  port:
+    targetPort: http
+  to:
+    kind: Service
+    name: {{ include "name" $ }}
+    weight: 100
+  {{- if $route.tls.enabled }}
+  tls:
+    insecureEdgeTerminationPolicy: {{ $route.tls.insecureEdgeTerminationPolicy }}
+    termination: {{ $route.tls.termination }}
+{{- if $route.tls.key }}
+    key: |-
+{{ $route.tls.key | indent 6 }}
+{{- end }}
+{{- if $route.tls.certificate }}
+    certificate: |-
+{{ $route.tls.certificate | indent 6 }}
+{{- end }}
+{{- if $route.tls.caCertificate }}
+    caCertificate: |-
+{{ $route.tls.caCertificate | indent 6 }}
+{{- end }}
+  {{- end }}
+status:
+  ingress: []
+{{- end -}}

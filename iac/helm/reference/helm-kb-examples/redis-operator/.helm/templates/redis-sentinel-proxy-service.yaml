@@ -1,0 +1,51 @@
+{{- if not (eq .Values.global.env "operator") }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: redis-sentinel-proxy
+spec:
+  ports:
+  - port: 6379
+    targetPort: 9999
+    name: redis-sentinel-proxy
+  selector:
+    app: redis-sentinel-proxy
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-exporter
+  labels:
+    prometheus.deckhouse.io/target: redis
+spec:
+  ports:
+  - name: http-metrics
+    port: 9121
+    protocol: TCP
+    targetPort: 9121
+  selector:
+    app: redis-failover
+    component: redis
+    creator: redisfailover
+    redis: redis
+    redisfailover: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rfs-exporter
+  labels:
+    prometheus.deckhouse.io/custom-target: sentinel
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/component: sentinel
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: redis-failover
+  ports:
+  - name: http-metrics
+    port: 9355
+{{- end }}

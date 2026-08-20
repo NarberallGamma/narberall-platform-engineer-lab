@@ -1,0 +1,62 @@
+{{- with .Values.rabbitmq }}
+{{- if include "fl.isTrue" (list $ . .enabled) }}
+
+{{ $cluster_name := (printf "%s-rmq" $.Chart.Name) }}
+{{ $vhosts := (include "fl.value" (list $ . .vhosts) | fromYamlArray) }}
+{{ $user := (include "fl.value" (list $ . .user)) }}
+{{ $password := (include "fl.value" (list $ . .password)) }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $cluster_name }}
+  annotations:
+    werf.io/weight: "-200"
+data:
+  rabbitmq_definitions.json: |
+    {
+      "users": [
+        {
+          "name": {{ $user | quote }},
+          "password": {{ $password | quote }},
+          "tags": "administrator",
+          "limits": {}
+        }
+      ],
+      "vhosts": [
+        {{- range $index, $vhost := $vhosts }}
+          {{- if $index }},{{ end }}
+          {"name": {{ $vhost | quote }}}
+        {{- end  }}
+      ],
+      "permissions": [
+        {{- range $index, $vhost := $vhosts }}
+          {{- if $index }},{{ end }}
+          {
+            "user": {{ $user | quote }},
+            "vhost": {{ $vhost | quote }},
+            "configure": ".*",
+            "write": ".*",
+            "read": ".*"
+          }
+        {{- end }}
+      ],
+      "topic_permissions": [],
+      "parameters": [],
+      "policies": [
+        {{- range $index, $vhost := $vhosts }}
+          {{- if $index }},{{ end }}
+          {
+            "vhost": {{ $vhost | quote }},
+            "name": "ha",
+            "pattern": "",
+            "definition": {"ha-mode": "all", "ha-sync-mode": "automatic", "ha-sync-batch-size": 81920, "expires": 259200000}
+          }
+        {{- end  }}
+      ],
+      "queues": [],
+      "exchanges": [],
+      "bindings": []
+    }
+{{- end  }}
+{{- end  }}

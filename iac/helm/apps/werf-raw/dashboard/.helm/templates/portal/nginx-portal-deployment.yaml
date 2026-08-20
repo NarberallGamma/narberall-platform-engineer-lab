@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}-{{ .Values.werf.env }}
+  labels:
+    app: {{ .Chart.Name }}-{{ .Values.werf.env }}
+spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 25%
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}-{{ .Values.werf.env }}
+  replicas: {{ pluck .Values.werf.env .Values.portal.replicas | first | default .Values.portal.replicas._default }}
+  template:
+    metadata:
+      annotations:
+        checksum/nginx-config: {{ include (print $.Template.BasePath "/portal/nginx-portal-cm.yaml") . | sha256sum }}
+      labels:
+        app: {{ .Chart.Name }}-{{ .Values.werf.env }}
+    spec:
+{{ include "affinity" . | indent 6 }}
+{{ include "tolerations" . | indent 6 }}
+{{ include "priorityClassName" . | indent 6 }}
+      imagePullSecrets:
+      - name: {{ required ".Values.registry.secret_name" .Values.registry.secret_name }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: {{ .Chart.Name }}-{{ .Values.werf.env }}
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: {{ .Chart.Name }}-{{ .Values.werf.env }}-nginx-config
+      containers:
+      - name: nginx
+        imagePullPolicy: IfNotPresent
+        image: {{ .Values.werf.image.nginx }}
+        command: ["/usr/sbin/nginx", "-g", "daemon off;"]
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        lifecycle:
+          preStop:
+            exec:
+              command: [ "/bin/bash", "-c", "sleep 5; kill -QUIT 1" ]
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /_tech/ngx-status
+            port: 80
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /_tech/ngx-status
+            port: 80
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        resources:
+          {{ toYaml (pluck .Values.werf.env .Values.resources.nginx | first | default .Values.resources.nginx._default) | nindent 10 }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Chart.Name }}-{{ .Values.werf.env }}
+spec:
+  clusterIP: None
+  selector:
+    app: {{ .Chart.Name }}-{{ .Values.werf.env }}
+  ports:
+  - name: http
+    port: 80
+
+---
+apiVersion: autoscaling.k8s.io/v1beta2
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ .Chart.Name }}-{{ .Values.werf.env }}
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: {{ .Chart.Name }}-{{ .Values.werf.env }}
+  updatePolicy:
+    updateMode: "Off"
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Chart.Name }}-{{ .Values.werf.env }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}-{{ .Values.werf.env }}

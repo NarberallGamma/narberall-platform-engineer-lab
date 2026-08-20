@@ -1,0 +1,307 @@
+# Default notification policy: group by instance + mountpoint so each disk gets its own Telegram message (avoids 4096 truncation).
+# Cloud.ru events: child route groups by id so each event gets its own message (5 events = 5 notifications).
+# Strimzi Kafka Connect: group by pod so per-pod CPU/JVM alerts are separate Telegram messages (same rule, multiple pods).
+# Kafka DMS CloudEye: group by kafka_broker for per-broker CPU/memory alerts.
+# PostgreSQL RDS CloudEye: group by alert (no per-instance split in rules).
+# Node Exporter Full (host + disk): per-instance grouping; disk rules also use mountpoint via default group_by.
+# Kubernetes CCE: group_by includes rulename so DatasourceNoData and similar alerts with the same alertname do not merge into one Telegram message.
+# Kubernetes Views / Pods (CPU/memory vs limits): group_by namespace, pod, container so each container gets its own notification.
+# Dual delivery: Telegram first (continue: true), then email. Estate / Databases / Global: Telegram -> ops email (continue: true) -> admins. Estate / Ledger / Global and other dashboards: Telegram -> admins.
+# Retries on failed Telegram or SMTP delivery: contact point / network; repeat_interval only re-notifies still-firing alerts.
+# repeat_interval: 4h default for most dashboards: re-notify still-FIRING groups.
+# Cloud.ru / Global: 48h reminder for still-FIRING events (repeat_interval is a multiple of group_interval 5m).
+# Provisioning overwrites the full policy tree; receiver names must match contact points (Tele + Email provisioned, Telegram "Platform Grafana Alerts" in UI or pre-existing).
+# SMTP for email is configured in grafana.ini [smtp]; see alerts/README.md
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: "Platform Grafana Alerts"
+    group_by:
+      - alertname
+      - grafana_folder
+      - instance
+      - mountpoint
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+    routes:
+      # Cloud.ru Emergency & Planned Work: one notification per row (group by id + status so in-work and planned for same event = 2 messages)
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["dashboard", "=", "Cloud.ru / Global"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - id
+          - status
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 48h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["dashboard", "=", "Cloud.ru / Global"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - id
+          - status
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 48h
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["dashboard", "=", "Strimzi Kafka Connect"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - pod
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["dashboard", "=", "Strimzi Kafka Connect"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - pod
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["dashboard", "=", "Kafka (DMS) - CloudEye"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - kafka_broker
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["dashboard", "=", "Kafka (DMS) - CloudEye"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - kafka_broker
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["dashboard", "=", "PostgreSQL (RDS) - CloudEye"]
+        group_by:
+          - alertname
+          - grafana_folder
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["dashboard", "=", "PostgreSQL (RDS) - CloudEye"]
+        group_by:
+          - alertname
+          - grafana_folder
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["dashboard", "=", "Node Exporter Full"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - instance
+          - mountpoint
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["dashboard", "=", "Node Exporter Full"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - instance
+          - mountpoint
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["dashboard", "=", "Kubernetes / System / API Server"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - rulename
+          - namespace
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["dashboard", "=", "Kubernetes / System / API Server"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - rulename
+          - namespace
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["dashboard", "=", "Kubernetes / System / CoreDNS"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - rulename
+          - namespace
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["dashboard", "=", "Kubernetes / System / CoreDNS"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - rulename
+          - namespace
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["dashboard", "=", "Kubernetes / Views / Namespaces"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - rulename
+          - namespace
+          - pod
+          - persistentvolumeclaim
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["dashboard", "=", "Kubernetes / Views / Namespaces"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - rulename
+          - namespace
+          - pod
+          - persistentvolumeclaim
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["dashboard", "=", "Kubernetes / Views / Pods"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - namespace
+          - pod
+          - container
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["dashboard", "=", "Kubernetes / Views / Pods"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - namespace
+          - pod
+          - container
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+      # Estate databases: Telegram -> ops -> admins. Estate ledger: Telegram -> admins (no ops hop).
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["dashboard", "=", "Estate / Databases / Global"]
+        group_by:
+          - alertname
+          - grafana_folder
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (ops)"
+        object_matchers:
+          - ["dashboard", "=", "Estate / Databases / Global"]
+        group_by:
+          - alertname
+          - grafana_folder
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["dashboard", "=", "Estate / Databases / Global"]
+        group_by:
+          - alertname
+          - grafana_folder
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["dashboard", "=", "Estate / Ledger / Global"]
+        group_by:
+          - alertname
+          - grafana_folder
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["dashboard", "=", "Estate / Ledger / Global"]
+        group_by:
+          - alertname
+          - grafana_folder
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+      # Remaining Grafana-managed alerts (other dashboard value or no dashboard label in matchers above): same grouping as default policy
+      - receiver: "Platform Grafana Alerts"
+        object_matchers:
+          - ["alertname", "=~", ".+"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - instance
+          - mountpoint
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: true
+      - receiver: "Platform Grafana Email (admins)"
+        object_matchers:
+          - ["alertname", "=~", ".+"]
+        group_by:
+          - alertname
+          - grafana_folder
+          - instance
+          - mountpoint
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h

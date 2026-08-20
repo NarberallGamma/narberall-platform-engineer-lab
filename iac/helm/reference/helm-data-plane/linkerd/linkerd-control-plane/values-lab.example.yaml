@@ -1,0 +1,19 @@
+# Lab placeholders for cluster DNS and image registry.
+# Live cluster names and private registry mirrors are not copied.
+
+clusterDomain: cluster.local
+identityTrustDomain: cluster.local
+
+controllerImage: example.registry/linkerd/controller
+
+proxy:
+  image:
+    name: example.registry/linkerd/proxy
+
+proxyInit:
+  image:
+    name: example.registry/linkerd/proxy-init
+
+debugContainer:
+  image:
+    name: example.registry/linkerd/debug

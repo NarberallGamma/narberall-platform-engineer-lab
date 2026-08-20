@@ -26,6 +26,8 @@ This page is the **VPC** slice. Selectel as a market and the dedicated/Proxmox m
 
 Resource types: [`../terraform/RESOURCES.md`](../terraform/RESOURCES.md)
 
+Cluster Helm: [`../helm/`](../helm/).
+
 ## Keywords
 
 OpenStack, Selectel, Selectel Cloud, Nova, Cinder, Neutron, Keystone, Terraform, Kubernetes, GitLab, PostgreSQL, volume-boot, ru-3

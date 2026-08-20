@@ -1,0 +1,6 @@
+variables:
+  CUSTOM_K8S_NAMESPACE: backup
+
+include:
+  - project: 'platform/common-ci'
+    file: 'deployInfra.yml'

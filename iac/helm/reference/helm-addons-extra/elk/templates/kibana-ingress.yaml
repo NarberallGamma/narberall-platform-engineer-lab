@@ -1,0 +1,30 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kibana
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/auth-signin: https://$host/dex-authenticator/sign_in
+    nginx.ingress.kubernetes.io/auth-url: https://kibana-kb-http-dex-authenticator.{{ .Values.werf.namespace }}.svc.cluster.local/dex-authenticator/auth
+    nginx.ingress.kubernetes.io/auth-response-headers: X-Auth-Request-User,X-Auth-Request-Email
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header authorization 'Basic {{ (printf "elastic:%s" ( pluck .Values.global.env .Values.auth | first | default .Values.auth._default )) | b64enc }}';
+      proxy_pass_header authorization;
+spec:
+  ingressClassName: infra
+  rules:
+    - host: {{ include "fl.value" (list $ . .Values.kibana.ingress.host) }}
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: kibana-kb-http
+                port:
+                  number: 5601
+  tls:
+    - hosts:
+        - {{ include "fl.value" (list $ . .Values.kibana.ingress.host) }}
+      secretName: {{ include "fl.value" (list $ . .Values.kibana.ingress.secretName) }}

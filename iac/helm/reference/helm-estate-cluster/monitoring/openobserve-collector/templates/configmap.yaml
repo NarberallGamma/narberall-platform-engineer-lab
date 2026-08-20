@@ -1,0 +1,245 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openobserve-collector.fullname" . }}
+  namespace: {{ include "openobserve-collector.namespace" . }}
+  labels:
+    {{- include "openobserve-collector.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+      basicauth/openobserve:
+        client_auth:
+          username: ${env:O2_INGEST_USER}
+          password: ${env:ZO_MAIN_SERVICE_ACCOUNT_TOKEN}
+
+    receivers:
+{{- range .Values.collect.namespaces }}
+      filelog/{{ .stream }}:
+        include:
+          - /var/log/pods/{{ .name }}_*/*/*.log
+        exclude:
+{{- range $.Values.collect.exclude }}
+          - {{ . | quote }}
+{{- end }}
+        start_at: {{ $.Values.collect.startAt }}
+        max_log_size: {{ $.Values.collect.maxLogSize }}
+        include_file_path: true
+        include_file_name: false
+        poll_interval: 1s
+        retry_on_failure:
+          enabled: true
+        operators:
+          - type: router
+            id: get-format
+            routes:
+              - output: parser-docker
+                expr: 'body matches "^\\{"'
+              - output: parser-crio
+                expr: 'body matches "^[^ Z]+ "'
+              - output: parser-containerd
+                expr: 'body matches "^[^ Z]+Z"'
+          - type: regex_parser
+            id: parser-crio
+            regex: '^(?P<time>[^ Z]+) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) ?(?P<log>.*)$'
+            output: recombine-cri
+            timestamp:
+              parse_from: attributes.time
+              layout_type: gotime
+              layout: "2006-01-02T15:04:05.999999999Z07:00"
+          - type: regex_parser
+            id: parser-containerd
+            regex: '^(?P<time>[^ ^Z]+Z) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) ?(?P<log>.*)$'
+            output: recombine-cri
+            timestamp:
+              parse_from: attributes.time
+              layout: "%Y-%m-%dT%H:%M:%S.%LZ"
+          - type: json_parser
+            id: parser-docker
+            output: recombine-cri
+            timestamp:
+              parse_from: attributes.time
+              layout: "%Y-%m-%dT%H:%M:%S.%LZ"
+          - type: recombine
+            id: recombine-cri
+            combine_field: attributes.log
+            combine_with: ""
+            is_last_entry: attributes.logtag == "F" || attributes.logtag == nil
+            source_identifier: attributes["log.file.path"]
+            overwrite_with: oldest
+            max_log_size: 1048576
+            force_flush_period: 1s
+            output: extract_metadata_from_filepath
+          - type: regex_parser
+            id: extract_metadata_from_filepath
+            regex: '^.*\/(?P<namespace>[^_]+)_(?P<pod_name>[^_]+)_(?P<uid>[a-f0-9\-]{36})\/(?P<container_name>[^\/]+)\/(?P<restart_count>\d+)\.log$'
+            parse_from: attributes["log.file.path"]
+            cache:
+              size: 128
+          - type: move
+            from: attributes.log
+            to: body
+          - type: recombine
+            id: recombine-java
+            combine_field: body
+            combine_with: "\n"
+            is_first_entry: body matches "^\\d{4}-\\d{2}-\\d{2}" || body matches "^\\{" || (body != "" && !(body matches "^\\s+at " || body matches "^Caused by:" || body matches "^\\s+\\.\\.\\." || body matches "^[\\w.$]+Exception" || body matches "^[\\w.$]+Error:" || body matches "^\\s+Suppressed:"))
+            source_identifier: attributes["log.file.path"]
+            overwrite_with: oldest
+            max_batch_size: 200
+            max_log_size: 1048576
+            force_flush_period: 1s
+          - type: move
+            from: attributes.stream
+            to: attributes["log.iostream"]
+          - type: move
+            from: attributes.uid
+            to: resource["k8s.pod.uid"]
+            on_error: send
+          - type: move
+            from: attributes.namespace
+            to: resource["k8s.namespace.name"]
+            on_error: send
+          - type: move
+            from: attributes.pod_name
+            to: resource["k8s.pod.name"]
+            on_error: send
+          - type: move
+            from: attributes.container_name
+            to: resource["k8s.container.name"]
+            on_error: send
+{{- end }}
+
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 400
+        spike_limit_mib: 80
+      resourcedetection:
+        detectors: [env, system]
+        override: false
+      k8sattributes:
+        auth_type: serviceAccount
+        passthrough: false
+        filter:
+          node_from_env_var: K8S_NODE_NAME
+        extract:
+          labels:
+            - tag_name: service.name
+              key: app.kubernetes.io/name
+              from: pod
+            - tag_name: k8s.app.instance
+              key: app.kubernetes.io/instance
+              from: pod
+            - tag_name: service.version
+              key: app.kubernetes.io/version
+              from: pod
+            - tag_name: k8s.app.component
+              key: app.kubernetes.io/component
+              from: pod
+          metadata:
+            - k8s.namespace.name
+            - k8s.pod.name
+            - k8s.pod.uid
+            - k8s.deployment.name
+            - k8s.daemonset.name
+            - k8s.statefulset.name
+            - k8s.replicaset.name
+            - k8s.job.name
+            - k8s.cronjob.name
+            - k8s.node.name
+            - k8s.container.name
+            - container.image.name
+            - container.image.tag
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.uid
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.name
+              - from: resource_attribute
+                name: k8s.namespace.name
+      attributes/static:
+        actions:
+          - key: k8s_cluster
+            action: upsert
+            value: {{ .Values.k8sCluster | quote }}
+          - key: environment
+            action: upsert
+            value: {{ .Values.environment | quote }}
+          - key: source
+            action: upsert
+            value: kubernetes
+{{- range .Values.collect.namespaces }}
+      resource/{{ .stream }}:
+        attributes:
+          - key: log_group
+            action: upsert
+            value: {{ .group | quote }}
+          - key: o2.stream
+            action: upsert
+            value: {{ .stream | quote }}
+{{- end }}
+      transform/l2:
+        error_mode: ignore
+        log_statements:
+          - context: log
+            statements:
+              - set(attributes["k8s_namespace"], resource.attributes["k8s.namespace.name"])
+              - set(attributes["k8s_pod"], resource.attributes["k8s.pod.name"])
+              - set(attributes["k8s_container"], resource.attributes["k8s.container.name"])
+              - set(attributes["k8s_node"], resource.attributes["k8s.node.name"])
+              - set(attributes["k8s_app"], resource.attributes["k8s.deployment.name"])
+              - set(attributes["k8s_app"], resource.attributes["k8s.statefulset.name"]) where resource.attributes["k8s.deployment.name"] == nil
+              - set(attributes["k8s_app"], resource.attributes["k8s.daemonset.name"]) where resource.attributes["k8s.deployment.name"] == nil and resource.attributes["k8s.statefulset.name"] == nil
+              - set(attributes["k8s_app"], resource.attributes["k8s.pod.name"]) where attributes["k8s_app"] == nil
+              - set(attributes["service_name"], resource.attributes["service.name"])
+              - set(attributes["service_name"], attributes["k8s_app"]) where attributes["service_name"] == nil
+              - set(attributes["log_group"], resource.attributes["log_group"])
+              - set(attributes["o2_stream"], resource.attributes["o2.stream"])
+              - set(attributes["environment"], resource.attributes["environment"])
+              - set(attributes["k8s_cluster"], resource.attributes["k8s_cluster"])
+      batch:
+        send_batch_size: 1024
+        send_batch_max_size: 2048
+        timeout: 5s
+
+    exporters:
+{{- range .Values.collect.namespaces }}
+      otlphttp/{{ .stream }}:
+        endpoint: {{ $.Values.openobserve.endpoint | quote }}
+        auth:
+          authenticator: basicauth/openobserve
+        headers:
+          stream-name: {{ .stream | quote }}
+        compression: gzip
+        retry_on_failure:
+          enabled: true
+        sending_queue:
+          enabled: true
+          num_consumers: 2
+          queue_size: 200
+{{- end }}
+
+    service:
+      extensions: [health_check, basicauth/openobserve]
+      telemetry:
+        logs:
+          level: info
+      pipelines:
+{{- range .Values.collect.namespaces }}
+        logs/{{ .stream }}:
+          receivers: [filelog/{{ .stream }}]
+          processors:
+            - memory_limiter
+            - resourcedetection
+            - k8sattributes
+            - attributes/static
+            - resource/{{ .stream }}
+            - transform/l2
+            - batch
+          exporters: [otlphttp/{{ .stream }}]
+{{- end }}

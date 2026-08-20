@@ -1,0 +1,40 @@
+{{- if .Values.migrations.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  {{- if .Values.namespace }}
+  namespace: {{ .Values.namespace }}
+  {{- end }}
+  name: {{ include "base-chart.fullname" . }}-migration-job-{{ regexReplaceAll "\\W+" .Values.image.tag  "" }}
+  labels: 
+    app.kubernetes.io/instance: {{ include "base-chart.name" . }}
+    app.kubernetes.io/name: {{ .Release.Name }}-migration-job 
+  {{- with .Values.migrations.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}    
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      name: {{ include "base-chart.fullname" . }}-migration-job
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}      
+      containers:
+        - name: {{ include "base-chart.fullname" . }}-migration-job
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- if .Values.migrations.command }}
+          command: {{ toYaml .Values.migrations.command | nindent 12 }} 
+          {{- end }}      
+          {{- if .Values.env }}
+          envFrom:
+            - secretRef:
+                name: {{ include "base-chart.fullname" . }}-env 
+          {{- end }}
+{{- end }}

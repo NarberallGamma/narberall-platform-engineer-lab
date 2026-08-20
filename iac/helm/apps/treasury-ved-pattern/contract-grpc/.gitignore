@@ -1,0 +1,2 @@
+# Local helm dependency build. Shared lib is ../_libs/base-chart (one copy).
+charts/

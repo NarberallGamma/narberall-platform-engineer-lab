@@ -1,0 +1,74 @@
+variables:
+  WERF_VERSION: "1.1 stable"
+  CI_NAMESPACE: ${CI_ENVIRONMENT_SLUG}
+
+before_script:
+  - pwd
+  - type multiwerf && source <(multiwerf use ${WERF_VERSION})
+  - werf version
+  - type werf && source <(werf ci-env gitlab --tagging-strategy=stages-signature --verbose)
+
+.base_deploy: &base_deploy
+  script:
+    - set -ex
+    - werf deploy
+      --namespace ${CI_NAMESPACE}
+      --timeout "${DEPLOY_TIMEOUT:-600}"
+  tags:
+    - werf
+  except:
+    - schedules
+  when: manual
+
+.base_operator: &base_operator
+  <<: *base_deploy
+  stage: operator
+  environment:
+    name: redis-operator
+
+stages:
+  - operator
+  - project1
+  - project2
+
+To project1-develop:
+  <<: *base_deploy
+  stage: project1
+  environment:
+    name: project1-develop
+  variables:
+    WERF_KUBE_CONTEXT: develop
+
+To project1-release:
+  <<: *base_deploy
+  stage: project1
+  environment:
+    name: project1-release
+  variables:
+    WERF_KUBE_CONTEXT: production
+
+To project2-develop:
+  <<: *base_deploy
+  stage: project2
+  environment:
+    name: project2-develop
+  variables:
+    WERF_KUBE_CONTEXT: develop
+
+To project2-release:
+  <<: *base_deploy
+  stage: project2
+  environment:
+    name: project2-release
+  variables:
+    WERF_KUBE_CONTEXT: production
+
+Context dev:
+  <<: *base_operator
+  variables:
+    WERF_KUBE_CONTEXT: dev
+
+Context production:
+  <<: *base_operator
+  variables:
+    WERF_KUBE_CONTEXT: production

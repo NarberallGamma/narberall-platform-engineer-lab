@@ -1,0 +1,16 @@
+apiVersion: v2
+name: prometheus-cloud-ru-status-exporter
+description: Prometheus exporter for Cloud.ru Status API (service_availability + emergency)
+version: 1.0.0
+appVersion: "1.4"
+kubeVersion: ">=1.19.0-0"
+home: https://cloud.ru/docs/overview/support/topics/api-redoc-open-api-v3
+keywords:
+  - prometheus
+  - cloud.ru
+  - monitoring
+  - status
+type: application
+maintainers:
+  - name: DevOps Team
+    email: devops@example.com

@@ -1,0 +1,10 @@
+project: minio-operator
+configVersion: 1
+
+---
+image: operator
+from: quay.io/minio/operator:v7.1.1
+
+---
+image: console
+from: quay.io/minio/console:v0.30.0

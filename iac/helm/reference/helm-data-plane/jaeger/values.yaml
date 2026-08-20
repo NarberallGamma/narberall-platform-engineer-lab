@@ -1,0 +1,3 @@
+jaeger:
+  replicas: 1
+  public_domain: jaeger.example.com

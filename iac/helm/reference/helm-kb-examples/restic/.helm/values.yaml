@@ -1,0 +1,51 @@
+resources:
+  crons:
+    requests:
+      cpu:
+        _default: 100m
+      memory:
+        _default: 1Gi
+    limits:
+      memory:
+        _default: 1Gi
+
+hostname:
+  _default: estate-backup-staging
+  production: estate-backup-production
+
+backup_dms:
+  name:
+    _default: backup-monitoring-restic-stage
+    stagelong: backup-monitoring-restic-stage-long
+    production: backup-monitoring-restic-prod
+
+buckets:
+  staging:
+    backup_bucket_etcd_staging_backup:
+      endpoint: "s3:https://s3.us-west-002.backblazeb2.com/"
+      bucket: <any_bucket_name>/etcd-staging-backup
+    backup_bucket_mongodb_staging_backup:
+      endpoint: "s3:https://s3.amazonaws.com/"
+      bucket: <any_bucket_name>/mongodb-staging-backup
+    backup_bucket_postgresql_staging_backup:
+      endpoint: "s3:https://minio.estate.example.com/"
+      bucket: <any_bucket_name>/postgresql-staging-backup
+    backup_bucket_wal_staging_backup:
+      endpoint: "s3:https://storage.yandexcloud.net/"
+      bucket: <any_bucket_name>/wal-staging-backup
+    backup_bucket_gitlab_backup:
+      endpoint: "s3:https://s3.example.com/"
+      bucket: <any_bucket_name>/gitlab-backup
+  production:
+    backup_bucket_etcd_production_backup:
+      endpoint: "s3:https://s3.amazonaws.com/"
+      bucket: <any_bucket_name>/etcd-production-backup
+    backup_bucket_mongodb_production_backup:
+      endpoint: "s3:https://s3.us-west-002.backblazeb2.com/"
+      bucket: <any_bucket_name>/mongodb-production-backup
+    backup_bucket_postgresql_production_backup:
+      endpoint: "s3:https://minio.estate.example.com/"
+      bucket: <any_bucket_name>/postgresql-production-backup
+    backup_bucket_wal_production_backup:
+      endpoint: "s3:https://minio.estate.example.com/"
+      bucket: <any_bucket_name>/wal-production-backup

@@ -1,0 +1,92 @@
+{{- if eq .Values.werf.env "production" }}
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: CustomPrometheusRules
+metadata:
+  labels:
+    component: rules
+    prometheus: main
+  name: podreadinesswatcher
+spec:
+  groups:
+  - name: PodReadiness
+    rules:
+    - alert: DeliverySchedulerPodsNotReady
+      annotations:
+        description: Check delivery-scheduler pods in {{`{{$labels.namespace}}`}} namespace.
+        plk_labels_as_annotations: host, namespace, pod
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        summary: One or more replicas of delivery-scheduler statefulset in {{`{{$labels.namespace}}`}}
+          is not ready for last 3 minutes
+      expr: kube_statefulset_status_replicas_ready{namespace=~"production|shop|lab", statefulset="delivery-scheduler"}
+        <= 1
+      for: 3m
+      labels:
+        severity_level: "4"
+    - alert: DeliverySchedulerStatefullSetNotReady
+      annotations:
+        description: Check delivery-scheduler statefulset in {{`{{$labels.namespace}}`}} namespace.
+        plk_labels_as_annotations: host, namespace, pod
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        summary: delivery-scheduler statefulset in {{`{{$labels.namespace}}`}} is not ready
+          for last 1 minute
+      expr: kube_statefulset_status_replicas_ready{namespace=~"production|shop|lab", statefulset="delivery-scheduler"}
+        == 0
+      for: 3m
+      labels:
+        severity_level: "1"
+    - alert: FinancialCalculatorApiPodsNotReady
+      annotations:
+        description: Check financial-calculator-api pods in {{`{{$labels.namespace}}`}} namespace.
+        plk_labels_as_annotations: host, namespace, pod
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        summary: One or more replicas of financial-calculator-api deployment in {{`{{$labels.namespace}}`}}
+          is not ready for last 3 minutes
+      expr: kube_deployment_status_replicas_available{namespace=~"production|shop|lab", deployment="financial-calculator-api"}
+        <= 1
+      for: 3m
+      labels:
+        severity_level: "4"
+    - alert: FinancialCalculatorApiDeploymentNotReady
+      annotations:
+        description: Check financial-calculator-api deployment in {{`{{$labels.namespace}}`}} namespace.
+        plk_labels_as_annotations: host, namespace, pod
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        summary: financial-calculator-api deployment in {{`{{$labels.namespace}}`}} is not ready
+          for last 1 minute
+      expr: kube_deployment_status_replicas_available{namespace=~"production|shop|lab", deployment="financial-calculator-api"}
+        == 0
+      for: 3m
+      labels:
+        severity_level: "1"
+    - alert: PromoApiPodsNotReady
+      annotations:
+        description: Check promo-api pods in {{`{{$labels.namespace}}`}} namespace.
+        plk_labels_as_annotations: host, namespace, pod
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        summary: One or more replicas of promo-api deployment in {{`{{$labels.namespace}}`}}
+          is not ready for last 3 minutes
+      expr: kube_deployment_status_replicas_available{namespace=~"production|shop|lab", deployment="promo-api"}
+        <= 1
+      for: 3m
+      labels:
+        severity_level: "4"
+    - alert: PromoApiDeploymentNotReady
+      annotations:
+        description: Check promo-api deployment in {{`{{$labels.namespace}}`}} namespace.
+        plk_labels_as_annotations: host, namespace, pod
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        summary: promo-api deployment in {{`{{$labels.namespace}}`}} is not ready
+          for last 1 minute
+      expr: kube_deployment_status_replicas_available{namespace=~"production|shop|lab", deployment="promo-api"}
+        == 0
+      for: 3m
+      labels:
+        severity_level: "1"
+{{- end }}

@@ -1,0 +1,3 @@
+# library lives in ../_libs/front-base; do not vendor a second copy
+charts/
+Chart.lock

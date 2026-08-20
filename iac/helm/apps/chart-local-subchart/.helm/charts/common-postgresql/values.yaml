@@ -1,0 +1,55 @@
+imagePullSecrets: |
+  - name: registrysecret
+
+priorityClassName:
+  _default: develop
+  production: production-medium
+
+image: '{{ index $.Values.werf.image "postgres" }}'
+
+external_hosts: {}
+  # production: |
+  #   restaurant-psql:
+  #     ip: "10.10.0.12"
+  #     port: "6432"
+  #   restaurant-root-psql:
+  #     ip: "10.10.0.11"
+  #     port: "32770"
+
+clusters: {}
+  # restaurant:
+  #   enabled:
+  #     _default: true
+  #     production: false
+  #   user: restaurant
+  #   password: restaurant
+  #   database: restaurant
+
+storage: 5Gi
+storageClassName: local
+
+nodeSelector:
+  _default: |
+    node-role/worker: ""
+  production: |
+    node-role/app: ""
+
+tolerations:
+  _default: |
+    - effect: NoExecute
+      key: dedicated
+      operator: Equal
+      value: worker
+  production: |
+    - effect: NoExecute
+      key: dedicated
+      operator: Equal
+      value: app
+
+resources: {}
+  # limits:
+  #   cpu: 2000m
+  #   memory: 256Mi
+  # requests:
+  #   cpu: 50m
+  #   memory: 256Mi

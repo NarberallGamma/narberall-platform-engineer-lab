@@ -1,0 +1,14 @@
+rules:
+- name: platform-admin
+  access_level: Admin
+  allow_scale: true
+  port_forwarding: true
+  system_namespaces: true
+  groups:
+  - platform-admins
+- name: user
+  access_level: User
+  limit_namespaces:
+  - staging
+  groups:
+  - d8-authz/estate-dev/user

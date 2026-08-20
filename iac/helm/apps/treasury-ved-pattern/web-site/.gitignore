@@ -1,0 +1,3 @@
+# remote base-chart tarball from helm dependency build stays out of git
+charts/
+Chart.lock

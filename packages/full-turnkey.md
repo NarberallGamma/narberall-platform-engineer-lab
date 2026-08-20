@@ -9,7 +9,7 @@
 - Application or site + utilities as needed
 - Infrastructure and deploy path
 - AI integration when required
-- Docs + monitoring so the system is operable after handoff
+- Docs + monitoring so the system is operable after handoff. New Grafana views and alert rules the same day (product APIs, not a vendor workshop): [`../architecture/05-sre.md`](../architecture/05-sre.md), [`../docs/sre/`](../docs/sre/)
 
 ## Message
 
@@ -17,5 +17,5 @@ One owner from infra to documentation and observability, including application *
 
 ## Proof in this repo
 
-- Case studies `01`–`03`
-- `practice/home-lab/reference/apps/`, `iac/ansible/reference/`, `iac/terraform/`, `practice/home-lab/reference/ai/`, `practice/workstation/reference/`
+- Case studies `01`–`03`, `10`–`11` (estate Ansible + Helm overlay)
+- `practice/home-lab/reference/apps/`, `iac/ansible/reference/`, `iac/terraform/`, `iac/helm/reference/`, [`iac/helm/apps/`](../iac/helm/apps/), `practice/home-lab/reference/ai/`, `practice/workstation/reference/`

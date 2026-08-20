@@ -1,0 +1,89 @@
+{{- with .Values.rabbitmq }}
+{{- if include "fl.isTrue" (list $ . .enabled) }}
+
+{{- /* attach vhosts and users to an existing orders-rmq cluster; do not create the cluster here */ -}}
+
+{{- range $index, $vhost :=  .custom.vhosts }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Vhost
+metadata:
+  name: {{ $.Chart.Name }}-{{ $vhost }}-vhost
+  namespace: platform-{{ $.Values.werf.namespace }}
+spec:
+  name: {{ $vhost }}
+  rabbitmqClusterReference:
+    name: orders-rmq
+    namespace: platform-{{ $.Values.werf.namespace }}
+
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Policy
+metadata:
+  name: {{ $.Chart.Name }}-{{ $vhost }}-policy
+  namespace: platform-{{ $.Values.werf.namespace }}
+spec:
+  name:  {{ $vhost |quote }}
+  pattern: ""
+  applyTo: "all"
+  priority: 0
+  vhost:  {{ $vhost |quote }}
+  definition:
+    ha-mode: "all"
+    ha-sync-mode: "automatic"
+    ha-sync-batch-size: 81920
+    expires: 259200000
+  rabbitmqClusterReference:
+    name: orders-rmq
+    namespace: platform-{{ $.Values.werf.namespace }}
+{{- end }}
+
+{{- /* users on the shared orders-rmq cluster */ -}}
+{{- range $user, $value :=  .custom.users }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $.Chart.Name }}-{{ $user }}-creds
+  namespace: platform-{{ $.Values.werf.namespace }}
+type: Opaque
+stringData:
+  username: {{ $user }}
+  password: {{ include "fl.value" (list $ $.Values.envs.config $.Values.envs.config.RABBITMQ_PASS) }}
+
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: {{ $.Chart.Name }}-{{ $user }}-user
+  namespace: platform-{{ $.Values.werf.namespace }}
+spec:
+  tags: {{ toYaml $value.tags |nindent 4 }}
+  importCredentialsSecret:
+    name: {{ $.Chart.Name }}-{{ $user }}-creds
+  rabbitmqClusterReference:
+    name: orders-rmq
+    namespace: platform-{{ $.Values.werf.namespace }}
+
+{{- range $index, $pvalue :=  .permissions }}
+{{- $vname:= ternary "root" $pvalue.vhostname (contains $pvalue.vhostname "/" ) }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: {{ $.Chart.Name }}-{{ $user }}-{{ $vname }}-permission
+  namespace: platform-{{ $.Values.werf.namespace }}
+spec:
+  vhost: {{ $pvalue.vhostname| quote }}
+  user: {{ $user }}
+  permissions: {{ toYaml $pvalue.permission |nindent 4 }}
+  rabbitmqClusterReference:
+    name: orders-rmq
+    namespace: platform-{{ $.Values.werf.namespace }}
+
+{{- end }}
+
+{{- end }}
+
+{{- end }}
+{{- end }}

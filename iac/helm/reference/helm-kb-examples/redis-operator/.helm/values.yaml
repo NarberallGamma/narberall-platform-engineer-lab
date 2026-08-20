@@ -1,0 +1,24 @@
+---
+
+replicas:
+  _default: 3
+
+resources:
+  requests:
+    cpu:
+      _default: 100m
+    memory:
+      _default: 600Mi
+  limits:
+    memory:
+      _default: 600Mi
+
+storage:
+  class:
+    _default: rbd
+  size:
+    _default: 1Gi
+  custom_config:
+    _default:
+      - "maxmemory 512MB"
+      - "maxmemory-policy allkeys-lru"

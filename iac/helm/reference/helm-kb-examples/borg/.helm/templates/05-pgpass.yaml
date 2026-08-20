@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cron-pg
+data:
+  pgpass: |
+{{- range $key, $value := .Values.psql }}
+    {{ default "*" $value.host }}:{{ default "5432" $value.port }}:{{ default "*" $value.database }}:{{ default "*" $value.user }}:{{ $value.password }}
+{{- end }}

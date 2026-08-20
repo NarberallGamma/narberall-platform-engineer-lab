@@ -1,0 +1,56 @@
+postgresql:
+  enabled: true
+  enableExternalService: false
+  spec:
+    numberOfInstances: 2
+    dockerImage: ghcr.io/zalando/spilo-15:3.0-p1
+    enableLogicalBackup: true
+    enableMasterPoolerLoadBalancer: false
+    enableConnectionPooler: true
+    connectionPooler:
+      numberOfInstances: 2
+      mode: session
+      user: pooler
+    allowedSourceRanges: null
+    teamId: lab
+    volume:
+      size: 50Gi
+      storageClass: ssd
+    resources:
+      requests:
+        cpu: 200m
+        memory: 500Mi
+      limits:
+        cpu: 1000m
+        memory: 2500Mi
+    postgresql:
+      version: "15"
+      parameters:
+        max_connections: "500"
+        log_lock_waits: "on"
+        wal_level: logical
+        log_destination: stderr
+        logging_collector: "off"
+        max_replication_slots: "20"
+        max_wal_senders: "20"
+    patroni:
+      # Debezium connectors create their own replication slots.
+    databases:
+      lab_tx: lab_user
+      lab_onboarding: lab_user
+      lab_contract: lab_user
+      lab_report: lab_user
+      lab_otp: lab_user
+      lab_web: lab_user
+      lab_auth: lab_user
+      lab_aml: lab_user
+      lab_csp: lab_user
+      lab_notification: lab_user
+      lab_audit: lab_user
+      lab_idp: lab_user
+    users:
+      lab_user:
+        - REPLICATION
+    env:
+      - name: DISABLE_ULIMIT_CHECK
+        value: "true"

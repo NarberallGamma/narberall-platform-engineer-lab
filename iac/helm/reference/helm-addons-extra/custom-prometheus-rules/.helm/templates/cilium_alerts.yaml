@@ -1,0 +1,50 @@
+apiVersion: deckhouse.io/v1alpha1
+kind: CustomPrometheusRules
+metadata:
+  name: cilium-agent-pods-alerts
+  labels:
+    component: rules
+    prometheus: main
+spec:
+  groups:
+    - name: CiliumAgentPodAlerts
+      rules:
+        - alert: CiliumAgentPodContainerRestarts
+          expr: increase(kube_pod_container_status_restarts_total{namespace="d8-cni-cilium"}[1h]) > 2
+          labels:
+            severity_level: "4"
+            team: platform-alerts
+          annotations:
+            plk_markup_format: markdown
+            plk_protocol_version: "1"
+            summary: More than 2 restarts of container {{`{{$labels.container}}`}} in pod {{`{{$labels.pod}}`}} within last 1 hour in d8-cni-cilium
+            description: |-
+              There are more than 2 container {{`{{$labels.container}}`}} restarts in the last 1 hour in pod {{`{{$labels.pod}}`}} namespace d8-cni-cilium.
+              Check pod logs and node health.
+        - alert: CiliumAgentPodNotRunning
+          expr: kube_pod_status_phase{namespace="d8-cni-cilium", phase!="Running"} == 1
+          for: 5m
+          labels:
+            severity_level: "4"
+            team: platform-alerts
+          annotations:
+            plk_markup_format: markdown
+            plk_protocol_version: "1"
+            summary: Pod {{`{{$labels.pod}}`}} in namespace d8-cni-cilium is in phase {{`{{$labels.phase}}`}} for more than 5 minutes
+            description: |-
+              Pod {{`{{$labels.pod}}`}}, namespace d8-cni-cilium, is not Running but in phase {{`{{$labels.phase}}`}} for over 5 minutes.
+              Investigate pod status and node conditions.
+        - alert: CiliumAgentContainerOOMKilled
+          expr: |
+            kube_pod_container_status_last_terminated_reason{namespace="d8-cni-cilium", reason="OOMKilled"} > 0
+          for: 1m
+          labels:
+            severity_level: "4"
+            team: platform-alerts
+          annotations:
+            plk_markup_format: markdown
+            plk_protocol_version: "1"
+            summary: Container {{`{{$labels.container}}`}} in pod {{`{{$labels.pod}}`}} was OOMKilled
+            description: |-
+              The container {{`{{$labels.container}}`}} in pod {{`{{$labels.pod}}`}} (namespace `d8-cni-cilium`) was terminated due to OOMKilled.
+              Check memory limits, requests, and pod logs to identify the root cause.

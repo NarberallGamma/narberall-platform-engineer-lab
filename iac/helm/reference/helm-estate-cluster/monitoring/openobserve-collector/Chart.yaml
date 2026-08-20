@@ -1,0 +1,14 @@
+apiVersion: v2
+name: openobserve-collector
+description: OTel Collector DaemonSet, container logs to OpenObserve (logs only)
+type: application
+version: 0.1.2
+appVersion: "0.138.0"
+kubeVersion: ">=1.19.0-0"
+keywords:
+  - openobserve
+  - opentelemetry
+  - logs
+maintainers:
+  - name: DevOps Team
+    email: devops@example.com

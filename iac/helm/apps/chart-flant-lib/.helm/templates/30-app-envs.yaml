@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Chart.Name }}-env
+  annotations:
+    werf.io/weight: "-110"
+stringData:
+  {{- range $variable, $value := .Values.envs.config }}
+  {{ $variable }}: {{ include "fl.value" (list $ . $value) | quote }}
+  {{- end }}

@@ -1,0 +1,4 @@
+.helm/secret-values.yaml
+.helm/charts/
+.werf_secret_key
+*.tgz

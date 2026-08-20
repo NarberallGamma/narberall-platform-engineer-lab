@@ -1,0 +1,55 @@
+{{ $db_host          := index .Values.mysql.host .Values.global.cluster | list $ . | include "fl.value" }}
+{{ $db_root_user     := .Values.mysql.root_user                         | list $ . | include "fl.value" }}
+{{ $db_root_password := .Values.mysql.root_password                     | list $ . | include "fl.value" }}
+{{ $db_database      := .Values.mysql.db                                | list $ . | include "fl.value" }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Chart.Name }}-scripts
+stringData:
+{{- if (ne .Values.werf.env "production") }}
+  create-db.sh: |
+    #!/bin/bash
+
+    function mysql_cmd {
+      mysql \
+        -h{{ $db_host }} \
+        -u{{ $db_root_user }} \
+        -p{{ $db_root_password }} \
+        -e "${@}"
+    }
+
+    echo '# Create databases'
+    mysql_cmd "CREATE DATABASE IF NOT EXISTS {{ $db_database }};"
+    mysql_cmd "CREATE DATABASE IF NOT EXISTS webapps_testing;"
+    echo '# Create user'
+    mysql_cmd "CREATE USER IF NOT EXISTS '{{ $db_database }}'@'%' \
+               IDENTIFIED BY '{{ pluck .Values.werf.env .Values.mysql.user_password | first | default .Values.mysql.user_password._default }}';"
+    echo '# Grants'
+    mysql_cmd "GRANT ALL ON {{ $db_database }}.* \
+               TO '{{ $db_database }}'@'%';"
+    mysql_cmd "GRANT ALL ON webapps_testing.* TO '{{ $db_database }}'@'%';"
+    echo '# Flush privileges'
+    mysql_cmd "FLUSH PRIVILEGES;"
+
+
+{{- end }}
+  wait-db.sh: |
+    #!/bin/bash
+
+    function mysql_cmd {
+      mysql \
+        -h{{ $db_host }} \
+        -u{{ $db_root_user }} \
+        -p{{ $db_root_password }} \
+        -e "${@}"
+    }
+
+    while true; do
+      if mysql_cmd "SELECT 1;"; then
+        break;
+      fi
+      echo "Waiting for mysql to appear!"
+      sleep 1;
+    done

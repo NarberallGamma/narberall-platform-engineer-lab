@@ -1,0 +1,84 @@
+# Shared values excerpt. One file feeds every unit via werf --values.
+# The estate file listed ~40 unit keys (~3100 lines). This sample keeps
+# the envelope plus s3_cache_proxy. Brand feed-adapter keys stay out.
+
+config:
+  envs:
+    api_url:
+      _default: "http://admin.example.svc.cluster.local:5000"
+
+# CIDR allow-list some units pluck by werf.env (documentation ranges only).
+whitelist:
+  _default: []
+  production:
+    - 203.0.113.0/24
+    - 198.51.100.10/32
+
+envoy_common:
+  url:
+    _default:
+      - interface.dev.example.com
+    production:
+      - interface.example.com
+  gateway:
+    _default: envoy
+  remoteJWKS:
+    _default: https://keycloak.example.com/realms/platform/protocol/openid-connect/certs
+  headers:
+    name: "Authorization2"
+    prefix: "Bearer "
+
+clusterissuer:
+  _default: letsencrypt
+
+s3_cache_proxy:
+  name: s3-cache-proxy
+  lockbox:
+    production:
+      account: platform-css
+      refreshInterval: 30s
+      secrets:
+        - name: platform-s3-cache-proxy
+  is_istio_enabled:
+    _default: false
+    dev: false
+  replicas:
+    _default: 1
+    production: 0
+  resources:
+    _default:
+      requests:
+        cpu: 300m
+        memory: "500Mi"
+      limits:
+        memory: "500Mi"
+  aws_sigs_version:
+    _default: "4"
+  s3_bucket_name:
+    _default: history-cache
+  s3_region:
+    _default: eu-central-1
+  s3_server_port:
+    _default: 80
+  s3_server_proto:
+    _default: http
+  s3_server:
+    _default: s3.example.com
+  s3_style:
+    _default: default
+  allow_directory_list:
+    _default: false
+  proxy_cache_inactive:
+    _default: 7d
+  ports:
+    _default:
+      - number: 80
+        name: web-port
+        protocol: TCP
+  volumes:
+    - name: s3-cache-proxy
+      emptyDir:
+        sizeLimit: "10Gi"
+  volumeMounts:
+    - name: s3-cache-proxy
+      mountPath: /var/cache/nginx/

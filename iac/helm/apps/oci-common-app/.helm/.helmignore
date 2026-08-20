@@ -1,0 +1,4 @@
+secret-values.yaml
+charts/
+*.tgz
+.werf_secret_key

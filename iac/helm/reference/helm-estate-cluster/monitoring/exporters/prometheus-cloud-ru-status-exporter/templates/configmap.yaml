@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "prometheus-cloud-ru-status-exporter.fullname" . }}
+  namespace: {{ include "prometheus-cloud-ru-status-exporter.namespace" . }}
+  labels:
+    {{- include "prometheus-cloud-ru-status-exporter.labels" . | nindent 4 }}
+data:
+  config.yml: |
+    platform: {{ .Values.config.platform | quote }}
+    {{- if .Values.config.emergency_platforms }}
+    emergency_platforms:
+    {{- range .Values.config.emergency_platforms }}
+      - {{ . | quote }}
+    {{- end }}
+    {{- end }}
+    api_base_url: {{ .Values.config.api_base_url | quote }}
+    scrape_interval_seconds: {{ .Values.config.scrape_interval_seconds }}

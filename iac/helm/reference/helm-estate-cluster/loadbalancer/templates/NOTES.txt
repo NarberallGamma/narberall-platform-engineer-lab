@@ -1,0 +1,5 @@
+Three LoadBalancer Services, selector ingress-nginx / controller, externalTrafficPolicy Local.
+
+Zones: zone-a, zone-b, zone-c. ingress-nginx controller.service.enabled must stay false.
+
+  kubectl get svc -n {{ .Values.namespace }} -l app.kubernetes.io/name=ingress-nginx

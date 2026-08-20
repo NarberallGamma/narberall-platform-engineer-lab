@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cron
+spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backup-cron
+  template:
+    metadata:
+      annotations:
+        checksum/config-pgpass: {{ include (print $.Template.BasePath "/05-pgpass.yaml") . | sha256sum }}
+        checksum/schedule: {{ (.Files.Get "vars/vars") | sha256sum }}
+        checksum/vars: {{ (.Files.Get "vars/vars") | sha256sum }}
+      labels:
+        app: backup-cron
+    spec:
+      imagePullSecrets:
+      - name: registrysecret
+      volumes:
+      - name: ssh-key
+        secret:
+          secretName: ssh-key
+          defaultMode: 256
+      - name: pg
+        configMap:
+          name: cron-pg
+          defaultMode: 0600
+      - name: schedule
+        configMap:
+          name: schedule
+          defaultMode: 0400
+      - name: vars
+        configMap:
+          name: vars
+          defaultMode: 0660
+      shareProcessNamespace: true
+      containers:
+      - name: cron
+        image: {{ .Values.werf.image.backup }}
+{{- include "resources_crons" . | indent 8 }}
+        command: ["/usr/local/bin/dumb-init"]
+        args:
+          - '--'
+          - '/usr/local/bin/supercronic'
+          - '-json'
+          - '/supercronic/schedule'
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh","-c","while [ $(ps --no-headers -o pid --ppid=$(pidof supercronic) 2>/dev/null | wc -l) -gt 0 ]; do echo 'backup in process...'; sleep 5; done;"]
+        volumeMounts:
+        - name: ssh-key
+          mountPath: "/root/.ssh/.borg"
+          subPath: .borg
+        - name: pg
+          mountPath: /root/.pgpass
+          subPath: pgpass
+        - name: schedule
+          mountPath: /supercronic
+        - name: vars
+          mountPath: /app/vars
+          subPath: vars
+{{- include "backup_envs" . | indent 8 }}
+      - name: reloader
+        image: {{ .Values.werf.image.backup }}
+        command:
+        - sh
+        - -c
+        - |
+          while true; do inotifywait -e modify -q /supercronic/schedule ; sleep 2; /usr/local/bin/supercronic -test /supercronic/schedule && (kill -USR2 $(pidof supercronic) && echo "time=\""$(date +"%Y-%m-%dT%H:%M:%S%:z")"\" level=info msg=\"Send signal to reload config\"") || echo "time=\""$(date +"%Y-%m-%dT%H:%M:%S%:z")"\" level=fatal msg=\"Test supercronic config failed\""; done
+        volumeMounts:
+        - name: schedule
+          mountPath: /supercronic

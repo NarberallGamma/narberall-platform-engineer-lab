@@ -1,0 +1,273 @@
+# Kubernetes / Views / Pods - container CPU and memory usage vs resource limits (not requests).
+# Matches dashboard panels: CPU Usage / Requests & Limits by container (panel 50, LIMITS series logic),
+# Memory Usage / Requests & Limits by container (panel 30, LIMITS series logic).
+# WARN: usage/limit in [70%, 90%); CRITICAL: usage/limit >= 90%. Series without a CPU/memory limit are excluded (no denominator match).
+# Selectors omit cluster= and job= on kube metrics where possible (CCE / kube-prometheus-stack label sets).
+# Datasource UID: PBFA97CFB590B2093.
+# noDataState: OK: missing series must not raise DatasourceNoData; notify only when the query returns a value and the threshold fires.
+# execErrState: OK: query errors (Prometheus timeout, datasource down) must not raise DatasourceError; notify only on a metric threshold.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Kubernetes Views Pods Resources
+    folder: Alerting
+    interval: 30s
+    rules:
+      - uid: k8s_pod_cpu_vs_limit_warn
+        title: Kubernetes - container CPU usage over 70% of limit (warning)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                (
+                  (
+                    sum(rate(container_cpu_usage_seconds_total{namespace!="", pod!="", image!=""}[5m])) by (namespace, pod, container)
+                    /
+                    clamp_min(
+                      sum(
+                        kube_pod_container_resource_limits{resource="cpu", namespace!=""}
+                        and on(namespace, pod)
+                        max by (namespace, pod) (kube_pod_status_phase{phase="Running"} == 1)
+                      ) by (namespace, pod, container),
+                      1e-9
+                    )
+                  ) >= 0.70
+                )
+                unless
+                (
+                  (
+                    sum(rate(container_cpu_usage_seconds_total{namespace!="", pod!="", image!=""}[5m])) by (namespace, pod, container)
+                    /
+                    clamp_min(
+                      sum(
+                        kube_pod_container_resource_limits{resource="cpu", namespace!=""}
+                        and on(namespace, pod)
+                        max by (namespace, pod) (kube_pod_status_phase{phase="Running"} == 1)
+                      ) by (namespace, pod, container),
+                      1e-9
+                    )
+                  ) >= 0.90
+                )
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_views_pods
+        panelId: 50
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: 'CPU vs limit ≥ 70% (warn): {{ "{{" }} {{ "$" }}{{ "labels.namespace" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.container" }} {{ "}}" }}'
+          description: "rate(container_cpu_usage_seconds_total[5m]) / kube_pod_container_resource_limits{resource=\"cpu\"} for Running pods; threshold 70-90%. Panel: CPU Usage / Requests & Limits by container (limit ratio)."
+        labels:
+          dashboard: "Kubernetes / Views / Pods"
+          severity: warning
+
+      - uid: k8s_pod_cpu_vs_limit_crit
+        title: Kubernetes - container CPU usage over 90% of limit (critical)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                (
+                  sum(rate(container_cpu_usage_seconds_total{namespace!="", pod!="", image!=""}[5m])) by (namespace, pod, container)
+                  /
+                  clamp_min(
+                    sum(
+                      kube_pod_container_resource_limits{resource="cpu", namespace!=""}
+                      and on(namespace, pod)
+                      max by (namespace, pod) (kube_pod_status_phase{phase="Running"} == 1)
+                    ) by (namespace, pod, container),
+                    1e-9
+                  )
+                ) >= 0.90
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_views_pods
+        panelId: 50
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: 'CPU vs limit ≥ 90%: {{ "{{" }} {{ "$" }}{{ "labels.namespace" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.container" }} {{ "}}" }}'
+          description: "rate(container_cpu_usage_seconds_total[5m]) / kube_pod_container_resource_limits{resource=\"cpu\"} for Running pods; threshold ≥ 90%. Panel: CPU Usage / Requests & Limits by container (limit ratio)."
+        labels:
+          dashboard: "Kubernetes / Views / Pods"
+          severity: critical
+
+      - uid: k8s_pod_mem_vs_limit_warn
+        title: Kubernetes - container memory usage over 70% of limit (warning)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                (
+                  (
+                    sum(container_memory_working_set_bytes{namespace!="", pod!="", image!=""}) by (namespace, pod, container)
+                    /
+                    clamp_min(
+                      sum(
+                        kube_pod_container_resource_limits{resource="memory", namespace!=""}
+                        and on(namespace, pod)
+                        max by (namespace, pod) (kube_pod_status_phase{phase="Running"} == 1)
+                      ) by (namespace, pod, container),
+                      1
+                    )
+                  ) >= 0.70
+                )
+                unless
+                (
+                  (
+                    sum(container_memory_working_set_bytes{namespace!="", pod!="", image!=""}) by (namespace, pod, container)
+                    /
+                    clamp_min(
+                      sum(
+                        kube_pod_container_resource_limits{resource="memory", namespace!=""}
+                        and on(namespace, pod)
+                        max by (namespace, pod) (kube_pod_status_phase{phase="Running"} == 1)
+                      ) by (namespace, pod, container),
+                      1
+                    )
+                  ) >= 0.90
+                )
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_views_pods
+        panelId: 30
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: 'Memory vs limit ≥ 70% (warn): {{ "{{" }} {{ "$" }}{{ "labels.namespace" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.container" }} {{ "}}" }}'
+          description: "container_memory_working_set_bytes / kube_pod_container_resource_limits{resource=\"memory\"} for Running pods; threshold 70-90%. Panel: Memory Usage / Requests & Limits by container (limit ratio)."
+        labels:
+          dashboard: "Kubernetes / Views / Pods"
+          severity: warning
+
+      - uid: k8s_pod_mem_vs_limit_crit
+        title: Kubernetes - container memory usage over 90% of limit (critical)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                (
+                  sum(container_memory_working_set_bytes{namespace!="", pod!="", image!=""}) by (namespace, pod, container)
+                  /
+                  clamp_min(
+                    sum(
+                      kube_pod_container_resource_limits{resource="memory", namespace!=""}
+                      and on(namespace, pod)
+                      max by (namespace, pod) (kube_pod_status_phase{phase="Running"} == 1)
+                    ) by (namespace, pod, container),
+                    1
+                  )
+                ) >= 0.90
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_views_pods
+        panelId: 30
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: 'Memory vs limit ≥ 90%: {{ "{{" }} {{ "$" }}{{ "labels.namespace" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.container" }} {{ "}}" }}'
+          description: "container_memory_working_set_bytes / kube_pod_container_resource_limits{resource=\"memory\"} for Running pods; threshold ≥ 90%. Panel: Memory Usage / Requests & Limits by container (limit ratio)."
+        labels:
+          dashboard: "Kubernetes / Views / Pods"
+          severity: critical

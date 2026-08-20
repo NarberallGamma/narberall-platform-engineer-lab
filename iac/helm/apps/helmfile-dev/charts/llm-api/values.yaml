@@ -1,0 +1,31 @@
+app_name: llm-api
+k8s_namespace: dev-stand
+app_image: example.registry/apps/llm-api:latest
+
+imagePullSecrets: []
+# Optional DEV aliases for a private git / registry that has no cluster DNS.
+# Example:
+# hostAliases:
+#   - ip: "10.10.4.10"
+#     hostnames:
+#       - git.example.com
+#       - registry.example.com
+hostAliases: []
+
+persistence:
+  enabled: true
+  storageClassName: standard
+  size: 50Gi
+  accessMode: ReadWriteOnce
+
+service:
+  type: NodePort
+  port: 11434
+
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: "1"
+  limits:
+    memory: "4Gi"
+    cpu: "2"

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: estate-integration
+description: Estate integration adapter umbrella. ExternalSecret is the sample.
+type: application
+version: 0.1.0
+appVersion: "3.5.1"
+
+dependencies:
+  - name: base-chart
+    version: 0.2.1
+    repository: "file://../_libs/base-chart"
+    alias: application
+    condition: application.enabled

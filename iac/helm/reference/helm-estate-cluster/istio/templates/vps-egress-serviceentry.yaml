@@ -1,0 +1,31 @@
+{{- if .Values.vpsEgress.enabled }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: {{ .Values.vpsEgress.serviceEntry.name }}
+  namespace: {{ .Values.vpsEgress.serviceEntry.namespace }}
+  labels:
+    app.kubernetes.io/component: vps-egress
+    environment: {{ .Values.environment }}
+spec:
+  hosts:
+    - {{ .Values.vpsEgress.serviceEntry.host | quote }}
+  addresses:
+    - {{ .Values.vpsEgress.serviceEntry.address | quote }}
+  ports:
+    - number: {{ .Values.vpsEgress.serviceEntry.port }}
+      name: {{ .Values.vpsEgress.serviceEntry.portName }}
+      protocol: {{ .Values.vpsEgress.serviceEntry.protocol }}
+  resolution: STATIC
+  location: MESH_EXTERNAL
+  endpoints:
+    - address: {{ .Values.vpsEgress.endpoints.primary.address | quote }}
+      locality: {{ .Values.vpsEgress.endpoints.primary.locality | quote }}
+      ports:
+        {{ .Values.vpsEgress.serviceEntry.portName }}: {{ .Values.vpsEgress.serviceEntry.port }}
+    - address: {{ .Values.vpsEgress.endpoints.backup.address | quote }}
+      locality: {{ .Values.vpsEgress.endpoints.backup.locality | quote }}
+      ports:
+        {{ .Values.vpsEgress.serviceEntry.portName }}: {{ .Values.vpsEgress.serviceEntry.port }}
+{{- end }}

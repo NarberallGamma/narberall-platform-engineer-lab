@@ -1,0 +1,6 @@
+apiVersion: v2
+name: istio-peer-authentication
+description: PeerAuthentication and VPS egress (Istio networking)
+type: application
+version: 0.2.3
+appVersion: "1.0"

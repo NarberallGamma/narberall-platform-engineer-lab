@@ -60,5 +60,5 @@ flowchart TB
 
 Sanitize: no personal LAN IPs, hostnames, VPS addresses, panel URLs, or credentials.
 
-Proof of code lives under [`reference/`](reference/) (AI compose, SSH clients, snap-pair). Ansible kits: [`../../iac/ansible/reference/`](../../iac/ansible/reference/).
+Proof of code lives under [`reference/`](reference/) (AI compose, SSH clients, snap-pair). Ansible kits: [`../../iac/ansible/reference/`](../../iac/ansible/reference/). Cluster Helm is [`../../iac/helm/`](../../iac/helm/), not this home-lab tree.
 

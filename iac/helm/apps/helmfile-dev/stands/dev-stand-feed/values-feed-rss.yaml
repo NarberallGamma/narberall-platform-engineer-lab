@@ -1,0 +1,3 @@
+# Shared overlay for every feed-rss release. Schedule and source come from helmfile inline values.
+persistence:
+  size: 100Mi

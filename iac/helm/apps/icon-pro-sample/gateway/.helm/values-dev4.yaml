@@ -1,0 +1,4 @@
+replicaCount: 2
+env:
+  PROFILES: dev4
+domain: dev4.example.com

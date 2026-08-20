@@ -1,0 +1,11 @@
+project: sonarqube
+configVersion: 1
+---
+image: sonarqube
+from:  mirror.gcr.io/sonarqube:2025.4.1-enterprise
+---
+# image: postgres
+# from:  mirror.gcr.io/bitnami/postgresql:11.14.0-debian-10-r22
+---
+image: init
+from: busybox:1.36

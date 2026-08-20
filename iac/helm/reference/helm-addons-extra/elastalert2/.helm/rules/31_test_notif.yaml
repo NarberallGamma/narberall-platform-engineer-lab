@@ -1,0 +1,57 @@
+name: Alert action blocked test
+type: frequency
+index: suricata-*
+num_events: 1
+timeframe:
+  minutes: 60
+realert:
+  minutes: 1
+use_count_query: false
+filter:
+- query:
+    query_string:
+      query: "alert.action:blocked"
+include:
+  - timestamp
+  - alert.signature
+  - alert.action
+  - src_ip
+  - geoip.country_name
+  - geoip.region_name
+  - dest_ip
+  - proto
+  - agent.name
+  - _index
+
+include_match_in_root: true
+
+alert_subject: "PROD: Suricata Alert: Potential Threat Blocked :warning:"
+
+alert_text_type: alert_text_only
+
+alert_text: |-
+  Timestamp: `{}`
+  Alert Signature: `{}`
+  Action: `{}`
+  Source IP: `{}`
+  Source Location: `{}`, `{}`
+  Destination IP: `{}`
+  Protocol: `{}`
+  Agent: `{}`
+  Index: `{}`
+alert_text_args:
+  - timestamp
+  - alert.signature
+  - alert.action
+  - src_ip
+  - geoip.country_name
+  - geoip.region_name
+  - dest_ip
+  - proto
+  - agent.name
+  - _index
+alert:
+  - "telegram"
+telegram:
+telegram_bot_token: "CHANGE_ME"
+telegram_room_id: "CHANGE_ME"

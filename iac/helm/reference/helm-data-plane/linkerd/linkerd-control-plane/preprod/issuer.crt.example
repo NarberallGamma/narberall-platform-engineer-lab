@@ -1,0 +1,6 @@
+# PLACEHOLDER. Not a live issuer certificate.
+# Generate with: linkerd upgrade --identity
+# or: ./generate.sh (step CLI). Do not commit issuer.crt or issuer.key.
+-----BEGIN CERTIFICATE-----
+LAB-PLACEHOLDER-NOT-A-LIVE-ISSUER-CERT
+-----END CERTIFICATE-----

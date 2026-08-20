@@ -58,3 +58,4 @@ Terraform, `sbercloud` 1.12.18, OBS S3 backend, CCE, RDS PostgreSQL, ECS, EVS, c
 - Related brownfield: [`04-terraform-brownfield-import.md`](04-terraform-brownfield-import.md)
 - Related OpenStack-class legacy: [`05-legacy-estate-as-code.md`](05-legacy-estate-as-code.md)
 - Ansible on the same class of estate: [`10-ansible-estate.md`](10-ansible-estate.md)
+- Helm / GitOps on the same class of estate: [`11-helm-estate.md`](11-helm-estate.md)

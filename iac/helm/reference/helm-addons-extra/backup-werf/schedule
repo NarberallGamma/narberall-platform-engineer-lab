@@ -1,0 +1,7 @@
+# -*- mode: crontab -*-
+# vi: set ft=crontab :
+#
+# Header only. Per-env jobs live in schedule-staging and schedule-production.
+# entrypoint.sh copies schedule-${ENV} over this file at start.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""

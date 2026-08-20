@@ -1,0 +1,848 @@
+# Alert rules for dashboard "PostgreSQL (RDS) - CloudEye" (uid: pg_exporter_monitoring).
+# Metrics: prometheus-cloudeye-exporter (job=cloudeye-exporter). Datasource UID: PBFA97CFB590B2093.
+# noDataState: OK: missing metrics (scrape/CES gap) must not raise DatasourceNoData; notify only when the query returns a value and the threshold fires.
+# execErrState: OK: query errors (Prometheus timeout, datasource down) must not raise DatasourceError; notify only on a metric threshold.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: PostgreSQL RDS CloudEye
+    folder: Alerting
+    interval: 30s
+    rules:
+      - uid: pg_rds_replica_status_not_up
+        title: PostgreSQL RDS - Replica Status not Up
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: clamp_max(max(sbercloud_sys_rds_slave_replication_status{job="cloudeye-exporter"} > bool 0), 1)
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B < 1'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 49
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS replica status is not Up (panel Replica Status)"
+          description: "clamp_max(max(slave_replication_status > bool 0), 1) < 1. Dashboard: Replica Status."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: critical
+
+      - uid: pg_rds_master_status_not_up
+        title: PostgreSQL RDS - Master DB Status not Up
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: clamp_max(max(sbercloud_sys_rds_rds001_cpu_util{job="cloudeye-exporter"} > bool 0) or max(sbercloud_sys_rds_rds002_mem_util{job="cloudeye-exporter"} > bool 0), 1)
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B < 1'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 48
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS master DB status is not Up (panel Master DB Status)"
+          description: "CPU/mem availability probe < 1. Dashboard: Master DB Status."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: critical
+
+      - uid: pg_rds_conn_pool_util_warn
+        title: PostgreSQL RDS - Connection Pool Utilization > 70%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_rds083_conn_usage{job="cloudeye-exporter"}) / 100
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 0.7'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 1
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS connection pool utilization above 70%"
+          description: "max(rds083_conn_usage)/100 > 0.7. Dashboard: Connection Pool Utilization."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: warning
+
+      - uid: pg_rds_conn_pool_util_crit
+        title: PostgreSQL RDS - Connection Pool Utilization > 90%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_rds083_conn_usage{job="cloudeye-exporter"}) / 100
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 0.9'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 1
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS connection pool utilization above 90%"
+          description: "max(rds083_conn_usage)/100 > 0.9. Dashboard: Connection Pool Utilization."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: critical
+
+      - uid: pg_rds_idle_in_transaction_warn
+        title: PostgreSQL RDS - Idle in Transaction > 15
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_idle_transaction_connections{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 15'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 2
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS idle-in-transaction connections exceed 15"
+          description: "max(idle_transaction_connections) > 15. Dashboard: Idle in Transaction (Dangerous!)."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: warning
+
+      - uid: pg_rds_idle_in_transaction_crit
+        title: PostgreSQL RDS - Idle in Transaction > 30
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_idle_transaction_connections{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 30'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 2
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS idle-in-transaction connections exceed 30"
+          description: "max(idle_transaction_connections) > 30. Dashboard: Idle in Transaction (Dangerous!)."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: critical
+
+      - uid: pg_rds_total_connections_low_warn
+        # Baseline after a prod app scale: total ~260-270; old <300 false-positive.
+        title: PostgreSQL RDS - Total Database Connections < 240
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_rds042_database_connections{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B < 240'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 12
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS total database connections below 240 (possible mass disconnect)"
+          description: "max(rds042_database_connections) < 240. Dashboard: Total Database Connections. Threshold retuned after app scale-1 (baseline ~260-270)."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: warning
+
+      - uid: pg_rds_total_connections_low_crit
+        title: PostgreSQL RDS - Total Database Connections < 200
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_rds042_database_connections{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B < 200'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 12
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS total database connections below 200 (critical disconnect risk)"
+          description: "max(rds042_database_connections) < 200. Dashboard: Total Database Connections."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: critical
+
+      - uid: pg_rds_cpu_usage_warn
+        title: PostgreSQL RDS - CPU Usage > 70%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_rds001_cpu_util{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 70'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 50
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: "PostgreSQL RDS CPU usage above 70%"
+          description: "max(rds001_cpu_util) > 70. Dashboard: CPU Usage."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: warning
+
+      - uid: pg_rds_cpu_usage_crit
+        title: PostgreSQL RDS - CPU Usage > 90%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_rds001_cpu_util{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 90'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 50
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: "PostgreSQL RDS CPU usage above 90%"
+          description: "max(rds001_cpu_util) > 90. Dashboard: CPU Usage."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: critical
+
+      - uid: pg_rds_memory_usage_warn
+        title: PostgreSQL RDS - Memory Usage > 70%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_rds002_mem_util{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 70'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 51
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: "PostgreSQL RDS memory usage above 70%"
+          description: "max(rds002_mem_util) > 70. Dashboard: Memory Usage."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: warning
+
+      - uid: pg_rds_memory_usage_crit
+        title: PostgreSQL RDS - Memory Usage > 90%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_rds002_mem_util{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 90'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 51
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: "PostgreSQL RDS memory usage above 90%"
+          description: "max(rds002_mem_util) > 90. Dashboard: Memory Usage."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: critical
+
+      - uid: pg_rds_read_io_latency_warn
+        title: PostgreSQL RDS - Read I/O Latency > 10 ms
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_io_read_delay{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 10'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 27
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS read I/O latency above 10 ms"
+          description: "max(io_read_delay) > 10. Dashboard: Read I/O Latency."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: warning
+
+      - uid: pg_rds_read_io_latency_crit
+        title: PostgreSQL RDS - Read I/O Latency > 50 ms
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_io_read_delay{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 50'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 27
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS read I/O latency above 50 ms"
+          description: "max(io_read_delay) > 50. Dashboard: Read I/O Latency."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: critical
+
+      - uid: pg_rds_replication_lag_warn
+        title: PostgreSQL RDS - Replication Lag > 1000 ms
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_rds046_replication_lag{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 1000'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 44
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS replication lag above 1000 ms"
+          description: "max(rds046_replication_lag) > 1000. Dashboard: Replication Lag."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: warning
+
+      - uid: pg_rds_replication_lag_crit
+        title: PostgreSQL RDS - Replication Lag > 10000 ms
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_rds046_replication_lag{job="cloudeye-exporter"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 10000'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 44
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS replication lag above 10000 ms"
+          description: "max(rds046_replication_lag) > 10000. Dashboard: Replication Lag."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: critical
+
+      - uid: pg_rds_stream_replication_active_low
+        title: PostgreSQL RDS - Stream Replication Active Replicas < 1
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(sbercloud_sys_rds_slave_replication_status{job="cloudeye-exporter"}) - 1
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B < 1'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 45
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS active stream replication replicas below 1"
+          description: "max(slave_replication_status) - 1 < 1. Dashboard: Stream Replication Status."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: critical
+
+      - uid: pg_rds_disk_usage_warn
+        title: PostgreSQL RDS - Disk Usage > 70%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: (max(sbercloud_sys_rds_rds048_disk_used_size{job="cloudeye-exporter"}) / max(sbercloud_sys_rds_rds047_disk_total_size{job="cloudeye-exporter"})) * 100
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 70'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 26
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS disk usage above 70%"
+          description: "used/total disk * 100 > 70. Dashboard: Disk Usage Percentage."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: warning
+
+      - uid: pg_rds_disk_usage_crit
+        title: PostgreSQL RDS - Disk Usage > 85%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: (max(sbercloud_sys_rds_rds048_disk_used_size{job="cloudeye-exporter"}) / max(sbercloud_sys_rds_rds047_disk_total_size{job="cloudeye-exporter"})) * 100
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 85'
+        dashboardUid: pg_exporter_monitoring
+        panelId: 26
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "PostgreSQL RDS disk usage above 85%"
+          description: "used/total disk * 100 > 85. Dashboard: Disk Usage Percentage."
+        labels:
+          dashboard: "PostgreSQL (RDS) - CloudEye"
+          severity: critical

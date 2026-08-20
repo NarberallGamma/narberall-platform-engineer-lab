@@ -1,0 +1,171 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  {{- if .Values.namespace }}
+  namespace: {{ .Values.namespace }}
+  {{- end }}
+  name: {{ include "base-chart.fullname" . }}
+  labels:
+    {{- include "base-chart.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "base-chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "base-chart.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "base-chart.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if or .Values.migrations.enabled .Values.initContainers .Values.initContainersTemplate }}
+      initContainers:
+        {{- if .Values.migrations.enabled }}
+        - name: {{ include "base-chart.fullname" . }}-init
+          image: "example.registry/docker.io/groundnuty/k8s-wait-for:v1.5.1"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: 
+          - "job"
+          - "{{ include "base-chart.fullname" . }}-migration-job-{{ regexReplaceAll "\\W+" .Values.image.tag  "" }}"
+        {{- end }}
+        {{- if .Values.initContainersTemplate }}
+        {{- include .Values.initContainersTemplate . | nindent 8 }}
+        {{- else if .Values.initContainers }}
+        {{- toYaml .Values.initContainers | nindent 8 }}
+        {{- end }}
+      {{- end }}    
+      containers:
+        - name: {{ include "base-chart.fullname" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.lifecycle }}
+          lifecycle: {{ toYaml .Values.lifecycle | nindent 12 }} 
+          {{- end }}     
+          {{- if .Values.command }}
+          command: {{ toYaml .Values.command | nindent 12 }} 
+          {{- end }}         
+          {{- if or .Values.env .Values.extraEnvFrom }}
+          envFrom:
+            {{- if .Values.env }}
+            - secretRef:
+                name: {{ include "base-chart.fullname" . }}-env 
+            {{- end }}
+            {{- if .Values.extraEnvFrom }}
+            {{- toYaml .Values.extraEnvFrom | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.extraEnv }}
+          env:
+            {{- range .Values.extraEnv }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.startupProbe }}
+          startupProbe: {{ toYaml .Values.startupProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.livenessProbe }}
+          livenessProbe: {{ toYaml .Values.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.readinessProbe }}
+          readinessProbe: {{ toYaml .Values.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.containerPorts }}
+          ports: {{ toYaml .Values.containerPorts | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if or (and (or ( .Values.config ) ( .Values.configImport )) ( .Values.configPath ) ( .Values.configFileName )) ( .Values.keystore.enabled ) ( .Values.emptyDir.enabled ) ( .Values.global.truststore.enabled ) ( .Values.global.emptyDir.enabled ) ( .Values.global.externalConfig ) .Values.extraVolumeMounts }}
+          volumeMounts:
+            {{- if and (or ( .Values.config ) ( .Values.configImport )) ( .Values.configPath ) ( .Values.configFileName ) }}
+            - name: config
+              mountPath: "{{ .Values.configPath }}/{{ .Values.configFileName }}"
+              subPath: {{ .Values.configFileName }}
+            {{- end }}
+            {{- if ( .Values.global.externalConfig ) }}
+            - name: ext-config
+              mountPath: "{{ .Values.global.configPath }}/{{ .Values.global.configFileName }}"
+              subPath: {{ .Values.global.configFileName }}
+            {{- end }}
+            {{- if ( .Values.keystore.enabled ) }}
+            - name: jcs
+              mountPath: "{{ .Values.keystore.path }}/{{ .Values.keystore.filename }}"
+              subPath: {{ .Values.keystore.filename }}
+            {{- end }}
+            {{- if or ( .Values.emptyDir.enabled ) }}
+            - name: emptydir
+              mountPath: "{{ .Values.emptyDir.path }}"
+            {{- end }}
+            {{- if or ( .Values.global.emptyDir.enabled ) }}
+            - name: global-emptydir
+              mountPath: "{{ .Values.global.emptyDir.path }}"
+            {{- end }}
+            {{- if ( .Values.global.truststore.enabled ) }}
+            - name: jvm-cacerts
+              mountPath: "{{ .Values.global.truststore.path }}/{{ .Values.global.truststore.filename }}"
+              subPath: {{ .Values.global.truststore.filename }}
+            {{- end }}
+            {{- if .Values.extraVolumeMounts }}
+            {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
+            {{- end }}
+          {{- end }}
+      {{- if or (and (or ( .Values.config ) ( .Values.configImport )) ( .Values.configPath ) ( .Values.configFileName )) ( .Values.keystore.enabled ) ( .Values.global.truststore.enabled ) ( .Values.global.externalConfig ) .Values.extraVolumes }}  
+      volumes:
+        {{- if or (and (or ( .Values.config ) ( .Values.configImport )) ( .Values.configPath ) ( .Values.configFileName )) }}
+        - name: config
+          configMap:
+            name: {{ include "base-chart.fullname" . }}-config  
+        {{- end }}  
+        {{- if and ( .Values.global.externalConfig ) ( .Values.global.configPath ) ( .Values.global.configFileName ) }}
+        - name: ext-config
+          configMap:
+            name: {{ .Release.Name }}-ext-config  
+        {{- end }}  
+        {{- if ( .Values.keystore.enabled ) }} 
+        - name: jcs
+          secret:
+            secretName: {{ include "base-chart.fullname" . }}-jcs-secret  
+        {{- end }}  
+        {{- if or ( .Values.emptyDir.enabled ) }} 
+        - name: emptydir
+          emptyDir: {}
+        {{- end }} 
+        {{- if or ( .Values.global.emptyDir.enabled ) }} 
+        - name: global-emptydir
+          emptyDir: {}
+        {{- end }} 
+        {{- if ( .Values.global.truststore.enabled ) }} 
+        - name: jvm-cacerts
+          secret:
+            secretName: {{ .Release.Name }}-cacerts-secret  
+        {{- end }}
+        {{- if .Values.extraVolumes }}
+        {{- toYaml .Values.extraVolumes | nindent 8 }}
+        {{- end }}
+      {{- end }}  
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

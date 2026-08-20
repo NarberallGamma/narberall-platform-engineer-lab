@@ -1,0 +1,8 @@
+# Shared NodePort map for kafka, postgres, and minio charts.
+# Contrast stand only. Production brokers and databases stay managed.
+nodePorts:
+  postgres: 32222
+  kafka: 32223
+  kafkaUi: 32224
+  minioApi: 32225
+  minioUi: 32226

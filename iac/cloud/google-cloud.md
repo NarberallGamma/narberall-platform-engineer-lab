@@ -16,6 +16,7 @@ Published Terraform in this lab is concentrated on Huawei-class, AWS, Selectel, 
 ## Related code
 
 - Pattern reference: [`../terraform/aws/`](../terraform/aws/), [`../terraform/cloud-ru-huawei/`](../terraform/cloud-ru-huawei/)
+- Cluster Helm: [`../helm/`](../helm/)
 - Delivery story: [turnkey from zero](../../case-studies/02-cloud-platform-turnkey.md)
 
 ## Keywords

@@ -1,0 +1,50 @@
+---
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: {{ .Chart.Name }}
+spec:
+  auth:
+    roles:
+      - secretName: elasticsearch-logstash-role
+  version: {{ include "fl.value" (list $ . .Values.elasticsearch.version) }}
+  updateStrategy:
+    changeBudget:
+      maxUnavailable: 1
+  nodeSets:
+    - name: cluster
+      config:
+        node.roles: ["master", "data", "ingest", "transform", "remote_cluster_client"]
+        node.attr.data: hot
+      podTemplate:
+        metadata:
+          labels:
+            app: {{ .Chart.Name }}
+        spec:
+          containers:
+            - name: elasticsearch
+              resources: {{ include "fl.value" (list $ . .Values.elasticsearch.resources) | nindent 18 }}
+              env:
+                - name: ES_JAVA_OPTS
+                  value: {{ include "fl.value" (list $ . .Values.elasticsearch.java_opts) }}
+          initContainers:
+            - command:
+                - sh
+                - -c
+                - sysctl -w vm.max_map_count=262144
+              name: set-max-map-count
+              securityContext:
+                privileged: true
+          nodeSelector: {{ include "fl.value" (list $ . .Values.elasticsearch.nodeSelector) | nindent 14 }}
+          tolerations: {{ include "fl.value" (list $ . .Values.elasticsearch.tolerations) | nindent 14 }}
+      count: {{ include "fl.value" (list $ . .Values.elasticsearch.count) }}
+      volumeClaimTemplates:
+        - metadata:
+            name: elasticsearch-data
+          spec:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ include "fl.value" (list $ . .Values.elasticsearch.storage) }}
+            storageClassName: {{ include "fl.value" (list $ . .Values.elasticsearch.storageClassName) }}

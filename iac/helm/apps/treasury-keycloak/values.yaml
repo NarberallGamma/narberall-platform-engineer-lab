@@ -1,0 +1,132 @@
+global:
+  imagePullSecrets:
+    - name: CHANGE_ME
+
+keycloak:
+  enabled: true
+
+  # Override the Keycloak release name.
+  fullnameOverride: keycloak
+
+  # Persistence off: the database is external PostgreSQL.
+  persistence:
+    enabled: false
+
+  # Official Keycloak image (Quarkus 26).
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: "26.0.6"
+    pullPolicy: IfNotPresent
+
+  # Explicit start flags (same set as on 25.x).
+  args:
+    - start
+    - --health-enabled=true
+    - --http-enabled=true
+
+  serviceAccount:
+    create: true
+    imagePullSecrets:
+      - name: CHANGE_ME
+
+  realm:
+    id: estate
+    realm: estate
+    enabled: true
+    displayName: estate
+
+  client:
+    clientId: estate
+    secret: CHANGE_ME
+    clientAuthenticatorType: client-secret
+
+  extraEnv: |
+    - name: KC_HOSTNAME
+      value: "https://keycloak.example.com"
+    - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+      value: "true"
+    - name: KC_PROXY_HEADERS
+      value: "xforwarded"
+    - name: KC_HTTP_ENABLED
+      value: "true"
+    - name: KC_DB
+      value: postgres
+    - name: KC_DB_URL
+      value: jdbc:postgresql://10.10.x.x:5432/keycloak?sslmode=require
+    - name: KC_DB_USERNAME
+      value: CHANGE_ME
+    - name: KC_BOOTSTRAP_ADMIN_USERNAME
+      value: CHANGE_ME
+    - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: estate-keycloak-vault-secrets
+          key: KEYCLOAK_ADMIN_PASSWORD
+    - name: KC_HEALTH_ENABLED
+      value: "true"
+    - name: KC_HTTP_MANAGEMENT_PORT
+      value: "9000"
+
+  extraEnvFrom: |
+    - secretRef:
+        name: estate-keycloak-vault-secrets
+
+  imagePullSecrets:
+    - name: CHANGE_ME
+
+  # Embedded PostgreSQL stays off. Bitnami postgresql 10.3.13 ships inside codecentric 17.0.2 and is not vendored here.
+  postgresql:
+    enabled: false
+
+  ingress:
+    servicePort: http
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      kubernetes.io/tls-acme: "true"
+    rules:
+      - host: "keycloak.example.com"
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: wildcard-tls
+        hosts:
+          - keycloak.example.com
+
+  resources:
+    requests:
+      cpu: 188m
+      memory: 384Mi
+    limits:
+      cpu: 750m
+      memory: 768Mi
+
+  # Health probes on the management port (Keycloak 26 / Quarkus).
+  livenessProbe: |
+    httpGet:
+      path: /health/live
+      port: 9000
+    initialDelaySeconds: 90
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 5
+  readinessProbe: |
+    httpGet:
+      path: /health/ready
+      port: 9000
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 5
+  startupProbe: |
+    httpGet:
+      path: /health/started
+      port: 9000
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    timeoutSeconds: 1
+    failureThreshold: 60

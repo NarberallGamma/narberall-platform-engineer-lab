@@ -1,0 +1,59 @@
+{{- with .Values.rabbitmq.ingress }}
+{{- if include "fl.isTrue" (list $ . .enabled) }}
+
+{{ $cluster_name := (printf "%s-rmq" $.Chart.Name) }}
+{{ $host := include "fl.value" (list $ . .host) }}
+{{ $secretName := include "fl.value" (list $ . .tls.secretName) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $cluster_name }}
+  annotations:
+    werf.io/weight: "-200"
+
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/auth-signin: https://$host/dex-authenticator/sign_in
+    nginx.ingress.kubernetes.io/auth-url: https://{{ $cluster_name }}-dex-authenticator.{{ $.Release.Namespace }}.svc.cluster.local/dex-authenticator/auth
+    nginx.ingress.kubernetes.io/auth-response-headers: X-Auth-Request-User,X-Auth-Request-Email
+    {{- include "fl.value" (list $ . $.Values.ingress.annotations) | nindent 4 }}
+spec:
+  tls:
+    - hosts:
+      - {{ $host }}
+      secretName: {{ $secretName }}
+  rules:
+  - host: {{ $host }}
+    http:
+      paths:
+      - path: "/"
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ $cluster_name }}
+            port:
+              name: management
+
+---
+apiVersion: deckhouse.io/v1
+kind: DexAuthenticator
+metadata:
+  name: {{ $cluster_name }}
+  annotations:
+    werf.io/weight: "-200"
+spec:
+  applicationDomain: {{ $host }}
+  sendAuthorizationHeader: false
+  applicationIngressCertificateSecretName: {{ $secretName }}
+  applicationIngressClassName: "nginx"
+  keepUsersLoggedInFor: "720h"
+  allowedGroups:
+  {{- if eq $.Values.werf.env "dev" }}
+  - dex/development/rabbitmq
+  {{- end }}
+  {{- if eq $.Values.werf.env "production" }}
+  - dex/production/rabbitmq
+  {{- end }}
+  - platform
+{{- end }}
+{{- end }}

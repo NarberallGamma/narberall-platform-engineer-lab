@@ -1,0 +1,44 @@
+{{- if eq .Values.werf.env "production" }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-upload-web-to-bucket-{{ now | unixEpoch }}
+  annotations:
+    werf.io/weight: "-100"
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      name: {{ .Chart.Name }}-upload-web-to-bucket
+    spec:
+{{ include "affinity" . | indent 6 }}
+{{ include "tolerations" . | indent 6 }}
+{{ include "priorityClassName" . | indent 6 }}
+      restartPolicy: Never
+      imagePullSecrets:
+      - name: {{ required ".Values.registry.secret_name" .Values.registry.secret_name }}
+      containers:
+      - name: deploy
+        image: {{ $.Values.werf.image.awscopy }}
+        command: ["/bin/sh", "/app/deploy_to_bucket.sh"]
+        volumeMounts:
+        - name: script
+          mountPath: /app/deploy_to_bucket.sh
+          subPath: deploy_to_bucket.sh
+        - name: aws-key
+          mountPath: /root/.aws/credentials
+          subPath: credentials
+        env:
+        - name: UPLOAD_DIR
+          value: {{ .Values.portal.job.upload_dir }}
+      volumes:
+      - name: script
+        configMap:
+          defaultMode: 420
+          name: {{ $.Chart.Name }}-deploy-script
+      - name: aws-key
+        secret:
+          secretName: {{ .Chart.Name }}-aws-credentials
+{{- end }}

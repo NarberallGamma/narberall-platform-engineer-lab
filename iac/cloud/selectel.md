@@ -31,6 +31,8 @@ Different console and Terraform provider than Huawei-class cloud.ru (`sbercloud`
 Resource types: [`../terraform/RESOURCES.md`](../terraform/RESOURCES.md)  
 Coverage vs other clouds: [`../terraform/COVERAGE.md`](../terraform/COVERAGE.md)
 
+Cluster Helm: [`../helm/`](../helm/).
+
 ## Keywords
 
 Selectel, Russian IaaS, datacenter, OpenStack, Nova, Cinder, Neutron, Keystone, selcloud, volume types, ru-3, Proxmox VE, dedicated, Terraform, Kubernetes, Ceph, GitLab, PostgreSQL

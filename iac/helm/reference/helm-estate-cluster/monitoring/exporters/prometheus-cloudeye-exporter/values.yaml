@@ -1,0 +1,143 @@
+global:
+  imageRegistry: ""
+
+image:
+  registry: "example.registry/platform/base-images"
+  repository: "cloudeye-exporter"
+  tag: "1.11"
+  pullPolicy: IfNotPresent
+  pullSecrets:
+    - registry-pull
+
+namespaceOverride: "monitoring"
+
+replicas: 1
+kind: Deployment
+
+service:
+  type: ClusterIP
+  port: 8087
+  targetPort: 8087
+  annotations: {}
+
+containerPort: 8087
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1024Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+# tcpSocket: full /metrics triggers Cloud Eye API and caused liveness timeouts and pod restarts.
+livenessProbe:
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+config:
+  global:
+    prefix: "sbercloud"
+    port: ":8087"
+    # Smaller batches reduce CES BatchListMetricData latency (APIGW 30s limit).
+    scrape_batch_size: 50
+    # Lower parallelism reduces concurrent CES load; longer total scrape, see Prometheus timeouts.
+    max_routines: 2
+    resource_sync_interval_minutes: 180
+    ignore_ssl_verify: false
+    metric_query_duration: 10
+    logs_conf_path: "/app/logs.yml"
+    metrics_conf_path: "/app/metric.yml"
+    endpoints_conf_path: "/app/endpoints.yml"
+    # Filter instances by ID (comma-separated list). If empty, all instances are monitored.
+    # Only instances with IDs in these lists will be monitored.
+    rds_instance_ids: "CHANGE_ME"
+    dcs_instance_ids: "00000000-0000-4000-8000-000000000010"
+    dms_instance_ids: "00000000-0000-4000-8000-000000000011"
+  paths:
+    configFile: "/etc/cloudeye/clouds.yml"
+    configTemplate: "/etc/cloudeye/template/clouds.yml.template"
+    configDir: "/etc/cloudeye"
+    templateDir: "/etc/cloudeye/template"
+  
+  auth:
+    auth_url: "https://iam.example.com/v3"
+    use_project_id: false
+    project_name: ""
+    project_id: ""
+    access_key: ""
+    secret_key: ""
+    region: "CHANGE_ME"
+
+monitoredServices:
+  - "SYS.RDS"
+  - "SYS.DCS"
+  - "SYS.DMS"
+
+externalSecret:
+  name: ""
+  secretName: ""
+  refreshInterval: "1h"
+  secretStoreRef:
+    name: "vault-cluster-secret-store"
+    kind: "ClusterSecretStore"
+  vaultPath: "secret/cloudeye-exporter"
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+nodeSelector: {}
+affinity: {}
+tolerations: []
+
+extraEnv: []
+extraEnvFrom: []
+extraVolumes: []
+extraVolumeMounts: []
+
+restartPolicy: Always
+revisionHistoryLimit: 10
+
+serviceMonitor:
+  # Off: scrape is a static Prometheus job. A second Prometheus via ServiceMonitor duplicated Collect() and overloaded CES. Enable SM only if that Prometheus is the sole CloudEye source.
+  # Switching enabled from true to false does not delete the ServiceMonitor (Helm has no prune). Delete: kubectl delete servicemonitor -n monitoring prometheus-cloudeye-exporter --ignore-not-found
+  enabled: false
+  interval: 100s
+  scrapeTimeout: 82s
+  labels: {}
+  relabelings: []
+  metricRelabelings: []
+
+initContainer:
+  enabled: false

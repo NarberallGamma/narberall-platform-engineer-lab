@@ -1,0 +1,96 @@
+{{- with .Values.rabbitmq }}
+{{- if include "fl.isTrue" (list $ . .enabled) }}
+{{ $cluster_name := (printf "%s-rmq" $.Chart.Name) }}
+{{ $defaultuser := (include "fl.value" (list $ . .user)) }}
+## default secret for auth in rmq
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $cluster_name }}-creds
+type: Opaque
+stringData:
+  username: {{ $defaultuser }}
+  password: {{ include "fl.value" (list $ . .password) }}
+  uri: {{ $cluster_name }}.{{ $.Release.Namespace }}.svc.cluster.local:15672
+
+
+
+{{- range $index, $vhost :=  .custom.vhosts }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Vhost
+metadata:
+  name: {{ $cluster_name }}-{{ $vhost }}-vhost
+spec:
+  name: {{ $vhost }}
+  rabbitmqClusterReference:
+    connectionSecret:
+      name: {{ $cluster_name }}-creds
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Policy
+metadata:
+  name: {{ $cluster_name }}-{{ $vhost }}-policy
+spec:
+  name:  {{ $vhost |quote }}
+  pattern: ""
+  applyTo: "all"
+  priority: 0
+  vhost:  {{ $vhost |quote }}
+  definition:
+    ha-mode: "all"
+    ha-sync-mode: "automatic"
+    ha-sync-batch-size: 81920
+    expires: 259200000
+  rabbitmqClusterReference:
+    connectionSecret:
+      name: {{ $cluster_name }}-creds
+{{- end }}
+
+
+{{- range $user, $value :=  .custom.users }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $cluster_name }}-{{ $user }}-creds
+type: Opaque
+stringData:
+  username: {{ $user }}
+  password: {{ include "fl.value" (list $ . $value.password) }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: {{ $cluster_name }}-{{ $user }}-user
+spec:
+  tags: {{ toYaml $value.tags |nindent 4 }}
+  importCredentialsSecret:
+    name: {{ $cluster_name }}-{{ $user }}-creds
+  rabbitmqClusterReference:
+    connectionSecret:
+      name: {{ $cluster_name }}-creds
+
+{{- range $index, $pvalue :=  .permissions }}
+{{- $vname:= ternary "root" $pvalue.vhostname (contains $pvalue.vhostname "/" ) }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: {{ $cluster_name }}-{{ $user }}-{{ $vname }}-permission
+spec:
+  vhost: {{ $pvalue.vhostname| quote }}
+  user: {{ $user }}
+  permissions: {{ toYaml $pvalue.permission |nindent 4 }}
+  rabbitmqClusterReference:
+    connectionSecret:
+      name: {{ $cluster_name }}-creds
+
+{{- end }}
+
+{{- end }}
+
+
+{{- end }}
+{{- end }}

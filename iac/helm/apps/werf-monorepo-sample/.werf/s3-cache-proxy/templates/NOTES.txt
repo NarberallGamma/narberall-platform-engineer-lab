@@ -1,0 +1,4 @@
+{{- $release_name := .Release.Name }}
+{{- $image_1 := .Values.werf.image.s3_cache_proxy }}
+
+{{ include "utils.notes" (list $release_name (dict "s3_cache_proxyr" $image_1)) }}

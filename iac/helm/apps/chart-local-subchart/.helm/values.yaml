@@ -1,0 +1,627 @@
+app:
+  replicas:
+    _default: 2
+    production: 5
+
+migrations:
+  enabled: true
+  dry_run: false
+
+consumers:
+  consumer:
+    replicas:
+      _default: 2
+      production: 5
+    command: |
+      ["/bin/bash", "-c", "php commandConsume.php"]
+    resources:
+      _default: |
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 128Mi
+      production: |
+        requests:
+          cpu: 1
+          memory: 128Mi
+        limits:
+          memory: 128Mi
+  consumer-event:
+    replicas:
+      _default: 2
+      production: 5
+    command: |
+      ["/bin/bash", "-c", "php eventConsume.php"]
+    resources:
+      _default: |
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 128Mi
+      production: |
+        requests:
+          cpu: 1
+          memory: 128Mi
+        limits:
+          memory: 128Mi
+
+ingress:
+  enabled: true
+  host:
+    _default: 'orders-{{ index $.Values.werf "namespace" }}.kube.example.com'
+    review: 'orders-{{ index $.Values.werf "namespace" }}.kube.example.com'
+    preprod: "orders-preprod.example.com"
+    prodlike: "orders-prodlike.example.com"
+    production: "orders.example.com"
+  tls:
+    secretName:
+      _default: "wildcard.example.com"
+      review: "wildcard.example.com"
+      preprod: "wildcard.example.com"
+      prodlike: "wildcard.example.com"
+      production: "wildcard.example.com"
+  annotations:
+    _default: |
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/proxy-body-size: 128m
+      nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+      nginx.ingress.kubernetes.io/whitelist-source-range: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 203.0.113.0/24, 2001:db8::/32
+    production: |
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/proxy-body-size: 128m
+      nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+
+ingress_partners:
+  enabled:
+    _default: false
+    production: true
+  host:
+    production: "partners.example.com"
+  tls:
+    secretName:
+      production: "wildcard.example.com"
+  annotations:
+    _default: |
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/proxy-body-size: 128m
+      nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+
+ingress_public_rest_api:
+  enabled:
+    _default: false
+    production: true
+  host:
+    production: "public-api.example.com"
+  tls:
+    secretName:
+      production: "wildcard.example.com"
+  annotations:
+    _default: |
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/proxy-body-size: 128m
+      nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+
+envs:
+  config:
+    APP_ENV:
+      _default: dev
+      preprod: preprod
+      prodlike: prod
+      production: prod
+
+    SENTRY_IS_ENABLED:
+      _default: false
+      preprod: false
+      prodlike: true
+      production: true
+
+    SENTRY_ENVIRONMENT:
+      _default: dev
+      preprod: preprod
+      prodlike: prodlike
+      production: prod
+
+    SENTRY_DOMAIN:
+        _default: sentrydomain
+        preprod: sentrydomain
+        prodlike: sentry.example.com
+        production: sentry.example.com
+
+    SENTRY_PROJECT_ID:
+        _default: 0
+        preprod: 0
+        prodlike: 0
+        production: 0
+
+    SITE_URL:
+      _default: https://{{ include "fl.value" (list $ . $.Values.ingress.host) }}
+      preprod: https://shop-preprod.example.com
+      prodlike: https://shop.example.com
+      production: https://shop.example.com
+
+    ### Service discovery
+    DELIVERY_SERVICE_URL: "http://orders"
+    RESTAURANT_SERVICE_URL: "http://restaurant"
+
+    ### orders_delivery root access
+    DB_ROOT_USER:
+      _default: orders_delivery
+      prodlike: orders_delivery
+      production: orders_delivery
+    ORDERS_DELIVERY_MASTER_HOST_FOR_ROOT_USER:
+      _default: orders-delivery-root-psql
+      prodlike: pg-pool-master
+      production: pg-pool-master
+    ORDERS_DELIVERY_MASTER_PORT_FOR_ROOT_USER:
+      _default: "5432"
+      prodlike: "6432"
+      production: "6432"
+    ORDERS_DELIVERY_DB_NAME: orders_delivery
+
+    ### orders_delivery database
+    ORDERS_DELIVERY_APPLICATION_USER:
+      _default: orders_delivery
+      prodlike: orders_delivery
+      production: orders_delivery
+    ORDERS_DELIVERY_MASTER_HOST_FOR_APPLICATION_USER:
+      _default: orders-delivery-psql
+      prodlike: pg-pool-master
+      production: pg-pool-master
+    ORDERS_DELIVERY_OLTP_SLAVE_HOST_FOR_APPLICATION_USER:
+      _default: orders-delivery-psql
+      prodlike: pg-pool-sync
+      production: pg-pool-sync
+    ORDERS_DELIVERY_REPORT_SLAVE_HOST_FOR_APPLICATION_USER:
+      _default: orders-delivery-psql
+      prodlike: pg-pool-async
+      production: pg-pool-async
+    ORDERS_DELIVERY_PORT_FOR_APPLICATION_USER:
+      _default: "5432"
+      prodlike: "6432"
+      production: "6432"
+    ORDERS_DELIVERY_OLTP_SLAVE_PORT_FOR_APPLICATION_USER:
+      _default: "5432"
+      prodlike: "6432"
+      production: "6432"
+    ORDERS_DELIVERY_REPORT_SLAVE_PORT_FOR_APPLICATION_USER:
+      _default: "5432"
+      prodlike: "6432"
+      production: "6432"
+    ORDERS_DELIVERY_MASTER_DB_NAME_ALIAS_FOR_APPLICATION_USER: orders_delivery
+    ORDERS_DELIVERY_OLTP_SLAVE_DB_NAME_ALIAS_FOR_APPLICATION_USER:
+      _default: orders_delivery
+      prodlike: orders_delivery
+      production: orders_delivery
+    ORDERS_DELIVERY_REPORT_SLAVE_DB_NAME_ALIAS_FOR_APPLICATION_USER:
+      _default: orders_delivery
+      prodlike: orders_delivery
+      production: orders_delivery
+
+    ### History root access
+    HISTORY_ROOT_USER:
+      _default: history
+      prodlike: history
+      production: history
+    HISTORY_MASTER_HOST_FOR_ROOT_USER:
+      _default: history-root-psql
+      prodlike: "pg-pool-master"
+      production: "pg-pool-master"
+    HISTORY_MASTER_PORT_FOR_ROOT_USER:
+      _default: "5432"
+      prodlike: "6432"
+      production: "6432"
+
+    ### History Database
+    HISTORY_APPLICATION_USER:
+      _default: history
+      prodlike: history
+      production: history
+    HISTORY_HOST_FOR_APPLICATION_USER:
+      _default: history-psql
+      prodlike: "pg-pool-master"
+      production: "pg-pool-master"
+    HISTORY_PORT_FOR_APPLICATION_USER:
+      _default: "5432"
+      prodlike: "6432"
+      production: "6432"
+    HISTORY_DB_NAME: history
+
+    ### Report root access
+    REPORT_ROOT_USER:
+      _default: report
+      prodlike: report
+      production: report
+    REPORT_MASTER_HOST_FOR_ROOT_USER:
+      _default: report-root-psql
+      prodlike: "pg-pool-master"
+      production: "pg-pool-master"
+    REPORT_MASTER_PORT_FOR_ROOT_USER:
+      _default: "5432"
+      prodlike: "6432"
+      production: "6432"
+
+    ### Report Database
+    REPORT_APPLICATION_USER:
+      _default: report
+      prodlike: report
+      production: report
+    REPORT_HOST_FOR_APPLICATION_USER:
+      _default: report-psql
+      prodlike: pg-pool-master
+      production: pg-pool-master
+    REPORT_PORT_FOR_APPLICATION_USER:
+      _default: "5432"
+      prodlike: "6432"
+      production: "6432"
+    REPORT_DB_NAME: report
+
+    ### Legacy MSSQL
+    LEGACY_MSSQL_DB_NAME: "legacy"
+    LEGACY_MSSQL_DB_HOST: "legacy-mssql.example.svc"
+    LEGACY_MSSQL_DB_PORT: "1433"
+    LEGACY_MSSQL_DB_USER: "web"
+
+    ### Rabbit
+    RBT_HOST: "orders-rmq"
+    RBT_PORT: "5672"
+    RBT_USER: "orders"
+
+    ### POS vendor
+    POS_URL: "https://vendor.example.com"
+    POS_LOGIN:
+      _default: "test"
+      prodlike: ""
+      production: ""
+
+    ### Telegram
+    TELEGRAM_CHAT_WITH_ALL_ORDER_REGISTRATION_REQUESTS:
+      _default: "CHANGE_ME"
+      prodlike: "CHANGE_ME"
+      production: "CHANGE_ME"
+    TELEGRAM_CHAT_WITH_FAILED_ORDER_REGISTRATIONS:
+      _default: "CHANGE_ME"
+      prodlike: "CHANGE_ME"
+      production: "CHANGE_ME"
+    TELEGRAM_TECH_CHAT_ID:
+      _default: "CHANGE_ME"
+      production: "CHANGE_ME"
+      preprod: "CHANGE_ME"
+    TELEGRAM_ALERTS_THREAD_ID:
+      _default: "CHANGE_ME"
+      production: "CHANGE_ME"
+      preprod: "CHANGE_ME"
+
+    ALLOW_REGISTER_ORDER_WITH_ALL_ITEMS: "0"
+
+    CC_MAIL:
+      _default: "ops@example.com"
+      prodlike: "ops@example.com"
+      production: "ops@example.com"
+
+    CALLCENTER_LOGIN:
+      _default: "test"
+      prodlike: "CHANGE_ME"
+      production: "CHANGE_ME"
+
+    AMPLITUDE_API_URL: "https://analytics.example.com/2/httpapi"
+
+    PUSH_SERVICE_URL:
+      _default: https://push-stage.kube.example.com/V1
+      prodlike: https://push.example.com/V1
+      production: https://push.example.com/V1
+
+    SMS_RU_URL:
+      prodlike: "https://sms.example.com/ru"
+      production: "https://sms.example.com/ru"
+    SMS_KZ_URL:
+      prodlike: "https://sms.example.com/kz"
+      production: "https://sms.example.com/kz"
+    SMS_UZ_URL:
+      prodlike: "https://sms.example.com/ru"
+      production: "https://sms.example.com/ru"
+    SMS_RU_LOGIN:
+      prodlike: "CHANGE_ME"
+      production: "CHANGE_ME"
+    SMS_KZ_LOGIN:
+      prodlike: "CHANGE_ME"
+      production: "CHANGE_ME"
+    SMS_UZ_LOGIN:
+      prodlike: "CHANGE_ME"
+      production: "CHANGE_ME"
+
+    CALL_LOGIN:
+      prodlike: "CHANGE_ME"
+      production: "CHANGE_ME"
+
+    CRM_BASKET_SDK_URL:
+      _default: https://basket-stage.kube.example.com
+      preprod: https://basket-preprod.example.com
+      prodlike: https://basket-stage.kube.example.com
+      production: https://basket.example.com
+    CRM_SDK_URL:
+      preprod: https://crm-preprod.example.com
+      prodlike: https://crm-stage.kube.example.com
+      production: https://crm.example.com
+
+    CRM_PARTNER_BASKET_SDK_URL:
+      _default: https://basket-partner-stage.kube.example.com
+      preprod: https://basket-preprod.partner.example.com
+      prodlike: https://basket-partner-stage.kube.example.com
+      production: https://basket.partner.example.com
+    CRM_PARTNER_SDK_URL:
+      preprod: https://crm-preprod.partner.example.com
+      prodlike: https://crm-partner-stage.kube.example.com
+      production: https://crm.partner.example.com
+    BACKEND_SDK_URL:
+      preprod: https://shop-backend-stage.kube.example.com
+      prodlike: https://shop.example.com
+      production: https://shop.example.com
+    PAY_JWKS_URL:
+      preprod: https://pay.example.com/api/jwks
+      prodlike: https://pay.example.com/api/jwks
+      production: https://pay.example.com/api/jwks
+
+    MS_GEOCODER_URL:
+      _default: https://geocoder-stage.kube.example.com/api/v1
+      prodlike: https://geocoder-stage.kube.example.com/api/v1
+      production: https://geocoder.example.com/api/v1
+      preprod: https://geocoder-preprod.example.com/api/v1
+
+    RBT_SITE_BACKEND_HOST:
+      _default: "rabbitmq.shop-stage.svc.cluster.local"
+      prodlike: "rabbitmq.shop-production.svc.cluster.local"
+      production: "rabbitmq.shop-production.svc.cluster.local"
+    RBT_SITE_BACKEND_PORT:
+      _default: "5672"
+      prodlike: "5672"
+      production: "5672"
+    RBT_SITE_BACKEND_USER:
+      _default: "orders"
+      prodlike: "oms"
+      production: "oms"
+    PARTNER_SITE_BACKEND_HOST:
+      _default: "rabbitmq.partner-stage.svc.cluster.local"
+      prodlike: "rabbitmq.partner-production.svc.cluster.local"
+      production: "rabbitmq.partner-production.svc.cluster.local"
+    PARTNER_SITE_BACKEND_PORT:
+      _default: "5672"
+      prodlike: "5672"
+      production: "5672"
+    PARTNER_SITE_BACKEND_USER:
+      _default: "orders"
+      prodlike: "oms"
+      production: "oms"
+    RABBIT_SHOP_ORDERS_EXCHANGE_NAME:
+      _default: "shop_orders_exchange"
+      prodlike: "shop_orders_exchange"
+      production: "shop_orders_exchange"
+    RABBIT_SHOP_ORDERS_QUEUE_NAME:
+      _default: "shop_orders"
+      prodlike: "shop_orders"
+      production: "shop_orders"
+    RABBIT_PARTNER_ORDERS_EXCHANGE_NAME:
+      _default: "partner_orders_exchange"
+      prodlike: "partner_orders_exchange"
+      production: "partner_orders_exchange"
+    RABBIT_PARTNER_ORDERS_QUEUE_NAME:
+      _default: "partner_orders"
+      prodlike: "partner_orders"
+      production: "partner_orders"
+
+imagePullSecrets: |
+  - name: registrysecret
+
+priorityClassName:
+  _default: develop
+  production: production-medium
+
+nodeSelector:
+  _default: |
+    node-role/worker: ""
+  production: &nodeSelector-production |
+    node-role/app: ""
+  prodlike: *nodeSelector-production
+
+tolerations:
+  _default: |
+    - effect: NoExecute
+      key: dedicated
+      operator: Equal
+      value: worker
+  production: &tolerations-production |
+    - effect: NoExecute
+      key: dedicated
+      operator: Equal
+      value: app
+  prodlike: *tolerations-production
+
+rabbitmq:
+  enabled: true
+  replicas:
+    _default: 1
+    production: 3
+
+  # extra users live here so the definitions ConfigMap stays compatible
+  # later: drop rabbitmq_definitions.json and keep operator CRs only
+  custom:
+    vhosts: ['restaurant', 'kitchen']
+    users:
+      restaurant:
+        tags:
+        - policymaker
+        - monitoring
+        - management
+        permissions:
+        - vhostname: "/"
+          permission:
+            write: '.*'
+            configure: '.*'
+            read: '.*'
+        - vhostname: "restaurant"
+          permission:
+            write: '.*'
+            configure: '.*'
+            read: '.*'
+      kitchen:
+        tags:
+        - policymaker
+        - monitoring
+        - management
+        permissions:
+        - vhostname: "/"
+          permission:
+            write: '.*'
+            configure: '.*'
+            read: '.*'
+        - vhostname: "kitchen"
+          permission:
+            write: '.*'
+            configure: '.*'
+            read: '.*'
+
+  user: orders
+  vhosts: |
+    - "/"
+  ingress:
+    enabled: true
+    host:
+      _default: 'platform-rmq-{{ index $.Values.werf "namespace" }}.kube.example.com'
+      review: 'platform-rmq-{{ index $.Values.werf "namespace" }}.kube.example.com'
+      preprod: "orders-rmq-preprod.example.com"
+      prodlike: "orders-rmq-prodlike.example.com"
+      production: "orders-rmq.example.com"
+    tls:
+      secretName:
+        _default: "wildcard.example.com"
+        review: "wildcard.example.com"
+        preprod: "wildcard.example.com"
+        prodlike: "wildcard.example.com"
+        production: "wildcard.example.com"
+    annotations:
+      _default: |
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/proxy-body-size: 128m
+        nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+        nginx.ingress.kubernetes.io/whitelist-source-range: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 203.0.113.0/24, 198.51.100.0/24
+  additionalConfig: |
+    vm_memory_high_watermark_paging_ratio = 0.4
+    vm_memory_high_watermark.relative = 0.7
+    disk_free_limit.absolute = 1Gb
+    load_definitions = /etc/rabbitmq/rabbitmq_definitions.json
+    prometheus.return_per_object_metrics = true
+    cluster_partition_handling = autoheal
+    loopback_users.guest = false
+
+  persistence:
+    storage: 10Gi
+    storageClassName: local
+  resources:
+    _default: |
+      limits:
+        memory: 768Mi
+      requests:
+        cpu: 50m
+        memory: 768Mi
+    production: |
+      limits:
+        memory: 3Gi
+      requests:
+        cpu: 200m
+        memory: 3Gi
+
+postgresql:
+  enabled: true
+  external_hosts:
+    production: |
+      orders-delivery-psql:
+        ip: "10.10.0.12"
+        port: "6432"
+      orders-delivery-root-psql:
+        ip: "10.10.0.20"
+        port: "30432"
+      history-psql:
+        ip: "10.10.0.12"
+        port: "6432"
+      history-root-psql:
+        ip: "10.10.0.11"
+        port: "30433"
+      report-psql:
+        ip: "10.10.0.12"
+        port: "6432"
+      report-root-psql:
+        ip: "10.10.0.11"
+        port: "30434"
+
+  clusters:
+    orders-delivery:
+      enabled:
+        _default: true
+        prodlike: false
+        production: false
+      args: |
+        - -c
+        - intervalstyle=iso_8601
+      user: orders_delivery
+      database: orders_delivery
+      resources:
+        limits:
+          memory: 1Gi
+        requests:
+          cpu: 50m
+          memory: 256Mi
+    history:
+      enabled:
+        _default: true
+        prodlike: false
+        production: false
+      user: history
+      database: history
+    report:
+      enabled:
+        _default: true
+        prodlike: false
+        production: false
+      user: report
+      database: report
+
+  storage: 5Gi
+  storageClassName: local
+  resources:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 256Mi
+
+resources:
+  frontend:
+    _default:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 128Mi
+    production:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+  backend:
+    _default:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        memory: 256Mi
+    production:
+      requests:
+        cpu: 2
+        memory: 10Gi
+  php_exporter:
+    _default:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 64Mi

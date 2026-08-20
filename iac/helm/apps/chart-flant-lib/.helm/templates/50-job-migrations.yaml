@@ -1,0 +1,36 @@
+{{- if include "fl.isTrue" (list $ . $.Values.migrations.enabled) }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-migrate-{{ now | unixEpoch }}
+  annotations:
+    werf.io/weight: "-100"
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      name: {{ .Chart.Name }}-migrate
+    spec:
+      restartPolicy: Never
+
+      {{- include "imagePullSecrets" . | indent 6 }}
+      {{- include "tolerations" . | indent 6 }}
+      {{- include "nodeSelector" . | indent 6 }}
+      {{- include "priorityClassName" . | indent 6 }}
+
+      initContainers:
+        {{ include "init-psql" . | indent 8 }}
+
+      containers:
+      - name: migrate
+        image: {{ .Values.werf.image.php }}
+        command:
+          - "sh"
+          - "-c"
+          - "php vendor/bin/phinx migrate -e {{ include `fl.value` (list $ . $.Values.envs.config.APP_ENV) }}"
+        envFrom:
+          - secretRef:
+              name: {{ $.Chart.Name }}-env
+{{- end }}

@@ -1,0 +1,184 @@
+contour: dev
+
+replicaCount: 1
+
+image:
+  repository: example.registry/shop/gateway
+  tag: main
+  pullPolicy: Always
+  # imagePullSecrets:
+  #   - name: registry
+
+nameOverride: ""
+
+fullnameOverride: ""
+
+#Env
+env:
+  PUBLIC_URL: "/"
+  CONFIG_ENDPOINT: http://config:8080
+  JAVA_TOOL_OPTIONS: >
+    -XX:+UseG1GC
+    -XX:MaxRAMPercentage=70
+    -XX:InitialRAMPercentage=50
+    -XX:+ExitOnOutOfMemoryError
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/tmp
+    -Xlog:gc*:file=/tmp/gc.log:time,uptime,level,tags:filecount=2,filesize=100m
+    -XX:InitiatingHeapOccupancyPercent=45
+    -XX:G1ReservePercent=20
+    -XX:+UseStringDeduplication
+    -XX:+PrintCommandLineFlags
+
+# ExtraEnv
+extraEnv: []
+
+#Service
+service:
+  type: ClusterIP
+  externalIPs: []
+  loadBalancerSourceRanges: []
+  annotations:
+    prometheus.io/port: "8081"
+    prometheus.io/scrape: "true"
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8081
+
+common:
+  virtualservice:
+    enabled: false
+    uriprefix: /
+
+#Route
+route:
+  enabled: false
+  host: 
+  path: /
+  annotations:
+    haproxy.router.openshift.io/timeout: 180s
+    haproxy.router.openshift.io/timeout-client: 180s
+    haproxy.router.openshift.io/timeout-server: 180s
+  labels: {}
+  tls:
+    enabled: true
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+    certificate: ""
+    key: ""
+    caCertificate: ""
+
+#Ingress
+ingress:
+  enabled: false
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt"
+    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/tls-acme: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "1024m"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "203.0.113.0/24"
+  hosts:
+    - host:
+      paths:
+        - /
+  tls:
+    - secretName: 
+      hosts:
+        - 
+
+securityContext:
+  {}
+  # allowPrivilegeEscalation: false
+  # readOnlyRootFilesystem: true
+  # capabilities:
+  #   drop: [ALL]
+
+serviceAccount:
+  create: false
+  annotations: {}
+  name: test
+
+podSecurityContext:
+  fsGroup: 
+  runAsUser:
+  runAsNonRoot: true
+
+livenessProbe:
+#  httpGet:
+#    path: /actuator/health/liveness
+#    port: http
+#  initialDelaySeconds: 210
+#  periodSeconds: 10
+#  timeoutSeconds: 10
+#  successThreshold: 1
+#  failureThreshold: 3
+
+readinessProbe:
+#  httpGet:
+#    path: /actuator/health/readiness
+#    port: http
+#  initialDelaySeconds: 60
+#  periodSeconds: 10
+#  timeoutSeconds: 10
+#  successThreshold: 3
+#  failureThreshold: 3
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1024Mi
+
+## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+affinity: {}
+## Node labels for pod assignment (this value is evaluated as a template)
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
+nodeSelector: {}
+## Tolerations for pod assignment (this value is evaluated as a template)
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#taints-and-tolerations-beta-feature
+tolerations: []
+## Annotations for external-dns pods
+podAnnotations:
+  sidecar.istio.io/inject: "false"
+  sidecar.istio.io/rewriteAppHTTPProbers: "true"
+  traffic.sidecar.istio.io/excludeOutboundPorts: ""
+## Additional labels for the pod(s).
+podLabels: {}
+## Pod priority class name
+priorityClassName: ""
+
+## Configure volumes
+volumes:
+
+## Configure volumeMounts
+volumeMounts:
+ 
+# Configure secret
+secret:
+  enabled: false
+  filename: ""
+  content: ""
+
+metrics:
+  enabled: false
+  serviceMonitor:
+    endpoints:
+      - port: http
+        path: /
+        interval: 10s
+        scrapeTimeout: 10s
+
+    namespaceSelector:
+      matchNames:
+        - dev 
+hpa:
+  enabled: true
+  minReplicaCount: 2
+  maxReplicaCount: 10
+  targetCPUUtilizationPercentage: 50
+  targetMemoryUtilizationPercentage: 90
+  behavior: {}

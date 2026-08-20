@@ -20,6 +20,8 @@
 
 Resource types: [`../terraform/RESOURCES.md`](../terraform/RESOURCES.md)
 
+Cluster Helm: [`../helm/`](../helm/).
+
 ## Keywords
 
 Proxmox, Proxmox VE, Terraform, Kubernetes, GitLab, PostgreSQL, on-prem

@@ -1,0 +1,62 @@
+{{- $host := pluck .Values.werf.env .Values.portal.host | first | default (printf .Values.portal.host._default .Values.werf.env) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Chart.Name }}-{{ .Values.werf.env }}
+  annotations:
+{{- if or ( eq .Values.werf.env "dev" ) ( eq .Values.werf.env "stage" ) }}
+    nginx.ingress.kubernetes.io/client-max-body-size: 100m
+    nginx.ingress.kubernetes.io/proxy-body-size: 100m
+    nginx.ingress.kubernetes.io/auth-signin: "https://$host/dex-authenticator/sign_in"
+    nginx.ingress.kubernetes.io/auth-url: {{ printf "https://%s-%s-dex-authenticator.%s.svc.cluster.local/dex-authenticator/auth" .Chart.Name .Release.Namespace .Release.Namespace | quote }}
+    nginx.ingress.kubernetes.io/auth-response-headers: X-Auth-Request-User,X-Auth-Request-Email,Authorization
+{{- end }}
+    nginx.ingress.kubernetes.io/configuration-snippet : |
+        if ($request_uri = /) {
+            add_header Cache-Control "no-store,no-cache,must-revalidate";
+            add_header Pragma "no-cache";
+            add_header Expires "0";
+        }
+        if ($request_uri = /index.html) {
+            add_header Cache-Control "no-store,no-cache,must-revalidate";
+            add_header Pragma "no-cache";
+            add_header Expires "0";
+        }
+spec:
+  ingressClassName: {{ pluck .Values.werf.env .Values.portal.ingressclassname| first | default .Values.portal.ingressclassname._default | quote }}
+  tls:
+    - hosts:
+      - {{ $host }}
+{{ if contains "review" .Values.werf.env }}
+      secretName: wildcard-kube-tls
+{{ else }}
+      secretName: wildcard-prod-tls
+      # secretName: wildcard-kube-tls
+{{- end }}
+
+  rules:
+  - host: {{ $host }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: {{ .Chart.Name }}-{{ .Values.werf.env }}
+            port:
+              name: http
+        path: /
+        pathType: ImplementationSpecific
+
+# ---
+# apiVersion: cert-manager.io/v1
+# kind: Certificate
+# metadata:
+#   name: {{ .Chart.Name }}-{{ .Values.werf.env }}
+# spec:
+#   secretName: {{ .Chart.Name }}-{{ .Values.werf.env }}
+#   issuerRef:
+#     kind: ClusterIssuer
+#     name: letsencrypt
+#   commonName: {{ $host }}
+#   dnsNames:
+#   - {{ $host }}

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: pki-gateway
+description: Estate PKI gateway umbrella. Three PVCs (users, keys, pkidebug) and a ConfigMap via .Files.Get.
+type: application
+version: 0.1.0
+appVersion: "0.0.1"
+
+dependencies:
+  - name: base-chart
+    version: 0.2.1
+    repository: "file://../_libs/base-chart"
+    alias: application
+    condition: application.enabled

@@ -1,0 +1,28 @@
+# -*- mode: crontab -*-
+# vi: set ft=crontab :
+#
+# Staging runner. Hosts are documentation names and CIDRs.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""
+
+# kube-master etcd
+0 2 * * * /app/00-scripts/borg_run_on.sh 10.10.20.20 borg_backup_etcd.sh
+
+# mysql-trading-0 binlog
+3 * * * * /app/00-scripts/borg_run_on.sh mysql-trading-0.estate.example.com borg_backup_files.sh 'BINLOG /var/lib/mysql/binlogs/mysql-bin.*'
+
+# mysql-trading-1 xtrabackup
+13 23 * * * /app/00-scripts/borg_run_on.sh mysql-trading-1.estate.example.com borg_backup_xtrabackup.sh 'MYSQL --defaults-file "/etc/mysql/mysql.conf.d/mysqld.cnf"'
+
+# mysql-app-0 binlog
+23 23 * * * /app/00-scripts/borg_run_on.sh mysql-app-0.estate.example.com borg_backup_files.sh 'BINLOG /var/lib/mysql/binlogs/mysql-bin.*'
+
+# mysql-app-1 xtrabackup
+33 23 * * * /app/00-scripts/borg_run_on.sh mysql-app-1.estate.example.com borg_backup_xtrabackup.sh 'MYSQL --defaults-file "/etc/mysql/mysql.conf.d/mysqld.cnf"'
+
+# mysql-legacy-0
+51 2 * * * /app/00-scripts/borg_run_on.sh mysql-legacy-0.estate.example.com borg_backup_xtrabackup.sh 'MYSQL --defaults-file "/etc/mysql/mysql.conf.d/mysqld.cnf" --add-innobackupex-option "--no-server-version-check"'
+31 1 * * * /app/00-scripts/borg_run_on.sh mysql-legacy-0.estate.example.com borg_backup_files.sh 'BINLOG /var/lib/mysql/mysql-bin.*'
+
+# audit mongodb
+30 1 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo.sh 'MONGO-AUDIT --host "rs0/mongodb-common-rs0-0.mongodb-common-rs0.backup.svc.cluster.local:27017,mongodb-common-rs0-1.mongodb-common-rs0.backup.svc.cluster.local:27017,mongodb-common-rs0-2.mongodb-common-rs0.backup.svc.cluster.local:27017" --port 27017 --password "/root/secrets/.mongo-audit-pass" --user backup --authenticationDatabase admin --prune "--keep-within=7d" --skip-hostname-prefix'

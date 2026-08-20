@@ -1,0 +1,79 @@
+# Deploy variant:
+# * the project has Kubernetes
+# * Borg repo may be estate-owned or on shared backup storage
+
+variables:
+  context: estate-dev
+
+.base_werf: &base_werf
+  - pwd
+  - type trdl && . $(trdl use werf ${WERF_VERSION:-1.2 alpha})
+  - type werf && source $(werf ci-env gitlab --as-file)
+  - werf version
+
+.base_lint: &base_lint
+  stage: lint
+  script:
+    - pwd
+    - bash -c '[ -x ~/bin/supercronic ] || (mkdir -p ~/bin && curl -Lo ~/bin/supercronic https://github.com/aptible/supercronic/releases/download/v0.1.12/supercronic-linux-amd64 && chmod a+x ~/bin/supercronic)'
+    - bash -c '[ "$(md5sum < ~/bin/supercronic)" == "c2c91843ae9f6f092c1618a990b1aab3  -" ] || (rm -rf ~/bin/supercronic && exit 1)'
+    - ~/bin/supercronic -test $(pwd)/.helm/schedules/schedule-${CLUSTER:-unknown}
+  tags:
+    - werf
+
+.base_build: &base_build
+  stage: build
+  script:
+    - *base_werf
+    - werf build
+  tags:
+    - werf
+
+.base_deploy: &base_deploy
+  stage: deploy
+  script:
+    - *base_werf
+    - werf converge
+      --namespace ${CI_ENVIRONMENT_SLUG}
+      --kube-context=${context}
+      --set "global.env=${CI_ENVIRONMENT_SLUG}"
+      --set "global.cluster=${CLUSTER:-unknown}"
+      --env ${CI_ENVIRONMENT_SLUG}
+      --skip-build
+      ${CI_REGISTRY_IMAGE}
+    - kubectl --context=${context} annotate namespace ${CI_ENVIRONMENT_SLUG} extended-monitoring.example.com/enabled="" --overwrite || true
+  tags:
+    - werf
+
+stages:
+  - build
+  - lint
+  - deploy
+  - cleanup
+
+Build:
+  <<: *base_build
+
+Lint for main:
+  <<: *base_lint
+  variables:
+    CLUSTER: main
+
+Deploy to main:
+  <<: *base_deploy
+  environment:
+    name: backup
+  variables:
+    CLUSTER: main
+  when:
+    on_success
+  needs: ["Lint for main"]
+  tags:
+    - werf
+
+Cleanup stages:
+  stage: cleanup
+  script:
+    - *base_werf
+    - docker login -u nobody -p ${WERF_IMAGES_CLEANUP_PASSWORD} ${WERF_REPO}
+    - werf cleanup

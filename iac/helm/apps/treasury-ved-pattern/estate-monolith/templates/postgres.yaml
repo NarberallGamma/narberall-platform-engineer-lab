@@ -1,0 +1,33 @@
+{{- if .Values.postgresql.enabled }}
+---
+kind: "postgresql"
+apiVersion: "acid.zalan.do/v1"
+metadata:
+  name: {{ .Values.postgresql.spec.teamId }}-{{ .Release.Namespace }}-postgresql
+  labels:
+    {{- include "estate.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.postgresql.spec }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+---
+{{- if .Values.postgresql.enableExternalService }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.postgresql.spec.teamId }}-{{ .Release.Name }}-postgresql-pooler-external
+  {{- with .Values.postgresql.externalServiceAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: LoadBalancer
+  selector:
+    connection-pooler: {{ .Values.postgresql.spec.teamId }}-{{ .Release.Name }}-postgresql-pooler
+  ports:
+    - name: {{ .Values.postgresql.spec.teamId }}-{{ .Release.Name }}-postgresql-pooler
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+{{- end }}
+{{- end }}

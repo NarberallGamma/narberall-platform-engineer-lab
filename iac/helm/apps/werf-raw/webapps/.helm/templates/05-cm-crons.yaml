@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-crons
+data:
+  crontab: |
+    # Crons
+    * * * * * cd /app && php artisan schedule:run 2>&1

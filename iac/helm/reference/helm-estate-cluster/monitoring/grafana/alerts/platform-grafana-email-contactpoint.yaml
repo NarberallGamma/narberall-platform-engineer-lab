@@ -1,0 +1,26 @@
+# SMTP contact points. Templates platform.email.* live in notification-templates.yaml.
+# (admins) and (ops): same subject/body via provisioned templates.
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: Platform Grafana Email (admins)
+    receivers:
+      - uid: platform_grafana_email_admins
+        type: email
+        disableResolveMessage: false
+        settings:
+          addresses: ops@example.com
+          singleEmail: true
+          subject: '{{ "{{" }} template "platform.email.subject" . {{ "}}" }}'
+          message: '{{ "{{" }} template "platform.email.body" . {{ "}}" }}'
+  - orgId: 1
+    name: Platform Grafana Email (ops)
+    receivers:
+      - uid: platform_grafana_email_ops
+        type: email
+        disableResolveMessage: false
+        settings:
+          addresses: ops@example.com; oncall@example.com
+          singleEmail: true
+          subject: '{{ "{{" }} template "platform.email.subject" . {{ "}}" }}'
+          message: '{{ "{{" }} template "platform.email.body" . {{ "}}" }}'

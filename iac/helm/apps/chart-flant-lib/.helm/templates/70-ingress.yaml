@@ -1,0 +1,120 @@
+{{- range $key, $values := $.Values.ingresses }}
+{{- if include "fl.isTrue" (list $ . $values.enabled) }}
+{{- $name         := (include "fl.value" (list $ . $values.name)) | default (printf "%s-%s" $.Chart.Name $key) }}
+{{- $host         := (include "fl.value" (list $ . $values.host)) }}
+{{- $secretName   := (include "fl.value" (list $ . $values.tls.secretName)) | default (printf "%s-%s-tls" $.Chart.Name $key) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $.Chart.Name }}
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    {{- include "fl.value" (list $ . $values.annotations) | nindent 4 }}
+spec:
+  rules:
+  - host: {{ $host }}
+    http:
+      {{- $paths := (include "fl.value" (list $ . $values.paths)) }}
+      {{- if $paths }}
+      paths: {{ $paths | nindent 8 }}
+      {{- else }}
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ $.Chart.Name }}
+            port:
+              name: http
+      {{- end }}
+  tls:
+    - hosts:
+        - {{ $host }}
+      secretName: {{ $secretName }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}-api
+  labels:
+    app: {{ $.Chart.Name }}
+  annotations:
+    nginx.ingress.kubernetes.io/whitelist-source-range: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 203.0.113.0/24, 198.51.100.0/24
+    kubernetes.io/ingress.class: "nginx"
+    {{- include "fl.value" (list $ . $values.annotations) | nindent 4 }}
+spec:
+  rules:
+  - host: {{ $host }}
+    http:
+      {{- $paths := (include "fl.value" (list $ . $values.paths)) }}
+      {{- if $paths }}
+      paths: {{ $paths | nindent 8 }}
+      {{- else }}
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ $.Chart.Name }}
+            port:
+              name: http
+      {{- end }}
+  tls:
+    - hosts:
+        - {{ $host }}
+      secretName: {{ $secretName }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}-places
+  labels:
+    app: {{ $.Chart.Name }}
+  annotations:
+    nginx.ingress.kubernetes.io/whitelist-source-range: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 203.0.113.0/24, 2001:db8::/32
+    kubernetes.io/ingress.class: "nginx"
+    {{- include "fl.value" (list $ . $values.annotations) | nindent 4 }}
+spec:
+  rules:
+  - host: {{ $host }}
+    http:
+      {{- $paths := (include "fl.value" (list $ . $values.paths)) }}
+      {{- if $paths }}
+      paths: {{ $paths | nindent 8 }}
+      {{- else }}
+      paths:
+      - path: /places
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ $.Chart.Name }}
+            port:
+              name: http
+      {{- end }}
+  tls:
+    - hosts:
+        - {{ $host }}
+      secretName: {{ $secretName }}
+
+{{- if include "fl.isTrue" (list $ . $values.tls.certManagerEnabled) }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $.Chart.Name }}
+spec:
+  secretName: {{ $secretName }}
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt
+  commonName: {{ $host }}
+  dnsNames:
+  - {{ $host }}
+{{- end }} {{/* if $values.tls.certManagerEnabled */}}
+{{- end }} {{/* if $values.enabled */}}
+{{- end }} {{/* range $.Values.ingresses */}}

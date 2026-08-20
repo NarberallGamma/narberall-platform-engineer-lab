@@ -1,0 +1,165 @@
+{{- include "newrelic_configmap" . }}
+{{- $app_urls := pluck .Values.global.cluster .Values.app.app_urls | first }}
+{{- range $i, $app_url := pluck .Values.werf.env $app_urls | first | default $app_urls._default }}
+{{- $app_url := printf "https://%s" (include "fl.value" (list $ . $app_url.host)) }}
+{{- $name    := printf "%s-%d" $.Chart.Name $i }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 2
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  replicas: {{ pluck $.Values.werf.env $.Values.replicas | first | default $.Values.replicas._default }}
+  template:
+    metadata:
+      annotations:
+        checksum/config-nginx: {{ include (print $.Template.BasePath "/05-cm-nginx.yaml") $ | sha256sum }}
+        checksum/envs: {{ include (print $.Template.BasePath "/15-envs.yaml") $ | sha256sum }}
+        checksum/appurl: {{ $app_url | sha256sum }}
+      labels:
+        app: {{ $name }}
+        part-of: {{ $.Chart.Name }}
+    spec:
+      {{ include "priorityClassName" $ | indent 6 }}
+      {{ include "affinity" $ | nindent 6 }}
+      {{ include "tolerations" $ | nindent 6 }}
+      imagePullSecrets:
+      - name: registrysecret
+      volumes:
+        - name: {{ $.Chart.Name }}-nginx
+          configMap:
+            name: {{ $.Chart.Name }}-nginx
+        - name: newrelic-config
+          configMap:
+            name: {{ $.Chart.Name }}-newrelic-configmap
+      containers:
+      - name: nginx
+        image: {{ index $.Values.werf.image "nginx" }}
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        env:
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /_tech/ngx-status
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /_tech/ngx-status
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        volumeMounts:
+        - name: {{ $.Chart.Name }}-nginx
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: {{ $.Chart.Name }}-nginx
+          mountPath: /etc/nginx/fastcgi_params
+          subPath: fastcgi_params
+{{- include "resources_nginx" $ | indent 8}}
+      - name: php
+        image: {{ index $.Values.werf.image "app" }}
+        command: ["/usr/sbin/php-fpm8.1"]
+        workingDir: /app
+        args: ["-F"]
+        livenessProbe:
+          exec:
+            command:
+            - env
+            - -i
+            - /bin/bash
+            - -c
+            - /app/.werffiles/backend/ping-probe.sh
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - env
+            - -i
+            - /bin/bash
+            - -c
+            - /app/.werffiles/backend/status-probe.sh
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        securityContext:
+          capabilities:
+            add:
+            - SYS_PTRACE
+{{- include "resources_app" $ | indent 8}}
+        volumeMounts:
+{{- if or (eq $.Values.werf.env "production") (eq $.Values.werf.env "stage") }}
+        - name: newrelic-config
+          mountPath: /etc/php/8.1/mods-available/newrelic.ini
+          subPath: newrelic.ini
+{{- end }}
+        ports:
+        - containerPort: 9000
+          name: fcgi
+          protocol: TCP
+        env:
+          - name: APP_URL
+            value: {{ $app_url | quote }}
+        envFrom:
+          - configMapRef:
+              name: {{ $.Chart.Name }}-env
+          - secretRef:
+              name: {{ $.Chart.Name }}-env
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+spec:
+  clusterIP: None
+  selector:
+    app: {{ $name }}
+  ports:
+  - name: http
+    port: 80
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ $name }}
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: {{ $name }}
+  updatePolicy:
+    updateMode: "Off"
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: {{ $name }}
+{{- end }} {{/* range .Values.app.app_urls */}}

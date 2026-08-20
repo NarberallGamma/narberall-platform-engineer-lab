@@ -1,0 +1,13 @@
+apiVersion: v2
+name: contract-grpc
+description: Thin umbrella. Extra gRPC Service on 6865 plus shared base-chart.
+type: application
+version: 0.1.0
+appVersion: "2.8.0"
+
+dependencies:
+  - name: base-chart
+    version: 0.2.1
+    repository: "file://../_libs/base-chart"
+    alias: application
+    condition: application.enabled

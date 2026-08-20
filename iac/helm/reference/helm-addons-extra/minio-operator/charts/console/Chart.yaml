@@ -1,0 +1,19 @@
+apiVersion: v2
+appVersion: v0.30.0
+description: A Helm chart for MinIO Console
+home: https://min.io
+icon: https://min.io/resources/img/logo/MINIO_wordmark.png
+keywords:
+- storage
+- object-storage
+- S3
+- console
+- ui
+maintainers:
+- email: dev@minio.io
+  name: MinIO, Inc
+name: console
+sources:
+- https://github.com/minio/console
+type: application
+version: 0.1.0

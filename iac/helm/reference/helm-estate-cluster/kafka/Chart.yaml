@@ -1,0 +1,12 @@
+apiVersion: v2
+name: estate-kafka
+description: Thin parent for Kafka Connect CRs, outbox connectors, and secret overrides. The broker stays outside the cluster.
+type: application
+version: 0.1.0
+appVersion: "2.8.0"
+
+dependencies:
+  - name: akhq
+    version: 0.3.1
+    repository: "https://akhq.io/"
+    condition: akhq.enabled

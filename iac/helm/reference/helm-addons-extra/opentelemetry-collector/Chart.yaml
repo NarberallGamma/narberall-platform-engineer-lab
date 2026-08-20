@@ -1,0 +1,5 @@
+apiVersion: v2
+name: opentelemetry-collector
+description: OpenTelemetryCollector CR overlay (OTLP in, Kafka out)
+type: application
+version: 0.1.0

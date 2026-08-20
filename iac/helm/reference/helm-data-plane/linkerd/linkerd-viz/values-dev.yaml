@@ -1,0 +1,16 @@
+# Lab overlay. Live remote_write hosts and passwords are not copied.
+clusterDomain: cluster.local
+identityTrustDomain: cluster.local
+defaultRegistry: example.registry/linkerd
+
+dashboard:
+  enforcedHostRegexp: '^web[.]linkerd-viz[.]svc[.]cluster[.]local$|^localhost$|^linkerd-viz[.]dev[.]platform[.]example[.]com$'
+
+prometheus:
+  image:
+    registry: example.registry
+  remoteWrite:
+    - url: http://prometheus.dev.platform.example.com:9090/api/v1/write
+      basic_auth:
+        username: linkerd
+        password: CHANGE_ME

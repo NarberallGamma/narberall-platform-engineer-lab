@@ -1,0 +1,27 @@
+{{- range $svcName, $values := (include "fl.value" (list $ . $.Values.external_hosts) | fromYaml) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svcName }}
+  annotations:
+    werf.io/weight: "-200"
+spec:
+  ports:
+  - name: psql
+    port: {{ $values.port | int }}
+
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: {{ $svcName }}
+  annotations:
+    werf.io/weight: "-200"
+subsets:
+- addresses:
+  - ip: {{ $values.ip }}
+  ports:
+  - name: psql
+    port: {{ $values.port | int }}
+{{- end }}

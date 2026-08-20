@@ -1,0 +1,186 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Chart.Name }}
+  annotations:
+    pod-reloader.deckhouse.io/auto: "true"
+  labels:
+    app: {{ $.Chart.Name }}
+spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+  replicas: {{ (include "fl.value" (list $ . $.Values.app.replicas)) }}
+  selector:
+    matchLabels:
+      app: {{ $.Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Chart.Name }}
+      annotations:
+        checksum/nginx-config: {{ include (print $.Template.BasePath "/app-nginx-config.yaml") . | sha256sum }}
+        checksum/php-config: {{ include (print $.Template.BasePath "/app-php-config.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/app-config.yaml") . | sha256sum }}
+    spec:
+      {{- include "imagePullSecrets" . | indent 6 }}
+      {{- include "affinity" (list $ . $.Chart.Name) | indent 6 }}
+      {{- include "tolerations" . | indent 6 }}
+      {{- include "nodeSelector" . | indent 6 }}
+      {{- include "priorityClassName" . | indent 6 }}
+
+      volumes:
+        - name: {{ $.Chart.Name }}-php
+          configMap:
+            name: {{ $.Chart.Name }}-php
+        - name: {{ $.Chart.Name }}-nginx
+          configMap:
+            name: {{ $.Chart.Name }}-nginx
+
+      initContainers:
+        {{ include "init-rabbitmq" . | indent 8 }}
+        {{ include "init-psql-orders" . | indent 8 }}
+        {{ include "init-psql-history" . | indent 8 }}
+        {{ include "init-psql-report" . | indent 8 }}
+
+      containers:
+        - name: backend
+          image: {{ index .Values.werf.image "backend" }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              /usr/lib/postfix/sbin/master -w
+              php-fpm -y /usr/local/etc/php-fpm.conf -F
+          lifecycle:
+            preStop:
+              exec:
+                command: [ "/bin/bash", "-c", "sleep 5; kill -QUIT 1" ]
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /_tech/php-ping
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /_tech/php-status
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: {{ $.Chart.Name }}-php
+              mountPath: /usr/local/etc/php-fpm.conf
+              subPath: php-fpm.conf
+            - name: {{ $.Chart.Name }}-php
+              mountPath: /usr/local/etc/php/php.ini
+              subPath: php.ini
+          resources:
+            {{ toYaml (pluck .Values.werf.env .Values.resources.backend | first | default .Values.resources.backend._default) | nindent 14 }}
+          ports:
+            - containerPort: 9000
+              name: fcgi
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ $.Chart.Name }}-env
+            - secretRef:
+                name: {{ $.Chart.Name }}-env
+
+        - name: frontend
+          image: {{ index .Values.werf.image "frontend" }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/bash", "-c", "sleep 5; nginx -s quit"]
+          resources:
+            {{ toYaml (pluck .Values.werf.env .Values.resources.frontend | first | default .Values.resources.frontend._default) | nindent 14 }}
+          ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+          volumeMounts:
+            - name: {{ $.Chart.Name }}-nginx
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - name: {{ $.Chart.Name }}-nginx
+              mountPath: /etc/nginx/logs.js
+              subPath: logs.js
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /_tech/ngx-status
+              port: 80
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /_tech/ngx-status
+              port: 80
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+
+        - name: php-fpm-exporter
+          command:
+            - /php-fpm-exporter
+            - --addr
+            - 0.0.0.0:5132
+            - --endpoint
+            - http://127.0.0.1:80/_tech/php-status
+          image: {{ index .Values.werf.image "php-fpm-exporter" }}
+          resources:
+            {{ toYaml (pluck .Values.global.env .Values.resources.php_exporter | first | default .Values.resources.php_exporter._default) | nindent 14 }}
+          ports:
+            - containerPort: 5132
+              name: http-metrics
+              protocol: TCP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Chart.Name }}
+  labels:
+    prometheus.deckhouse.io/target: php-fpm
+spec:
+  selector:
+    app: {{ $.Chart.Name }}
+  ports:
+    - name: http
+      port: 80
+    - name: http-metrics
+      port: 5132
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ $.Chart.Name }}
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: {{ $.Chart.Name }}
+  updatePolicy:
+    updateMode: "Off"
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Chart.Name }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: {{ $.Chart.Name }}

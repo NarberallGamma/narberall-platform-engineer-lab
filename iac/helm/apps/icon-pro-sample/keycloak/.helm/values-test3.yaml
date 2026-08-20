@@ -1,0 +1,11 @@
+replicaCount: 1
+nodeport: 32018
+env:
+  KC_DB_URL: jdbc:postgresql://10.10.0.10:5432/shop_keycloak_test3?sslmode=verify-ca&sslfactory=org.postgresql.ssl.DefaultJavaSSLFactory
+  KC_DB_USERNAME: root
+  KC_DB_PASSWORD: CHANGE_ME
+  KC_DB_SCHEMA: public 
+  KC_FEATURES: preview
+  KEYCLOAK_ADMIN: admin
+  KEYCLOAK_ADMIN_PASSWORD: CHANGE_ME
+  KC_CACHE: local

@@ -1,0 +1,103 @@
+project: backup
+configVersion: 1
+deploy:
+  namespace: "[[ project ]]"
+  helmRelease: "[[ project ]]"
+---
+image: backup
+from: ubuntu:18.04
+git:
+- add: /
+  to: /app
+  stageDependencies:
+    install:
+    - vars
+    setup:
+    - 00-scripts
+    - "*.py"
+  excludePaths:
+  - .helm
+  - .gitignore
+  - .gitlab-ci.yml
+  - werf.yaml
+docker:
+  WORKDIR: /app
+  ENV:
+    TZ: UTC
+shell:
+  beforeInstall:
+  - |
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -qy \
+      apt-transport-https \
+      apt-utils \
+      bash \
+      bind9-host \
+      bzip2 \
+      ca-certificates \
+      curl \
+      iputils-ping \
+      jq \
+      nano \
+      openssh-client \
+      python3 \
+      python3-pip \
+      screen \
+      software-properties-common \
+      telnet \
+      tzdata \
+      vim \
+      wget \
+      yamllint
+    rm -rf /var/lib/apt/lists/*
+  - |
+    TZ="UTC"; export TZ
+    TZ="UTC"; ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+  - |
+    ln -sf python3 /usr/bin/python
+    pip3 install \
+      pyyaml \
+      requests
+  - |
+    wget https://github.com/Yelp/dumb-init/releases/download/v1.2.2/dumb-init_1.2.2_amd64 -O /usr/local/bin/dumb-init
+    chmod +x /usr/local/bin/dumb-init
+  - |
+    wget https://github.com/aptible/supercronic/releases/download/v0.1.12/supercronic-linux-amd64 -O /usr/local/bin/supercronic
+    chmod +x /usr/local/bin/supercronic
+  - |
+    wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | apt-key add -
+    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-4.2.list
+  - |
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -qy mongodb-org-tools
+  - |
+    wget -qO - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+  - |
+    echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+    apt update && apt -qy install postgresql-client-12
+  - |
+    export DEBIAN_FRONTEND=noninteractive
+    TEMP_DEB="$(mktemp)"
+    wget -qO "$TEMP_DEB" https://repo.mysql.com//mysql-apt-config_0.8.16-1_all.deb
+    dpkg -i "$TEMP_DEB"
+    rm -f "$TEMP_DEB"
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 467B942D3A79BD29
+    apt-get update
+    apt-get install -qy mysql-client
+  - |
+    wget -q https://github.com/restic/restic/releases/download/v0.12.0/restic_0.12.0_linux_amd64.bz2 -O /tmp/restic_0.12.0_linux_amd64.bz2
+    /bin/bzcat /tmp/restic_0.12.0_linux_amd64.bz2 > /usr/local/bin/restic_0.12.0_linux_amd64
+    chown root:root /usr/local/bin/restic_0.12.0_linux_amd64
+    chmod 755 /usr/local/bin/restic_0.12.0_linux_amd64
+    ln -s /usr/local/bin/restic_0.12.0_linux_amd64 /usr/bin/restic
+  install:
+  - |
+    source /app/vars
+    command -v backup_notify >/dev/null || echo "backup_notify not on PATH (optional alerting CLI)"
+  setup:
+  - |
+    chmod +x -R /app/00-scripts
+  - |
+    touch /app/UNDER_KUBERNETES

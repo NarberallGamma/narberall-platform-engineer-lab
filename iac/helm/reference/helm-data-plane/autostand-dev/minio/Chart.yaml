@@ -1,0 +1,5 @@
+apiVersion: v2
+name: minio
+description: Single-node MinIO plus bucket-init Job for a DEV autostand (contrast sample)
+version: 1.0.0
+appVersion: "2025-09-07"

@@ -1,0 +1,55 @@
+apiVersion: v2
+name: supabase
+dependencies:
+  - name: supabase
+    version: 0.1.2
+    repository: https://teochenglim.github.io/helm-charts/
+    export-values:
+      - parent: werf.repo
+        child: analytics.image.repository
+      - parent: werf.tag.analytics
+        child: analytics.image.tag
+      - parent: werf.repo
+        child: auth.image.repository
+      - parent: werf.tag.auth
+        child: auth.image.tag
+      - parent: werf.repo
+        child: functions.image.repository
+      - parent: werf.tag.functions
+        child: functions.image.tag
+      - parent: werf.repo
+        child: meta.image.repository
+      - parent: werf.tag.meta
+        child: meta.image.tag
+      - parent: werf.repo
+        child: realtime.image.repository
+      - parent: werf.tag.realtime
+        child: realtime.image.tag
+      - parent: werf.repo
+        child: rest.image.repository
+      - parent: werf.tag.rest
+        child: rest.image.tag
+      - parent: werf.repo
+        child: studio.image.repository
+      - parent: werf.tag.studio
+        child: studio.image.tag
+      - parent: werf.repo
+        child: db.image.repository
+      - parent: werf.tag.db
+        child: db.image.tag
+      - parent: werf.repo
+        child: vector.image.repository
+      - parent: werf.tag.vector
+        child: vector.image.tag
+      - parent: werf.repo
+        child: kong.image.repository
+      - parent: werf.tag.kong
+        child: kong.image.tag
+      - parent: werf.repo
+        child: imgproxy.image.repository
+      - parent: werf.tag.imgproxy
+        child: imgproxy.image.tag
+      - parent: werf.repo
+        child: storage.image.repository
+      - parent: werf.tag.storage
+        child: storage.image.tag

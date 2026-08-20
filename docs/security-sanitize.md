@@ -1,5 +1,8 @@
 # Sanitize checklist (before publish)
 
+How secrets reach agents and Vault (practice, not this list): [`security-ai.md`](security-ai.md).
+
+
 - [ ] No secrets, tokens, private keys, `.env` with values  
 - [ ] No client legal names (use sector + scale)  
 - [ ] No real hostnames, IPs, internal domains  

@@ -1,0 +1,22 @@
+apiVersion: v2
+name: oci-common-app
+description: Thin ASP.NET app chart. Shared helpers come from an OCI library, not a vendored tarball.
+type: application
+version: 0.1.0
+appVersion: "1.0"
+dependencies:
+  - name: common
+    version: 0-latest
+    repository: oci://example.registry/helm/common
+    type: library
+    export-values:
+      - parent: werf
+        child: werf
+  - name: review-jobs
+    version: 0-latest
+    repository: oci://example.registry/helm/review-jobs
+    export-values:
+      - parent: werf
+        child: werf
+      - parent: review_jobs
+        child: review_jobs

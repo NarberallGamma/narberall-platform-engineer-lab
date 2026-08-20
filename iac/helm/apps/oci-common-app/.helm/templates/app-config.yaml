@@ -1,0 +1,206 @@
+{{- $env := .Values.werf.env }}
+
+{{- $pepper := .Values.app.pepper | list $ . | include "fl.value" }}
+
+{{- $intercom_app_id     := ($env | contains "feature") | ternary (pluck "feature" .Values.app.intercom.appid | first | default (.Values.app.intercom.appid  | list $ . | include "fl.value")) (.Values.app.intercom.appid  | list $ . | include "fl.value") }}
+{{- $intercom_app_secret := ($env | contains "feature") | ternary (pluck "feature" .Values.app.intercom.secret | first | default (.Values.app.intercom.secret | list $ . | include "fl.value")) (.Values.app.intercom.secret | list $ . | include "fl.value") }}
+{{- $intercom_environment := .Values.app.intercom.environment | list $ . | include "fl.value" }}
+
+{{- $tenants_app_api := .Values.tenants.app_api | list $ . | include "fl.value" }}
+
+{{- $ecommerce_default_host    := .Values.ecommerce.default_host    | list $ . | include "fl.value" }}
+{{- $ecommerce_short_url_host := .Values.ecommerce.short_url_host | list $ . | include "fl.value" }}
+
+{{- $mssql_host := ternary "mssql.feature.svc.cluster.local" (.Values.mssql.host | list $ . | include "fl.value") (.Values.werf.env | contains "feature")}}
+{{- $mssql_host_ro := ternary "mssql.feature.svc.cluster.local" (.Values.mssql.host_ro | list $ . | include "fl.value") (.Values.werf.env | contains "feature")}}
+
+{{- $mssql_store_database      := .Values.mssql.dbs.store.name     | list $ . | include "fl.value" }}
+{{- $mssql_store_user          := .Values.mssql.dbs.store.user     | list $ . | include "fl.value" }}
+{{- $mssql_store_user_password := .Values.mssql.dbs.store.password | list $ . | include "fl.value" }}
+
+{{- $mssql_hangfire_database      := .Values.mssql.dbs.hangfire.name     | list $ . | include "fl.value" }}
+{{- $mssql_hangfire_user          := .Values.mssql.dbs.hangfire.user     | list $ . | include "fl.value" }}
+{{- $mssql_hangfire_user_password := .Values.mssql.dbs.hangfire.password | list $ . | include "fl.value" }}
+
+{{- $chHost     := .Values.clickhouse.host     | list $ . | include "fl.value" }}
+{{- $chUser     := .Values.clickhouse.user     | list $ . | include "fl.value" }}
+{{- $chPassword := .Values.clickhouse.password | list $ . | include "fl.value" }}
+{{- $chDB       := .Values.clickhouse.db       | list $ . | include "fl.value" }}
+{{- $chPort     := .Values.clickhouse.port     | list $ . | include "fl.value" }}
+{{- $chProtocol := .Values.clickhouse.protocol | list $ . | include "fl.value" }}
+
+{{- $memory_cache_is_enabled          := .Values.memory_cache.is_enabled          | list $ . | include "fl.value" }}
+{{- $memory_cache_size_limit          := .Values.memory_cache.size_limit          | list $ . | include "fl.value" }}
+{{- $memory_cache_ttl                 := .Values.memory_cache.ttl                 | list $ . | include "fl.value" }}
+{{- $memory_cache_enabled_for_actions := .Values.memory_cache.enabled_for_actions | toJson                        }}
+
+{{- $rabbitmq_host          := .Values.rabbitmq.host     | list $ . | include "fl.value" }}
+{{- $rabbitmq_port          := .Values.rabbitmq.port     | list $ . | include "fl.value" }}
+{{- $rabbitmq_user          := .Values.rabbitmq.user     | list $ . | include "fl.value" }}
+{{- $rabbitmq_user_password := .Values.rabbitmq.password | list $ . | include "fl.value" }}
+
+{{- $aws_access_key := ( pluck .Values.global.cluster_context .Values.aws.access_key | first | default $.Values.aws.access_key._default ) }}
+{{- $aws_secret_key := ( pluck .Values.global.cluster_context .Values.aws.secret_key | first | default $.Values.aws.secret_key._default ) }}
+{{- $aws_bucket     := ( pluck .Values.global.cluster_context .Values.aws.bucket     | first | default $.Values.aws.bucket._default ) }}
+{{- $aws_subdir     := .Values.aws.subdir                                  | list $ . | include "fl.value" }}
+{{- $aws_endpoint   := ( pluck .Values.global.cluster_context .Values.aws.endpoint   | first | default $.Values.aws.endpoint._default ) }}
+
+{{- $elasticSearchnodeUri  := .Values.logger.elasticSearchnodeUri  | list $ . | include "fl.value" }}
+{{- $elasticSearchUser     := .Values.logger.elasticSearchUser     | list $ . | include "fl.value" }}
+{{- $elasticSearchPassword := .Values.logger.elasticSearchPassword | list $ . | include "fl.value" }}
+{{- $index_name := .Values.global.index_name | required "global.index_name: required" | replace "/" "-" | lower }}
+
+{{- $elasticUri := printf $elasticSearchnodeUri $elasticSearchUser $elasticSearchPassword }}
+{{- $loggerDisableMaskedLogs := .Values.logger.disableMaskedLogs | list $ . | include "fl.value" }}
+
+{{- $api_message_processor_version  := printf "%s-%s" $env .Values.werf.commit.hash | quote }}
+{{- $fake                           := ternary "-fake" "" (contains "feature" $.Values.werf.env) }}
+{{- $monitor_mode                   := .Values.rate_limiting.monitor_mode             | list $ . | include "fl.value" }}
+{{- $client_rate_limit_period       := .Values.rate_limiting.client_rate_limit_period | list $ . | include "fl.value" }}
+{{- $client_rate_limit              := .Values.rate_limiting.client_rate_limit        | list $ . | include "fl.value" }}
+
+{{- $hangfireMaxPool := ternary "10" "20" (contains "feature" $.Values.werf.env) }}
+
+{{- $etcd_enabled     := ( pluck .Values.global.cluster_context .Values.etcd.enabled  | first | default $.Values.etcd.enabled._default ) }}
+{{- $etcd_host        := ( pluck .Values.global.cluster_context .Values.etcd.host     | first | default $.Values.etcd.host._default ) }}
+{{- $etcd_username    := ( pluck .Values.global.cluster_context .Values.etcd.username | first | default $.Values.etcd.username._default ) }}
+{{- $etcd_password    := ( pluck .Values.global.cluster_context .Values.etcd.password | first | default $.Values.etcd.password._default ) }}
+
+{{- $report_parent_dealer_id   := .Values.report_csv_options.parent_dealer_id | list $ . | include "fl.value" }}
+{{- $report_dealers := pluck $env .Values.report_csv_options.dealers | first | default .Values.report_csv_options.dealers._default | toJson }}
+{{- $brands_split_dealer_ids := pluck $env .Values.brands_split_dealer_ids_options.dealer_ids | first | default .Values.brands_split_dealer_ids_options.dealer_ids._default | toJson }}
+{{- $atm_customer_holder_dealer_ids := pluck $env .Values.atm_payment_method_options.customer_holder_dealer_ids | first | default .Values.atm_payment_method_options.customer_holder_dealer_ids._default | toJson }}
+
+{{- $caregivers_disabled   := .Values.caregivers.disabled | list $ . | include "fl.value" }}
+
+{{- $sentry_host        := ( pluck .Values.global.cluster_context .Values.sentry.host     | first | default $.Values.sentry.host._default ) }}
+
+{{- range $configSuffix := list "" "-storefront" "-kiosk" "-counter" }}
+{{- $consumersSuffix := $configSuffix }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $.Chart.Name }}{{ $configSuffix }}-config
+  labels:
+    app: {{ $.Chart.Name }}{{ $configSuffix }}-config
+data:
+  appsettings.Env.json: |
+        {
+          "ConnectionStrings": {
+            "StoreRO": "Server={{ $mssql_host_ro }}; Database={{ $mssql_store_database }}; User Id={{ $mssql_store_user }}; Password={{ $mssql_store_user_password }}; Max Pool Size=100; Connection Timeout=30; MultiSubnetFailover=Yes; TrustServerCertificate=True; ApplicationIntent=ReadOnly",
+            "StoreRW": "Server={{ $mssql_host }}; Database={{ $mssql_store_database }}; User Id={{ $mssql_store_user }}; Password={{ $mssql_store_user_password }}; Max Pool Size=100; Connection Timeout=30; MultiSubnetFailover=Yes; TrustServerCertificate=True;",
+            "Hangfire": "Server={{ $mssql_host }}; Database={{ $mssql_hangfire_database }}; User Id={{ $mssql_hangfire_user }}; Password={{ $mssql_hangfire_user_password }}; Max Pool Size={{ $hangfireMaxPool }}; Connection Timeout=10; MultiSubnetFailover=Yes; TrustServerCertificate=True;",
+            {{ if eq $etcd_enabled true }}"Etcd": "Server={{ $etcd_host }};UserName={{ $etcd_username }};Password={{ $etcd_password }}",{{ end }}
+            "Clickhouse": "Host={{ $chHost }};Port={{ $chPort }};Database={{ $chDB }};Username={{ $chUser }};Password={{ $chPassword }};Compression=true;TrustServerCertificate=True;Protocol={{ $chProtocol }}"
+            },
+          "Redis": {
+            "KeyPrefix": "app_api_{{ $env }}"
+          },
+          "HandlersCache": {
+            "IsEnabled": {{ $memory_cache_is_enabled }},
+            "SizeLimit": {{ $memory_cache_size_limit }},
+            "AbsoluteExpirationRelativeToNow": "{{ $memory_cache_ttl }}",
+            "EnabledForActions": {{ $memory_cache_enabled_for_actions }}
+          },
+          "Intercom": {
+            "AppId": "{{ $intercom_app_id }}",
+            "Secret": "{{ $intercom_app_secret }}",
+            "Environment": "{{ $intercom_environment }}"
+          },
+          "Rabbit": {
+            "Host": "{{ $rabbitmq_host }}",
+            "Port": {{ $rabbitmq_port }},
+            "Login": "{{ $rabbitmq_user }}",
+            "Pass": "{{ $rabbitmq_user_password }}",
+            "AutomaticRecovery": true
+          },
+          "HashPepper": "{{ $pepper }}",
+          "ApiMessageProcessor": {
+            "Version": {{ $api_message_processor_version }}
+          },
+          "AmazonHelper": {
+            "BucketName": "{{ $aws_bucket }}",
+            "SubDirectoryInBucket": "{{ $aws_subdir }}",
+            "AccessKey": "{{ $aws_access_key }}",
+            "SecretKey": "{{ $aws_secret_key }}",
+            "EndpointName": "{{ $aws_endpoint }}"
+          },
+          "ConfirmProcessor": {
+            "Templates": {
+              "Sms": "Your confirmation code: [CODE]"
+            }
+          },
+          "Tenants": {
+            "AppApi": "{{ $tenants_app_api }}"
+          },
+          "EcommerceHost": {
+            "DefaultHost": "{{ $ecommerce_default_host }}",
+            "ShortUrlHost": "{{ $ecommerce_short_url_host }}"
+          },
+          "Grpc": {
+            "Notification": "dns:///notifications{{ $fake }}:5006",
+            "Confirmations": "dns:///confirmations{{ $fake }}:5006",
+            "Chat": "dns:///chat{{ $fake }}:5006",
+            "Marketing": "dns:///marketing{{ $fake }}:5006",
+            "Consumers": "dns:///consumers{{ $consumersSuffix }}{{ $fake }}:5006",
+            "Delivery": "dns:///delivery-api{{ $fake }}:5006",
+            "Payments": "dns:///payments{{ $fake }}:5006",
+            "Reports": "dns:///reports{{ $fake }}:5006",
+            "Images": "dns:///images{{ $fake }}:5006",
+            "Authorization": "dns:///authorization-grpc{{ $fake }}:5006",
+            "Catalog": "dns:///product-catalog{{ $fake }}:5006",
+            "Inventory": "dns:///inventory{{ $fake }}:5006"
+          },
+          "Logger": {
+            "ElasticIndexFormat": "{{ $env | contains "feature" | ternary $index_name $env }}-app-api-v1",
+            "ElasticHost": "{{ $elasticUri }}",
+            "DisableMaskedLogs": "{{ $loggerDisableMaskedLogs }}"
+          },
+          "ClientRateLimiting": {
+            "EnableEndpointRateLimiting": false,
+            "ClientIdHeader": "X-ClientId",
+            "ClientWhitelist": [ "anon" ],
+            "HttpStatusCode": 429,
+            "GeneralRules": [
+              {
+                "Endpoint": "*",
+                "Period": "{{ $client_rate_limit_period }}",
+                "Limit": {{ $client_rate_limit }},
+                "MonitorMode": {{ $monitor_mode }}
+              }
+            ]
+          },
+          "CsvReportOptions": {
+              "ParentDealerId": {{ $report_parent_dealer_id }},
+              "Dealers": {{ $report_dealers }}
+          },
+          "BrandsSplitDealerIdsOptions": {
+              "DealerIds": {{ $brands_split_dealer_ids }}
+          },
+          "AtmPaymentMethodOptions": {
+              "CustomerHolderDealerIds": {{ $atm_customer_holder_dealer_ids }}
+          },
+          "Caregivers": {
+            "Disabled": {{ $caregivers_disabled }}
+          },
+          "Sentry": {
+            "Dsn": "{{ $sentry_host }}"
+          }
+        }
+{{- end }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Chart.Name }}-env
+  labels:
+    app: {{ .Chart.Name }}-env
+stringData:
+  Redis__Configuration: {{ list $ $.Values.redis | include "common.redis.configuration" }}
+  {{- with $.Values.global.ciCommitRefSlug }}
+  CI_COMMIT_REF_SLUG: {{ . | quote }}
+  {{- end }}
+  {{- with $.Values.global.ciCommitShortSha }}
+  CI_COMMIT_SHORT_SHA: {{ . | quote }}
+  {{- end }}

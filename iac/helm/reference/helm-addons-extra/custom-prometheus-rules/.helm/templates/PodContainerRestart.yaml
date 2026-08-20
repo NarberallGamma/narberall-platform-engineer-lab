@@ -1,0 +1,33 @@
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: CustomPrometheusRules
+metadata:
+  labels:
+    component: rules
+    prometheus: main
+  name: podcontainerrestart
+spec:
+  groups:
+    - name: PodContainerRestart
+      rules:
+        - alert: PodContainerRestarts
+          expr: increase(kube_pod_container_status_restarts_total{namespace=~"production|shop|lab", pod!~"analytics-(refresh-worker.+|sql-api.+)"}[1h]) > 2
+          labels:
+            severity_level: "4"
+          annotations:
+            plk_markup_format: markdown
+            plk_protocol_version: "1"
+            summary: More than 2 restarts of container {{`{{$labels.container}}`}}/{{`{{$labels.pod}}`}}  last 1 hours
+            description: |-
+                There are more than 2 container {{`{{$labels.container}}`}} restarts last 1 hours into pod {{`{{$labels.pod}}`}} at ns {{`{{$labels.namespace}}`}}.
+        - alert: PodContainerRestartsLow
+          expr: increase(kube_pod_container_status_restarts_total{namespace=~"thumbor|opentelemetry-collector|jaeger-operator|cloudwatch-exporter|etcd"}[1h]) > 2
+          labels:
+            severity_level: "4"
+            team: platform-alerts
+          annotations:
+            plk_markup_format: markdown
+            plk_protocol_version: "1"
+            summary: More than 2 restarts of container {{`{{$labels.container}}`}}/{{`{{$labels.pod}}`}}  last 1 hours
+            description: |-
+                There are more than 2 container {{`{{$labels.container}}`}} restarts last 1 hours into pod {{`{{$labels.pod}}`}} at ns {{`{{$labels.namespace}}`}}.

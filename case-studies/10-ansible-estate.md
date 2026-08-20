@@ -20,12 +20,12 @@ See diagram: [`diagrams/case-studies/10-ansible-estate.md`](../diagrams/case-stu
 1) inventories/prod|preprod|demo with the same group names
 2) prepare_servers / prepare_vps_cluster / bootstrap users
 3) docker_app engine + per-app templates (edge LB, HSM, CryptoPro, GitLab, certs, gateway, hibernate)
-4) node-exporter
+4) node-exporter (`:9100`); scraped by `ansible-app-platform` `monitoring_deploy` (Prom → VictoriaMetrics); the Helm overlay ([case 11](11-helm-estate.md)) alerts on those host metrics
 5) Vault roles (docker, load-balancer, secrets)
 6) estate_databases: rw/ro users, drop, schema migrate
 ```
 
-Honest scope: network and CCE stay in Terraform. This tree assumes SSH reachability and an inventory.
+Honest scope: network and CCE stay in Terraform. This tree assumes SSH reachability and an inventory. Host Prom to VictoriaMetrics, blackbox, and Kubernetes SD live in [`ansible-app-platform`](../iac/ansible/reference/ansible-app-platform/), not in this docker_app tree. Host Grafana / vmalert / Alertmanager live in [`sec-stack`](../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/). sar / vnstat before a full scrape estate: [`monitoring-starter`](../iac/ansible/reference/monitoring-starter/).
 
 ## What shipped
 
@@ -40,15 +40,21 @@ Honest scope: network and CCE stay in Terraform. This tree assumes SSH reachabil
 - A host change is a playbook limit, not a rebuild
 - Preprod reuses the same roles
 - Reviewers see a real docker-app graph, not a single nginx demo
+- Host node-exporter is the scrape half of the same SRE story as the Helm Grafana overlay ([case 11](11-helm-estate.md), [`../architecture/05-sre.md`](../architecture/05-sre.md)). Prom to VictoriaMetrics and host Grafana live in the sibling Ansible kits linked below.
 
 ## Stack
 
-Ansible, Docker, nginx, Vault, CryptoPro, HSM, GitLab, Prometheus node-exporter, PostgreSQL, Flyway, Huawei-class hosts
+Ansible, Docker, nginx, Vault, CryptoPro, HSM, GitLab, Prometheus, VictoriaMetrics, node-exporter, PostgreSQL, Flyway, Huawei-class hosts
 
 ## Links
 
 - Sanitized code: [`iac/ansible/reference/ansible-estate/`](../iac/ansible/reference/ansible-estate/)
 - Ansible hub: [`iac/ansible/`](../iac/ansible/)
+- Host Prom / VM / blackbox: [`iac/ansible/reference/ansible-app-platform/`](../iac/ansible/reference/ansible-app-platform/)
+- Host Grafana / vmalert: [`iac/ansible/reference/ansible-llm-collab/extras/sec-stack/`](../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/)
+- Host sar before Prom: [`iac/ansible/reference/monitoring-starter/`](../iac/ansible/reference/monitoring-starter/)
+- In-cluster overlay: [`iac/helm/reference/helm-estate-cluster/monitoring/`](../iac/helm/reference/helm-estate-cluster/monitoring/)
+- SRE / product APIs: [`../architecture/05-sre.md`](../architecture/05-sre.md)
 - Terraform catalog: [`07-huawei-compute-catalog.md`](07-huawei-compute-catalog.md)
 - Night park: [`../architecture/02-finops-night-park.md`](../architecture/02-finops-night-park.md)
 - Host baseline (separate): [`iac/ansible/reference/ansible-bootstrap/`](../iac/ansible/reference/ansible-bootstrap/)

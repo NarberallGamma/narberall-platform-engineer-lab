@@ -1,0 +1,167 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "prometheus-cloudeye-exporter.fullname" . }}
+  namespace: {{ include "prometheus-cloudeye-exporter.namespace" . }}
+  labels:
+    {{- include "prometheus-cloudeye-exporter.labels" . | nindent 4 }}
+  {{- with .Values.podAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "prometheus-cloudeye-exporter.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        {{- include "prometheus-cloudeye-exporter.selectorLabels" . | nindent 8 }}
+        {{- if .Values.podLabels }}
+        {{- toYaml .Values.podLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.podAnnotations }}
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "prometheus-cloudeye-exporter.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range .Values.image.pullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: {{ .Values.restartPolicy }}
+      initContainers:
+      - name: config-init
+        image: alpine:3.18
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          {{- if .Values.config.auth.use_project_id }}
+          if [ -z "${CLOUDEYE_PROJECT_ID}" ] || [ -z "${CLOUDEYE_ACCESS_KEY}" ] || [ -z "${CLOUDEYE_SECRET_KEY}" ]; then
+            echo "ERROR: Required credentials are missing"
+            exit 1
+          fi
+          sed -e "s|\${CLOUDEYE_PROJECT_ID}|${CLOUDEYE_PROJECT_ID}|g" \
+              -e "s|\${CLOUDEYE_ACCESS_KEY}|${CLOUDEYE_ACCESS_KEY}|g" \
+              -e "s|\${CLOUDEYE_SECRET_KEY}|${CLOUDEYE_SECRET_KEY}|g" \
+              "${CONFIG_TEMPLATE_PATH}" > "${CONFIG_FILE_PATH}"
+          {{- else }}
+          if [ -z "${CLOUDEYE_PROJECT_NAME}" ] || [ -z "${CLOUDEYE_ACCESS_KEY}" ] || [ -z "${CLOUDEYE_SECRET_KEY}" ]; then
+            echo "ERROR: Required credentials are missing"
+            exit 1
+          fi
+          sed -e "s|\${CLOUDEYE_PROJECT_NAME}|${CLOUDEYE_PROJECT_NAME}|g" \
+              -e "s|\${CLOUDEYE_ACCESS_KEY}|${CLOUDEYE_ACCESS_KEY}|g" \
+              -e "s|\${CLOUDEYE_SECRET_KEY}|${CLOUDEYE_SECRET_KEY}|g" \
+              "${CONFIG_TEMPLATE_PATH}" > "${CONFIG_FILE_PATH}"
+          {{- end }}
+        env:
+        - name: CONFIG_TEMPLATE_PATH
+          value: {{ .Values.config.paths.configTemplate | quote }}
+        - name: CONFIG_FILE_PATH
+          value: {{ .Values.config.paths.configFile | quote }}
+        {{- if .Values.config.auth.use_project_id }}
+        - name: CLOUDEYE_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "prometheus-cloudeye-exporter.fullname" . }}
+              key: project_id
+        {{- else }}
+        - name: CLOUDEYE_PROJECT_NAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "prometheus-cloudeye-exporter.fullname" . }}
+              key: project_name
+        {{- end }}
+        - name: CLOUDEYE_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "prometheus-cloudeye-exporter.fullname" . }}
+              key: access_key
+        - name: CLOUDEYE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "prometheus-cloudeye-exporter.fullname" . }}
+              key: secret_key
+        volumeMounts:
+        - name: config-template
+          mountPath: {{ .Values.config.paths.templateDir }}
+          readOnly: true
+        - name: config
+          mountPath: {{ .Values.config.paths.configDir }}
+      containers:
+      - name: cloudeye-exporter
+        image: {{ include "prometheus-cloudeye-exporter.image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.containerPort }}
+          protocol: TCP
+        {{- with .Values.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        args:
+        - -config={{ .Values.config.paths.configFile }}
+        {{- with .Values.extraEnv }}
+        env:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.extraEnvFrom }}
+        envFrom:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 10 }}
+        volumeMounts:
+        - name: config
+          mountPath: {{ .Values.config.paths.configDir }}
+          readOnly: true
+        {{- with .Values.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+      - name: config-template
+        configMap:
+          name: {{ include "prometheus-cloudeye-exporter.fullname" . }}
+      - name: config
+        emptyDir: {}
+      {{- with .Values.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}

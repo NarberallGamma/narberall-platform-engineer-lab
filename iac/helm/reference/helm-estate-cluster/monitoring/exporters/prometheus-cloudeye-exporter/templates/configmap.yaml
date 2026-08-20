@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "prometheus-cloudeye-exporter.fullname" . }}
+  namespace: {{ include "prometheus-cloudeye-exporter.namespace" . }}
+  labels:
+    {{- include "prometheus-cloudeye-exporter.labels" . | nindent 4 }}
+data:
+  clouds.yml.template: |
+    global:
+      prefix: {{ .Values.config.global.prefix | default "huaweicloud" | quote }}
+      port: {{ .Values.config.global.port | default ":8087" | quote }}
+      scrape_batch_size: {{ .Values.config.global.scrape_batch_size | default 300 }}
+      {{- if .Values.config.global.max_routines }}
+      max_routines: {{ .Values.config.global.max_routines }}
+      {{- end }}
+      resource_sync_interval_minutes: {{ .Values.config.global.resource_sync_interval_minutes | default 180 }}
+      ignore_ssl_verify: {{ .Values.config.global.ignore_ssl_verify | default false }}
+      {{- if .Values.config.global.logs_conf_path }}
+      logs_conf_path: {{ .Values.config.global.logs_conf_path | quote }}
+      {{- end }}
+      {{- if .Values.config.global.metrics_conf_path }}
+      metrics_conf_path: {{ .Values.config.global.metrics_conf_path | quote }}
+      {{- end }}
+      {{- if .Values.config.global.endpoints_conf_path }}
+      endpoints_conf_path: {{ .Values.config.global.endpoints_conf_path | quote }}
+      {{- end }}
+      {{- if .Values.config.global.metric_query_duration }}
+      metric_query_duration: {{ .Values.config.global.metric_query_duration }}
+      {{- end }}
+      {{- if .Values.config.global.ep_ids }}
+      ep_ids: {{ .Values.config.global.ep_ids | quote }}
+      {{- end }}
+      {{- if .Values.config.global.rds_instance_ids }}
+      rds_instance_ids: {{ .Values.config.global.rds_instance_ids | quote }}
+      {{- end }}
+      {{- if .Values.config.global.dcs_instance_ids }}
+      dcs_instance_ids: {{ .Values.config.global.dcs_instance_ids | quote }}
+      {{- end }}
+      {{- if .Values.config.global.dms_instance_ids }}
+      dms_instance_ids: {{ .Values.config.global.dms_instance_ids | quote }}
+      {{- end }}
+    auth:
+      auth_url: {{ .Values.config.auth.auth_url | quote }}
+      {{- if .Values.config.auth.use_project_id }}
+      project_id: "${CLOUDEYE_PROJECT_ID}"
+      {{- else }}
+      project_name: "${CLOUDEYE_PROJECT_NAME}"
+      {{- end }}
+      access_key: "${CLOUDEYE_ACCESS_KEY}"
+      secret_key: "${CLOUDEYE_SECRET_KEY}"
+      region: {{ .Values.config.auth.region | quote }}

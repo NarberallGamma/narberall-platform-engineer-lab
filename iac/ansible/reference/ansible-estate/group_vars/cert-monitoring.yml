@@ -17,7 +17,7 @@ docker_app:
   slug: cert-monitoring
   image: "{{ docker_app_registry }}/cert-monitoring:2.0"
   app_version: "2.0"
-  telegram_chat_ids: "-1003166833121"
+  telegram_chat_ids: "-1000000000001"
   check_interval_seconds: 43200
   early_warning_days: 30
   warning_days: 21

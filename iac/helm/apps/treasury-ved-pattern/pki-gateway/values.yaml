@@ -1,0 +1,192 @@
+fullnameOverride: pki-gateway
+
+global:
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+  env:
+    PLACEHOLDER: "managed-by-vault-external-secrets"
+
+# Three PVCs: users, keys, pkidebug.
+# storageClass: "ssd". Explicit empty class: storageClass: "-"
+persistence:
+  enabled: true
+  storageClass: "ssd"
+  accessMode: ReadWriteOnce
+  finalizers:
+    - kubernetes.io/pvc-protection
+  annotations: {}
+  cprocspUsers:
+    create: true
+    claimName: &pvc_pki_users pki-gateway-cprocsp-users-pvc
+    size: 1Gi
+  pkidebugData:
+    create: true
+    claimName: &pvc_pki_pkidebug pki-gateway-pkidebug-data-pvc
+    size: 1Gi
+  cprocspKeys:
+    create: true
+    claimName: &pvc_pki_keys pki-gateway-cprocsp-keys-pvc
+    size: 1Gi
+
+application:
+  enabled: true
+  replicaCount: 1
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+
+  podSecurityContext:
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+
+  service:
+    enabled: true
+    port: 8080
+    targetPort: 8080
+    type: ClusterIP
+
+  podAnnotations:
+    sidecar.istio.io/inject: "true"
+    sidecar.istio.io/proxyCPU: "100m"
+    sidecar.istio.io/proxyMemory: "128Mi"
+
+  serviceAccount:
+    authDelegator: true
+
+  extraEnvFrom:
+    - secretRef:
+        name: pki-gateway-vault-secrets
+
+  env:
+    server.forward-headers-strategy: framework
+
+    spring.application.name: pki-gateway-app
+    spring.cloud.vault.uri: "https://vault.example.com"
+    spring.cloud.vault.authentication: KUBERNETES
+    spring.cloud.vault.kubernetes.role: app
+    spring.cloud.vault.kubernetes.service-account-token-file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    spring.cloud.vault.kubernetes-path: kubernetes
+
+    spring.cloud.openfeign.client.config.default.logger-level: basic
+
+    treasury.policy-gateway.dgtry.mode: GENKEY
+    KEYS_AMOUNT: 0
+    pkidebug.enabled: true
+    pkigateway.mode: debug
+    pkigateway.debug.crl-callback-url: "http://cert-verifier-application:8080/certificates/crl/add"
+    pkigateway.cryptopro.crl-sync-interval: "1h"
+
+    management.endpoints.web.exposure.include: "*"
+
+    logging.level.root: INFO
+    logging.level.com.example.estate: INFO
+    logging.level.feign_util_logger: INFO
+
+  extraVolumes:
+    - name: bootstrap-script
+      configMap:
+        name: pki-gateway-bootstrap-script
+        defaultMode: 0755
+    - name: cprocsp-users
+      persistentVolumeClaim:
+        claimName: *pvc_pki_users
+    - name: cprocsp-keys
+      persistentVolumeClaim:
+        claimName: *pvc_pki_keys
+    - name: pkidebug-data
+      persistentVolumeClaim:
+        claimName: *pvc_pki_pkidebug
+
+  extraVolumeMounts:
+    - name: cprocsp-users
+      mountPath: /var/opt/cprocsp/users/cprouser
+    - name: cprocsp-keys
+      mountPath: /var/opt/cprocsp/keys/cprouser
+    - name: pkidebug-data
+      mountPath: /app/data/pkigateway
+
+  extraEnv:
+    - name: JAVA_TOOL_OPTIONS
+      value: "-Djdk.tls.namedGroups=secp256r1,secp384r1,secp521r1,ffdhe2048,ffdhe3072 -Dcom.sun.net.ssl.checkRevocation=false -Djavax.net.ssl.checkRevocation=false -Dcom.sun.jndi.ldap.object.disableEndpointIdentification=true -Djdk.tls.client.enableStatusRequestExtension=false"
+
+  initContainers:
+    # base-chart 0.2.1 bootstrap: scripts/bootstrap-cryptopro.sh (ConfigMap via .Files.Get). GENKEY: genkeys does not run in init.
+    - name: bootstrap
+      image: example.registry/csp/cryptopro:latest
+      imagePullPolicy: IfNotPresent
+      securityContext:
+        runAsUser: 0
+      command:
+        - bash
+        - /scripts/bootstrap-cryptopro.sh
+      env:
+        - name: treasury.policy-gateway.dgtry.mode
+          value: GENKEY
+        - name: KEYS_AMOUNT
+          value: "0"
+      volumeMounts:
+        - name: bootstrap-script
+          mountPath: /scripts
+          readOnly: true
+        - name: cprocsp-keys
+          mountPath: /var/opt/cprocsp/keys/cprouser
+
+  image:
+    repository: example.registry/estate/pki-gateway
+    tag: "0.0.3"
+    pullPolicy: IfNotPresent
+
+  livenessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 90
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  readinessProbe:
+    httpGet:
+      path: /actuator/health
+      port: 8080
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 5
+
+  containerPorts:
+    - name: http
+      containerPort: 8080
+      protocol: TCP
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      kubernetes.io/tls-acme: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$1
+      nginx.ingress.kubernetes.io/x-forwarded-prefix: /api/v0/pki-gateway/
+    hosts:
+      - host: web.example.com
+        paths:
+          - path: /api/v0/pki-gateway/(.*)
+            pathType: ImplementationSpecific
+    tls:
+      - secretName: wildcard-tls
+        hosts:
+          - web.example.com
+
+  resources:
+    requests:
+      cpu: 188m
+      memory: 384Mi
+    limits:
+      cpu: 750m
+      memory: 768Mi

@@ -1,0 +1,6 @@
+dependencies:
+- name: common-postgresql
+  repository: ""
+  version: ~0
+digest: sha256:543134dca08474afde3193b4468bc70314c133331d58bf5df7dff952f7b89299
+generated: "2024-09-03T23:45:58.882291+03:00"

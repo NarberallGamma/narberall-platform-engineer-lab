@@ -1,0 +1,78 @@
+# -*- mode: crontab -*-
+# # vi: set ft=crontab :
+#
+
+# WARNING! CRONTAB MANAGED FROM GITLAB CI RUNNER IN ${CI_PROJECT_URL}
+# CI_COMMIT_SHA: ${CI_COMMIT_SHA}
+# Branch/tag: ${CI_COMMIT_REF_NAME}
+# Timestamp: ${TIMESTAMP}
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""
+
+# здесь и далее нужно заменить строку SERVER_IP на IP-адрес сервера, на котором должен выполняться скрипт, имя которого передаётся borg_run_on.sh вторым аргументом
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_files.sh 'SYSTEM /etc,/opt'
+
+###################
+# Примеры бекапов
+# Внимание! Имена заданий, являющихся также суффиксами имен Borg-репозиториев, необходимо писать в верхнем регистре!
+# Например: SYSTEM, DATA, VAR, PG, WAL, MYSQL, BINLOG, GITLAB, ETCD, MONGO, CLCKHS и т.д.
+
+###################
+# Бэкап системы (SYSTEM)
+# backup SYSTEM (borg repositary name will be $(hostname)-SYSTEM)
+# Внимание! Имя SYSTEM-бэкапа необходимо писать в верхнем регистре т.е. SYSTEM, иначе в бэкапы не будет попадать список установленных пакетов!
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_files.sh 'SYSTEM /etc,/var/spool/cron,/etc/estate-agent/etc/config.d ^\/etc\/\.git$'
+
+###################
+# Бэкап любых файлов
+# backup var dir, exclude /var/.*/lock (borg repositary name will be $(hostname)-VAR)
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_files.sh 'VAR /var ^\/var\/.*\/lock$'
+
+###################
+# Бэкап PostgreSQL
+# backup postgres databases (borg repositary name will be $(hostname)-PG)
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_postgres_stdout.sh 'PG'
+
+# backup postgres wals (borg repositary name will be $(hostname)-WAL, WAL archives located in /var/backups/pgsql/wal, WAL archives older than 14 days will be deleted)
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_wals.sh '/var/backups/pgsql/wal 14'
+
+###################
+# Бэкап MySQL
+# backup mysql databases via innobackupex (borg repositary name will be $(hostname)-MYSQL)
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_mysql.sh 'MYSQL'
+
+# backup mysql databases via mysqldump (borg repositary name will be $(hostname)-MYSQLDUMP)
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_mysqldump.sh 'MYSQLDUMP'
+
+# backup mysql binlogs (borg repositary name will be $(hostname)-BINLOG)
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_files.sh 'BINLOG "/var/lib/mysql/mysql-bin.*"'
+
+###################
+# Бэкап GitLab
+# backup gitlab (borg repositary name will be $(hostname)-GITLAB)
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_gitlab.sh 'GITLAB'
+
+###################
+# Бэкап etcd
+# backup kubernetes etcd (borg repositary name will be $(hostname)-ETCD)
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_etcd.sh
+
+###################
+# Бэкап ElasticSearch
+# backup elastic all indices (borg repositary name will be $(hostname)-ESDUMP)
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_es_esdump.sh 'ESDUMP'
+
+# backup elastic indice blog (borg repositary name will be $(hostname)-ESDUMP)
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_es_esdump.sh 'ESDUMP blog'
+
+###################
+# Бэкап ardb
+# backup ardb (borg repositary name will be $(hostname)-ARDB, port ARDB - 2280, temporary directory of backup - /backup/ardb)
+0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_ardb.sh 'ARDB 2280 /backup/ardb'
+
+###################
+# Бэкап Mongo снаружи узла
+0 23 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo_auth.sh k8s-production-MONGO "MainRepSet/mongod-0.mongo.production.svc.cluster.local:27017,mongod-1.mongo.production.svc.cluster.local:27017,mongod-2.mongo.production.svc.cluster.local:27017"
+
+# Бэкап Sentry из kube кластера
+0 23 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_pg_dump.sh 'KUBE-DEV-SENTRY-PGDUMP --db SENTRY_DATABASE --host SENTRY_HOST --user SENTRY_USER'

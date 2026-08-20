@@ -1,0 +1,86 @@
+{{- if include "fl.isTrue" (list $ . $.Values.ingress.enabled) }}
+{{ $host := include "fl.value" (list $ . $.Values.ingress.host) }}
+{{ $secretName := include "fl.value" (list $ . $.Values.ingress.tls.secretName) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Chart.Name }}
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    {{- include "fl.value" (list $ . $.Values.ingress.annotations) | nindent 4 }}
+spec:
+  tls:
+    - hosts:
+        - {{ $host }}
+      secretName: {{ $secretName }}
+  rules:
+  - host: {{ $host }}
+    http:
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: {{ .Chart.Name }}
+            port:
+              name: http
+{{- end }}
+
+{{- if include "fl.isTrue" (list $ . $.Values.ingress_partners.enabled) }}
+{{ $host := include "fl.value" (list $ . $.Values.ingress_partners.host) }}
+{{ $secretName := include "fl.value" (list $ . $.Values.ingress_partners.tls.secretName) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Chart.Name }}-partners
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    {{- include "fl.value" (list $ . $.Values.ingress_partners.annotations) | nindent 4 }}
+spec:
+  tls:
+    - hosts:
+        - {{ $host }}
+      secretName: {{ $secretName }}
+  rules:
+  - host: {{ $host }}
+    http:
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: {{ .Chart.Name }}
+            port:
+              name: http
+{{- end }}
+
+{{- if include "fl.isTrue" (list $ . $.Values.ingress_public_rest_api.enabled) }}
+{{ $host := include "fl.value" (list $ . $.Values.ingress_public_rest_api.host) }}
+{{ $secretName := include "fl.value" (list $ . $.Values.ingress_public_rest_api.tls.secretName) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Chart.Name }}-public-rest-api
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    {{- include "fl.value" (list $ . $.Values.ingress_public_rest_api.annotations) | nindent 4 }}
+spec:
+  tls:
+    - hosts:
+        - {{ $host }}
+      secretName: {{ $secretName }}
+  rules:
+  - host: {{ $host }}
+    http:
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: {{ .Chart.Name }}
+            port:
+              name: http
+{{- end }}

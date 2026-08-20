@@ -1,0 +1,9 @@
+---
+include:
+  - project: 'platform/infra/common-ci'
+    file: '/multiStageInfra.yml'
+
+variables:
+  WERF_VERSION: "1.2 ea"
+  KUBE_NAMESPACE: "default"
+  WERF_EXPERIMENTAL_DEPLOY_ENGINE: "1"

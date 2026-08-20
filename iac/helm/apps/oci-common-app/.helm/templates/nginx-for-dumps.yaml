@@ -1,0 +1,122 @@
+{{- if eq .Values.werf.env "production" }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    werf.io/weight: "-110"
+  finalizers:
+  - kubernetes.io/pvc-protection
+  name: dotnet-dumps
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: efs-sc
+  volumeMode: Filesystem
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-for-dumps
+  labels:
+    app: nginx-for-dumps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-for-dumps
+  template:
+    metadata:
+      labels:
+        app: nginx-for-dumps
+    spec:
+      containers:
+      - name: nginx-for-dumps
+        image: {{ .Values.werf.image.nginx }}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: dotnet-dumps
+          mountPath: /var/nginx/dotnet-dumps
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+      imagePullSecrets:
+        - name: registrysecret
+      volumes:
+      - name: dotnet-dumps
+        persistentVolumeClaim:
+          claimName: dotnet-dumps
+      - name: nginx-config
+        configMap:
+          name: nginx-configmap-for-dumps
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-configmap-for-dumps
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+
+        location /dotnet-dumps/ {
+            alias /var/nginx/dotnet-dumps/;
+            autoindex on;
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-for-dumps
+  labels:
+    app: nginx-for-dumps
+spec:
+  selector:
+    app: nginx-for-dumps
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  type: ClusterIP
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cleanup-cronjob-dumps
+spec:
+  schedule: "0 11 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: cleanup
+            image: {{ .Values.werf.image.nginx }}
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/bash
+            - -c
+            - |
+              find /var/nginx/dotnet-dumps -type f -mtime +5 -exec rm -f {} \; -print
+            volumeMounts:
+            - name: dotnet-dumps
+              mountPath: /var/nginx/dotnet-dumps
+          restartPolicy: OnFailure
+          imagePullSecrets:
+            - name: registrysecret
+          volumes:
+          - name: dotnet-dumps
+            persistentVolumeClaim:
+              claimName: dotnet-dumps
+{{- end }}

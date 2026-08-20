@@ -1,9 +1,9 @@
 ---
-hostname: lb-waf-prod-01
+hostname: lb-waf.example.local
 uuid: [ключ на сервере] (выдается в консоли Wallarm)
 secret: [ключ на сервере] (выдается в консоли Wallarm)  
 api:
-  host: api.webmonitorx.ru
+  host: wallarm.example.com
   ca_verify: false
   port: 443
 sub_type: all

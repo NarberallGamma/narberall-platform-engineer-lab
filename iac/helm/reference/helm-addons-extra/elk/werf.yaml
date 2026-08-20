@@ -1,0 +1,23 @@
+configVersion: 1
+project: elk
+---
+image: elasticsearch-exporter
+from: quay.io/prometheuscommunity/elasticsearch-exporter:v1.3.0
+---
+image: ubuntu
+from: ubuntu:24.04
+shell:
+  setup:
+  - >
+    apt update &&
+    apt install curl jq -y --no-install-recommends &&
+    apt autoremove
+---
+image: logstash
+from: docker.elastic.co/logstash/logstash:8.14.0
+# ---
+# image: kibana
+# from: docker.elastic.co/kibana/kibana:8.14.0
+# ---
+# image: elasticsearch
+# from: docker.elastic.co/elasticsearch/elasticsearch:8.14.0

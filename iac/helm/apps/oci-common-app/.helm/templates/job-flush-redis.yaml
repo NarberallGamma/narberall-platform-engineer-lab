@@ -1,0 +1,31 @@
+{{- $run_flush := ne $.Values.global.cluster_type "reserve" }}
+{{- $redis_host := .Values.redis.host | list $ . | include "fl.value" }}
+{{- $redis_port := .Values.redis.port | list $ . | include "fl.value" }}
+{{- $redis_flush_command := .Values.redis_flush_command | list $ . | include "fl.value" | replace "%h" $redis_host | replace "%p" $redis_port }}
+{{- if $run_flush }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-flush-redis
+  annotations:
+    "helm.sh/hook": post-install, post-upgrade
+    "helm.sh/hook-weight": "-1"
+spec:
+  activeDeadlineSeconds: 3600
+  backoffLimit: 1
+  template:
+    metadata:
+      name: {{ .Chart.Name }}-flush-redis
+    spec:
+      imagePullSecrets:
+      - name: registrysecret
+      restartPolicy: Never
+      initContainers:
+      {{- list . "redis" $redis_host $redis_port | include "common.initContainer.waitPort" | indent 6 }}
+      containers:
+      - name: flush-redis
+        image: {{ .Values.common.images.rediscli }}
+        imagePullPolicy: IfNotPresent
+        command: ['/bin/sh', '-c', '{{ $redis_flush_command }}']
+{{- end }}

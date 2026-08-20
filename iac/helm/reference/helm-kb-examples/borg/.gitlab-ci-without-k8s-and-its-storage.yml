@@ -1,0 +1,40 @@
+# Deploy variant:
+# * the project has no Kubernetes
+# * the estate has no dedicated Borg storage host
+# * jobs write to shared backup storage
+
+stages:
+  - deploy
+  - cleanup
+
+before_script:
+  - pwd
+  - hostname
+  - echo "${HOME}"
+  - echo "${CI_PROJECT_DIR}"
+  - echo "${PROJECT_UUID}"
+
+deploy:
+  stage: deploy
+  script:
+    - test -n "${PROJECT_UUID}" || echo "Variable PROJECT_UUID not defined. Generate it value by uuidgen and set his to GitLab variables"
+    - test -n "${PROJECT_UUID}"
+    - export TIMESTAMP="$(date '+%Y.%m.%d %H:%M:%S')"
+    - mkdir -p "${HOME}/cron.d.tmp/"
+    - |
+      flock --verbose --exclusive --wait 60 "${HOME}/backup_deploy_lockfile" bash -c "
+      cat '${CI_PROJECT_DIR}/schedule' | envsubst > '${HOME}/cron.d.tmp/${PROJECT_UUID}';
+      cat '${HOME}/CRON_PATH' '${HOME}/cron.d.tmp/'* | crontab -;"
+    - chmod +x "${CI_PROJECT_DIR}/00-scripts/"*.sh
+  tags:
+    - borg
+  only:
+    - master
+
+cleanup:
+  stage: cleanup
+  script:
+    - if test -f "${HOME}/cron.d.tmp/${PROJECT_UUID}"; then unlink "${HOME}/cron.d.tmp/${PROJECT_UUID}"; fi
+  tags:
+    - borg
+  when: manual

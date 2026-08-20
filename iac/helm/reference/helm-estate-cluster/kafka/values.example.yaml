@@ -1,0 +1,363 @@
+# Excerpt only. Broker StatefulSet stays off. One KafkaConnect plus outbox KafkaConnectors.
+# Replace placeholders before a real install. Live passwords stay out of git.
+
+global:
+  imagePullSecrets:
+    - name: regcred
+
+# In-cluster Kafka and ZooKeeper stay disabled. Brokers are managed DMS.
+kafka:
+  enabled: false
+
+# Vendor chart AKHQ 0.3.1 is a dependency pin only. Keep charts/akhq out of git.
+akhq:
+  enabled: true
+  existingSecrets: kafka-akhq-secrets
+  imagePullSecrets:
+    - name: regcred
+  secrets:
+    micronaut:
+      server:
+        context-path: /kafka
+      security:
+        enabled: true
+    akhq:
+      security:
+        default-group: no-roles
+        basic-auth:
+          - username: admin
+            password: "VAULT_AKHQ_ADMIN_PASSWORD"
+            passwordHash: BCRYPT
+            groups:
+              - admin
+          - username: reader
+            password: "VAULT_AKHQ_READER_PASSWORD"
+            passwordHash: BCRYPT
+            groups:
+              - reader
+      connections:
+        kafka:
+          properties:
+            bootstrap.servers: "kafka-0.kafka.example.com:9093,kafka-1.kafka.example.com:9093,kafka-2.kafka.example.com:9093"
+            security.protocol: SASL_SSL
+            sasl.mechanism: PLAIN
+            sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="kafka_user" password="VAULT_KAFKA_CLIENT_PASSWORD";
+            ssl.endpoint.identification.algorithm: ""
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    paths:
+      - /kafka
+    hosts:
+      - kafka.example.com
+    tls:
+      - secretName: wildcard-tls
+        hosts:
+          - kafka.example.com
+
+kafkaConnect:
+  - name: debezium
+    spec:
+      image: example.registry/platform/kafka-connect-transactional-outbox-debezium:1.0.1
+      replicas: 3
+      bootstrapServers: kafka-0.kafka.example.com:9093,kafka-1.kafka.example.com:9093,kafka-2.kafka.example.com:9093
+      config:
+        group.id: connect-cluster
+        offset.storage.topic: connect-cluster-offsets
+        config.storage.topic: connect-cluster-configs
+        status.storage.topic: connect-cluster-status
+        config.storage.replication.factor: -1
+        offset.storage.replication.factor: -1
+        status.storage.replication.factor: -1
+        socket.connection.setup.timeout.ms: 60000
+        request.timeout.ms: 60000
+        metadata.max.age.ms: 300000
+        fetch.max.bytes: 52428800
+        ssl.endpoint.identification.algorithm: ""
+        producer.ssl.endpoint.identification.algorithm: ""
+        consumer.ssl.endpoint.identification.algorithm: ""
+        admin.ssl.endpoint.identification.algorithm: ""
+        log4j.logger.io.debezium: INFO
+        log4j.rootLogger: INFO, stdout
+      authentication:
+        type: plain
+        username: kafka_user
+        passwordSecret:
+          secretName: kafka-user-pass
+          password: CHANGE_ME
+      tls:
+        trustedCertificates:
+          - secretName: kafka-ca-cert
+            certificate: ca.crt
+      # Place resources on spec.resources for Strimzi 0.46.0 (not template.connectContainer).
+      resources:
+        requests:
+          cpu: 400m
+          memory: 1408Mi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+      template:
+        pod:
+          terminationGracePeriodSeconds: 60
+          imagePullSecrets:
+            - name: regcred
+          metadata:
+            annotations:
+              prometheus.io/scrape: "true"
+              prometheus.io/port: "9404"
+              prometheus.io/path: "/metrics"
+          volumes:
+            - name: log4j-config
+              configMap:
+                name: kafka-kafka-connect-log4j
+        connectContainer:
+          volumeMounts:
+            - name: log4j-config
+              mountPath: /mnt/log4j-config
+              readOnly: true
+          env:
+            - name: KAFKA_LOG4J_OPTS
+              value: "-Dlog4j.configuration=file:/mnt/log4j-config/log4j.properties"
+            - name: KAFKA_CONNECT_BOOTSTRAP_SERVERS
+              value: "kafka-0.kafka.example.com:9093,kafka-1.kafka.example.com:9093,kafka-2.kafka.example.com:9093"
+            - name: KAFKA_CONNECT_SASL_MECHANISM
+              value: "plain"
+            - name: KAFKA_CONNECT_SASL_USERNAME
+              value: "kafka_user"
+            - name: KAFKA_CONNECT_SASL_PASSWORD_FILE
+              value: "kafka-user-pass/pass"
+            - name: KAFKA_CONNECT_TLS
+              value: "true"
+            - name: KAFKA_CONNECT_TRUSTED_CERTS
+              value: "kafka-ca-cert/ca.crt"
+            # Supply the full key=value block. Strimzi 0.46.0 no longer injects it for a custom connect image.
+            - name: KAFKA_CONNECT_CONFIGURATION
+              value: |
+                offset.storage.topic=connect-cluster-offsets
+                value.converter=org.apache.kafka.connect.json.JsonConverter
+                config.storage.topic=connect-cluster-configs
+                key.converter=org.apache.kafka.connect.json.JsonConverter
+                group.id=connect-cluster
+                status.storage.topic=connect-cluster-status
+                admin.ssl.endpoint.identification.algorithm=
+                config.storage.replication.factor=-1
+                consumer.ssl.endpoint.identification.algorithm=
+                fetch.max.bytes=52428800
+                metadata.max.age.ms=300000
+                offset.storage.replication.factor=-1
+                producer.ssl.endpoint.identification.algorithm=
+                request.timeout.ms=60000
+                socket.connection.setup.timeout.ms=60000
+                ssl.endpoint.identification.algorithm=
+                status.storage.replication.factor=-1
+                log4j.logger.io.debezium=INFO
+                log4j.rootLogger=INFO, stdout
+
+# Shared outbox config. Merge at config level so dbname and slot override without dropping SMT keys.
+x-outbox-config: &outboxConfig
+  topic.prefix: estate-postgresql
+  database.hostname: 10.10.0.10
+  database.port: 5432
+  database.user: VAULT_POSTGRES_USER
+  database.password: VAULT_POSTGRES_PASSWORD
+  database.server.name: estate-postgresql
+  schema.include.list: kafka_transactional_outbox
+  table.include.list: kafka_transactional_outbox.outbox_message
+  tombstones.on.delete: "false"
+  transforms: outbox
+  transforms.outbox.type: com.example.outbox.message.debezium.transformation.OutboxMessageTransformation
+  key.converter: io.debezium.converters.ByteArrayConverter
+  key.converter.delegate.converter.type: org.apache.kafka.connect.json.JsonConverter
+  key.converter.delegate.converter.type.schemas.enable: true
+  value.converter: io.debezium.converters.ByteArrayConverter
+  value.converter.delegate.converter.type: org.apache.kafka.connect.json.JsonConverter
+  value.converter.delegate.converter.type.schemas.enable: true
+  heartbeat.action.query: "UPDATE kafka_transactional_outbox.heartbeat SET updated_date = NOW();"
+  heartbeat.interval.ms: 60000
+  snapshot.mode: never
+  slot.drop.on.stop: true
+  slot.drop.on.stop.timeout.ms: 30000
+  slot.lag.increase.mark.disabled: true
+  publication.autocreate.mode: filtered
+  plugin.name: pgoutput
+
+kafkaConnector:
+  - name: onboarding-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_onboarding
+        slot.name: app_onboarding_debezium
+      autoRestart:
+        enabled: true
+  - name: contract-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_contract
+        slot.name: app_contract_debezium
+      autoRestart:
+        enabled: true
+  - name: report-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_report
+        slot.name: app_report_debezium
+      autoRestart:
+        enabled: true
+  - name: aml-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_aml
+        slot.name: app_aml_debezium
+      autoRestart:
+        enabled: true
+  - name: web-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_web
+        slot.name: app_web_debezium
+      autoRestart:
+        enabled: true
+  - name: auth-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_auth
+        slot.name: app_auth_debezium
+      autoRestart:
+        enabled: true
+  - name: safe-deal-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_safe_deal
+        slot.name: app_safe_deal_debezium
+      autoRestart:
+        enabled: true
+  - name: treasury-adapter-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_treasury_adapter
+        slot.name: app_treasury_adapter_debezium
+      autoRestart:
+        enabled: true
+  - name: rates-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_rates
+        slot.name: app_rates_debezium
+      autoRestart:
+        enabled: true
+  - name: aml-tx-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_aml_tx
+        slot.name: app_aml_tx_debezium
+      autoRestart:
+        enabled: true
+  - name: api-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_api
+        slot.name: app_api_debezium
+      autoRestart:
+        enabled: true
+  - name: nodes-eth-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_nodes_eth
+        slot.name: app_nodes_eth_debezium
+      autoRestart:
+        enabled: true
+  - name: nodes-tron-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_nodes_tron
+        slot.name: app_nodes_tron_debezium
+      autoRestart:
+        enabled: true
+  - name: csp-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_csp
+        slot.name: app_csp_debezium
+      autoRestart:
+        enabled: true
+  - name: lp-adapter-transactional-outbox
+    enabled: false
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_lp_adapter
+        slot.name: app_lp_adapter_debezium
+      autoRestart:
+        enabled: true
+  - name: nodes-btc-transactional-outbox
+    enabled: false
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_nodes_btc
+        slot.name: app_nodes_btc_debezium
+      autoRestart:
+        enabled: true

@@ -1,0 +1,44 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-template-upload
+  annotations:
+    "helm.sh/hook": post-upgrade
+    "helm.sh/hook-weight": "10"
+    "werf/watch-logs": "true"
+spec:
+  activeDeadlineSeconds: 360
+  backoffLimit: 1
+  template:
+    metadata:
+      name: {{ .Chart.Name }}-template-upload
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: registrysecret
+      volumes:
+        - name: elk-es-templates
+          configMap:
+            name: elk-es-templates
+      containers:
+        - name: elk-template-upload
+          image: {{ index .Values.werf.image "ubuntu" }}
+          command:
+            - bash
+            - /opt/templates/entrypoint.sh
+          volumeMounts:
+            - name: elk-es-templates
+              mountPath: /opt/templates
+          env:
+            - name: ELASTICSEARCH_HOST
+              value: {{ printf "%s-es-http" .Chart.Name }}
+            - name: ELASTICSEARCH_PORT
+              value: "9200"
+            - name: ELASTICSEARCH_USERNAME
+              value: elastic
+            - name: ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: elastic
+                  name: {{ .Chart.Name }}-es-elastic-user

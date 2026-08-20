@@ -1,0 +1,57 @@
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: CustomPrometheusRules
+metadata:
+  labels:
+    component: rules
+    prometheus: main
+  name: requestsresponses
+spec:
+  groups:
+    - name: TooManyRequestsResponse
+      rules:
+        - alert: TooManyRequestsResponseInfo
+          expr: sum(rate(ingress_nginx_detail_responses_total{job="nginx-ingress-controller", namespace=~"production|shop|lab", status="429"}[60s])) > 0.25
+          for: 2m
+          labels:
+            severity_level: "4"
+          annotations:
+            plk_protocol_version: "1"
+            summary: "Too Many Requests Errors > 0.25"
+            plk_grouped_by__minio_monitoring: TooManyRequestsResponse
+            plk_incident_link_icon__grafana: fa-bar-chart
+            plk_incident_link_title_en__grafana: Grafana Dashboard
+            plk_incident_link_title_ru__grafana: Grafana Dashboard
+            plk_incident_link_url__grafana: https://grafana.example.com/d/D38hRqGmk/vhosts
+            description: |-
+                Too Many Requests Errors > 0.25, maybe we need increase requests limits.
+        - alert: TooManyRequestsResponseWarn
+          expr: sum(rate(ingress_nginx_detail_responses_total{job="nginx-ingress-controller", namespace=~"production|shop|lab", status="429"}[60s])) > 3
+          for: 2m
+          labels:
+            severity_level: "3"
+          annotations:
+            plk_protocol_version: "1"
+            summary: "Too Many Requests Errors > 3"
+            plk_grouped_by__minio_monitoring: TooManyRequestsResponse
+            plk_incident_link_icon__grafana: fa-bar-chart
+            plk_incident_link_title_en__grafana: Grafana Dashboard
+            plk_incident_link_title_ru__grafana: Grafana Dashboard
+            plk_incident_link_url__grafana: https://grafana.example.com/d/D38hRqGmk/vhosts
+            description: |-
+                Too Many Requests Errors > 3, maybe we need increase requests limits.
+        - alert: TooManyRequestsResponseCrit
+          expr: sum(rate(ingress_nginx_detail_responses_total{job="nginx-ingress-controller", namespace=~"production|shop|lab", status="429"}[60s])) > 10
+          for: 2m
+          labels:
+            severity_level: "2"
+          annotations:
+            plk_protocol_version: "1"
+            summary: "Too Many Requests Errors > 10"
+            plk_grouped_by__minio_monitoring: TooManyRequestsResponse
+            plk_incident_link_icon__grafana: fa-bar-chart
+            plk_incident_link_title_en__grafana: Grafana Dashboard
+            plk_incident_link_title_ru__grafana: Grafana Dashboard
+            plk_incident_link_url__grafana: https://grafana.example.com/d/D38hRqGmk/vhosts
+            description: |-
+                Too Many Requests Errors > 10, maybe its DDoS!

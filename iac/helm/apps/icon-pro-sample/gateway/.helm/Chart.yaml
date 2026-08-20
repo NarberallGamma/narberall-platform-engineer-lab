@@ -1,0 +1,5 @@
+apiVersion: v2
+appVersion: "1.0"
+description: Shop API gateway. Path-based publication Ingress in front of sibling services.
+name: shop-gateway
+version: 1.0.0

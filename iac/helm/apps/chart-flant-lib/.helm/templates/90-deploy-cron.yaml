@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ labels:
+   app: {{ .Chart.Name }}-cron
+ annotations:
+   pod-reloader.deckhouse.io/auto: "true"
+ name: {{ .Chart.Name }}-cron
+spec:
+  strategy:
+    type: RollingUpdate
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}-cron
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}-cron
+    spec:
+      {{- include "imagePullSecrets" . | indent 6 }}
+      {{- include "tolerations" . | indent 6 }}
+      {{- include "nodeSelector" . | indent 6 }}
+      {{- include "priorityClassName" . | indent 6 }}
+      containers:
+      - name: cron
+        envFrom:
+          - secretRef:
+              name: {{ $.Chart.Name }}-env
+        image: {{ .Values.werf.image.cron }}
+        command: ["/usr/local/bin/supercronic", "/etc/crontab"]
+        resources:
+          {{ toYaml (pluck .Values.werf.env .Values.resources.cron | first | default .Values.resources.cron._default) | nindent 10 }}
+        volumeMounts:
+          - name: {{ $.Chart.Name }}-cron-conf
+            mountPath: /etc/crontab
+            subPath: crontab
+      volumes:
+        - name: {{ $.Chart.Name }}-cron-conf
+          configMap:
+            name: {{ $.Chart.Name }}-cron-conf
+ 

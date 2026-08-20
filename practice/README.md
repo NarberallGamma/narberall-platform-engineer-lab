@@ -13,4 +13,4 @@ The workstation kit is **OS-agnostic**: bash, Docker, `chmod 600` env files, `mc
 
 Site section title: **Practice** (never "Hobbies").
 
-Sanitized code sits next to the pages: [`home-lab/reference/`](home-lab/reference/), [`workstation/reference/`](workstation/reference/). Ansible kits: [`../iac/ansible/reference/`](../iac/ansible/reference/).
+Sanitized code sits next to the pages: [`home-lab/reference/`](home-lab/reference/), [`workstation/reference/`](workstation/reference/). Ansible kits: [`../iac/ansible/reference/`](../iac/ansible/reference/). Cluster Helm lives in [`../iac/helm/`](../iac/helm/), not under home-lab.

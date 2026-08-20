@@ -1,0 +1,106 @@
+project: app-api
+configVersion: 1
+
+{{ $app := "Estate.App.Api" }}
+{{ $sln := "Estate.App.sln" }}
+
+{{ $preImageTTL := mul 60 60 24 7 }}{{/* keep pre images for 1 week */}}
+
+---
+image: pre-build
+from: mcr.microsoft.com/dotnet/sdk:8.0
+fromLatest: true
+fromCacheVersion: {{ div (now | unixEpoch) $preImageTTL | quote }}
+shell:
+  beforeInstall: |
+    set -euo pipefail
+    apt-get update
+    apt-get install -y fonts-crosextra-carlito curl wget ca-certificates gnupg
+mount:
+  - {from: tmp_dir, to: /var/lib/apt/lists}
+
+---
+image: build
+fromImage: pre-build
+git:
+  - add: /
+    to: /src
+    stageDependencies:
+      install:
+        - "**/*.sln"
+        - "**/*.props"
+        - "**/*.targets"
+        - "**/*.csproj"
+        - "**/nuget.config"
+      setup:
+        - "**/*"
+    excludePaths:
+      - .git*
+      - .helm
+      - werf*
+      - "**/appsettings*.json"
+mount:
+  - {from: tmp_dir, to: /tmp}
+  - {from: tmp_dir, to: /root/.dotnet/TelemetryStorageService}
+  - {from: tmp_dir, to: /root/.local/share/NuGet/http-cache}
+  - {from: tmp_dir, to: /root/.microsoft/usersecrets}
+shell:
+  install: |
+    cd /src
+    dotnet restore {{ $sln }} --configfile "nuget.config"
+  setup: |
+    set -euo pipefail
+    cd /src
+    dotnet build {{ $sln }} -c Release --no-restore
+    cd /src/src/{{ $app }}
+    dotnet publish {{ $app }}.csproj -c Release --no-build -o /app/publish
+
+---
+image: pre-app
+from: mcr.microsoft.com/dotnet/aspnet:8.0
+fromLatest: true
+fromCacheVersion: {{ div (now | unixEpoch) $preImageTTL | quote }}
+shell:
+  beforeInstall: |
+    set -euo pipefail
+    apt-get update
+    apt-get install -y --allow-unauthenticated wget ca-certificates gnupg unzip fonts-crosextra-carlito
+
+    wget -nv -O /usr/local/bin/dotnet-dump https://aka.ms/dotnet-dump/linux-x64
+    chmod +x /usr/local/bin/dotnet-dump
+
+    wget -nv -O /usr/local/bin/dotnet-trace https://aka.ms/dotnet-trace/linux-x64
+    chmod +x /usr/local/bin/dotnet-trace
+mount:
+  - {from: tmp_dir, to: /var/lib/apt/lists}
+
+---
+image: app
+fromImage: pre-app
+docker:
+  WORKDIR: /app
+  ENV:
+    LC_ALL: en_US.UTF-8
+    LANG: en_US.UTF-8
+  EXPOSE:
+    - "80"
+    - "443"
+    - "5006"
+    - "5007"
+  ENTRYPOINT: ["dotnet", "{{ $app }}.dll"]
+import:
+  - image: build
+    add: /app/publish
+    to: /app
+    after: install
+  - image: build
+    add: /src/scripts/dump.sh
+    to: /app/dump.sh
+    after: install
+git:
+  - add: /src/{{ $app }}/appsettings.json
+    to: /app/appsettings.json
+
+---
+image: nginx
+from: nginx:1.24

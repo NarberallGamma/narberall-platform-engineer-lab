@@ -1,0 +1,14 @@
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# monitoring
+30 20 * * * /app/check_backups.py -c /app/conf/backup-monitoring.yaml
+# etcd prod-master-0
+16 1 * * * /app/00-scripts/restic_run_on.sh 10.10.20.10 backup_bucket_etcd_production_backup restic_backup_kube_master.sh
+# mongo mongodb namespace
+37 2 * * * /app/00-scripts/restic_backup_mongo_ext.sh MONGODB-PRODUCTION --bucket backup_bucket_mongodb_production_backup --host "rs0/mongo-mongodb-0.mongo-mongodb-headless.mongo-production.svc.cluster.local:27017,mongo-mongodb-1.mongo-mongodb-headless.mongo-production.svc.cluster.local:27017" --add-mongodump-option="--readPreference secondary"
+# postgresql backup
+48 3 * * * /app/00-scripts/restic_run_on.sh 10.10.20.11 backup_bucket_postgresql_production_backup restic_backup_postgres_stdout.sh 'POSTGRESQL-PRODUCTION --user postgres --do-su-under-user'
+33 * * * * /app/00-scripts/restic_run_on.sh 10.10.20.12 backup_bucket_wal_production_backup restic_backup_wals_patroni.sh 'WAL-PRODUCTION /var/backup/pgsql/wal 60'
+33 * * * * /app/00-scripts/restic_run_on.sh 10.10.20.11 backup_bucket_wal_production_backup restic_backup_wals_patroni.sh 'WAL-PRODUCTION /var/backup/pgsql/wal 60'
+# mysql backup
+0 2 * * 6 /app/00-scripts/restic_run_on.sh 10.10.20.13 backup_bucket_db2mysql_production_backup restic_backup_mysql8.sh 'estate-production --defaults-file "/etc/mysql_prod/debian.cnf" --prune "--keep-within 30d"'

@@ -1,0 +1,3 @@
+# local helm dependency build; shared lib is ../_libs/base-chart (one copy)
+charts/
+Chart.lock

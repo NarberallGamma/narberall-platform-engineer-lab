@@ -1,0 +1,35 @@
+# Thin wrap. Vault server is outside the cluster (Ansible or a VM).
+# This chart only bootstraps ESO RBAC and a ClusterSecretStore.
+
+global:
+  enabled: true
+  tlsDisable: false
+  namespace: ""
+
+server:
+  enabled: false
+
+injector:
+  enabled: false
+
+csi:
+  enabled: false
+
+ui:
+  enabled: false
+
+externalSecrets:
+  enabled: true
+  serviceAccount:
+    create: true
+    name: external-secrets-vault
+  vaultAddress: "https://vault.example.com"
+  vaultNamespace: ""
+  vaultPath: secret
+  vaultKVVersion: v2
+  auth:
+    mountPath: kubernetes
+    role: app
+  clusterSecretStore:
+    enabled: true
+    name: vault-cluster-secret-store

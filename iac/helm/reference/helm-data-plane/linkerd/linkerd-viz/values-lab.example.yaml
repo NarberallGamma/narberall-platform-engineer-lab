@@ -1,0 +1,18 @@
+# Lab placeholders for cluster DNS, dashboard host, and image registry.
+# Live cluster names, ingress hosts, and private registry mirrors are not copied.
+
+clusterDomain: cluster.local
+identityTrustDomain: cluster.local
+defaultRegistry: example.registry/linkerd
+
+dashboard:
+  enforcedHostRegexp: '^web[.]linkerd-viz[.]svc[.]cluster[.]local$|^localhost$|^linkerd-viz[.]platform[.]example[.]com$'
+
+prometheus:
+  image:
+    registry: example.registry
+  remoteWrite:
+    - url: http://prometheus.platform.example.com:9090/api/v1/write
+      basic_auth:
+        username: linkerd
+        password: CHANGE_ME

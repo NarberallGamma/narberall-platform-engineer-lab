@@ -1,0 +1,11 @@
+replicaCount: 2
+env:
+  PROFILES: test2
+hpa:
+  enabled: true
+  minReplicaCount: 2
+  maxReplicaCount: 10
+  targetCPUUtilizationPercentage: 170
+  targetMemoryUtilizationPercentage: 170
+  behavior: {}
+domain: test2.example.com

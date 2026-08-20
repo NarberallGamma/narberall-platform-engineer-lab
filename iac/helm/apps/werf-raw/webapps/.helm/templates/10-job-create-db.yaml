@@ -1,0 +1,30 @@
+{{- if (ne .Values.werf.env "production") }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-create-db
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+spec:
+  activeDeadlineSeconds: 900
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+      - name: "registrysecret"
+      volumes:
+      - name: scripts
+        secret:
+          secretName: {{ .Chart.Name }}-scripts
+      containers:
+      - name: create-db
+        image: {{ index .Values.werf.image "mysql" }}
+        command: ["/bin/bash"]
+        args:
+          - '/create-db.sh'
+        volumeMounts:
+        - name: scripts
+          mountPath: /create-db.sh
+          subPath: create-db.sh
+{{- end }}

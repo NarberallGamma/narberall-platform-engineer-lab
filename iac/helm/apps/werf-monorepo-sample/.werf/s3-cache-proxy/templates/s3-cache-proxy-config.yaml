@@ -1,0 +1,26 @@
+{{ $values := .Values.s3_cache_proxy }}
+{{ $lockbox := (pluck .Values.werf.env $values.lockbox | first | default $values.lockbox._default )}}
+{{ if (pluck .Values.werf.env $values.lockbox | first | default $values.lockbox._default )}}
+{{ include "lockbox.external.secrets" (list $lockbox $values.name)}}
+{{- else }}
+{{ $envs := .Values.config.envs }}
+
+---
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: {{ $values.name }}
+stringData:
+  AWS_SIGS_VERSION: {{ pluck .Values.werf.env $values.aws_sigs_version | first | default $values.aws_sigs_version._default | quote }}
+  AWS_ACCESS_KEY_ID: {{ pluck .Values.werf.env $values.aws_access_key_id | first | default $values.aws_access_key_id._default | quote }}
+  AWS_SECRET_ACCESS_KEY: {{ pluck .Values.werf.env $values.aws_secret_access_key | first | default $values.aws_secret_access_key._default | quote }}
+  S3_BUCKET_NAME: {{ pluck .Values.werf.env $values.s3_bucket_name | first | default $values.s3_bucket_name._default | quote }}
+  S3_REGION: {{ pluck .Values.werf.env $values.s3_region | first | default $values.s3_region._default | quote }}
+  S3_SERVER_PORT: {{ pluck .Values.werf.env $values.s3_server_port | first | default $values.s3_server_port._default | quote }}
+  S3_SERVER_PROTO: {{ pluck .Values.werf.env $values.s3_server_proto | first | default $values.s3_server_proto._default | quote }}
+  S3_SERVER: {{ pluck .Values.werf.env $values.s3_server | first | default $values.s3_server._default | quote }}
+  S3_STYLE: {{ pluck .Values.werf.env $values.s3_style | first | default $values.s3_style._default | quote }}
+  ALLOW_DIRECTORY_LIST: {{ pluck .Values.werf.env $values.allow_directory_list | first | default $values.allow_directory_list._default | quote }}
+  PROXY_CACHE_INACTIVE: {{ pluck .Values.werf.env $values.proxy_cache_inactive | first | default $values.proxy_cache_inactive._default | quote }}
+{{ end }}

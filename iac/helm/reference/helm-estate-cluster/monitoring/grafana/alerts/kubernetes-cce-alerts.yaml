@@ -1,0 +1,453 @@
+# Kubernetes (CCE): API Server, CoreDNS, Namespaces, PVC usage. Selectors omit cluster= to match Prometheus (cluster label may differ from default).
+# API Server: Prometheus has no namespace on up{job="kubernetes-apiservers"}. Use label_replace(..., "namespace", "kube-system", "cluster", ".*") so sum by (namespace) matches the CCE control plane (kube_pod_info has no kube-apiserver series here).
+# node-local-dns: namespace is present on up{job="kubernetes-service-endpoints",service="node-local-dns"} (e.g. kube-system).
+# Workload and PVC rules: namespace (and persistentvolumeclaim for PVC) from kube_* / kubelet_* series labels.
+# Datasource UID: PBFA97CFB590B2093.
+# noDataState: OK: missing series must not raise DatasourceNoData; notify only when the query returns a value and the threshold fires.
+# execErrState: OK: query errors (Prometheus timeout, datasource down) must not raise DatasourceError; notify only on a metric threshold.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Kubernetes CCE
+    folder: Alerting
+    interval: 30s
+    rules:
+      - uid: k8s_apisrv_health_warn
+        title: Kubernetes - API Server not all UP (warning)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                (
+                  (sum by (namespace) (1 - label_replace(up{job="kubernetes-apiservers"}, "namespace", "kube-system", "cluster", ".*"))) >= 1
+                )
+                and
+                (
+                  (sum by (namespace) (1 - label_replace(up{job="kubernetes-apiservers"}, "namespace", "kube-system", "cluster", ".*"))) < 2
+                )
+                and
+                (
+                  (count by (namespace) (label_replace(up{job="kubernetes-apiservers"}, "namespace", "kube-system", "cluster", ".*"))) > sum by (namespace) (1 - label_replace(up{job="kubernetes-apiservers"}, "namespace", "kube-system", "cluster", ".*"))
+                )
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_system_apisrv
+        panelId: 42
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "API Server: exactly one endpoint down while other replicas are still up"
+          description: "up{job=kubernetes-apiservers}; namespace via label_replace from cluster (CCE scrape has no namespace on up). Panel: API Server - Health Status."
+        labels:
+          dashboard: "Kubernetes / System / API Server"
+          severity: warning
+
+      - uid: k8s_apisrv_health_crit
+        title: Kubernetes - API Server critical (2+ down or all down)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                (
+                  (sum by (namespace) (1 - label_replace(up{job="kubernetes-apiservers"}, "namespace", "kube-system", "cluster", ".*"))) >= 2
+                )
+                or
+                (
+                  (
+                    (count by (namespace) (label_replace(up{job="kubernetes-apiservers"}, "namespace", "kube-system", "cluster", ".*"))) == sum by (namespace) (1 - label_replace(up{job="kubernetes-apiservers"}, "namespace", "kube-system", "cluster", ".*"))
+                  )
+                  and
+                  (sum by (namespace) (1 - label_replace(up{job="kubernetes-apiservers"}, "namespace", "kube-system", "cluster", ".*"))) > 0
+                )
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_system_apisrv
+        panelId: 42
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "API Server: two or more endpoints down, or all endpoints down"
+          description: "up{job=kubernetes-apiservers}; namespace via label_replace from cluster. Panel: API Server - Health Status."
+        labels:
+          dashboard: "Kubernetes / System / API Server"
+          severity: critical
+
+      - uid: k8s_nodelocaldns_health_warn
+        title: Kubernetes - node-local-dns at least one not UP (warning)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                (
+                  (sum by (namespace) (1 - up{job="kubernetes-service-endpoints",service="node-local-dns"})) >= 1
+                )
+                and
+                (
+                  (sum by (namespace) (1 - up{job="kubernetes-service-endpoints",service="node-local-dns"})) < 3
+                )
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_system_coredns
+        panelId: 25
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "node-local-dns: 1-2 targets not UP in this namespace"
+          description: "up{service=node-local-dns}, per-namespace from scrape labels (thresholds apply per namespace). Panel: CoreDNS - Health Status."
+        labels:
+          dashboard: "Kubernetes / System / CoreDNS"
+          severity: warning
+
+      - uid: k8s_nodelocaldns_health_crit
+        title: Kubernetes - node-local-dns 3+ not UP (critical)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum by (namespace) (1 - up{job="kubernetes-service-endpoints",service="node-local-dns"}) >= 3
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_system_coredns
+        panelId: 25
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "node-local-dns: 3 or more targets not UP in this namespace"
+          description: "up{service=node-local-dns}, per-namespace from scrape labels (>=3 down in the same namespace). Panel: CoreDNS - Health Status."
+        labels:
+          dashboard: "Kubernetes / System / CoreDNS"
+          severity: critical
+
+      - uid: k8s_ns_pod_pending_warn
+        title: Kubernetes - pods in Pending phase
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: kube_pod_status_phase{phase="Pending"} > 0
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_views_ns
+        panelId: 72
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: 'Pod in Pending phase: {{ "{{" }} {{ "$" }}{{ "labels.namespace" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}'
+          description: "kube_pod_status_phase{phase=\"Pending\"} > 0. Panel: Kubernetes Pods Status Phase."
+        labels:
+          dashboard: "Kubernetes / Views / Namespaces"
+          severity: warning
+
+      - uid: k8s_ns_pod_failed_unknown_crit
+        title: Kubernetes - pods Failed or Unknown phase
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: kube_pod_status_phase{phase=~"Failed|Unknown"} > 0
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_views_ns
+        panelId: 72
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: 'Pod phase {{ "{{" }} {{ "$" }}{{ "labels.phase" }} {{ "}}" }}: {{ "{{" }} {{ "$" }}{{ "labels.namespace" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}'
+          description: "kube_pod_status_phase{phase=~\"Failed|Unknown\"}. Panel: Kubernetes Pods Status Phase."
+        labels:
+          dashboard: "Kubernetes / Views / Namespaces"
+          severity: critical
+
+      - uid: k8s_ns_oom_events_crit
+        title: Kubernetes - OOM events > 1 per pod (5m)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum by (namespace, pod) (increase(container_oom_events_total[5m])) > 1
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_views_ns
+        panelId: 74
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: 'OOM: more than 1 event in 5m: {{ "{{" }} {{ "$" }}{{ "labels.namespace" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}'
+          description: "increase(container_oom_events_total[5m]) > 1. Panel: OOM Events by namespace, pod."
+        labels:
+          dashboard: "Kubernetes / Views / Namespaces"
+          severity: critical
+
+      - uid: k8s_ns_container_restarts_crit
+        title: Kubernetes - container restarts > 1 per pod (5m)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total[5m])) > 1
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_views_ns
+        panelId: 75
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: 'Container restarts: more than 1 in 5m: {{ "{{" }} {{ "$" }}{{ "labels.namespace" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}'
+          description: "increase(kube_pod_container_status_restarts_total[5m]) > 1. Panel: Container Restarts by namespace, pod."
+        labels:
+          dashboard: "Kubernetes / Views / Namespaces"
+          severity: critical
+
+      - uid: k8s_ns_pvc_usage_warn
+        title: Kubernetes - PVC usage over 70% (warning)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                (
+                  max(kubelet_volume_stats_used_bytes{namespace!=""}) by (persistentvolumeclaim, namespace)
+                  /
+                  max(kubelet_volume_stats_capacity_bytes{namespace!=""}) by (persistentvolumeclaim, namespace)
+                ) >= 0.70
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_views_ns
+        panelId: 65
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: 'PVC over 70% full: {{ "{{" }} {{ "$" }}{{ "labels.namespace" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.persistentvolumeclaim" }} {{ "}}" }}'
+          description: "used_bytes/capacity_bytes from kubelet_volume_stats. Panel: Persistent Volumes - Capacity and usage in %."
+        labels:
+          dashboard: "Kubernetes / Views / Namespaces"
+          severity: warning
+
+      - uid: k8s_ns_pvc_usage_crit
+        title: Kubernetes - PVC usage over 90% (critical)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                (
+                  max(kubelet_volume_stats_used_bytes{namespace!=""}) by (persistentvolumeclaim, namespace)
+                  /
+                  max(kubelet_volume_stats_capacity_bytes{namespace!=""}) by (persistentvolumeclaim, namespace)
+                ) >= 0.90
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 0'
+        dashboardUid: k8s_views_ns
+        panelId: 65
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: 'PVC over 90% full: {{ "{{" }} {{ "$" }}{{ "labels.namespace" }} {{ "}}" }}/{{ "{{" }} {{ "$" }}{{ "labels.persistentvolumeclaim" }} {{ "}}" }}'
+          description: "used_bytes/capacity_bytes from kubelet_volume_stats. Panel: Persistent Volumes - Capacity and usage in %."
+        labels:
+          dashboard: "Kubernetes / Views / Namespaces"
+          severity: critical

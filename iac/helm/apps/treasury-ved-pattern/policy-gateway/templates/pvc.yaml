@@ -1,0 +1,36 @@
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+{{- $claimName := .Values.persistence.claimName }}
+{{- $existingPvc := lookup "v1" "PersistentVolumeClaim" .Release.Namespace $claimName }}
+{{- if not $existingPvc }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $claimName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "policy-gateway.labels" . | nindent 4 }}
+    app.kubernetes.io/component: policy-gateway-persistence
+  annotations:
+    helm.sh/resource-policy: keep
+    argocd.argoproj.io/sync-options: Prune=false
+    {{- with .Values.persistence.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.persistence.finalizers }}
+  finalizers:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- range .Values.persistence.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size | quote }}
+  {{- if and (.Values.persistence.lookupVolumeName) $existingPvc }}
+  volumeName: {{ $existingPvc.spec.volumeName }}
+  {{- end }}
+{{ include "policy-gateway.pvc.storageClassSpec" .Values.persistence }}
+{{- end }}
+{{- end }}

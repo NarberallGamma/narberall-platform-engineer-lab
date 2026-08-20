@@ -1,0 +1,47 @@
+{{- if eq .Values.werf.env "production" }}
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: CustomPrometheusRules
+metadata:
+  labels:
+    component: rules
+    prometheus: main
+  name: redis-cluster-monitoring
+spec:
+  groups:
+  - name: RedisClusterNotFullGroup
+    rules:
+    - alert: RedisClusterNotFull
+      expr: max(redis_cluster_known_nodes{service=~"redis-cluster-[0-9].*",namespace=~"production|lab"})-sum(redis_up{service=~"redis-cluster-[0-9].*",namespace=~"production|lab"})>0
+      for: 3m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/DV0yeDkmz/redis?orgId=1&refresh=30s
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        description: |
+          Check Redis cluster state in {{`{{$labels.namespace}}`}} namespace of custom/Redis grafana dashboard.
+        summary: Redis cluster in {{`{{$labels.namespace}}`}} is not full.
+    - alert: RedisClusterWrongReplicasCount
+      expr: count by (master_host)(redis_slave_info{namespace=~"production|lab|shop",service=~"redis-cluster-.*"})!=2
+      for: 3m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/DV0yeDkmz/redis?orgId=1&refresh=30s
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        description: |
+          Check Redis cluster state in {{`{{$labels.namespace}}`}} namespace of custom/Redis grafana dashboard.
+          Move Redis replica to correct master https://redisinsight.example.com/
+        summary: Redis master in {{`{{$labels.namespace}}`}} has incorrect number of replicas.
+{{- end }}

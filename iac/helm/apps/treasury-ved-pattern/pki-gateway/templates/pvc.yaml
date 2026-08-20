@@ -1,0 +1,81 @@
+{{- if .Values.persistence.enabled }}
+{{- $p := .Values.persistence }}
+{{- $ns := .Release.Namespace }}
+{{- if $p.cprocspUsers.create }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $p.cprocspUsers.claimName }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "pki-gateway.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: pki-gateway-persistence
+  {{- with $p.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $p.finalizers }}
+  finalizers:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - {{ $p.accessMode | default "ReadWriteOnce" }}
+  resources:
+    requests:
+      storage: {{ $p.cprocspUsers.size }}
+{{ include "pki-gateway.pvc.storageClassSpec" $p }}
+---
+{{- end }}
+{{- if $p.pkidebugData.create }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $p.pkidebugData.claimName }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "pki-gateway.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: pki-gateway-persistence
+  {{- with $p.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $p.finalizers }}
+  finalizers:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - {{ $p.accessMode | default "ReadWriteOnce" }}
+  resources:
+    requests:
+      storage: {{ $p.pkidebugData.size }}
+{{ include "pki-gateway.pvc.storageClassSpec" $p }}
+---
+{{- end }}
+{{- if $p.cprocspKeys.create }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $p.cprocspKeys.claimName }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "pki-gateway.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: pki-gateway-persistence
+  {{- with $p.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $p.finalizers }}
+  finalizers:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - {{ $p.accessMode | default "ReadWriteOnce" }}
+  resources:
+    requests:
+      storage: {{ $p.cprocspKeys.size }}
+{{ include "pki-gateway.pvc.storageClassSpec" $p }}
+{{- end }}
+{{- end }}

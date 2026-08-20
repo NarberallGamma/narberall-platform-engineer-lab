@@ -1,0 +1,52 @@
+{{- if eq .Values.global.env "review" }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-recreate-{{ now | unixEpoch }}
+  annotations:
+    werf.io/weight: "-110"
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 3600
+  template:
+    metadata:
+      name: {{ .Chart.Name }}-recreate
+    spec:
+      restartPolicy: Never
+
+      {{- include "imagePullSecrets" . | indent 6 }}
+      {{- include "tolerations" . | indent 6 }}
+      {{- include "nodeSelector" . | indent 6 }}
+      {{- include "priorityClassName" . | indent 6 }}
+
+      initContainers:
+        {{ include "init-psql-orders" . | indent 8 }}
+        {{ include "init-psql-history" . | indent 8 }}
+        {{ include "init-psql-report" . | indent 8 }}
+
+      containers:
+      - name: app
+        image: {{ index .Values.werf.image "backend" }}
+        command:
+          - /bin/bash
+          - -c
+          - |
+            echo "### Checking if relation `guest` in db `${ORDERS_DELIVERY_DB_NAME}` exist, if not then execute sql file"
+            export PGPASSWORD=${DB_ROOT_PASS}
+            psql -h ${ORDERS_DELIVERY_MASTER_HOST_FOR_ROOT_USER} -U ${DB_ROOT_USER} ${ORDERS_DELIVERY_DB_NAME} -c "select 1 from guest;" || psql -h ${ORDERS_DELIVERY_MASTER_HOST_FOR_ROOT_USER} -U ${DB_ROOT_USER} ${ORDERS_DELIVERY_DB_NAME} -f ./migrations/orders_delivery/setup/createTables.sql
+
+            echo "### Checking if relation `history` in db `${HISTORY_DB_NAME}` exist, if not then execute sql file"
+            export PGPASSWORD=${HISTORY_ROOT_PASS}
+            psql -h ${HISTORY_MASTER_HOST_FOR_ROOT_USER} -U ${HISTORY_ROOT_USER} ${HISTORY_DB_NAME} -c "select 1 from history;" || psql -h ${HISTORY_MASTER_HOST_FOR_ROOT_USER} -U ${HISTORY_ROOT_USER} ${HISTORY_DB_NAME} -f ./migrations/history/setup/createTables.sql
+
+            echo "### Checking if relation `report_migration` in db `${REPORT_DB_NAME}` exist, if not then execute sql file"
+            export PGPASSWORD=${REPORT_ROOT_PASS}
+            psql -h ${REPORT_MASTER_HOST_FOR_ROOT_USER} -U ${REPORT_ROOT_USER} ${REPORT_DB_NAME} -c "select 1 from report_migration;" || psql -h ${REPORT_MASTER_HOST_FOR_ROOT_USER} -U ${REPORT_ROOT_USER} ${REPORT_DB_NAME} -f ./migrations/report/setup/createTables.sql
+
+        envFrom:
+          - configMapRef:
+              name: {{ $.Chart.Name }}-env
+          - secretRef:
+              name: {{ $.Chart.Name }}-env
+{{- end }}

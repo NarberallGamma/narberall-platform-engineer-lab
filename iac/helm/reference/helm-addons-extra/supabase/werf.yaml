@@ -1,0 +1,39 @@
+---
+project: supabase
+configVersion: 1
+---
+image: analytics
+from: supabase/logflare:1.4.0
+---
+image: auth
+from: supabase/gotrue:v2.143.0
+---
+image: functions
+from: supabase/edge-runtime:v1.41.2
+---
+image: meta
+from: supabase/postgres-meta:v0.80.0
+---
+image: realtime
+from: supabase/realtime:v2.27.5
+---
+image: rest
+from: postgrest/postgrest:v12.0.1
+---
+image: studio
+from: supabase/studio:20240326-5e5586d
+---
+image: db
+from: supabase/postgres:15.1.0.147
+---
+image: vector
+from: timberio/vector:0.34.0-alpine
+---
+image: kong
+from: kong:2.8.1
+---
+image: imgproxy
+from: darthsim/imgproxy:v3.8.0
+---
+image: storage
+from: supabase/storage-api:v0.46.4

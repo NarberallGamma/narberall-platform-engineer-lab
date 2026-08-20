@@ -1,0 +1,124 @@
+{{- $env := .Values.werf.env }}
+{{- $app_urls := pluck .Values.global.cluster .Values.app.app_urls | first }}
+{{- $app_urls := pluck $env $app_urls | first | default $app_urls._default }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $.Chart.Name }}
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/server-alias: {{ list $ $app_urls $env | include "server_alias" | quote }}
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "200m"
+spec:
+  rules:
+{{- range $i, $app_url := $app_urls }}
+{{- $host        := include "fl.value" (list $ . $app_url.host) }}
+{{- $host2       := include "fl.value" (list $ . $app_url.host2) }}
+{{- $secretName  := include "fl.value" (list $ . $app_url.secretName) }}
+{{- $secretName2 := include "fl.value" (list $ . $app_url.secretName2) }}
+  - host: {{ $host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ printf "%s-%d" $.Chart.Name $i }}
+            port:
+              name: http
+  - host: '*.{{ $host }}'
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ printf "%s-%d" $.Chart.Name $i }}
+            port:
+              name: http
+  {{- if $host2 }}
+  - host: {{ $host2 }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ printf "%s-%d" $.Chart.Name $i }}
+            port:
+              name: http
+  - host: '*.{{ $host2 }}'
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ printf "%s-%d" $.Chart.Name $i }}
+            port:
+              name: http
+  {{- end }} {{/* if $host2 */}}
+{{- end }} {{/* range $app_urls */}}
+  tls:
+{{- range $i, $app_url := $app_urls }}
+{{- $host        := include "fl.value" (list $ . $app_url.host) }}
+{{- $host2       := include "fl.value" (list $ . $app_url.host2) }}
+{{- $secretName  := include "fl.value" (list $ . $app_url.secretName) }}
+{{- $secretName2 := include "fl.value" (list $ . $app_url.secretName2) }}
+  - hosts:
+    - {{ $host }}
+    - '*.{{ $host }}'
+    secretName: {{ $secretName }}
+  {{- if $host2 }}
+  - hosts:
+    - {{ $host2 }}
+    - '*.{{ $host2 }}'
+    secretName: {{ $secretName2 }}
+  {{- end }} {{/* if $host2 */}}
+{{- end }} {{/* range $app_urls */}}
+
+{{- range $i, $app_url := $app_urls }}
+{{- $host        := include "fl.value" (list $ . $app_url.host) }}
+{{- $host2       := include "fl.value" (list $ . $app_url.host2) }}
+{{- $secretName  := include "fl.value" (list $ . $app_url.secretName) }}
+{{- $secretName2 := include "fl.value" (list $ . $app_url.secretName2) }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $secretName }}
+  annotations:
+    werf.io/weight: "-1"
+spec:
+  secretName: {{ $secretName }}
+  issuerRef:
+    name: cloudflare
+    kind: ClusterIssuer
+  commonName: {{ $host | quote }}
+  dnsNames:
+    - {{ $host | quote }}
+    - {{ printf "*.%s" $host | quote }}
+
+{{- if $host2 }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $secretName2 }}
+  annotations:
+    werf.io/weight: "-1"
+spec:
+  secretName: {{ $secretName2 }}
+  issuerRef:
+    name: cloudflare
+    kind: ClusterIssuer
+  commonName: {{ $host2 | quote }}
+  dnsNames:
+    - {{ $host2 | quote }}
+    - {{ printf "*.%s" $host2 | quote }}
+{{- end }} {{/* if $host2 */}}
+{{- end }} {{/* range $app_urls */}}

@@ -1,0 +1,24 @@
+apiVersion: v2
+name: minio-operator
+version: 0.1.0
+description: MinIO Operator
+keywords:
+  - minio
+  - operator
+  - storage
+home: https://min.io
+sources:
+  - https://github.com/minio/operator
+maintainers:
+  - name: MinIO
+    email: support@min.io
+
+dependencies:
+  - name: operator
+    version: "7.1.1"
+    repository: "file://charts/operator"
+    condition: operator.enabled
+  - name: console
+    version: "0.1.0"
+    repository: "file://charts/console"
+    condition: console.enabled

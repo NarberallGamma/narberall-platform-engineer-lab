@@ -1,0 +1,283 @@
+# DEMO-stand excerpt. Overlay templates on. Vendor subcharts stay documented pins.
+# Replace placeholders before a real install. Live passwords stay out of git.
+
+fullnameOverride: estate-demo
+
+global:
+  imagePullSecrets:
+    - name: regcred
+  env:
+    APP_BASE_URL: "https://operator.example.com"
+    APP_LOGIN_PRIMARY_PAGE_URL: "https://operator.example.com/login"
+
+serviceAccount:
+  create: false
+  name: ""
+
+estate-chain-eth:
+  enabled: false
+estate-ledger:
+  enabled: false
+estate-onboarding:
+  enabled: false
+estate-contract:
+  enabled: false
+estate-web-ws:
+  enabled: false
+operator-ui:
+  enabled: false
+
+# Zalando operator CR. 2 instances, PgBouncer, logical WAL for CDC.
+postgresql:
+  enabled: true
+  enableExternalService: false
+  externalServiceAnnotations:
+    external-dns.alpha.kubernetes.io/hostname: pg.example.com
+  spec:
+    numberOfInstances: 2
+    dockerImage: ghcr.io/zalando/spilo-15:3.1-p1
+    enableLogicalBackup: true
+    enableMasterPoolerLoadBalancer: false
+    enableConnectionPooler: true
+    connectionPooler:
+      numberOfInstances: 2
+      mode: session
+      user: pooler
+    allowedSourceRanges: null
+    teamId: lab
+    resources:
+      requests:
+        cpu: 200m
+        memory: 500Mi
+      limits:
+        cpu: 1000m
+        memory: 2500Mi
+    postgresql:
+      version: "15"
+      parameters:
+        max_connections: "500"
+        log_lock_waits: "on"
+        wal_level: logical
+        log_destination: stderr
+        logging_collector: "off"
+        max_replication_slots: "20"
+        max_wal_senders: "20"
+    patroni:
+      slots:
+        app_ledger_debezium:
+          type: logical
+          database: app_ledger
+        app_onboarding_debezium:
+          type: logical
+          database: app_onboarding
+        app_contract_debezium:
+          type: logical
+          database: app_contract
+        app_web_debezium:
+          type: logical
+          database: app_web
+        app_auth_debezium:
+          type: logical
+          database: app_auth
+    databases:
+      app_ledger: lab_user
+      app_onboarding: lab_user
+      app_contract: lab_user
+      app_report: lab_user
+      app_web: lab_user
+      app_auth: lab_user
+      app_aml: lab_user
+      app_idp: lab_user
+    users:
+      lab_user:
+        - REPLICATION
+
+# Bitnami in-cluster broker. Production estate used managed DMS instead.
+# Fetch kafka 12.17.5 at install time. Do not vendor the tarball.
+kafka:
+  enabled: true
+  image:
+    registry: example.registry
+    repository: platform/kafka
+    tag: 2.8.0
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - regcred
+  deleteTopicEnable: true
+  auth:
+    enabled: true
+    clientProtocol: sasl
+    interBrokerProtocol: sasl
+    sasl:
+      mechanisms: plain
+      interBrokerMechanism: plain
+      jaas:
+        interBrokerUser: admin
+        interBrokerPassword: CHANGE_ME
+        clientUsers:
+          - kafka_user
+        clientPasswords:
+          - CHANGE_ME
+
+# AKHQ 0.3.1 pin. existingSecrets pattern lives in the estate Kafka kit.
+akhq:
+  enabled: true
+  secrets:
+    micronaut:
+      server:
+        context-path: /kafka
+      security:
+        enabled: true
+    akhq:
+      security:
+        default-group: no-roles
+        basic-auth:
+          - username: admin
+            password: CHANGE_ME
+            passwordHash: BCRYPT
+            groups:
+              - admin
+          - username: reader
+            password: CHANGE_ME
+            passwordHash: BCRYPT
+            groups:
+              - reader
+      connections:
+        kafka:
+          properties:
+            bootstrap.servers: "estate-demo-kafka.estate-demo.svc.cluster.local:9092"
+            security.protocol: SASL_PLAINTEXT
+            sasl.mechanism: PLAIN
+            sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="kafka_user" password="CHANGE_ME";
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/tls-acme: "true"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    paths:
+      - /kafka/
+    hosts:
+      - kafka.example.com
+    tls:
+      - secretName: demo-tls
+        hosts:
+          - kafka.example.com
+          - "*.example.com"
+
+# Strimzi Kafka CR stayed off on the DEMO stand. Spec is here so the template is usable.
+kafkaHA:
+  enabled: false
+  user:
+    create: false
+    name: estate-kafka-user
+  spec:
+    kafka:
+      replicas: 3
+      listeners:
+        - name: plain
+          port: 9092
+          type: internal
+          tls: false
+      storage:
+        type: persistent-claim
+        size: 10Gi
+    zookeeper:
+      replicas: 3
+      storage:
+        type: persistent-claim
+        size: 5Gi
+    entityOperator:
+      topicOperator: {}
+      userOperator: {}
+
+# One Connect cluster. JMX ConfigMap is rendered next to each item.
+kafkaConnect:
+  - name: debezium
+    spec:
+      image: example.registry/platform/kafka-connect-transactional-outbox-debezium:1.0.1
+      replicas: 1
+      bootstrapServers: estate-demo-kafka.estate-demo.svc.cluster.local:9092
+      config:
+        group.id: connect-cluster
+        offset.storage.topic: connect-cluster-offsets
+        config.storage.topic: connect-cluster-configs
+        status.storage.topic: connect-cluster-status
+        config.storage.replication.factor: -1
+        offset.storage.replication.factor: -1
+        status.storage.replication.factor: -1
+      authentication:
+        type: plain
+        username: kafka_user
+        passwordSecret:
+          secretName: kafka-user-pass
+          password: CHANGE_ME
+      template:
+        pod:
+          imagePullSecrets:
+            - name: regcred
+
+# Shared outbox SMT. Two connectors show the list shape. The source stand had seven copies of the same block.
+x-outbox-config: &outboxConfig
+  topic.prefix: lab-postgresql
+  database.hostname: lab-estate-demo-postgresql
+  database.port: 5432
+  database.user: lab_user
+  database.password: CHANGE_ME
+  database.server.name: lab-estate-demo-postgresql
+  schema.include.list: kafka_transactional_outbox
+  table.include.list: kafka_transactional_outbox.outbox_message
+  tombstones.on.delete: "false"
+  transforms: outbox
+  transforms.outbox.type: com.example.outbox.message.debezium.transformation.OutboxMessageTransformation
+  key.converter: io.debezium.converters.ByteArrayConverter
+  key.converter.delegate.converter.type: org.apache.kafka.connect.json.JsonConverter
+  key.converter.delegate.converter.type.schemas.enable: true
+  value.converter: io.debezium.converters.ByteArrayConverter
+  value.converter.delegate.converter.type: org.apache.kafka.connect.json.JsonConverter
+  value.converter.delegate.converter.type.schemas.enable: true
+  heartbeat.action.query: "UPDATE kafka_transactional_outbox.heartbeat SET updated_date = NOW();"
+  heartbeat.interval.ms: 60000
+  snapshot.mode: never
+  publication.autocreate.mode: filtered
+
+kafkaConnector:
+  - name: ledger-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_ledger
+        slot.name: app_ledger_debezium
+      autoRestart:
+        enabled: true
+  - name: contract-transactional-outbox
+    kafkaConnectName: debezium
+    spec:
+      class: io.debezium.connector.postgresql.PostgresConnector
+      tasksMax: 1
+      config:
+        <<: *outboxConfig
+        database.dbname: app_contract
+        slot.name: app_contract_debezium
+      autoRestart:
+        enabled: true
+
+# Full Vault tree stays out. Pin only.
+vault:
+  enabled: false
+  server:
+    image:
+      repository: example.registry/platform/vault
+      tag: CHANGE_ME
+    ingress:
+      enabled: true
+      hosts:
+        - host: vault.example.com
+          paths:
+            - /
+
+# Keycloak overlay lives in apps/treasury-keycloak. Pin only here.
+keycloak:
+  enabled: false

@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.app_name }}-deployment
+  namespace: {{ .Values.k8s_namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.app_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.app_name }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.hostAliases }}
+      hostAliases:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Values.app_name }}
+          image: {{ .Values.app_image }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          env:
+            - name: OLLAMA_MODELS
+              value: /root/.ollama/models
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: {{ .Values.app_name }}-models
+              mountPath: /root/.ollama/models
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+        - name: {{ .Values.app_name }}-models
+          persistentVolumeClaim:
+            claimName: {{ .Values.app_name }}-models
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.app_name }}-service
+  namespace: {{ .Values.k8s_namespace }}
+  labels:
+    app: {{ .Values.app_name }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: {{ .Values.app_name }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}

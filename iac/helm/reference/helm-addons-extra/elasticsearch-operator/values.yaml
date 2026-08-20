@@ -1,0 +1,156 @@
+eck-operator:
+  nameOverride: "elastic-operator"
+  fullnameOverride: "elastic-operator"
+  managedNamespaces: []
+  installCRDs: true
+  replicaCount: 1
+
+  image:
+    repository: ""
+    pullPolicy: IfNotPresent
+    tag: ""
+    fips: false
+
+  priorityClassName: ""
+  imagePullSecrets:
+    - name: registrysecret
+
+  resources:
+    limits:
+      cpu: 1
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 150Mi
+
+  statefulsetAnnotations: {}
+  statefulsetLabels: {}
+  podAnnotations: {}
+  podLabels: {}
+
+  podSecurityContext:
+    runAsNonRoot: true
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+
+  nodeSelector:
+    node-role.deckhouse.io/system: ""
+  tolerations:
+    - effect: NoExecute
+      operator: Equal
+      key: dedicated.deckhouse.io
+      value: system
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: node-role.deckhouse.io/system
+            operator: Exists
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  env: []
+  volumeMounts: []
+  volumes: []
+
+  createClusterScopedResources: true
+  automountServiceAccountToken: true
+
+  serviceAccount:
+    create: true
+    automountServiceAccountToken: true
+    annotations: {}
+    name: ""
+
+  tracing:
+    enabled: false
+    config:
+      ELASTIC_APM_SERVER_URL: http://localhost:8200
+      ELASTIC_APM_SERVER_TIMEOUT: 30s
+
+  refs:
+    enforceRBAC: false
+
+  webhook:
+    enabled: true
+    caBundle: Cg==
+    certManagerCert: null
+    certsDir: "/tmp/k8s-webhook-server/serving-certs"
+    failurePolicy: Ignore
+    manageCerts: true
+    namespaceSelector: {}
+    objectSelector: {}
+    port: 9443
+    certsSecret: ""
+
+  hostNetwork: false
+  dnsPolicy: ""
+  dnsConfig: {}
+
+  softMultiTenancy:
+    enabled: false
+
+  kubeAPIServerIP: null
+
+  telemetry:
+    disabled: false
+    distributionChannel: "helm"
+
+  config:
+    logVerbosity: "0"
+    metricsPort: 0
+    metrics:
+      port: "0"
+      secureMode:
+        enabled: false
+        tls:
+          certificateSecret: ""
+
+    containerRegistry: example.registry
+    containerRepository: "platform/elasticsearch"
+    containerSuffix: ""
+    maxConcurrentReconciles: "3"
+    caValidity: 8760h
+    caRotateBefore: 24h
+    caDir: ""
+    certificatesValidity: 8760h
+    certificatesRotateBefore: 24h
+    disableConfigWatch: false
+    exposedNodeLabels: ["topology.kubernetes.io/.*", "failure-domain.beta.kubernetes.io/.*"]
+    ipFamily: ""
+    setDefaultSecurityContext: "auto-detect"
+    kubeClientTimeout: 60s
+    elasticsearchClientTimeout: 180s
+    validateStorageClass: true
+    enableLeaderElection: true
+    elasticsearchObservationInterval: 10s
+    ubiOnly: false
+
+  podMonitor:
+    enabled: false
+    labels: {}
+    annotations: {}
+    interval: 5m
+    scrapeTimeout: 30s
+    podTargetLabels: []
+    podMetricsEndpointConfig: {}
+
+  serviceMonitor:
+    enabled: true
+    caSecret: ""
+    caMountDirectory: "/etc/prometheus/secrets/"
+    insecureSkipVerify: true
+
+  global:
+    manifestGen: false
+    createOperatorNamespace: false
+    kubeVersion: 1.21.0

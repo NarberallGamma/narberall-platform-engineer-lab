@@ -1,0 +1,109 @@
+# Custom chart values: PeerAuthentication and selective VPS egress.
+# istiod install values live in the mesh-eso kit, not here.
+# Mesh assumptions used with this chart:
+# - outboundTrafficPolicy ALLOW_ANY so non-matched egress uses cluster NAT
+# - sidecar autoInject disabled; enable per namespace label
+# - istiod HA: 2 replicas, zone anti-affinity
+
+# PeerAuthentication policies for this custom chart
+peerAuthentication:
+  enabled: true
+  services:
+    - name: web
+      namespace: app
+      mode: STRICT
+    - name: tx-eth
+      namespace: app
+      mode: STRICT
+    - name: tx-trx
+      namespace: app
+      mode: STRICT
+    - name: tx-svc
+      namespace: app
+      mode: STRICT
+    - name: contract
+      namespace: app
+      mode: STRICT
+    - name: report
+      namespace: app
+      mode: STRICT
+
+namespace: "istio-system"
+environment: "prod"
+
+# Egress via VPS proxy (Envoy TLS passthrough) and Istio egress gateway.
+# Prod-shaped flags: Grafana alert route on; chain RPC routes off until a lower-env sign-off.
+vpsEgress:
+  enabled: true
+  appNamespace: app
+
+  serviceEntry:
+    name: external-vps-cluster
+    namespace: istio-system
+    host: proxy.internal.example
+    address: 10.10.255.1
+    port: 443
+    portName: tls-vps
+    protocol: TLS
+
+  externalServiceEntry:
+    namespace: istio-system
+    port: 443
+    portName: tls
+    protocol: TLS
+    resolution: DNS
+
+  endpoints:
+    primary:
+      address: 203.0.113.10
+      locality: region/vps/primary
+    backup:
+      address: 203.0.113.11
+      locality: region/vps/backup
+
+  destinationRule:
+    name: vps-proxy-failover
+    namespace: istio-system
+    connectTimeout: 10s
+    failoverPriority:
+      - "region/vps/primary"
+      - "region/vps/backup"
+    outlierDetection:
+      consecutiveGatewayErrors: 2
+      consecutive5xxErrors: 2
+      interval: 10s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 100
+      minHealthPercent: 0
+
+  gateway:
+    namespace: istio-system
+    name: egress-vps-gateway
+    selector:
+      istio: egressgateway
+
+  egressGatewayService:
+    host: istio-egressgateway.istio-system.svc.cluster.local
+    port: 443
+
+  # Match pods with app.kubernetes.io/instance = sourceAppInstance (Helm release name).
+  # Set enabled false to drop one route without setting vpsEgress.enabled=false.
+  # namespace: VirtualService namespace (default: appNamespace).
+  routes:
+    - virtualServiceName: vps-egress-tx-eth
+      enabled: false
+      sourceAppInstance: tx-eth
+      externalHosts:
+        - eth.egress.example.com
+    - virtualServiceName: vps-egress-tx-trx
+      enabled: false
+      sourceAppInstance: tx-trx
+      externalHosts:
+        - trx.egress.example.com
+        - trx-grpc.egress.example.com
+    - virtualServiceName: vps-egress-grafana
+      enabled: true
+      namespace: monitoring
+      sourceAppInstance: grafana
+      externalHosts:
+        - alerts.egress.example.com

@@ -1,0 +1,52 @@
+{{- if .Values.vpsEgress.enabled }}
+{{- $root := . }}
+{{- range .Values.vpsEgress.routes }}
+{{- if eq (include "istio.vpsEgress.routeEnabled" .) "true" }}
+{{- $route := . }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ .virtualServiceName }}
+  namespace: {{ include "istio.vpsEgress.routeNamespace" (dict "route" . "root" $root) }}
+  labels:
+    app.kubernetes.io/component: vps-egress
+    environment: {{ $root.Values.environment }}
+spec:
+  hosts:
+    {{- range .externalHosts }}
+    - {{ . | quote }}
+    {{- end }}
+  gateways:
+    - mesh
+    - {{ include "istio.vpsEgress.gatewayNamespaced" $root }}
+  tls:
+    {{- range .externalHosts }}
+    - match:
+        - gateways:
+            - mesh
+          sourceLabels:
+            app.kubernetes.io/instance: {{ $route.sourceAppInstance | quote }}
+          port: 443
+          sniHosts:
+            - {{ . | quote }}
+      route:
+        - destination:
+            host: {{ $root.Values.vpsEgress.egressGatewayService.host | quote }}
+            port:
+              number: {{ $root.Values.vpsEgress.egressGatewayService.port }}
+    - match:
+        - gateways:
+            - {{ include "istio.vpsEgress.gatewayNamespaced" $root }}
+          port: 443
+          sniHosts:
+            - {{ . | quote }}
+      route:
+        - destination:
+            host: {{ $root.Values.vpsEgress.serviceEntry.host | quote }}
+            port:
+              number: {{ $root.Values.vpsEgress.serviceEntry.port }}
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,4 @@
+nodeport: 32010
+env:
+  KC_DB_SCHEMA: public
+  KC_FEATURES: preview

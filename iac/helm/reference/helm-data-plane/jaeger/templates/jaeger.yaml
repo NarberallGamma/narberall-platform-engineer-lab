@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+spec:
+  ports:
+  - name: "16686"
+    port: 16686
+    targetPort: 16686
+    protocol: TCP
+  - name: "4318"
+    port: 4318
+    targetPort: 4318
+    protocol: TCP
+  selector:
+    app: jaeger
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+spec:
+  selector:
+    matchLabels:
+      app: jaeger
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: jaeger
+        date: "{{ randAlphaNum 10 }}"
+    spec:
+      containers:
+      - name: jaeger
+        image: "jaegertracing/all-in-one:1.63.0"
+        ports:
+        - containerPort: 4318
+          protocol: TCP
+        - containerPort: 16686
+          protocol: TCP
+        resources:
+          limits:
+            memory: "2Gi"
+        env:
+        - name: COLLECTOR_ZIPKIN_HTTP_PORT
+          value: "9411"

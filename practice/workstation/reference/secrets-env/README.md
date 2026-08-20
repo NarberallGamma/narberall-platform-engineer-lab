@@ -1,6 +1,6 @@
 # secrets-env
 
-Env files on disk, `chmod 600`, never in git. The inventory script only prints **key names** and `ok|empty`.
+Env files on disk, `chmod 600`, never in git. The inventory script only prints **key names** and `ok|empty`. High-value production secrets stay in Vault / SOPS / Ansible Vault; this kit is the workstation layer. Policy: [`../../../../docs/security-ai.md`](../../../../docs/security-ai.md).
 
 | File | Job |
 |------|-----|

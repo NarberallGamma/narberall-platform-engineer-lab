@@ -1,0 +1,34 @@
+name: Falco - Shell in Container Alert dev
+type: any
+
+index: falco-*
+
+filter:
+- term:
+    data.rule.keyword: "run_shell_in_container"
+
+alert_text_type: alert_text_only
+alert_text: |
+  ⚠️ *PROD-2*: *Falco Alert:* Shell is running in the container not through the entrypoint!
+  *Rule:* 07_{0}
+  *Container:* {1}
+  *Pod:* {2}
+  *Namespace:* {3}
+  *Command:* `{4}`
+  *Node:* {5}
+
+alert_text_args:
+- data.rule
+- data.output_fields.container.name
+- data.output_fields.k8s.pod.name
+- data.output_fields.k8s.ns.name
+- data.output_fields.proc.cmdline
+- node
+
+timestamp_field: timestamp
+
+alert:
+  - "slack"
+slack:
+slack_webhook_url: https://hooks.slack.com/services/CHANGE_ME
+slack_channel_override: '#falco-alerts'

@@ -1,0 +1,28 @@
+---
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  name: kibana
+spec:
+  version: {{ include "fl.value" (list $ . .Values.kibana.version) }}
+  count: {{ include "fl.value" (list $ . .Values.kibana.count) }}
+  config:
+    server.publicBaseUrl: {{ printf "https://%s" (include "fl.value" (list $ . .Values.kibana.ingress.host)) }}
+    elasticsearch.requestHeadersWhitelist:
+      - authorization
+    xpack.apm.ui.enabled: false
+    xpack.observabilityAIAssistant.enabled: false
+  elasticsearchRef:
+    name: {{ .Chart.Name }}
+  podTemplate:
+    spec:
+      containers:
+        - env:
+            - name: NODE_OPTIONS
+              value: --max-old-space-size=3048
+          name: kibana
+          resources: {{ include "fl.value" (list $ . .Values.kibana.resources) | nindent 14 }}
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: true

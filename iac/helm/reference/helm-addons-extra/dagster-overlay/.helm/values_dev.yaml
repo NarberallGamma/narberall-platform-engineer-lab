@@ -1,0 +1,80 @@
+dagster:
+  dagsterWebserver:
+    workspace:
+      enabled: true
+      servers:
+        - host: "dagit-backend-backend"
+          port: 3030
+          name: "dagster-repo-backend"
+        - host: "dagit-analytics"
+          port: 3030
+          name: "dagster-analytics"
+        - host: "dagit-qa-backend"
+          port: 3030
+          name: "dagster-repo-qa"
+  pipelineRun:
+    image:
+      repository: "example.registry/platform/user-code"
+    tag: CHANGE_ME
+    pullPolicy: Always
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/auth-signin: "https://$host/dex-authenticator/sign_in"
+      nginx.ingress.kubernetes.io/auth-url: "https://dagster-dex-authenticator.dev.svc.cluster.local/dex-authenticator/auth"
+      nginx.ingress.kubernetes.io/auth-response-headers: X-Auth-Request-User,X-Auth-Request-Email,Authorization
+    labels: {}
+    dagsterWebserver:
+      host: "dagster-dev.example.com"
+      path: "/"
+      pathType: Prefix
+      tls:
+        enabled: true
+        clusterissuer: letsencrypt
+        secretName: dagster-tls
+
+  dagsterDaemon:
+    runCoordinator:
+      enabled: false
+    runMonitoring:
+      startTimeoutSeconds: 900
+    runRetries:
+      enabled: false
+
+  telemetry:
+    enabled: false
+
+  dagster-user-deployments:
+    enabled: true
+    enableSubchart: false
+    deployments: []
+
+  postgresql:
+    enabled: true
+    image:
+      repository: "library/postgres"
+      tag: "9.6.21"
+      pullPolicy: IfNotPresent
+    master:
+      priorityClassName: develop
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/sts
+                operator: Exists
+      tolerations:
+      - effect: NoExecute
+        operator: Equal
+        key: dedicated
+        value: sts
+
+  rabbitmq:
+    enabled: false
+
+  redis:
+    enabled: false
+    internal: false

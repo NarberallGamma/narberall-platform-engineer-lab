@@ -1,0 +1,194 @@
+{{- if eq .Values.werf.env "dev" }}
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: CustomPrometheusRules
+metadata:
+  labels:
+    component: rules
+    prometheus: main
+  name: cloudnativ-pg
+spec:
+  groups:
+  - name: CloudNativePG_Group
+    rules:
+    - alert: CloudNativePGMemoryUsed
+      expr: (((container_memory_usage_bytes{container="postgres", namespace=~".*app.*",pod=~".*pg-.*"})/(container_spec_memory_limit_bytes{container="postgres", namespace=~".*app.*",pod=~".*pg-.*"}))*100)>90
+      for: 1m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/D2zXQcrLH/cloudnativepg?orgId=1&refresh=1m
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        plk_create_group_if_not_exists__cloudnativpgcustommon: CloudNativPGCcustomMon
+        plk_grouped_by__cloudnativpgcustommon: CloudNativPGCcustomMon
+        description: |
+          Check PG in {{`{{$labels.namespace}}`}}.
+        summary: CloudNativePG memory usage is too high in {{`{{$labels.namespace}}`}}
+    - alert: CloudNativePGswapUsage
+      expr: (container_memory_swap{container="postgres", namespace=~".*app.*",pod=~".*pg-.*"})>0
+      for: 3m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/D2zXQcrLH/cloudnativepg?orgId=1&refresh=1m
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        plk_create_group_if_not_exists__cloudnativpgcustommon: CloudNativPGCcustomMon
+        plk_grouped_by__cloudnativpgcustommon: CloudNativPGCcustomMon
+        description: |
+          Check PG in {{`{{$labels.namespace}}`}} it may be memory issue .
+        summary: CloudNativePG use swap it may be memory issue in {{`{{$labels.namespace}}`}}
+    - alert: CloudNativePGhasErrors
+      expr: sum_over_time(cnpg_collector_last_collection_error{container="postgres", namespace=~".*app.*",pod=~".*pg-.*"}[5m])>10
+      for: 5m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/D2zXQcrLH/cloudnativepg?orgId=1&refresh=1m
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        plk_create_group_if_not_exists__cloudnativpgcustommon: CloudNativPGCcustomMon
+        plk_grouped_by__cloudnativpgcustommon: CloudNativPGCcustomMon
+        description: |
+          Check PG in {{`{{$labels.namespace}}`}} it has more than 10 errors at last 5 minutes.
+        summary: CloudNativePG too many errors in {{`{{$labels.namespace}}`}}
+    - alert: CloudNativePGWALs
+      expr: (cnpg_collector_pg_wal{container="postgres", namespace=~".*app.*",pod=~".*pg-.*",value=~"max"}- ignoring (value) cnpg_collector_pg_wal{container="postgres", namespace=~".*app.*",pod=~".*pg-.*",value=~"count"}) < 10 
+      for: 5m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/D2zXQcrLH/cloudnativepg?orgId=1&refresh=1m
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        plk_create_group_if_not_exists__cloudnativpgcustommon: CloudNativPGCcustomMon
+        plk_grouped_by__cloudnativpgcustommon: CloudNativPGCcustomMon
+        description: |
+          Check PG in {{`{{$labels.namespace}}`}} approaching the limit of WAL.
+        summary: CloudNativePG too many WALs in {{`{{$labels.namespace}}`}}
+    - alert: CloudNativePGblocked
+      expr: cnpg_backends_waiting_total{container="postgres",namespace=~".*app.*",pod=~".*pg-.*"}>10
+      for: 1m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/D2zXQcrLH/cloudnativepg?orgId=1&refresh=1m
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        plk_create_group_if_not_exists__cloudnativpgcustommon: CloudNativPGCcustomMon
+        plk_grouped_by__cloudnativpgcustommon: CloudNativPGCcustomMon
+        description: |
+          Check PG in {{`{{$labels.namespace}}`}} too many waiting processes.
+        summary: CloudNativePG too many waiting processes in {{`{{$labels.namespace}}`}}
+    - alert: CloudNativePGdeadlock
+      expr:  sum by (job) (cnpg_pg_stat_database_deadlocks{container="postgres", namespace=~".*app.*",pod=~".*pg-.*"}) > 1
+      for: 1m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/D2zXQcrLH/cloudnativepg?orgId=1&refresh=1m
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        plk_create_group_if_not_exists__cloudnativpgcustommon: CloudNativPGCcustomMon
+        plk_grouped_by__cloudnativpgcustommon: CloudNativPGCcustomMon
+        description: |
+          PG in {{`{{$labels.namespace}}`}} has deadlocks.
+        summary: PG in {{`{{$labels.namespace}}`}} has deadlocks.
+    - alert: CloudNativePGlongTran
+      expr: cnpg_backends_max_tx_duration_seconds{container="postgres", namespace=~".*app.*",pod=~".*pg-.*", state="active"} > 3600
+      for: 5m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/D2zXQcrLH/cloudnativepg?orgId=1&refresh=1m
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        plk_create_group_if_not_exists__cloudnativpgcustommon: CloudNativPGCcustomMon
+        plk_grouped_by__cloudnativpgcustommon: CloudNativPGCcustomMon
+        description: |
+          CloudNativePG has long running queries in {{`{{$labels.namespace}}`}}.
+        summary:  CloudNativePG has long running queries in {{`{{$labels.namespace}}`}}.
+    - alert: CloudNativePGStatus
+      expr: (kube_pod_container_status_ready{container="postgres", namespace=~".*app.*",pod=~".*pg-.*"})!=1
+      for: 5m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/D2zXQcrLH/cloudnativepg?orgId=1&refresh=1m
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        plk_create_group_if_not_exists__cloudnativpgcustommon: CloudNativPGCcustomMon
+        plk_grouped_by__cloudnativpgcustommon: CloudNativPGCcustomMon
+        description: |
+          CloudNativePG Status is not ready in {{`{{$labels.namespace}}`}}.
+        summary:  CloudNativePG Status is not ready in {{`{{$labels.namespace}}`}}.
+    - alert: CloudNativePGStorage
+      expr: (kubelet_volume_stats_available_bytes{namespace=~".*app.*",persistentvolumeclaim=~".*pg-.*"})  /  (kubelet_volume_stats_capacity_bytes{namespace=~".*app.*",persistentvolumeclaim=~".*pg-.*"}) * 100 < 10 
+      for: 2m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/D2zXQcrLH/cloudnativepg?orgId=1&refresh=1m
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        plk_create_group_if_not_exists__cloudnativpgcustommon: CloudNativPGCcustomMon
+        plk_grouped_by__cloudnativpgcustommon: CloudNativPGCcustomMon
+        description: |
+          CloudNativePG storage is almost full in {{`{{$labels.namespace}}`}}.
+        summary:  CloudNativePG storage is almost full in {{`{{$labels.namespace}}`}}.
+    - alert: CloudNativePGConnectionPool
+      expr: (sum by (job) (cnpg_backends_total{container="postgres",namespace=~".*app.*",pod=~".*pg-.*",state="active"})) /  (sum by (job) (cnpg_pg_settings_setting{container="postgres", name="max_connections", namespace=~".*app.*", pod=~".*pg-.*"}))*100 > 80 
+      for: 2m
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+        plk_incident_link_url__grafana: https://grafana.example.com/d/D2zXQcrLH/cloudnativepg?orgId=1&refresh=1m
+        plk_incident_link_title_ru__grafana: Grafana Dashboard
+        plk_incident_link_title_en__grafana: Grafana Dashboard
+        plk_incident_link_icon__grafana: fa-bar-chart
+        plk_create_group_if_not_exists__cloudnativpgcustommon: CloudNativPGCcustomMon
+        plk_grouped_by__cloudnativpgcustommon: CloudNativPGCcustomMon
+        description: |
+          CloudNativePG connections are used more than 80 percent in {{`{{$labels.namespace}}`}}.
+        summary:  CloudNativePG connections are almost full in {{`{{$labels.namespace}}`}}.
+{{- end }}

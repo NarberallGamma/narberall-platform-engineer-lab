@@ -1,0 +1,204 @@
+# CI injected global.cluster (east | west) to pick app_urls and mysql.host.
+# Example for a local render:
+# global:
+#   cluster: east
+
+app:
+  app_urls:
+    east:
+      _default:
+        - host: '{{ printf "webapps-%s.kube-east.example.com" $.Values.werf.env }}'
+          secretName: "{{ $.Chart.Name }}-tls"
+      production:
+        - host: "widgets.example.com"
+          secretName: "{{ $.Chart.Name }}-widgets-tls"
+          host2: "webapps-alt.example.com"
+          secretName2: "{{ $.Chart.Name }}-webapps-alt-tls"
+        - host: "app.example.com"
+          secretName: "{{ $.Chart.Name }}-app-tls"
+    west:
+      _default:
+        - host: '{{ printf "webapps-%s.kube-west.example.com" $.Values.werf.env }}'
+          secretName: "{{ $.Chart.Name }}-tls"
+      production:
+        - host: "app-eu.example.com"
+          secretName: "{{ $.Chart.Name }}-app-tls"
+
+replicas:
+  _default: 1
+  production: 3
+
+mysql:
+  host:
+    west:
+      _default: mysql
+      stage: mysql-west-master
+      production: mysql-west-master
+    east:
+      _default: mysql
+      stage: mysql
+      production: mysql-east-master
+  db:
+    _default: webapps
+  user:
+    _default: webapps
+  root_user:
+    _default: root
+
+envs:
+  configmap:
+    APP_ENV:
+      _default: "local"
+      test: "test"
+      stage: "test"
+      production: "production"
+    APP_DEBUG:
+      _default: "true"
+      test: "true"
+      production: "false"
+
+    APP_TIMEZONE: "Europe/Moscow"
+    LOG_CHANNEL: "stack"
+    LOG_SLACK_WEBHOOK_URL: "___FL_THIS_ENV_VAR_WILL_BE_DEFINED_BUT_EMPTY___"
+
+    COMPOSER_HOME: "/app/.composer"
+
+    MEMCACHE_HOST: memcached-0.memcached-cluster
+    MEMCACHE_HOST1: memcached-1.memcached-cluster
+    MEMCACHE_HOST2: memcached-2.memcached-cluster
+    MEMCACHED_PORT: "11211"
+    MEMCACHED_PERSISTENT_ID: "webapps"
+
+    DB_CONNECTION: "mysql"
+    DB_HOST: '{{ index $.Values.mysql.host $.Values.global.cluster | list $ . | include "fl.value" }}'
+    DB_PORT: "3306"
+    DB_DATABASE: "webapps"
+    DB_USERNAME: "webapps"
+
+    CACHE_DRIVER: "memcached"
+    SESSION_DRIVER: memcached
+    QUEUE_DRIVER: "sync"
+    QUEUE_CONNECTION: "database"
+
+    RMQ_HOST:
+        _default: rmq-test.kube-west.example.com:31333
+        test: rmq-test.kube-west.example.com:31333
+        stage: rmq-stage.kube-west.example.com:31333
+        production: rmq.example.com:31335
+    RMQ_PORT: "5672"
+    RMQ_USER:
+        _default: rabbitmq
+        production: rabbitmq_new
+
+    AWS_BUCKET: "webapps"
+    AWS_DEFAULT_REGION: "us-east-1"
+    AWS_ACCESS_KEY_ID: "CHANGE_ME"
+
+    SLACK_POST_TO_CHANNEL: "#api-test"
+    SLACK_URL: https://slack.example.com/api/chat.postMessage
+
+    CASHIER_LOGGER: "stack"
+    CASHIER_CURRENCY: "USD"
+
+    ACCOUNT_URL:
+        _default: "https://accounts-test.kube-west.example.com"
+        production: "https://accounts.example.com"
+
+    BILLING_URL:
+        _default: ""
+        test: "https://test-billing.example.com/billmgr"
+        stage: "https://stage-billing.example.com/billmgr"
+        production: "https://billing.example.com/billmgr"
+    BILLING_API_URL:
+        _default: ""
+        test: "https://billing-api-test.kube-west.example.com"
+        stage: "https://billing-api-stage.kube-west.example.com"
+        production: "https://billing-api.example.com"
+    TENANT_URL_PATTERN:
+        _default: ""
+        test: "https://DOMAIN_NAME.test.kube-west.example.com"
+        stage: "https://DOMAIN_NAME.stage.kube-west.example.com"
+        production: "https://DOMAIN_NAME.example.com"
+
+    MAIL_DRIVER: smtp
+    MAIL_HOST: smtp.example.com
+    MAIL_PORT: "587"
+    MAIL_USERNAME: "CHANGE_ME"
+    MAIL_ENCRYPTION: "tls"
+    MANDRILL_EMAIL:
+        _default: help@kube-west.example.com
+        production: help@example.com
+
+    LIST_ID_NEW_USER: "CHANGE_ME"
+
+    WM_LINK_URL:
+        _default: https://link-test.kube-west.example.com/
+        production: https://link.example.com/
+
+resources:
+  nginx:
+    requests:
+      cpu:
+        _default: 20m
+        production: 50m
+      memory:
+        _default: 128Mi
+        production: 256Mi
+    limits:
+      memory:
+        _default: 128Mi
+        production: 256Mi
+  php_backend:
+    requests:
+      cpu:
+        _default: 20m
+        production: 100m
+      memory:
+        _default: 128Mi
+        production: 386Mi
+    limits:
+      memory:
+        _default: 256Mi
+        production: 386Mi
+  php_cron:
+    requests:
+      cpu:
+        _default: 20m
+        production: 100m
+      memory:
+        _default: 128Mi
+        production: 386Mi
+    limits:
+      memory:
+        _default: 128Mi
+        production: 386Mi
+  php_worker:
+    requests:
+      cpu:
+        _default: 20m
+        production: 100m
+      memory:
+        _default: 128Mi
+        production: 386Mi
+    limits:
+      memory:
+        _default: 128Mi
+        production: 386Mi
+
+affinity:
+  _default: ""
+  production: |
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: node-role.kubernetes.io/prod-worker
+            operator: Exists
+
+tolerations:
+  _default: ""
+  production: |
+    - effect: NoExecute
+      key: dedicated
+      operator: Equal
+      value: prod-worker

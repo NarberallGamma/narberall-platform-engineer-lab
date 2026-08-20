@@ -1,0 +1,56 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-api-grpc
+spec:
+  clusterIP: None
+  selector:
+    app: app-api
+  ports:
+  {{- range $name, $number := $.Values.app.ports }}
+  - name: {{ $name }}
+    port: {{ $number | list $ . | include "fl.value" }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-api-counter-grpc
+spec:
+  clusterIP: None
+  selector:
+    app: app-api-counter
+  ports:
+  {{- range $name, $number := $.Values.app.ports }}
+  - name: {{ $name }}
+    port: {{ $number | list $ . | include "fl.value" }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-api-storefront-grpc
+spec:
+  clusterIP: None
+  selector:
+    app: app-api-storefront
+  ports:
+  {{- range $name, $number := $.Values.app.ports }}
+  - name: {{ $name }}
+    port: {{ $number | list $ . | include "fl.value" }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-api-kiosk-grpc
+spec:
+  clusterIP: None
+  selector:
+    app: app-api-kiosk
+  ports:
+  {{- range $name, $number := $.Values.app.ports }}
+  - name: {{ $name }}
+    port: {{ $number | list $ . | include "fl.value" }}
+  {{- end }}

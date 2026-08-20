@@ -1,0 +1,9 @@
+---
+apiVersion: deckhouse.io/v1
+kind: GrafanaDashboardDefinition
+metadata:
+  name: elastcsearch
+spec:
+  folder: Applications
+  definition: |
+{{ .Files.Get "dashboards/elasticsearch.json" | nindent 4 }}

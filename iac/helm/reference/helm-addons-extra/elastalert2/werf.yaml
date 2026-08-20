@@ -1,0 +1,9 @@
+configVersion: 1
+project: elastalert2
+deploy:
+  namespace: '[[ project ]]'
+  helmRelease: '[[ project ]]'
+---
+image: elastalert2
+from: jertel/elastalert2:2.20.0
+---

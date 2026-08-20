@@ -1,0 +1,7 @@
+---
+include:
+  - project: 'platform/infra/common-ci'
+    file: '/multiStageInfra.yml'
+
+variables:
+  KUBE_NAMESPACE: sonarqube

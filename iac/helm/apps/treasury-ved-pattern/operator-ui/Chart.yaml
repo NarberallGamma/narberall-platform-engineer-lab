@@ -1,0 +1,12 @@
+apiVersion: v2
+name: operator-ui
+description: Thin umbrella for the estate operator UI (front-base library)
+type: application
+version: 0.1.0
+appVersion: "3.0.1"
+dependencies:
+  - name: front-base
+    version: 0.1.1
+    repository: file://../_libs/front-base
+    alias: application
+    condition: application.enabled

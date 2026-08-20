@@ -3,7 +3,7 @@ version: '2.1'
 services:
 
   nginx:
-    image: 'wmx-public.gitlab.yandexcloud.net:5050/wmx-public/container-images/node:4.6'
+    image: 'registry.example.com/waf/node:4.6'
     restart: always
     network_mode: host
     logging:
@@ -11,7 +11,7 @@ services:
         max-size: '500m'
         max-file: '1'
     environment:
-      - WALLARM_API_HOST=api.webmonitorx.ru
+      - WALLARM_API_HOST=wallarm.example.com
       - WALLARM_API_TOKEN=[ключ на сервере] (выдается в консоли Wallarm)
       - DEPLOY_FORCE=True
       - TARANTOOL_MEMORY_GB=2

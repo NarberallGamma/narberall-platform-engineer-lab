@@ -1,0 +1,55 @@
+name: Application Logs Monitoring
+type: frequency
+index: 00000000-0000-4000-8000-000000000001
+num_events: 5
+timeframe:
+  minutes: 5
+realert:
+  minutes: 2
+
+filter:
+- query:
+    query_string:
+      query: "level:ERROR OR level:CRITICAL OR level:FATAL"
+
+include:
+  - "@timestamp"
+  - "level"
+  - "message"
+  - "logger_name"
+  - "thread_name"
+  - "host"
+  - "_index"
+
+include_match_in_root: true
+
+alert_subject: "Application Error Alert :warning:"
+
+alert_text_type: alert_text_only
+
+alert_text: |-
+  *Application Error Detected*
+  
+  *Timestamp:* `{}`
+  *Log Level:* `{}`
+  *Message:* `{}`
+  *Logger:* `{}`
+  *Thread:* `{}`
+  *Host:* `{}`
+  *Index:* `{}`
+
+alert_text_args:
+  - "@timestamp"
+  - "level"
+  - "message"
+  - "logger_name"
+  - "thread_name"
+  - "host"
+  - "_index"
+
+alert:
+  - "slack"
+
+slack:
+  slack_webhook_url: https://hooks.slack.com/services/CHANGE_ME
+  slack_channel_override: '#app-alerts'

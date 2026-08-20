@@ -1,0 +1,9 @@
+# LLM side of the DEV stand. CI ran `helmfile apply -f` from this file.
+# Mesh install is not here. See reference/helm-mesh-eso.
+releases:
+  - name: llm-api
+    namespace: dev-stand
+    chart: ../../charts/llm-api
+    values:
+      - values.yaml
+      - llm-api.env.yaml

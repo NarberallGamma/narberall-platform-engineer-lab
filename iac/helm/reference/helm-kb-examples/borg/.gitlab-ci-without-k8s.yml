@@ -1,0 +1,25 @@
+# Deploy variant:
+# * the project has no Kubernetes
+# * Borg repo is estate-owned storage
+# * shared backup storage is not used
+
+stages:
+  - deploy
+
+before_script:
+  - pwd
+  - hostname
+
+after_script:
+  - crontab -l
+  - chmod +x "${CI_PROJECT_DIR}/00-scripts/"*.sh
+
+deploy:
+  stage: deploy
+  script:
+    - export TIMESTAMP=$(date '+%Y.%m.%d %H:%M:%S')
+    - cat schedule | envsubst | crontab -
+  tags:
+    - borg
+  only:
+    - master

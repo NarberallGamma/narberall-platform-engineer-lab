@@ -1,0 +1,6 @@
+# PLACEHOLDER. Not a live trust anchor.
+# Generate with: linkerd upgrade --identity
+# or: ./generate.sh (step CLI). Do not commit ca.crt, ca.key, issuer.crt, or issuer.key.
+-----BEGIN CERTIFICATE-----
+LAB-PLACEHOLDER-NOT-A-LIVE-TRUST-ANCHOR
+-----END CERTIFICATE-----

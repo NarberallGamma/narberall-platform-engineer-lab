@@ -1,0 +1,100 @@
+# Alert rules for dashboard "Cloud.ru / Global" (uid: cloud-ru-global).
+# Fires for each emergency/planned work event from cloud_ru_emergency_event_info (one alert per event with all fields in annotations).
+# event_type "Авария" (Cloud.ru exporter label) -> critical; other types (planned work) -> warning.
+# Resolve when the event disappears from the exporter. Full details: https://cloud.ru/status/events
+# Datasource UID: Prometheus in Grafana (see Connections > Data sources).
+# noDataState: OK: missing series must not raise DatasourceNoData; notify only when the query returns a value and the threshold fires.
+# execErrState: OK: query errors (Prometheus timeout, datasource down) must not raise DatasourceError; notify only on a metric threshold.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Cloud.ru Emergency & Planned Work
+    folder: Alerting
+    interval: 1m
+    rules:
+      # event_type = "Авария" (label value from the Cloud.ru exporter) -> critical
+      - uid: cloud_ru_emergency_event_critical
+        title: Cloud.ru - Emergency (critical)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: 'cloud_ru_emergency_event_info{event_type="Авария"}'
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A >= 1'
+        dashboardUid: cloud-ru-global
+        panelId: 4
+        noDataState: OK
+        execErrState: OK
+        for: 0s
+        annotations:
+          summary: "Cloud.ru emergency: {{ "{{" }} {{ "$" }}{{ "labels.title" }} {{ "}}" }}"
+          description: |
+            • <b>Title:</b> {{ "{{" }} {{ "$" }}{{ "labels.title" }} {{ "}}" }}
+            • <b>Status:</b> {{ "{{" }} {{ "$" }}{{ "labels.status" }} {{ "}}" }}
+            • <b>Type:</b> {{ "{{" }} {{ "$" }}{{ "labels.event_type" }} {{ "}}" }}
+            • <b>Service:</b> {{ "{{" }} {{ "$" }}{{ "labels.exported_service" }} {{ "}}" }}
+            • <b>Start:</b> {{ "{{" }} {{ "$" }}{{ "labels.start_at" }} {{ "}}" }}
+            • <b>End:</b> {{ "{{" }} {{ "$" }}{{ "labels.end_at" }} {{ "}}" }}
+            • <b>Inaccessibility:</b> {{ "{{" }} {{ "$" }}{{ "labels.inaccessibility" }} {{ "}}" }}
+            • Full details: https://cloud.ru/status/events
+        labels:
+          dashboard: "Cloud.ru / Global"
+          severity: critical
+
+      # All other event types -> warning
+      - uid: cloud_ru_emergency_event_warning
+        title: Cloud.ru - Planned work or other event
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: 'cloud_ru_emergency_event_info unless on (id) cloud_ru_emergency_event_info{event_type="Авария"}'
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A >= 1'
+        dashboardUid: cloud-ru-global
+        panelId: 4
+        noDataState: OK
+        execErrState: OK
+        for: 0s
+        annotations:
+          summary: "Cloud.ru event: {{ "{{" }} {{ "$" }}{{ "labels.title" }} {{ "}}" }}"
+          description: |
+            • <b>Title:</b> {{ "{{" }} {{ "$" }}{{ "labels.title" }} {{ "}}" }}
+            • <b>Status:</b> {{ "{{" }} {{ "$" }}{{ "labels.status" }} {{ "}}" }}
+            • <b>Type:</b> {{ "{{" }} {{ "$" }}{{ "labels.event_type" }} {{ "}}" }}
+            • <b>Service:</b> {{ "{{" }} {{ "$" }}{{ "labels.exported_service" }} {{ "}}" }}
+            • <b>Start:</b> {{ "{{" }} {{ "$" }}{{ "labels.start_at" }} {{ "}}" }}
+            • <b>End:</b> {{ "{{" }} {{ "$" }}{{ "labels.end_at" }} {{ "}}" }}
+            • <b>Inaccessibility:</b> {{ "{{" }} {{ "$" }}{{ "labels.inaccessibility" }} {{ "}}" }}
+            • Full details: https://cloud.ru/status/events
+        labels:
+          dashboard: "Cloud.ru / Global"
+          severity: warning

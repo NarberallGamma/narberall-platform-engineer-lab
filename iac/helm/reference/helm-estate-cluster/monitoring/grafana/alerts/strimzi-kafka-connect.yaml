@@ -1,0 +1,264 @@
+# Alert rules for dashboard "Strimzi Kafka Connect" (uid: strimzi_kafka_connect).
+# Namespace kafka, KafkaConnect CR kafka-debezium (estate). CPU/JVM: one alert instance per pod (Math on vector A).
+# Datasource UID: Prometheus in Grafana (see Connections > Data sources).
+# noDataState: OK: missing series must not raise DatasourceNoData; notify only when the query returns a value and the threshold fires.
+# execErrState: OK: query errors (Prometheus timeout, datasource down) must not raise DatasourceError; notify only on a metric threshold.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Strimzi Kafka Connect
+    folder: Alerting
+    interval: 30s
+    rules:
+      - uid: kfc_rebalance_sum_gt1
+        title: Kafka Connect - rebalancing workers sum > 1
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(kafka_connect_worker_rebalance_rebalancing{namespace="kafka", strimzi_io_kind=~"KafkaConnect.*", strimzi_io_cluster="kafka-debezium"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 1'
+        dashboardUid: strimzi_kafka_connect
+        panelId: 56
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Kafka Connect rebalancing sum exceeds 1 (cluster kafka-debezium)"
+          description: "sum(kafka_connect_worker_rebalance_rebalancing) > 1. Check connector load and worker logs in namespace kafka."
+        labels:
+          dashboard: "Strimzi Kafka Connect"
+          severity: warning
+
+      - uid: kfc_nonrunning_task_counts
+        title: Kafka Connect - non-running connector tasks (paused/failed/unassigned/destroyed)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                sum(kafka_connect_worker_connector_paused_task_count{namespace="kafka", strimzi_io_kind=~"KafkaConnect.*", strimzi_io_cluster="kafka-debezium"})
+                + sum(kafka_connect_worker_connector_failed_task_count{namespace="kafka", strimzi_io_kind=~"KafkaConnect.*", strimzi_io_cluster="kafka-debezium"})
+                + sum(kafka_connect_worker_connector_unassigned_task_count{namespace="kafka", strimzi_io_kind=~"KafkaConnect.*", strimzi_io_cluster="kafka-debezium"})
+                + sum(kafka_connect_worker_connector_destroyed_task_count{namespace="kafka", strimzi_io_kind=~"KafkaConnect.*", strimzi_io_cluster="kafka-debezium"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 0'
+        dashboardUid: strimzi_kafka_connect
+        panelId: 34
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Kafka Connect has non-running tasks (Connector Task State / Connector Tasks with Issues)"
+          description: "Sum of paused, failed, unassigned, or destroyed connector tasks > 0. Inspect panels Connector Task State and Connector Tasks with Issues on the dashboard."
+        labels:
+          dashboard: "Strimzi Kafka Connect"
+          severity: critical
+
+      - uid: kfc_connector_status_not_running
+        title: Kafka Connect - connector status not running
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(kafka_connect_connector_status{namespace="kafka", strimzi_io_kind=~"KafkaConnect.*", strimzi_io_cluster="kafka-debezium", status!="running"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 0'
+        dashboardUid: strimzi_kafka_connect
+        panelId: 42
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Kafka Connect connector status is not running"
+          description: "At least one connector has status other than running. See panel Connector Status."
+        labels:
+          dashboard: "Strimzi Kafka Connect"
+          severity: critical
+
+      - uid: kfc_connector_record_failures
+        title: Kafka Connect - total record failures > 0
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(kafka_connect_task_error_total_record_failures{namespace="kafka", strimzi_io_kind=~"KafkaConnect.*", strimzi_io_cluster="kafka-debezium"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 0'
+        dashboardUid: strimzi_kafka_connect
+        panelId: 41
+        noDataState: OK
+        execErrState: OK
+        for: 2m
+        annotations:
+          summary: "Kafka Connect task total record failures > 0"
+          description: "See panel Connector Task Status (Total Record Failures)."
+        labels:
+          dashboard: "Strimzi Kafka Connect"
+          severity: critical
+
+      - uid: kfc_cpu_usage_pct_high
+        title: Kafka Connect - CPU usage > 70% of limit (per pod)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                100 * sum(rate(container_cpu_usage_seconds_total{namespace="kafka", pod=~"kafka-debezium-connect-.+", container="kafka-debezium-connect"}[5m])) by (pod)
+                / clamp_min(sum(kube_pod_container_resource_limits{namespace="kafka", pod=~"kafka-debezium-connect-.+", container="kafka-debezium-connect", resource="cpu"}) by (pod), 1e-9)
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 70'
+        dashboardUid: strimzi_kafka_connect
+        panelId: 30
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: "Kafka Connect CPU > 70% of limit on {{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}"
+          description: "container_cpu_usage_seconds_total vs kube_pod_container_resource_limits (cpu). Pod: {{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}."
+        labels:
+          dashboard: "Strimzi Kafka Connect"
+          severity: warning
+
+      - uid: kfc_jvm_heap_usage_pct_high
+        title: Kafka Connect - JVM heap used > 70% of max (per pod)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: |
+                100 * sum by (pod) (jvm_memory_used_bytes{namespace="kafka", pod=~"kafka-debezium-connect-.+", area="heap", strimzi_io_kind=~"KafkaConnect.*", strimzi_io_cluster="kafka-debezium"})
+                / clamp_min(sum by (pod) (jvm_memory_max_bytes{namespace="kafka", pod=~"kafka-debezium-connect-.+", area="heap", strimzi_io_kind=~"KafkaConnect.*", strimzi_io_cluster="kafka-debezium"}), 1)
+              refId: A
+              instant: true
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}A > 70'
+        dashboardUid: strimzi_kafka_connect
+        panelId: 31
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: "Kafka Connect JVM heap > 70% on {{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}"
+          description: "jvm_memory_used_bytes / jvm_memory_max_bytes (heap). Pod: {{ "{{" }} {{ "$" }}{{ "labels.pod" }} {{ "}}" }}."
+        labels:
+          dashboard: "Strimzi Kafka Connect"
+          severity: warning

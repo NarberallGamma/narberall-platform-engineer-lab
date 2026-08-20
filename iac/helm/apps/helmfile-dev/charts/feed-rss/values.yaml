@@ -1,0 +1,22 @@
+schedule: "*/5 * * * *"
+rssSource: "source_alpha"
+
+imagePullSecrets: []
+
+image:
+  repository: example.registry/apps/feed-rss
+  tag: latest
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+persistence:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 100Mi

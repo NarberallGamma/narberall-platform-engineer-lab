@@ -1,0 +1,43 @@
+# Upstream ingress-nginx values excerpt. Pin: controller v1.13.3.
+# No wrapper chart. Service is off: ../loadbalancer owns the three ELBs.
+
+controller:
+  replicaCount: 3
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values: [ingress-nginx]
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values: [controller]
+            topologyKey: topology.kubernetes.io/zone
+  service:
+    enabled: false
+  config:
+    use-gzip: "true"
+    gzip-level: "6"
+    worker-processes: "auto"
+    worker-connections: "32768"
+    proxy-connect-timeout: "30"
+    proxy-send-timeout: "1200"
+    proxy-read-timeout: "1200"
+    proxy-body-size: "10m"
+    ssl-protocols: "TLSv1.2 TLSv1.3"
+    rate-limit: "1000"
+    rate-limit-window: "1m"
+    server-tokens: "false"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2

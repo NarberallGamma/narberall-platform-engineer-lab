@@ -1,0 +1,133 @@
+project: webapps
+configVersion: 1
+---
+image: nginx
+from: nginx:1.23-alpine
+shell:
+  beforeInstall:
+  - echo "Remove some trash"
+  - rm -f /etc/nginx/conf.d/default.conf /etc/nginx/nginx.conf /etc/nginx/fastcgi_params
+  - echo "Set timezone"
+  - apk add tzdata bash
+  - cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime
+  - echo "Europe/Moscow" > /etc/timezone
+  - echo "AddUser www-data"
+  - adduser -u 82 -D -S -G www-data www-data
+git:
+{{ include "local git application files" . }}
+
+---
+image: app
+from: ubuntu:20.04
+docker:
+  WORKDIR: /app
+  EXPOSE: '80'
+  USER: www-data
+  ENV:
+    TERM: xterm
+    LC_ALL: en_US.UTF-8
+    TZ: Europe/Moscow
+git:
+{{ include "local git application files" . }}
+shell:
+  {{ include "app" . }}
+  beforeSetup:
+  - mv /app/app/Console/Kernel-all-job.php /app/app/Console/Kernel.php
+  - rm /app/app/Console/Kernel-one-job.php
+  - ls -la /app/app/Console
+
+---
+image: app-cron-one-job
+from: ubuntu:20.04
+docker:
+  WORKDIR: /app
+  EXPOSE: '80'
+  USER: www-data
+  ENV:
+    TERM: xterm
+    LC_ALL: en_US.UTF-8
+    TZ: Europe/Moscow
+git:
+{{ include "local git application files" . }}
+shell:
+  {{ include "app" . }}
+  beforeSetup:
+  - mv /app/app/Console/Kernel-one-job.php /app/app/Console/Kernel.php
+  - rm /app/app/Console/Kernel-all-job.php
+  - ls -la /app/app/Console
+---
+image:  mysql
+from:  mysql:5.7
+
+---
+# Includes
+{{- define "local git application files" -}}
+- add: /
+  to: /app
+  owner: www-data
+  group: www-data
+  excludePaths:
+  - .helm
+  stageDependencies:
+    install:
+    - composer.lock
+    beforeSetup:
+    - 'app/Console/*'
+    setup:
+    - '**/*'
+{{- end }}
+
+{{- define "app" -}}
+  beforeInstall:
+  - export DEBIAN_FRONTEND=noninteractive
+  - echo Install essential utils
+  - apt-get update && apt-get  install -y --no-install-recommends software-properties-common git nano curl sudo libmemcached-dev libz-dev libpq-dev libjpeg-dev libpng-dev libfreetype6-dev libssl-dev libmcrypt-dev default-mysql-client mysql-client libxml2-dev libzip-dev zip locales locales-all gettext-base tzdata bash wget unzip libfcgi0ldbl libfcgi-bin
+  - echo Install nodejs repo
+  - curl -sL https://deb.nodesource.com/setup_18.x | sudo -E bash
+  - apt-get  install -y nodejs
+  - echo "Set timezone"
+  - cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime
+  - echo "Europe/Moscow" > /etc/timezone
+  - echo "Generate en_US.UTF-8 default locale"
+  - locale-gen en_US.UTF-8
+  - update-locale LANG=en_US.UTF-8
+  - echo "Add Ondrej ppa"
+  - add-apt-repository ppa:ondrej/php
+  - echo "Install php packages"
+  - apt update && apt-get -y install --no-install-recommends php8.1 php8.1-{common,igbinary,msgpack,memcache,memcached,bcmath,bz2,curl,dba,dom,exif,fpm,ftp,gd,mbstring,mysql,posix,readline,simplexml,soap,tidy,tokenizer,xml,zip,xmlwriter,xsl}
+  - echo "Install cronic"
+  - wget --quiet -O /usr/local/bin/supercronic https://github.com/aptible/supercronic/releases/download/v0.1.9/supercronic-linux-amd64
+  - chmod +x /usr/local/bin/supercronic
+  - echo "download composer"
+  - wget -O /usr/local/bin/composer https://getcomposer.org/download/2.3.5/composer.phar
+  - chmod 0755 /usr/local/bin/composer
+  - echo "Remove some trash"
+  - rm -rf  /etc/php/5.5 /etc/php/5.6 /etc/php/7.0 /etc/php/7.1 /etc/php/8.1/fpm/pool.d/www.conf /etc/php/8.1/fpm/php-fpm.conf
+  - echo "Apt clean"
+  - apt-get  clean && rm -rf /var/lib/apt/lists/*
+  - echo "NewRelic repo keys"
+  - wget -qO - "http://download.newrelic.com/548C16BF.gpg" | apt-key add -
+  - echo "NewRelic repo"
+  - echo "deb http://apt.newrelic.com/debian/ newrelic non-free" > /etc/apt/sources.list.d/newrelic.list
+  install:
+  - export DEBIAN_FRONTEND=noninteractive
+  - echo "install ca"
+  - sed -i 's|mozilla/DST_Root_CA_X3.crt|!mozilla/DST_Root_CA_X3.crt|g' /etc/ca-certificates.conf
+  - update-ca-certificates
+  - apt update && apt install -y ca-certificates newrelic-php5
+  - apt clean && rm -rf /var/lib/apt/lists/*
+  - echo "Link to php-fpm config"
+  - rm -rf /etc/php/8.1/fpm/php-fpm.conf
+  - ln -s /app/.werffiles/backend/php-fpm.conf /etc/php/8.1/fpm/php-fpm.conf
+  - echo "Link to php-fpm pool"
+  - rm -rf /etc/php/8.1/fpm/pool.d/www.conf
+  - ln -s /app/.werffiles/backend/php-pool.conf /etc/php/8.1/fpm/pool.d/www.conf
+  - echo "Composer install"
+  - usermod -d /app www-data
+  - su - www-data -s /bin/bash -c "set -e; export COMPOSER_HOME=/app/.composer; /usr/local/bin/composer update; /usr/local/bin/composer install --no-interaction --no-ansi --no-dev --prefer-dist; /usr/local/bin/composer clear-cache; /usr/local/bin/composer dump-autoload"
+  - echo "npm install"
+  - su - www-data -s /bin/bash -c "npm i; npm cache clean -f"
+  setup:
+  - echo "Composer dump-autoload"
+  - su - www-data -s /bin/bash -c "set -e; export COMPOSER_HOME=/app/.composer; /usr/local/bin/composer dump-autoload"
+{{- end }}

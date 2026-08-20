@@ -1,0 +1,149 @@
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: CustomPrometheusRules
+metadata:
+  labels:
+    component: rules
+    prometheus: main
+  name: elasticsearch
+spec:
+  groups:
+  - name: applications.elasticsearch
+    rules:
+    - alert: ElasticDown
+      labels:
+        severity_level: "3"
+      annotations:
+        description: |-
+          Last request form exporter into cluster ElasticSearch was unsuccessful. Required to check states of all pods in cluster
+        summary: Cluster ElasticSearch in namespace {{`{{$labels.namespace}}`}} is unavailable
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+      for: 5m
+      expr: |
+        elasticsearch_clusterinfo_up < 1
+    - alert: ElasticClusterRed
+      labels:
+        severity_level: "2"
+        team: platform-alerts
+      annotations:
+        description: |-
+          Red status means, that at least one primary shard and all its replicas have not been allocated on any cluster node
+          Examples of code examples to check cluster status:
+          - `curl -sk -XGET https://127.0.0.1:9200/_cluster/health?pretty`
+          - `curl -sk -XGET https://127.0.0.1:9200/_cluster/allocation/explain?pretty`
+          Required autorization to execute
+        summary: Cluster ElasticSearch {{`{{ $labels.cluster }}`}} in namespace {{`{{ $labels.namespace }}`}} in Red status
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+      for: 1m
+      expr: |
+        sum by (cluster, namespace) (elasticsearch_cluster_health_status{color="red"} == 1)
+    - alert: ElasticClusterYellow
+      labels:
+        severity_level: "3"
+        team: platform-alerts
+      annotations:
+        description: |-
+          Status Yellow means, that at least one indice has shard replica which has not been allocated on any cluster node
+          Examples of code examples to check cluster status:
+          - `curl -sk -XGET https://127.0.0.1:9200/_cluster/health?pretty`
+          - `curl -sk -XGET https://127.0.0.1:9200/_cluster/allocation/explain?pretty`
+          Required autorization to execute
+        summary: Cluster ElasticSearch {{`{{ $labels.cluster }}`}} in namespace {{`{{ $labels.namespace }}`}} in Yellow status
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+      for: 5m
+      expr: |
+        sum by (cluster, namespace) (elasticsearch_cluster_health_status{color="yellow"} == 1)
+    - alert: ElasticNoNewDocuments
+      labels:
+        severity_level: "4"
+      annotations:
+        description: |-
+            For some reason, no new logs have been received in any of the indices on the node {{`{{ $labels.name }}`}} in the last 10 minutes.
+        summary: No new logs have been received in the last 10 minutes on the node {{`{{ $labels.name }}`}} in the cluster {{`{{ $labels.cluster }}`}} within the namespace {{`{{ $labels.namespace }}`}}.
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+      for: 10m
+      expr: |
+        sum by (cluster, namespace) (rate(elasticsearch_indices_docs[10m])) == 0
+    - alert: ElasticReadOnlyIndex
+      labels:
+        severity_level: "3"
+      annotations:
+        description: |-
+            One of the indices became in status read-only. This could have happened because ElasticSearch has run out of space.
+            Command to cancel read-only:
+            - `curl -sk -IXPUT -H "Content-Type: application/json" https://127.0.0.1:9200/all/_settings -d '{"index": {"blocks": {"read_only_allow_delete": "false"}}}'`
+            Required autorization to execute
+        summary: In cluster ElasticSearch in namespace {{`{{ $labels.namespace }}`}} there are indices in status read-only
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+      for: 5m
+      expr: |
+        elasticsearch_indices_settings_stats_read_only_indices > 1
+    - alert: ElasticUnassignedShards
+      labels:
+        severity_level: "4"
+      annotations:
+        description: |-
+            Count of unassigned shards: {{`{{ $value }}`}}
+            Useful commands:
+            - `curl -sk -XGET https://127.0.0.1:9200/_cluster/health?pretty`
+            - `curl -sk -XGET https://127.0.0.1:9200/_cluster/allocation/explain?pretty`
+            - `curl -sk -XPOST https://127.0.0.1:9200/_cluster/reroute?retry_failed`
+            - `curl -sk -XGET "https://127.0.0.1:9200/_cat/recovery?v&pretty&active_only"`
+            Required autorization to execute
+        summary: In cluster ElasticSearch in namespace {{`{{ $labels.namespace }}`}} there are unassigned shards
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+      for: 5m
+      expr: |
+        sum by (cluster, namespace) (elasticsearch_cluster_health_unassigned_shards > 0)
+    - alert: ElasticHeapUsageTooHigh
+      labels:
+        severity_level: "4"
+      annotations:
+        description: |-
+          Utilization Java Heap on node {{`{{ $labels.name }}`}}: {{`{{ $value }}`}}
+        summary: In cluster Elasticsearch {{`{{ $labels.cluster }}`}} node {{`{{ $labels.name }}`}} in namespace {{`{{ $labels.namespace }}`}} used Java Heap more than 80%
+        plk_markup_format: markdown
+        plk_protocol_version: "1"
+        plk_labels_as_annotations: pod,instance
+      for: 10m
+      expr: |
+        sum by(cluster, name, namespace) (round(elasticsearch_jvm_memory_used_bytes{area="heap"} / elasticsearch_jvm_memory_max_bytes{area="heap"} * 100)) > 80
+    - alert: ElasticsearchDiskUsageNearLowWatermark
+      for: 1m
+      expr: elasticsearch_filesystem_data_free_bytes / elasticsearch_filesystem_data_size_bytes * 100 < (100 - 85 + 5)
+      labels:
+        severity_level: "4"
+      annotations:
+        plk_markup_format: markdown
+        description: |-
+          Elasticsearch disk usage on mount point "{{`{{ $labels.mount }}`}}" in pod "{{`{{ $labels.pod }}`}}" in ns "{{`{{ $labels.namespace }}`}}" near low watermark
+          Current free space value is {{`{{ $value }}`}}" %
+          Check index lifecycle policy or curator config and then increase or cleanup disks
+        summary: >
+          Elasticsearch disk usage in ns "{{`{{ $labels.namespace }}`}}" near low watermark
+    - alert: ElasticsearchDiskUsageNearLowWatermark
+      for: 1m
+      expr: elasticsearch_filesystem_data_free_bytes / elasticsearch_filesystem_data_size_bytes * 100 < (100 - 85 + 1)
+      labels:
+        severity_level: "3"
+        team: platform-alerts
+      annotations:
+        plk_markup_format: markdown
+        description: |-
+          Elasticsearch disk usage on mount point "{{`{{ $labels.mount }}`}}" in pod "{{`{{ $labels.pod }}`}}" in ns "{{`{{ $labels.namespace }}`}}" near low watermark
+          Current free space value is {{`{{ $value }}`}}" %
+          Check index lifecycle policy or curator config and then increase or cleanup disks
+        summary: >
+          Elasticsearch disk usage in ns "{{`{{ $labels.namespace }}`}}" near low watermark

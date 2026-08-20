@@ -1,0 +1,189 @@
+# Alert rules for dashboard "Estate / Ledger / Global" (uid: estate_ledger_global)
+# Warning at lag > 100 blocks, critical at lag >= 200 blocks (Ethereum and TRON).
+# Resolve notification is sent when the alert clears (disableResolveMessage: false on contact point).
+# Datasource UID: Prometheus in Grafana (see Connections > Data sources).
+# noDataState: OK: missing series must not raise DatasourceNoData; notify only when the query returns a value and the threshold fires.
+# execErrState: OK: query errors (Prometheus timeout, datasource down) must not raise DatasourceError; notify only on a metric threshold.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Ledger blockchain lag
+    folder: Alerting
+    interval: 20s
+    rules:
+      - uid: eth_lag_blocks_high
+        title: Ethereum - Lag (blocks) > 100
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(estate_nodes_metrics_ethereum_mainnet_blockchain_height{namespace="estate-app"}) - max(estate_nodes_metrics_ethereum_mainnet_block_number_max{namespace="estate-app", status="PROCESSED"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 100'
+        dashboardUid: estate_ledger_global
+        panelId: 4
+        noDataState: OK
+        execErrState: OK
+        for: 1m
+        annotations:
+          summary: "Ethereum blockchain lag exceeded 100 blocks"
+          description: "Ethereum block processing lag > 100. Check blockchain accessibility from the cluster and nodes service logs in the cluster."
+        labels:
+          dashboard: "Estate / Ledger / Global"
+          severity: warning
+
+      - uid: eth_lag_blocks_critical
+        title: Ethereum - Lag (blocks) >= 200
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(estate_nodes_metrics_ethereum_mainnet_blockchain_height{namespace="estate-app"}) - max(estate_nodes_metrics_ethereum_mainnet_block_number_max{namespace="estate-app", status="PROCESSED"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B >= 200'
+        dashboardUid: estate_ledger_global
+        panelId: 4
+        noDataState: OK
+        execErrState: OK
+        for: 1m
+        annotations:
+          summary: "Ethereum blockchain lag 200 blocks or more"
+          description: "Ethereum block processing lag >= 200. Check blockchain accessibility from the cluster and nodes service logs in the cluster."
+        labels:
+          dashboard: "Estate / Ledger / Global"
+          severity: critical
+
+      - uid: tron_lag_blocks_high
+        title: TRON - Lag (blocks) > 100
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(estate_nodes_metrics_tron_mainnet_blockchain_height{namespace="estate-app"}) - max(estate_nodes_metrics_tron_mainnet_block_number_max{namespace="estate-app", status="PROCESSED"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B > 100'
+        dashboardUid: estate_ledger_global
+        panelId: 7
+        noDataState: OK
+        execErrState: OK
+        for: 1m
+        annotations:
+          summary: "TRON blockchain lag exceeded 100 blocks"
+          description: "TRON block processing lag > 100. Check blockchain accessibility from the cluster and nodes service logs in the cluster."
+        labels:
+          dashboard: "Estate / Ledger / Global"
+          severity: warning
+
+      - uid: tron_lag_blocks_critical
+        title: TRON - Lag (blocks) >= 200
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: max(estate_nodes_metrics_tron_mainnet_blockchain_height{namespace="estate-app"}) - max(estate_nodes_metrics_tron_mainnet_block_number_max{namespace="estate-app", status="PROCESSED"})
+              refId: A
+              instant: true
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              refId: B
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              refId: C
+              expression: '{{ printf "$" }}B >= 200'
+        dashboardUid: estate_ledger_global
+        panelId: 7
+        noDataState: OK
+        execErrState: OK
+        for: 1m
+        annotations:
+          summary: "TRON blockchain lag 200 blocks or more"
+          description: "TRON block processing lag >= 200. Check blockchain accessibility from the cluster and nodes service logs in the cluster."
+        labels:
+          dashboard: "Estate / Ledger / Global"
+          severity: critical

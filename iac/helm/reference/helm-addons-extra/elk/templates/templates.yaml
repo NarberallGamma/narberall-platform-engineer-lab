@@ -1,0 +1,1153 @@
+{{- $delete_age                   := include "fl.value"  (list $ . .Values.rollover.delete.age.k8s_app) }}
+{{- $delete_age_dashboard_api_sdk := include "fl.value"  (list $ . .Values.rollover.delete.age.dashboard_api_sdk) }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elk-es-templates
+  labels:
+    k8s-app: elk-es
+data:
+  index-k8s-app.json: |-
+    {
+      "template": {
+        "settings": {
+          "index": {
+            "lifecycle": {
+              "name": "k8s-app"
+            },
+            "codec": "best_compression",
+            "refresh_interval": "60s",
+            "number_of_shards": "6",
+            "mapping": {
+              "total_fields": {
+                "limit": "2000"
+              },
+              "depth": {
+                "limit": "20"
+              },
+              "nested_fields": {
+                "limit": "100"
+              }
+            },
+            "translog": {
+              "flush_threshold_size": "1024mb",
+              "sync_interval": "30s",
+              "durability": "async"
+            },
+            "requests": {
+              "cache": {
+                "enable": "true"
+              }
+            },
+            "queries": {
+              "cache": {
+                "enabled": "true"
+              }
+            }
+          }
+        },
+        "mappings": {
+          "_routing": {
+            "required": false
+          },
+          "numeric_detection": false,
+          "dynamic_date_formats": [
+            "strict_date_optional_time",
+            "yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z"
+          ],
+          "_source": {
+            "excludes": [],
+            "includes": [],
+            "enabled": true
+          },
+          "dynamic": true,
+          "dynamic_templates": [
+            {
+              "kubernetes_labels": {
+                "path_match": "kubernetes.labels.*",
+                "mapping": {
+                  "type": "keyword",
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            },
+            {
+              "kubernetes_annotations": {
+                "path_match": "kubernetes.annotations.*",
+                "mapping": {
+                  "type": "keyword",
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            },
+            {
+              "string_fields_not_analyzed": {
+                "match": "*",
+                "match_mapping_type": "string",
+                "mapping": {
+                  "type": "keyword",
+                  "ignore_above": 256,
+                  "index": true,
+                  "doc_values": false
+                }
+              }
+            }
+          ],
+          "date_detection": true,
+          "properties": {
+            "response_data": {
+              "eager_global_ordinals": false,
+              "ignore_above": 1000,
+              "index": true,
+              "type": "flattened",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.is_observer ": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.log_level": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.sdk_v": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "freqs",
+              "doc_values": true
+            },
+            "data.url_mask": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "freqs",
+              "doc_values": true
+            },
+            "data.code": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.is_sandbox ": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.os": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.token": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "doc_values": true
+            },
+            "data.http_method": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.is_storekit2": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.masked_request": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "doc_values": true
+            },
+            "data.cross_version": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "doc_values": true
+            },
+            "data.cross_platform": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.request_data": {
+              "eager_global_ordinals": false,
+              "ignore_above": 997,
+              "index": true,
+              "type": "flattened",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "request_data": {
+              "eager_global_ordinals": false,
+              "ignore_above": 1000,
+              "index": true,
+              "type": "flattened",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.response_data": {
+              "eager_global_ordinals": false,
+              "ignore_above": 1000,
+              "index": true,
+              "type": "flattened",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.log_type": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            }
+          }
+        }
+      },
+      "index_patterns": [
+        "k8s-app-*"
+      ],
+      "priority": 100,
+      "composed_of": []
+    }
+
+  index-k8s-app-gra.json: |-
+    {
+      "template": {
+        "settings": {
+          "index": {
+            "lifecycle": {
+              "name": "k8s-app"
+            },
+            "codec": "best_compression",
+            "refresh_interval": "60s",
+            "number_of_shards": "3",
+            "mapping": {
+              "total_fields": {
+                "limit": "2000"
+              },
+              "depth": {
+                "limit": "20"
+              },
+              "nested_fields": {
+                "limit": "100"
+              }
+            },
+            "translog": {
+              "flush_threshold_size": "1024mb",
+              "sync_interval": "30s",
+              "durability": "async"
+            },
+            "requests": {
+              "cache": {
+                "enable": "true"
+              }
+            },
+            "queries": {
+              "cache": {
+                "enabled": "true"
+              }
+            }
+          }
+        },
+        "mappings": {
+          "_routing": {
+            "required": false
+          },
+          "numeric_detection": false,
+          "dynamic_date_formats": [
+            "strict_date_optional_time",
+            "yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z"
+          ],
+          "_source": {
+            "excludes": [],
+            "includes": [],
+            "enabled": true
+          },
+          "dynamic": true,
+          "dynamic_templates": [
+            {
+              "kubernetes_labels": {
+                "path_match": "kubernetes.labels.*",
+                "mapping": {
+                  "type": "keyword",
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            },
+            {
+              "kubernetes_annotations": {
+                "path_match": "kubernetes.annotations.*",
+                "mapping": {
+                  "type": "keyword",
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            },
+            {
+              "string_fields_not_analyzed": {
+                "match": "*",
+                "match_mapping_type": "string",
+                "mapping": {
+                  "type": "keyword",
+                  "ignore_above": 256,
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            }
+          ],
+          "date_detection": true
+        }
+      },
+      "index_patterns": [
+        "k8s-app-gra-*"
+      ],
+      "priority": 600,
+      "composed_of": []
+    }
+
+  index-k8s-app-dev.json: |-
+    {
+      "template": {
+        "settings": {
+          "index": {
+            "lifecycle": {
+              "name": "k8s-app"
+            },
+            "codec": "best_compression",
+            "refresh_interval": "60s",
+            "number_of_shards": "1",
+            "mapping": {
+              "total_fields": {
+                "limit": "2000"
+              },
+              "depth": {
+                "limit": "20"
+              },
+              "nested_fields": {
+                "limit": "100"
+              }
+            },
+            "translog": {
+              "flush_threshold_size": "1024mb",
+              "sync_interval": "30s",
+              "durability": "async"
+            },
+            "requests": {
+              "cache": {
+                "enable": "true"
+              }
+            },
+            "queries": {
+              "cache": {
+                "enabled": "true"
+              }
+            }
+          }
+        },
+        "mappings": {
+          "_routing": {
+            "required": false
+          },
+          "numeric_detection": false,
+          "dynamic_date_formats": [
+            "strict_date_optional_time",
+            "yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z"
+          ],
+          "_source": {
+            "excludes": [],
+            "includes": [],
+            "enabled": true
+          },
+          "dynamic": true,
+          "dynamic_templates": [
+            {
+              "kubernetes_labels": {
+                "path_match": "kubernetes.labels.*",
+                "mapping": {
+                  "type": "keyword",
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            },
+            {
+              "kubernetes_annotations": {
+                "path_match": "kubernetes.annotations.*",
+                "mapping": {
+                  "type": "keyword",
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            },
+            {
+              "string_fields_not_analyzed": {
+                "match": "*",
+                "match_mapping_type": "string",
+                "mapping": {
+                  "type": "keyword",
+                  "ignore_above": 256,
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            }
+          ],
+          "date_detection": true
+        }
+      },
+      "index_patterns": [
+        "k8s-app-dev-*",
+        "k8s-app-stage-*"
+      ],
+      "priority": 600,
+      "composed_of": []
+    }
+
+  index-k8s-app-dashboard-api.json: |-
+    {
+      "template": {
+        "settings": {
+          "index": {
+            "lifecycle": {
+              "name": "k8s-app-dashboard-api"
+            },
+            "codec": "best_compression",
+            "refresh_interval": "60s",
+            "number_of_shards": "1",
+            "mapping": {
+              "total_fields": {
+                "limit": "2000"
+              },
+              "depth": {
+                "limit": "20"
+              },
+              "nested_fields": {
+                "limit": "100"
+              }
+            },
+            "translog": {
+              "flush_threshold_size": "1024mb",
+              "sync_interval": "30s",
+              "durability": "async"
+            },
+            "requests": {
+              "cache": {
+                "enable": "true"
+              }
+            },
+            "queries": {
+              "cache": {
+                "enabled": "true"
+              }
+            }
+          }
+        },
+        "mappings": {
+          "_routing": {
+            "required": false
+          },
+          "numeric_detection": false,
+          "dynamic_date_formats": [
+            "strict_date_optional_time",
+            "yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z"
+          ],
+          "_source": {
+            "excludes": [],
+            "includes": [],
+            "enabled": true
+          },
+          "dynamic": true,
+          "dynamic_templates": [
+            {
+              "kubernetes_labels": {
+                "path_match": "kubernetes.labels.*",
+                "mapping": {
+                  "type": "keyword",
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            },
+            {
+              "kubernetes_annotations": {
+                "path_match": "kubernetes.annotations.*",
+                "mapping": {
+                  "type": "keyword",
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            },
+            {
+              "string_fields_not_analyzed": {
+                "match": "*",
+                "match_mapping_type": "string",
+                "mapping": {
+                  "type": "keyword",
+                  "ignore_above": 256,
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            }
+          ],
+          "date_detection": true,
+          "properties": {
+            "response_data": {
+              "eager_global_ordinals": false,
+              "ignore_above": 1000,
+              "index": true,
+              "type": "flattened",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.is_observer ": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.log_level": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.sdk_v": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "freqs",
+              "doc_values": true
+            },
+            "data.url_mask": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "freqs",
+              "doc_values": true
+            },
+            "data.code": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.is_sandbox ": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.os": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.token": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "freqs",
+              "doc_values": true
+            },
+            "data.http_method": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.is_storekit2": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.masked_request": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "doc_values": true
+            },
+            "data.cross_version": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "freqs",
+              "doc_values": true
+            },
+            "data.cross_platform": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.request_data": {
+              "eager_global_ordinals": false,
+              "ignore_above": 997,
+              "index": true,
+              "type": "flattened",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "request_data": {
+              "eager_global_ordinals": false,
+              "ignore_above": 1000,
+              "index": true,
+              "type": "flattened",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.response_data": {
+              "eager_global_ordinals": false,
+              "ignore_above": 1000,
+              "index": true,
+              "type": "flattened",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.log_type": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            }
+          }
+        }
+      },
+      "index_patterns": [
+        "k8s-app-dashboard-api-*"
+      ],
+      "priority": 500,
+      "composed_of": []
+    }
+
+  index-dashboard-api-sdk.json: |-
+    {
+      "template": {
+        "settings": {
+          "index": {
+            "lifecycle": {
+              "name": "dashboard-api-sdk"
+            },
+            "codec": "best_compression",
+            "refresh_interval": "60s",
+            "number_of_shards": "4",
+            "mapping": {
+              "total_fields": {
+                "limit": "2000"
+              },
+              "depth": {
+                "limit": "20"
+              },
+              "nested_fields": {
+                "limit": "100"
+              }
+            },
+            "translog": {
+              "flush_threshold_size": "1024mb",
+              "sync_interval": "30s",
+              "durability": "async"
+            },
+            "requests": {
+              "cache": {
+                "enable": "true"
+              }
+            },
+            "queries": {
+              "cache": {
+                "enabled": "true"
+              }
+            }
+          }
+        },
+        "mappings": {
+          "_routing": {
+            "required": false
+          },
+          "numeric_detection": false,
+          "dynamic_date_formats": [
+            "strict_date_optional_time",
+            "yyyy/MM/dd HH:mm:ss Z||yyyy/MM/dd Z"
+          ],
+          "_source": {
+            "excludes": [],
+            "includes": [],
+            "enabled": true
+          },
+          "dynamic": true,
+          "dynamic_templates": [
+            {
+              "kubernetes_labels": {
+                "path_match": "kubernetes.labels.*",
+                "mapping": {
+                  "type": "keyword",
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            },
+            {
+              "kubernetes_annotations": {
+                "path_match": "kubernetes.annotations.*",
+                "mapping": {
+                  "type": "keyword",
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            },
+            {
+              "string_fields_not_analyzed": {
+                "match": "*",
+                "match_mapping_type": "string",
+                "mapping": {
+                  "type": "keyword",
+                  "ignore_above": 256,
+                  "index": false,
+                  "doc_values": false
+                }
+              }
+            }
+          ],
+          "date_detection": true,
+          "properties": {
+            "response_data": {
+              "eager_global_ordinals": false,
+              "ignore_above": 1000,
+              "index": true,
+              "type": "flattened",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.is_observer ": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.log_level": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.sdk_v": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "freqs",
+              "doc_values": true
+            },
+            "data.url_mask": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "freqs",
+              "doc_values": true
+            },
+            "data.code": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.is_sandbox ": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.os": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.token": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "freqs",
+              "doc_values": true
+            },
+            "data.http_method": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.is_storekit2": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.masked_request": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "freqs",
+              "doc_values": true
+            },
+            "data.cross_version": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "freqs",
+              "doc_values": true
+            },
+            "data.cross_platform": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.request_data": {
+              "eager_global_ordinals": false,
+              "ignore_above": 997,
+              "index": true,
+              "type": "flattened",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "request_data": {
+              "eager_global_ordinals": false,
+              "ignore_above": 1000,
+              "index": true,
+              "type": "flattened",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            },
+            "data.response_data": {
+              "type": "flattened",
+              "depth_limit": 30,
+              "ignore_above": 1000,
+              "doc_values": true,
+              "index": true,
+              "eager_global_ordinals": false
+            },
+            "data.log_type": {
+              "eager_global_ordinals": false,
+              "norms": false,
+              "index": true,
+              "store": false,
+              "type": "keyword",
+              "split_queries_on_whitespace": false,
+              "index_options": "docs",
+              "doc_values": true
+            }
+          }
+        }
+      },
+      "index_patterns": [
+        "dashboard-api-sdk-*"
+      ],
+      "priority": 400,
+      "composed_of": []
+    }
+
+  ilm-dashboard-api-sdk.json: |-
+    {
+      "policy": {
+        "phases": {
+          "hot": {
+            "min_age": "0ms",
+            "actions": {
+              "set_priority": {
+                "priority": 100
+              }
+            }
+          },
+          "delete": {
+            "min_age": "{{ $delete_age_dashboard_api_sdk }}",
+            "actions": {
+              "delete": {
+                "delete_searchable_snapshot": true
+              }
+            }
+          }
+        }
+      }
+    }
+
+  ilm-k8s-app.json: |-
+    {
+      "policy": {
+        "phases": {
+          "hot": {
+            "min_age": "0ms",
+            "actions": {
+              "set_priority": {
+                "priority": 100
+              }
+            }
+          },
+          "delete": {
+            "min_age": "{{ $delete_age }}",
+            "actions": {
+              "delete": {
+                "delete_searchable_snapshot": true
+              }
+            }
+          }
+        }
+      }
+    }
+
+  ilm-k8s-app-dashboard-api.json: |-
+    {
+      "policy": {
+        "phases": {
+          "hot": {
+            "min_age": "0ms",
+            "actions": {
+              "set_priority": {
+                "priority": 100
+              }
+            }
+          },
+          "delete": {
+            "min_age": "{{ include "fl.value"  (list $ . (index .Values.rollover.delete.age "k8s-app-dashboard-api")) }}",
+            "actions": {
+              "delete": {
+                "delete_searchable_snapshot": true
+              }
+            }
+          }
+        }
+      }
+    }
+
+  entrypoint.sh: |-
+    #!/bin/bash
+    echo "Upload script"
+    CURL_VARS="-s -u ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD} --insecure https://${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}"
+    getElasticVersion() {
+      VERSION=$(curl $CURL_VARS | jq -e .version.number)
+    if [ "$VERSION" != "null" ]; then
+      echo "ES version: ${VERSION}"
+    else
+      echo "Get version failed"
+      exit 1
+    fi
+    }
+
+    putElasticIndexTemplate() {
+        for template in "k8s-app" "k8s-app-gra" "k8s-app-dev" "k8s-app-dashboard-api" "dashboard-api-sdk"; do
+            RESULT=""
+            echo "[INFO] Rendered Index Template '$template':"
+            cat /opt/templates/index-$template.json | jq .
+            echo "[INFO] Upload Index '$template':"
+            RESULT=$(curl -H "Content-Type: application/json" $CURL_VARS/_index_template/$template -XPUT -d "@/opt/templates/index-$template.json")
+            if [[ "$(echo $RESULT | jq .acknowledged)" == "true" ]]; then
+                echo "[INFO] Index Template '$template' upload: Done"
+            else
+                echo "[ERROR] Upload Index Template '$template' failed"
+                echo $RESULT | jq .
+                exit 1
+            fi
+        done
+    }
+
+    putElasticILM() {
+        for ilm in "k8s-app" "k8s-app-dashboard-api" "dashboard-api-sdk"; do
+            RESULT=""
+            echo "[INFO] Rendered ILM '$ilm':"
+            cat /opt/templates/ilm-$ilm.json | jq .
+            echo "[INFO] Upload ILM '$ilm':"
+            RESULT=$(curl -H "Content-Type: application/json" $CURL_VARS/_ilm/policy/$ilm -XPUT -d "@/opt/templates/ilm-$ilm.json")
+            if [[ "$(echo $RESULT | jq .acknowledged)" == "true" ]]; then
+                echo "[INFO] ILM '$ilm' upload: Done"
+            else
+                echo "[ERROR] Upload ILM '$ilm' failed"
+                echo $RESULT | jq .
+                exit 1
+            fi
+        done
+    }
+
+    getElasticVersion
+    putElasticIndexTemplate
+    putElasticILM

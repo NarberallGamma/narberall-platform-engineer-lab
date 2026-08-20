@@ -1,0 +1,77 @@
+stages:
+  - build
+  - deploy
+  - cleanup
+
+workflow:
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    when: never
+  - when: always
+
+.base_werf: &base_werf
+  - type trdl && . $(trdl use werf ${WERF_VERSION:-1.2 ea})
+  - type werf && source $(werf ci-env gitlab --as-file)
+
+.base_converge: &base_converge
+  stage: deploy
+  script:
+    - *base_werf
+    - werf helm lint .helm/
+      --ignore-secret-key
+    - werf render
+      --validate
+      --ignore-secret-key > render.yaml
+    - werf converge
+      --skip-build
+  artifacts:
+    when: always
+    paths:
+      - render*.yaml
+    expire_in: 1 day
+  dependencies:
+    - Build
+  needs:
+    - Build
+  variables:
+    WERF_KUBE_CONTEXT: dev
+  tags: [ werf ]
+
+Build:
+  stage: build
+  script:
+    - *base_werf
+    - werf build
+  tags: [ werf ]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "trigger"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+Deploy to Prod:
+  <<: *base_converge
+  environment:
+    name: prod
+  variables:
+    WERF_KUBE_CONTEXT: prod
+    WERF_NAMESPACE: supabase
+  tags: [ werf ]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "trigger"'
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  when: manual
+
+Cleanup:
+  stage: cleanup
+  script:
+    - *base_werf
+    - docker login -u nobody -p ${WERF_IMAGES_CLEANUP_PASSWORD} ${WERF_REPO}
+    - werf cleanup
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+  tags: [ werf ]

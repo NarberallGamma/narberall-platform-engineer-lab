@@ -1,0 +1,62 @@
+project: backup
+configVersion: 1
+---
+image: backup
+from: ubuntu:20.04
+git:
+- add: '/'
+  to: '/app'
+  stageDependencies:
+    setup:
+    - '00-scripts'
+  excludePaths:
+  - '.helm'
+shell:
+  beforeInstall:
+  - echo "remove docker-clean"
+  - rm -rf  /etc/apt/apt.conf.d/docker-clean
+  - >
+    export DEBIAN_FRONTEND=noninteractive;
+    apt update && apt install -y --no-install-recommends
+    apt-transport-https
+    ca-certificates
+    curl
+    gettext-base
+    gnupg2
+    locales
+    openssl
+    openssh-client
+    software-properties-common
+    tzdata
+    unzip
+    vim
+    wget
+    iputils-ping
+    bind9-host
+    telnet
+  - apt clean
+  - rm -rf /var/lib/apt/lists/*
+  - rm -rf /etc/localtime && ln -s /usr/share/zoneinfo/Etc/UTC /etc/localtime && date
+  - localedef -i en_US -f UTF-8 en_US.UTF-8
+  install:
+  - chmod -R +x /app/00-scripts
+  - wget --quiet -O /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.5/dumb-init_1.2.5_x86_64
+  - chmod +x /usr/local/bin/dumb-init
+  - wget --quiet -O /usr/local/bin/supercronic https://github.com/aptible/supercronic/releases/download/v0.1.12/supercronic-linux-amd64
+  - chmod +x /usr/local/bin/supercronic
+  - wget --quiet -O /usr/local/bin/borg https://github.com/borgbackup/borg/releases/download/1.1.17/borg-linux64
+  - chmod +x /usr/local/bin/borg
+  - echo "make Borg binary symbolic links"
+  - ln -s /usr/local/bin/borg /usr/bin/borg
+  - ln -s /usr/local/bin/borg /usr/bin/borgfs
+  - wget --quiet -O - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add -
+  - sh -c 'echo "deb https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/4.4 multiverse" > /etc/apt/sources.list.d/mongodb.list'
+  - wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+  - sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+  - apt update && apt install -y --no-install-recommends mongodb-database-tools postgresql-client-9.6 mysql-client
+  - apt clean
+  - rm -rf /var/lib/apt/lists/*
+  # Vendor alerting CLI is not installed here. Jobs print ERROR if backup_notify is missing.
+  setup:
+  - chmod -R +x /app/00-scripts
+  - touch /app/UNDER_KUBERNETES

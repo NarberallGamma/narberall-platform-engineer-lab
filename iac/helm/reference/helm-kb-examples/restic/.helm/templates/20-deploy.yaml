@@ -1,0 +1,87 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cron
+spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cron
+  template:
+    metadata:
+      labels:
+        app: cron
+      annotations:
+        checksum/secret: {{ include (print .Template.BasePath "/01-secrets.yaml") . | sha256sum }}
+        checksum/config: {{ include (print .Template.BasePath "/05-cm.yaml") . | sha256sum }}
+    spec:
+      hostname: {{ pluck .Values.werf.env .Values.hostname | first | default .Values.hostname._default }}
+      imagePullSecrets:
+      - name: "registrysecret"
+      initContainers:
+      - name: linter
+        image: {{ .Values.werf.image.backup }}
+        command: ["yamllint"]
+        args:
+        - '-c'
+        - 'linter.rules'
+        - '/app/conf/backup-monitoring.yaml'
+        volumeMounts:
+        - name: exceptions
+          mountPath: /app/conf/backup-monitoring.yaml
+          subPath: backup-monitoring.yaml
+      containers:
+      - name: cron
+        image: {{ .Values.werf.image.backup }}
+{{- include "resources_crons" . | indent 8 }}
+        command: ["/usr/local/bin/dumb-init"]
+        args:
+        - '--'
+        - 'bash'
+        - '-c'
+        - '/usr/local/bin/supercronic -json /app/schedule-{{ .Values.werf.env }}'
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: ssh-key
+          mountPath: "/root/.ssh/.restic"
+          subPath: .restic
+        - name: buckets
+          mountPath: /app/buckets.yaml
+          subPath: buckets.yaml
+        - name: exceptions
+          mountPath: /app/conf/backup-monitoring.yaml
+          subPath: backup-monitoring.yaml
+        env:
+        - name: PSQL_PASSWORD
+          value: "{{ pluck .Values.werf.env .Values.psql.password | first | default .Values.psql.password._default }}"
+{{- include "backup_envs" . | indent 8 }}
+      volumes:
+      - name: ssh-key
+        secret:
+          secretName: ssh-key
+          defaultMode: 256
+      - name: buckets
+        secret:
+          secretName: buckets-{{ .Values.werf.env }}
+          defaultMode: 256
+      - name: exceptions
+        configMap:
+          defaultMode: 420
+          name: exceptions
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: cron
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: cron
+  updatePolicy:
+    updateMode: "Off"

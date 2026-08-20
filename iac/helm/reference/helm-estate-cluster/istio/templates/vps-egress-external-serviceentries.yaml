@@ -1,0 +1,31 @@
+{{- if .Values.vpsEgress.enabled }}
+{{- $root := . }}
+{{- $hosts := dict }}
+{{- range .Values.vpsEgress.routes }}
+{{- if eq (include "istio.vpsEgress.routeEnabled" .) "true" }}
+{{- range .externalHosts }}
+{{- $_ := set $hosts . . }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- range keys $hosts | sortAlpha }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: {{ include "istio.vpsEgress.externalServiceEntryName" (dict "host" .) }}
+  namespace: {{ $root.Values.vpsEgress.externalServiceEntry.namespace }}
+  labels:
+    app.kubernetes.io/component: vps-egress
+    environment: {{ $root.Values.environment }}
+spec:
+  hosts:
+    - {{ . | quote }}
+  ports:
+    - number: {{ $root.Values.vpsEgress.externalServiceEntry.port }}
+      name: {{ $root.Values.vpsEgress.externalServiceEntry.portName }}
+      protocol: {{ $root.Values.vpsEgress.externalServiceEntry.protocol }}
+  location: MESH_EXTERNAL
+  resolution: {{ $root.Values.vpsEgress.externalServiceEntry.resolution }}
+{{- end }}
+{{- end }}

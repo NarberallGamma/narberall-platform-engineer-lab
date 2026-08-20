@@ -1,0 +1,87 @@
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: CustomPrometheusRules
+metadata:
+  labels:
+    component: rules
+    prometheus: main
+  name: main-alerts
+spec:
+  groups:
+    - name: mainAlerts
+      rules:
+        - alert: LowCapacityPvc
+          expr: kubelet_volume_stats_available_bytes{namespace=~"(production|shop|lab|etcd|sentry|thumbor|opentelemetry-collector|jaeger-operator|otel-prometheus|data-platform|posthog)"}*100 /kubelet_volume_stats_capacity_bytes{namespace=~"(production|shop|lab|etcd|sentry|thumbor|opentelemetry-collector|jaeger-operator|otel-prometheus|data-platform|posthog)"} < 20
+          labels:
+            severity_level: "4"
+            team: platform-alerts
+          annotations:
+            plk_markup_format: markdown
+            plk_protocol_version: "1"
+            summary: Capacity of {{`{{$labels.namespace}}`}}/{{`{{$labels.persistentvolumeclaim}}`}} less than 20%
+            description: |-
+              `Increase Pvc.`
+        - alert: HighMessagesNumberRabbitmqQueue
+          expr: avg_over_time(rabbitmq_queue_messages{queue!~"marketing_broadcast_q_marketing-automation.*", namespace=~"production|shop|lab"}[10m]) > 50
+          labels:
+            severity_level: "4"
+            team: platform-alerts
+          annotations:
+            plk_markup_format: markdown
+            plk_protocol_version: "1"
+            summary: Number of messages of RabbitMQ Queue {{`{{$labels.queue}}`}} in ns {{`{{$labels.namespace}}`}} is more than 50
+            description: |-
+              `Average messages number of RabbitMQ queue has exceeded the threshold`
+        - alert: OOMKilled
+          expr: rate(kube_pod_container_status_last_terminated_reason{reason="OOMKilled", namespace=~"(production|shop|lab|etcd|thumbor|opentelemetry-collector|jaeger-operator|otel-prometheus|data-platform|posthog)", pod!~"analytics-sql-api.+"}[5m]) * on(container, pod) group_left(reason) (sum by (container, pod, reason) (increase(kube_pod_container_status_restarts_total[5m])) > 0)
+          labels:
+            severity_level: "4"
+          annotations:
+            plk_markup_format: markdown
+            plk_protocol_version: "1"
+            summary: Pod {{`{{$labels.pod}}`}} in ns {{`{{$labels.namespace}}`}} has been restarted
+            description: |-
+              `Try to find reason into loki ns=kube-system`
+        - alert: 499StatusCodeMoreThan-1-PercentOverall
+          for: 10m
+          expr: sum(rate(ingress_nginx_overall_responses_total{job="nginx-ingress-controller", vhost=~"analytics\\.example\\.com", status="499"}[1m]))*100/sum(rate(ingress_nginx_overall_requests_total{job="nginx-ingress-controller", vhost=~"analytics\\.example\\.com"}[1m])) > 1
+          labels:
+            severity_level: "4"
+            team: platform-alerts
+          annotations:
+            incident_flow: "client"
+            plk_protocol_version: "1"
+            summary: 499 status for {{`{{$labels.vhost}}`}} more than 1% of overall requests
+            description: |-
+              `Perhaps, browser (or smth) closed the connection to the server before the server could complete the request processing.`
+        - alert: GetStatusCode500
+          expr: increase(ingress_nginx_detail_responses_total{job="nginx-ingress-controller", status=~"5..", namespace=~"(data-platform|posthog)"}[1m]) !=0
+          labels:
+            severity_level: "4"
+            team: platform-alerts
+          annotations:
+            incident_flow: "client"
+            plk_protocol_version: "1"
+            summary: Get {{`{{$labels.status}}`}} on {{`{{$labels.vhost}}`}}
+        - alert: PodStatusPending
+          expr: kube_pod_status_phase{phase="Pending",namespace!~"feature-.*|test-.*"} == 1
+          for: 5m
+          labels:
+            severity_level: "4"
+          annotations:
+            plk_markup_format: markdown
+            plk_protocol_version: "1"
+            summary: pod {{`{{$labels.pod}}`}} into namespace {{`{{$labels.namespace}}`}} is Pending more than 5 min
+            description: |-
+              `check nodes "kubectl get nodes | grep Schedule" and delete it`
+        - alert: PodStatusPending10m
+          expr: kube_pod_status_phase{phase="Pending",namespace=~"feature-.*|test-.*"} == 1
+          for: 10m
+          labels:
+            severity_level: "4"
+          annotations:
+            plk_markup_format: markdown
+            plk_protocol_version: "1"
+            summary: pod {{`{{$labels.pod}}`}} into namespace {{`{{$labels.namespace}}`}} is Pending more than 10 min
+            description: |-
+              `check nodes "kubectl get nodes | grep Schedule" and delete it`

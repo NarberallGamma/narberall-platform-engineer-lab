@@ -1,0 +1,21 @@
+---
+apiVersion: v2
+name: sonarqube
+version: 1.0.0
+dependencies:
+- name: sonarqube
+  version: 2025.4.1
+  repository: https://SonarSource.github.io/helm-chart-sonarqube
+  export-values:
+  - parent: werf.repo
+    child: postgresql.image.repository
+  - parent: werf.tag.postgres
+    child: postgresql.image.tag
+  - parent: werf.repo
+    child: init.image.repository
+  - parent: werf.tag.postgres
+    child: init.image.tag
+  - parent: werf.repo
+    child: image.repository
+  - parent: werf.tag.sonarqube
+    child: image.tag

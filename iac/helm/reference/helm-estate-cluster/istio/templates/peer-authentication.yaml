@@ -1,0 +1,21 @@
+{{- if .Values.peerAuthentication.enabled }}
+{{- range .Values.peerAuthentication.services }}
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: mtls-{{ .name }}
+  namespace: {{ .namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .name }}
+    app.kubernetes.io/component: peer-authentication
+    environment: {{ $.Values.environment }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .name }}
+  mtls:
+    mode: {{ .mode }}
+{{- end }}
+{{- end }}
+

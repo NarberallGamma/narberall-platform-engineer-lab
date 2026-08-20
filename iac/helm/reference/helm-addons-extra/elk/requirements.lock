@@ -1,0 +1,6 @@
+dependencies:
+- name: eck-logstash
+  repository: https://helm.elastic.co
+  version: 0.11.0
+digest: sha256:1f9b8912e4606b2ccb7880c85781984ec566c0360aa6a51dec91c98db5085449
+generated: "2025-04-30T00:40:19.52688+03:00"

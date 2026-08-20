@@ -59,9 +59,9 @@
                 "Name": "SmtpMessagingChannel_Static",
                 "PluginName": "SmtpMessagingChannel",
                 "Configuration": {
-                    "Host": "static.ru",
+                    "Host": "smtp.example.com",
                     "Port": 25,
-                    "From": "mail@static.ru",
+                    "From": "mail@example.com",
                     "User": "test",
                     "Password": "CHANGE_ME"
                 }
@@ -76,7 +76,7 @@
                     "ServiceType": "servicetype_statyc",
                     "SenderName": "SerderName_static",
                     "SystemId": "systemID_static",
-                    "Password": "password_static",
+                    "Password": "CHANGE_ME",
                     "DataEncoding": 1,
                     "SubmitDataEncoding": 1,
                     "MessageDataEncoding": 1,

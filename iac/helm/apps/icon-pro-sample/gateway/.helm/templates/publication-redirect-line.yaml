@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/permanent-redirect: /lk/shop-line/$1
+    nginx.ingress.kubernetes.io/use-regex: "true"
+  name: publication-redirect-line
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: {{ .Values.domain }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: shop-landing
+            port:
+              number: 80
+        path: /shop-line-iframe/(.*)
+        pathType: ImplementationSpecific
+  tls:
+  - hosts:
+    - {{ .Values.domain }}
+    secretName: tls

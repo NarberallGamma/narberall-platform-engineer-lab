@@ -1,0 +1,79 @@
+# Grafana helm 10.4.0 / app 12.3.0. Excerpt only (not the vendor values tree).
+# Sidecar off: JSON under dashboards/ is an artefact, not mounted by Helm.
+
+deploymentStrategy:
+  type: Recreate
+
+persistence:
+  type: pvc
+  enabled: true
+  storageClassName: "ssd"
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      uid: PBFA97CFB590B2093
+      type: prometheus
+      url: http://prometheus.monitoring.svc.cluster.local:80
+      access: proxy
+      isDefault: true
+      editable: false
+
+# One key per file in alerts/. secretFile (no tpl) so math with $B is not rewritten by Helm.
+alerting:
+  estate-ledger-global.yaml: { file: alerts/estate-ledger-global.yaml }
+  node-exporter-host.yaml: { file: alerts/node-exporter-host.yaml }
+  cloud-ru-global-alerts.yaml: { file: alerts/cloud-ru-global-alerts.yaml }
+  strimzi-kafka-connect.yaml: { file: alerts/strimzi-kafka-connect.yaml }
+  kafka-dms-cloudeye.yaml: { file: alerts/kafka-dms-cloudeye.yaml }
+  postgresql-rds-cloudeye.yaml: { file: alerts/postgresql-rds-cloudeye.yaml }
+  estate-databases-global.yaml: { file: alerts/estate-databases-global.yaml }
+  kubernetes-cce-alerts.yaml: { file: alerts/kubernetes-cce-alerts.yaml }
+  kubernetes-views-pods-resources.yaml: { file: alerts/kubernetes-views-pods-resources.yaml }
+  platform-grafana-email-contactpoint.yaml: { file: alerts/platform-grafana-email-contactpoint.yaml }
+  notification-templates.yaml: { file: alerts/notification-templates.yaml }
+  notification-policies.yaml: { file: alerts/notification-policies.yaml }
+
+dashboards: {}
+
+sidecar:
+  alerts:
+    enabled: false
+  dashboards:
+    enabled: false
+  datasources:
+    enabled: false
+
+# Istio sidecar: Telegram egress via mesh egress gateway. Istio 1.27 needed both inject and rev=default.
+podAnnotations:
+  sidecar.istio.io/inject: "true"
+  sidecar.istio.io/proxyCPU: "100m"
+  sidecar.istio.io/proxyMemory: "128Mi"
+podLabels:
+  istio.io/rev: default
+
+grafana.ini:
+  server:
+    domain: grafana.example.com
+    root_url: https://grafana.example.com
+  smtp:
+    enabled: true
+    host: smtp.example.com:465
+    from_address: grafana@example.com
+    from_name: Grafana platform
+
+xGrafanaSmtpK8sSecret: &grafana_smtp_k8s_secret grafana-smtp-vault-secrets
+
+smtp:
+  createExternalSecret: true
+  vaultPath: secret/grafana
+  existingSecret: *grafana_smtp_k8s_secret
+  userKey: mail.username
+  passwordKey: mail.password
+
+namespaceOverride: "monitoring"

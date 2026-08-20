@@ -1,0 +1,18 @@
+{{- if .Values.common.virtualservice.enabled -}}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ include "name" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  gateways: {{- toYaml .Values.common.virtualservice.gateway | nindent 4}}
+  hosts: {{- toYaml  .Values.common.virtualservice.host | nindent 4}}
+  http:
+  - name: {{ include "name" . }}
+    match:
+    - uri:
+        prefix: {{ .Values.common.virtualservice.uriprefix }}
+    route:
+    - destination:
+        host: {{ include "name" . }}
+{{- end -}}

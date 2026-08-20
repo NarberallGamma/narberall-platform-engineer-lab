@@ -17,4 +17,5 @@ This lab publishes **curated slices**, not full production Terraform trees (secu
 - Cloudflare: documentation IPs only (`203.0.113.0/24`, `198.51.100.0/24`). No live zone IDs or account IDs
 - Ansible payments identity (`iac/ansible/reference/ansible-payments-idplat/`): no PFX/PEM, no live `passwd.yaml`, no employer brand or AD DNS
 - Ansible kits (`ansible-llm-collab`, `ansible-estate`, `ansible-app-platform`, `ansible-kb-linux`, `ansible-backup-borg`, `ansible-aws-hosts`): no EDR packages, no live PEM/PFX, no bootstrap credential dumps, no employer/client brands. Detail: [`../ansible/SANITIZE.md`](../ansible/SANITIZE.md)
+- Helm kits: no kubeconfig, vault tokens, `secret-values.yaml`, or Argo repo secrets. Detail: [`../helm/SANITIZE.md`](../helm/SANITIZE.md)
 - Workstation MCP/scripts (`practice/workstation/reference/`): no API tokens, no live Jira/wiki/GitLab URLs, no host SSH aliases or PEMs. Env files stay `chmod 600` on the machine (`env.example` only in git)

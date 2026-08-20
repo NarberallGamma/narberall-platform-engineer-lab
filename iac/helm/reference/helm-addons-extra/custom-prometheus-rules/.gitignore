@@ -1,0 +1,6 @@
+.idea
+.vs
+.vs/*
+/.vs/*
+*.sqlite
+.idea/*

@@ -1,0 +1,20 @@
+apiVersion: v2
+name: prometheus-cloudeye-exporter
+description: Prometheus CloudEye Exporter for SberCloud (HuaweiCloud-based)
+version: 1.0.3
+appVersion: "1.11"
+kubeVersion: ">=1.19.0-0"
+home: https://github.com/huaweicloud/cloudeye-exporter
+sources:
+  - https://github.com/huaweicloud/cloudeye-exporter
+keywords:
+  - prometheus
+  - cloudeye
+  - monitoring
+  - sbercloud
+  - rds
+  - dcs
+type: application
+maintainers:
+  - name: DevOps Team
+    email: devops@example.com

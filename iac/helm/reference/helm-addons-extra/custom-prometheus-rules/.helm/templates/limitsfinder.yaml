@@ -1,0 +1,60 @@
+{{- define "plk_annotations" }}
+plk_protocol_version: "1"
+plk_grouped_by__limitscustommon: LimitsCustomMon
+plk_create_group_if_not_exists__limitscustommon: LimitsCustomMon
+plk_markup_format: markdown
+{{- end }}
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: CustomPrometheusRules
+metadata:
+  labels:
+    component: rules
+    prometheus: main
+  name: limitsfinder
+spec:
+  groups:
+  - name: limitsalerts
+    rules:
+    - alert: CPURequestsLow
+      expr: |
+        (
+          (
+            sum by(namespace, pod, container) (rate(container_cpu_usage_seconds_total{namespace=~"production|shop|lab"}[1m]))
+          )
+            /
+          (
+            sum by(namespace, pod, container) (avg_over_time(kube_pod_container_resource_requests{namespace=~"production|shop|lab", resource="cpu"}[1m]))
+          )
+        ) >1
+      for: 1m
+      labels:
+        severity_level: "4"
+      annotations:
+        {{- include "plk_annotations" . | indent 8 }}
+        identifier: "{{`{{ $labels.pod }}`}}"
+        summary: "CPURequestsLow"
+        description: |-
+          Pod "{{`{{ $labels.pod }}`}}" in namespace "{{`{{$labels.namespace}}`}}" need more memory than it have
+          Analyze limits and requests, then tweak them.
+    - alert: MemmoryLimitsLow
+      expr: |
+        (
+          (
+            sum by(namespace, pod, container) (avg_over_time(container_memory_working_set_bytes:without_kmem{namespace=~"production|shop|lab"}[1m]))
+          )
+            /
+          (
+            sum by(namespace, pod, container) (avg_over_time(kube_pod_container_resource_limits{namespace=~"production|shop|lab", container!="POD",resource="memory"}[1m]))
+          )
+        ) > 0.9
+      for: 1m
+      labels:
+        severity_level: "4"
+      annotations:
+        {{- include "plk_annotations" . | indent 8 }}
+        identifier: "{{`{{ $labels.pod }}`}}"
+        summary: "MemmoryLimitsLow"
+        description: |-
+          Pod "{{`{{ $labels.pod }}`}}" in namespace "{{`{{$labels.namespace}}`}}" very close to the memory limit
+          Analyze limits and requests, then tweak them.

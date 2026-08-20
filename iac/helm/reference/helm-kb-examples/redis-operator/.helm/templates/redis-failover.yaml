@@ -1,0 +1,52 @@
+{{- if not (eq .Values.global.env "operator") }}
+---
+apiVersion: databases.spotahome.com/v1
+kind: RedisFailover
+metadata:
+  name: redis
+spec:
+  hardAntiAffinity: true                    # Optional. Value by default. If true, the pods will not be scheduled on the same node.
+  sentinel:
+    replicas: {{ pluck .Values.global.env .Values.replicas | first | default .Values.replicas._default }}
+    image: "redis:5.0.5"
+    exporter:
+      enabled: true
+      image: leominov/redis_sentinel_exporter:1.3.0
+    resources:                               # Optional. If not set, it won't be defined on created resources.
+      requests:
+        cpu: 100m
+      limits:
+        memory: 100Mi
+    customConfig: []                         # Optional. Empty by default.
+  redis:
+    replicas: {{ pluck .Values.global.env .Values.replicas | first | default .Values.replicas._default }}
+    image: "redis:5.0.5"                             # Optional. "redis" by default.
+    resources:                               # Optional. If not set, it won't be defined on created resources
+      requests:
+        cpu: {{ pluck .Values.global.env .Values.resources.requests.cpu | first | default .Values.resources.requests.cpu._default }}
+        memory: {{ pluck .Values.global.env .Values.resources.requests.memory | first | default .Values.resources.requests.memory._default }}
+      limits:
+        memory: {{ pluck .Values.global.env .Values.resources.limits.memory | first | default .Values.resources.limits.memory._default }}
+    exporter:
+      enabled: true
+      image: "oliver006/redis_exporter:v1.3.5-alpine"
+    securityContext:
+      runAsUser:  999
+      runAsGroup: 999
+      fsGroup:    0
+    storage:
+      persistentVolumeClaim:
+        metadata:
+          name: redis-data
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: {{ pluck .Values.global.env .Values.storage.size | first | default .Values.storage.size._default }}
+          storageClassName: {{ pluck .Values.global.env .Values.storage.class | first | default .Values.storage.class._default }}
+    customConfig:
+{{- range $index, $key := ( pluck .Values.global.env .Values.storage.custom_config | first | default .Values.storage.custom_config._default ) }}
+    - "{{ $key }}"
+{{- end }}
+{{- end }}

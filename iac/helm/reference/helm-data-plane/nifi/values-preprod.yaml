@@ -1,0 +1,5 @@
+domain: nifi.preprod.example.com
+user: admin
+pass: CHANGE_ME
+tls_secret: tls
+volume_size: 20Gi

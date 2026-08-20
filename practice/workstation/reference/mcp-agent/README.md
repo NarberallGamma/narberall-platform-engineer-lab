@@ -1,6 +1,6 @@
 # mcp-agent
 
-How the IDE talks to the workstation. Named MCP tools are shortcuts. The same agent still reaches any allowed script under [`../scripts/`](../scripts/).
+How an agent host talks to the workstation. Cursor, Claude Code, Codex, or a local-model wrapper can share this `mcp.json`. Named MCP tools are shortcuts. The same agent still reaches any allowed script under [`../scripts/`](../scripts/).
 
 ## Three layers
 

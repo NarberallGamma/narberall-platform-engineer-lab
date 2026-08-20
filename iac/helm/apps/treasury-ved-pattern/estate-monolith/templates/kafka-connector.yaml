@@ -1,0 +1,15 @@
+{{- $dot := . }}
+{{- range .Values.kafkaConnector }}
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata:
+  name: {{ $dot.Release.Name }}-{{ .name }}-connector
+  labels:
+    {{- include "estate.labels" $dot | nindent 4 }}
+    strimzi.io/cluster: {{ $dot.Release.Name }}-{{ .kafkaConnectName }}
+spec:
+  {{- with .spec }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+{{- end }}

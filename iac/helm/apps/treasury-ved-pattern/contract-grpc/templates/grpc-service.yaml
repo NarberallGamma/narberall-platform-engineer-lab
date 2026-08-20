@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-grpc
+  labels:
+    {{- include "contract-grpc.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6865
+      targetPort: 6865
+      protocol: TCP
+      name: grpc
+  selector:
+    app.kubernetes.io/name: {{ include "contract-grpc.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}

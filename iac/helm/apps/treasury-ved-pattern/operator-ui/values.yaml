@@ -1,0 +1,70 @@
+fullnameOverride: operator-ui
+
+global:
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+    - name: gitlab-regcred
+  env:
+    PLACEHOLDER: "managed-by-vault-external-secrets"
+    # AML risk labels shown in the UI
+    WARNING_RISK:
+      - severe
+      - high
+      - medium
+      - timeout
+
+application:
+  enabled: true
+  image:
+    repository: example.registry/estate/operator-ui
+    tag: "3.7.0"
+    pullPolicy: IfNotPresent
+  imagePullSecrets:
+    - name: regcred
+    - name: external-regcred
+  env:
+    GENERATE_OBSERVER_LINK: "false"
+    CHAIN_ID: 1
+    ETH_SUPPORTED_TOKENS: "USDT, USDC"
+    TRX_SUPPORTED_TOKENS: "USDT"
+    WE_ENV_KEYCLOAK_URL: "https://auth.example.com"
+    WE_ENV_BACKEND_API: "https://web.example.com"
+    WE_ENV_WEBSOCKET_URL: "wss://web.example.com"
+    WE_ENV_KYT_TRANSFER_URL: "https://kyt.example.com/transfers/"
+    WE_ENV_KYT_WALLET_URL: "https://kyt.example.com/fast-checks/"
+    WE_ENV_CLOUD_URL: "https://static.example.com"
+    WE_ENV_SALT: "CHANGE_ME"
+    WE_ENV_MAX_FILE_SIZE_MB: "20"
+    WE_ENV_DOCUMENTS_COLLAPSE_THRESHOLD: "3"
+    WE_ENV_CONTACTS_MAIL_TECH: "ops@example.com"
+    WE_ENV_CONTACTS_MAIL_CLIENT: "support@example.com"
+    WE_ENV_CONTACTS_PHONE: "+1-555-0100"
+
+  resources:
+    requests:
+      cpu: 188m
+      memory: 384Mi
+    limits:
+      cpu: 750m
+      memory: 768Mi
+
+  globalInherit: true
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      kubernetes.io/tls-acme: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$1
+    hosts:
+      - host: operator.example.com
+        paths:
+          - path: /(.*)
+            pathType: ImplementationSpecific
+    tls:
+      - secretName: wildcard-tls
+        hosts:
+          - operator.example.com

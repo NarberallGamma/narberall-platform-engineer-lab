@@ -1,0 +1,43 @@
+# Werf injects .Values.werf.env and .Values.werf.namespace at render.
+# Lab defaults so the CR is readable without werf.
+werf:
+  env: production
+  namespace: observability
+
+collector:
+  replicas: 2
+  mode: deployment
+  upgradeStrategy: automatic
+  kafka:
+    encoding: raw
+    topic: admin_requests
+    brokers:
+      lab:
+        - kafka-bootstrap.lab.svc.cluster.local:9092
+      production:
+        - kafka-bootstrap.production.svc.cluster.local:9092
+  filter:
+    # Keep only admin-path logs. Field names stay; the path is a placeholder.
+    endpointContains: "/admin"
+    keepKeys:
+      - body
+      - endpoint
+      - message
+      - method
+      - start_time
+      - status
+      - token
+      - token2
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 300m
+      memory: 512Mi
+  nodeSelector:
+    node-role.deckhouse.io/system: ""
+  tolerations:
+    - effect: NoExecute
+      key: dedicated.deckhouse.io
+      operator: Equal
+      value: system

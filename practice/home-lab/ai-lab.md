@@ -66,4 +66,4 @@ See [`../../diagrams/practice/home-lab/ai-lab.md`](../../diagrams/practice/home-
 
 ## Keywords
 
-CUDA, NVIDIA, LLM, Ollama, llama.cpp, Stable Diffusion, SDXL, LoRA, Kohya, Docker, MCP, Replicate, WSL, Arch Linux
+CUDA, NVIDIA, LLM, Ollama, llama.cpp, Stable Diffusion, SDXL, LoRA, Kohya, Docker, MCP, Replicate, Cursor, Claude Code, Codex, WSL, Arch Linux

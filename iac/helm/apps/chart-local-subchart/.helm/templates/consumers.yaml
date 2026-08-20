@@ -1,0 +1,84 @@
+{{- range $consumer, $php := $.Values.consumers }}
+{{- $name := $consumer | kebabcase }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Chart.Name }}-{{ $name }}
+  annotations:
+    pod-reloader.deckhouse.io/auto: "true"
+    werf.io/weight: "-50"
+  labels:
+    app: {{ $.Chart.Name }}-{{ $name }}
+spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+  replicas: {{ (include "fl.value" (list $ . $php.replicas)) }}
+  selector:
+    matchLabels:
+      app: {{ $.Chart.Name }}-{{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Chart.Name }}-{{ $name }}
+      annotations:
+        checksum/php-config: {{ include (print $.Template.BasePath "/app-php-config.yaml") $ | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/app-config.yaml") $ | sha256sum }}
+    spec:
+      {{- include "imagePullSecrets" $ | indent 6 }}
+      {{- include "affinity" (list $ . (printf "%s-%s" $.Chart.Name $name)) | indent 6 }}
+      {{- include "tolerations" $ | indent 6 }}
+      {{- include "nodeSelector" $ | indent 6 }}
+      {{- include "priorityClassName" $ | indent 6 }}
+
+      volumes:
+        - name: {{ $.Chart.Name }}-php
+          configMap:
+            name: {{ $.Chart.Name }}-php
+
+      initContainers:
+        {{ include "init-rabbitmq" $ | indent 8 }}
+        {{ include "init-psql-orders" $ | indent 8 }}
+        {{ include "init-psql-history" $ | indent 8 }}
+        {{ include "init-psql-report" $ | indent 8 }}
+
+      containers:
+        - name: consumer
+          image: {{ index $.Values.werf.image "backend" }}
+          command:  {{ include "fl.value" (list $ . $php.command) }}
+          volumeMounts:
+            - name: {{ $.Chart.Name }}-php
+              mountPath: /usr/local/etc/php/php.ini
+              subPath: php.ini
+          resources: {{ include "fl.value" (list $ . $php.resources) | default (include "fl.value" (list $ . $.Values.resources.consumer)) | nindent 14 }}
+          envFrom:
+            - configMapRef:
+                name: {{ $.Chart.Name }}-env
+            - secretRef:
+                name: {{ $.Chart.Name }}-env
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ $.Chart.Name }}-{{ $name }}
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: {{ $.Chart.Name }}-{{ $name }}
+  updatePolicy:
+    updateMode: "Off"
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Chart.Name }}-{{ $name }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: {{ $.Chart.Name }}-{{ $name }}
+{{- end }}

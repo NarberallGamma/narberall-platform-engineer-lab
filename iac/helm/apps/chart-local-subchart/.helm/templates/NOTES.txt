@@ -1,0 +1,9 @@
+____
+    Ingress:
+    {{- if include "fl.isTrue" (list $ . .Values.ingress.enabled) }}
+        -  https://{{ include "fl.value" (list $ . .Values.ingress.host) }}
+    {{- end }}
+    {{- if include "fl.isTrue" (list $ . .Values.rabbitmq.ingress.enabled) }}
+        -  https://{{ include "fl.value" (list $ . .Values.rabbitmq.ingress.host) }}
+    {{- end }}
+

@@ -1,0 +1,48 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-migrations
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "15"
+spec:
+  activeDeadlineSeconds: 900
+  template:
+    spec:
+    {{ include "priorityClassName" . | indent 6 }}
+    {{ include "affinity" . | nindent 6 }}
+    {{ include "tolerations" . | nindent 6 }}
+      restartPolicy: OnFailure
+      imagePullSecrets:
+      - name: "registrysecret"
+      volumes:
+      - name: scripts
+        secret:
+          secretName: {{ .Chart.Name }}-scripts
+      initContainers:
+      - name: wait
+        image: {{ index .Values.werf.image "mysql" }}
+        command: ["/bin/bash"]
+        args:
+          - '/wait-db.sh'
+        volumeMounts:
+        - name: scripts
+          mountPath: /wait-db.sh
+          subPath: wait-db.sh
+      containers:
+      - name: php
+{{- include "resources_app" . | indent 8 }}
+        image: {{ index .Values.werf.image "app" }}
+        securityContext:
+          runAsUser: 7000
+          allowPrivilegeEscalation: false
+        command: ["/bin/bash"]
+        args:
+          - '-c'
+          - "php /app/artisan migrate --force"
+        envFrom:
+          - configMapRef:
+              name: {{ $.Chart.Name }}-env
+          - secretRef:
+              name: {{ $.Chart.Name }}-env

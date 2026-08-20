@@ -1,0 +1,69 @@
+# Notification template groups for alert messages.
+# Telegram: contact point "Platform Grafana Alerts". Message = template "platform.message", parse mode HTML.
+# Email: admins and ops contact points. subject/message = template "platform.email.*" (plain text, no <b>/<i>, short subject).
+apiVersion: 1
+
+templates:
+  # Single-alert block: <b>/<i>, one paragraph between blocks, severity WARNING/CRITICAL.
+  - orgId: 1
+    name: platform.alert_list
+    template: |
+      {{ "{{" }} define "platform.alert_list" {{ "}}" }}{{ "{{" }} range $alert := . {{ "}}" }}
+      <b>{{ "{{" }} index $alert.Labels "alertname" {{ "}}" }}</b>
+
+      🏷️ <b>Labels:</b>
+      {{ "{{" }} range $k, $v := $alert.Labels {{ "}}" }}{{ "{{" }} if and (ne $k "grafana_folder") (ne $k "environment") (ne $k "cluster") (ne $k "fstype") (ne $k "hostname") (ne $k "usage_format") (ne $k "app_kubernetes_io_component") (ne $k "app_kubernetes_io_instance") (ne $k "app_kubernetes_io_managed_by") (ne $k "app_kubernetes_io_name") (ne $k "app_kubernetes_io_part_of") (ne $k "app_kubernetes_io_version") (ne $k "helm_sh_chart") (ne $k "node") (ne $k "service") (ne $k "instance") (ne $k "job") (ne $k "id") (ne $k "description") (ne $k "exported_service") {{ "}}" }}  • <b>{{ "{{" }} $k {{ "}}" }}</b> = {{ "{{" }} if eq $k "severity" {{ "}}" }}{{ "{{" }} if eq $v "warning" {{ "}}" }}🟠 {{ "{{" }} end {{ "}}" }}{{ "{{" }} if eq $v "critical" {{ "}}" }}🔴 {{ "{{" }} end {{ "}}" }}{{ "{{" }} $v | toUpper {{ "}}" }}{{ "{{" }} else {{ "}}" }}{{ "{{" }} $v {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+      {{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+      📋 <b>Annotations:</b>
+      {{ "{{" }} range $k, $v := $alert.Annotations {{ "}}" }}{{ "{{" }} if ne $k "usage_raw" {{ "}}" }}  • <b>{{ "{{" }} $k {{ "}}" }}</b>: <i>{{ "{{" }} $v {{ "}}" }}</i>
+      {{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+      {{ "{{" }} if $alert.GeneratorURL {{ "}}" }}🔗 <b>Source:</b> {{ "{{" }} $alert.GeneratorURL {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+
+      {{ "{{" }} if $alert.SilenceURL {{ "}}" }}🔕 <b>Silence:</b> {{ "{{" }} $alert.SilenceURL {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+      {{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+
+  # Message body (Firing/Resolved), calls platform.alert_list.
+  - orgId: 1
+    name: platform.message
+    template: |
+      {{ "{{" }} define "platform.message" {{ "}}" }}{{ "{{" }} if gt (len .Alerts.Firing) 0 {{ "}}" }}<b>🚨 FIRING</b>
+      {{ "{{" }} template "platform.alert_list" .Alerts.Firing {{ "}}" }}{{ "{{" }} if gt (len .Alerts.Resolved) 0 {{ "}}" }}
+
+      {{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}{{ "{{" }} if gt (len .Alerts.Resolved) 0 {{ "}}" }}<b>✅ Resolved</b>
+      {{ "{{" }} template "platform.alert_list" .Alerts.Resolved {{ "}}" }}{{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+
+  # Plain-text SMTP: group name must match the template name in define (Grafana provisioning rule).
+  - orgId: 1
+    name: platform.email.alert_plain
+    template: |
+      {{ "{{" }} define "platform.email.alert_plain" {{ "}}" }}{{ "{{" }} range $alert := . {{ "}}" }}
+      ---
+      {{ "{{" }} index $alert.Labels "alertname" {{ "}}" }}
+
+      {{ "{{" }} if index $alert.Annotations "summary" {{ "}}" }}Summary:
+      {{ "{{" }} index $alert.Annotations "summary" | reReplaceAll "<b>" "" | reReplaceAll "</b>" "" | reReplaceAll "<i>" "" | reReplaceAll "</i>" "" | reReplaceAll "<br />" " " | reReplaceAll "<br/>" " " | reReplaceAll "<br>" " " {{ "}}" }}
+      {{ "{{" }} end {{ "}}" }}
+      Annotations:
+      {{ "{{" }} range $k, $v := $alert.Annotations {{ "}}" }}{{ "{{" }} if ne $k "usage_raw" {{ "}}" }}• {{ "{{" }} $k {{ "}}" }}: {{ "{{" }} $v | reReplaceAll "<b>" "" | reReplaceAll "</b>" "" | reReplaceAll "<i>" "" | reReplaceAll "</i>" "" | reReplaceAll "<br />" " " | reReplaceAll "<br/>" " " | reReplaceAll "<br>" " " {{ "}}" }}
+      {{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+      Labels:
+      {{ "{{" }} range $k, $v := $alert.Labels {{ "}}" }}• {{ "{{" }} $k {{ "}}" }} = {{ "{{" }} $v {{ "}}" }}
+      {{ "{{" }} end {{ "}}" }}
+      {{ "{{" }} if $alert.GeneratorURL {{ "}}" }}Source: {{ "{{" }} $alert.GeneratorURL {{ "}}" }}
+      {{ "{{" }} end {{ "}}" }}{{ "{{" }} if $alert.SilenceURL {{ "}}" }}Silence: {{ "{{" }} $alert.SilenceURL {{ "}}" }}
+      {{ "{{" }} end {{ "}}" }}
+      {{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+
+  - orgId: 1
+    name: platform.email.subject
+    template: |
+      {{ "{{" }} define "platform.email.subject" {{ "}}" }}{{ "{{" }} if gt (len .Alerts.Firing) 0 {{ "}}" }}[FIRING:{{ "{{" }} len .Alerts.Firing {{ "}}" }}] {{ "{{" }} index (index .Alerts.Firing 0).Labels "alertname" {{ "}}" }}{{ "{{" }} else {{ "}}" }}{{ "{{" }} if gt (len .Alerts.Resolved) 0 {{ "}}" }}[RESOLVED:{{ "{{" }} len .Alerts.Resolved {{ "}}" }}] {{ "{{" }} index (index .Alerts.Resolved 0).Labels "alertname" {{ "}}" }}{{ "{{" }} else {{ "}}" }}[Grafana]{{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}
+
+  - orgId: 1
+    name: platform.email.body
+    template: |
+      {{ "{{" }} define "platform.email.body" {{ "}}" }}{{ "{{" }} if gt (len .Alerts.Firing) 0 {{ "}}" }}FIRING ({{ "{{" }} len .Alerts.Firing {{ "}}" }})
+      {{ "{{" }} template "platform.email.alert_plain" .Alerts.Firing {{ "}}" }}{{ "{{" }} end {{ "}}" }}{{ "{{" }} if gt (len .Alerts.Resolved) 0 {{ "}}" }}
+
+      RESOLVED ({{ "{{" }} len .Alerts.Resolved {{ "}}" }})
+      {{ "{{" }} template "platform.email.alert_plain" .Alerts.Resolved {{ "}}" }}{{ "{{" }} end {{ "}}" }}{{ "{{" }} end {{ "}}" }}

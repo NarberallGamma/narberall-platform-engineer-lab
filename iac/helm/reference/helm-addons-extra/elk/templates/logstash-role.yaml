@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.logstash.roleName }}
+stringData:
+  roles.yml: |
+    {{- range $roleName, $role := .Values.logstash.roles }}
+    {{ $roleName }}:
+      cluster:
+{{ toYaml $role.cluster | indent 8 }}
+      indices:
+{{ toYaml $role.indices | indent 8 }}
+    {{- end }}

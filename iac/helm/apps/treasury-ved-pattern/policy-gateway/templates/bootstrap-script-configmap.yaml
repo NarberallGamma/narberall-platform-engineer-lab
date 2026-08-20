@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "policy-gateway.bootstrapScriptConfigMapName" . }}
+  labels:
+    {{- include "policy-gateway.labels" . | nindent 4 }}
+data:
+  bootstrap-cryptopro-keys.sh: |
+{{- .Files.Get "scripts/bootstrap-cryptopro-keys.sh" | nindent 4 }}

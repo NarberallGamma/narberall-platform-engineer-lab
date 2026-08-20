@@ -1,0 +1,57 @@
+{{- if (eq .Values.werf.env "test") }}
+{{- $app_urls := pluck .Values.global.cluster .Values.app.app_urls | first }}
+{{- range $i, $app_url := pluck .Values.werf.env $app_urls | first | default $app_urls._default }}
+{{- $app_url := printf "https://%s" (include "fl.value" (list $ . $app_url.host)) }}
+{{- $name := printf "%s-%d" $.Chart.Name $i }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-feature-tests
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "100"
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 900
+  template:
+    spec:
+{{- if eq $.Values.werf.env "production" }}
+      priorityClassName: production-high
+{{- end }}
+      restartPolicy: Never
+      imagePullSecrets:
+      - name: "registrysecret"
+      volumes:
+      - name: scripts
+        secret:
+          secretName: {{ $.Chart.Name }}-scripts
+      initContainers:
+      - name: wait
+        image: {{ index $.Values.werf.image "mysql" }}
+        command: ["/bin/bash"]
+        args:
+          - '/wait-db.sh'
+        volumeMounts:
+        - name: scripts
+          mountPath: /wait-db.sh
+          subPath: wait-db.sh
+      containers:
+      - name: php
+        {{- include "resources_app" $ | nindent 8 }}
+        image: {{ index $.Values.werf.image "app" }}
+        command: ["/bin/bash"]
+        workingDir: /app
+        args:
+          - '-c'
+          - "composer install --no-interaction --no-ansi --dev --prefer-dist && vendor/bin/phpunit"
+        env:
+        - name: APP_URL
+          value: {{ $app_url | quote }}
+        envFrom:
+          - configMapRef:
+              name: {{ $.Chart.Name }}-env
+          - secretRef:
+              name: {{ $.Chart.Name }}-env
+{{- end }}
+{{- end }}

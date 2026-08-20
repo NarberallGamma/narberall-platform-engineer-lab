@@ -1,0 +1,95 @@
+# OpenObserve log collector (estate).
+# DaemonSet reads host container logs. Does not annotate or restart application pods.
+# Metrics/traces pipelines are off. OpenTelemetry Operator is not used.
+# filelog recombine: CRI P/F long lines, then Java stack frames into one body.
+
+fullnameOverride: openobserve-collector
+namespaceOverride: monitoring
+
+k8sCluster: estate-prod
+environment: estate-prod
+
+image:
+  repository: docker.io/otel/opentelemetry-collector-contrib
+  tag: "0.138.0"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# CCE/containerd keeps container stdout here, not in /var/log/pods.
+# Mount this directory at /var/log/pods inside the collector.
+hostLogs:
+  path: /var/lib/containerd/container_logs
+  mountPath: /var/log/pods
+
+# Files are 0640 root:root. Collector must run as root to read them.
+podSecurityContext:
+  runAsUser: 0
+  runAsGroup: 0
+  runAsNonRoot: false
+
+openobserve:
+  endpoint: http://openobserve-router.monitoring.svc.cluster.local:5080/api/CHANGE_ME
+  ingestUser: otel-collector@example.com
+
+externalSecret:
+  enabled: true
+  name: openobserve-collector-vault
+  secretName: openobserve-collector-vault-secrets
+  vaultPath: secret/openobserve
+  tokenProperty: ZO_MAIN_SERVICE_ACCOUNT_TOKEN
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault-cluster-secret-store
+    kind: ClusterSecretStore
+
+collect:
+  startAt: end
+  maxLogSize: 1MiB
+  namespaces:
+    - name: estate-app
+      stream: ns_estate_app
+      group: app
+    - name: kafka
+      stream: ns_kafka
+      group: infra
+    - name: istio-system
+      stream: ns_istio_system
+      group: infra
+    - name: ingress-nginx
+      stream: ns_ingress_nginx
+      group: infra
+    - name: external-secret-manager
+      stream: ns_external_secret_manager
+      group: infra
+    - name: argocd
+      stream: ns_argocd
+      group: infra
+    - name: monitoring
+      stream: ns_monitoring
+      group: infra
+  exclude:
+    - /var/log/pods/*/otc-container/*.log
+    - /var/log/pods/*/otel-collector/*.log
+    - /var/log/pods/monitoring_openobserve-ingester-*/*/*.log
+    - /var/log/pods/monitoring_openobserve-collector-*/*/*.log
+    - /var/log/pods/monitoring_log-agent-*/*/*.log
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+tolerations:
+  - operator: Exists
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+priorityClassName: ""
+nodeSelector: {}
+affinity: {}

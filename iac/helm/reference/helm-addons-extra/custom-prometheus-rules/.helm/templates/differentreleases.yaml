@@ -1,0 +1,40 @@
+{{- if eq .Values.werf.env "production" }}
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: CustomPrometheusRules
+metadata:
+  labels:
+    component: rules
+    prometheus: main
+  name: checkreleases
+spec:
+  groups:
+  - name: CheckReleases
+    rules:
+    - alert: DifferentReleasesDeployment
+      annotations:
+        description: Check releases in the production-use1 cluster
+        plk_protocol_version: "1"
+        plk_grouped_by__cpubusycustommon: CheckReleasesMon
+        plk_create_group_if_not_exists__cpubusycustommon: CheckReleasesMon
+        plk_markup_format: markdown
+        summary: Check releases "{{`{{ $labels.annotation_meta_helm_sh_release_name }}`}}" with deployment "{{`{{ $labels.deployment }}`}}" in the "{{`{{ $labels.exported_namespace }}`}}" namespace
+      expr: group by (annotation_ci_werf_io_commit, annotation_meta_helm_sh_release_name, deployment, exported_namespace) (max_over_time(kube_deployment_annotations_use1[10m])) unless (
+        group by (annotation_ci_werf_io_commit, annotation_meta_helm_sh_release_name, deployment, exported_namespace) (max_over_time(kube_deployment_annotations[10m])))
+      for: 3h
+      labels:
+        severity_level: "4"
+    - alert: DifferentReleasesStatefulset
+      annotations:
+        description: Check releases in the production-use1 cluster
+        plk_protocol_version: "1"
+        plk_grouped_by__cpubusycustommon: CheckReleasesMon
+        plk_create_group_if_not_exists__cpubusycustommon: CheckReleasesMon
+        plk_markup_format: markdown
+        summary: Check releases "{{`{{ $labels.annotation_meta_helm_sh_release_name }}`}}" with statefulset "{{`{{ $labels.statefulset }}`}}" in the "{{`{{ $labels.exported_namespace }}`}}" namespace
+      expr: group by (annotation_ci_werf_io_commit, annotation_meta_helm_sh_release_name, statefulset, exported_namespace) (max_over_time(kube_statefulset_annotations_use1[10m])) unless (
+        group by (annotation_ci_werf_io_commit, annotation_meta_helm_sh_release_name, statefulset, exported_namespace) (max_over_time(kube_statefulset_annotations[10m])))
+      for: 3h
+      labels:
+        severity_level: "4"
+{{- end }}

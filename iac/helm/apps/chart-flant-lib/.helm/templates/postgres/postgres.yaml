@@ -1,0 +1,137 @@
+{{- range $cluster_name, $values := .Values.postgres.clusters }}
+{{- if include "fl.isTrue" (list $ . $values.enabled) }}
+
+{{ $database := include "fl.value" (list $ . $values.database) }}
+{{ $user := include "fl.value" (list $ . $values.user) }}
+{{ $password := include "fl.value" (list $ . $values.password) }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $cluster_name }}-psql
+  annotations:
+    werf.io/weight: "-200"
+  labels:
+    app: {{ $cluster_name }}-psql
+spec:
+  serviceName: {{ $cluster_name }}
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: {{ $cluster_name }}-psql
+  template:
+    metadata:
+      labels:
+        app: {{ $cluster_name }}-psql
+    spec:
+      {{- include "imagePullSecrets" $ | indent 6 }}
+      {{- include "postgresql.affinity" (list $ . (printf "%s-psql" $cluster_name)) | indent 6 }}
+      {{- include "tolerations" $ | indent 6 }}
+      {{- include "nodeSelector" $ | indent 6 }}
+      {{- include "priorityClassName" $ | indent 6 }}
+
+      containers:
+        - name: postgres
+          image: {{ index $.Values.werf.image "postgres" }}
+          imagePullPolicy: Always
+          env:
+            - name: TZ
+              value: "UTC"
+            - name: POSTGRES_PASSWORD
+              value: {{ $password }}
+            - name: POSTGRES_USER
+              value: {{ $user }}
+            - name: POSTGRES_DB
+              value: {{ $database }}
+          ports:
+            - name: psql
+              containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: data
+          readinessProbe:
+            tcpSocket:
+              port: psql
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+          livenessProbe:
+            tcpSocket:
+              port: psql
+            initialDelaySeconds: 30
+            periodSeconds: 5
+          resources:
+          {{- if hasKey $values "resources" }}
+            {{ toYaml $values.resources | indent 12 }}
+          {{- else }}
+            {{ toYaml $.Values.postgres.resources | nindent 12 }}
+          {{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: {{ $.Values.postgres.storage }}
+      storageClassName: {{ $.Values.postgres.storageClassName }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $cluster_name }}-psql
+  annotations:
+    werf.io/weight: "-200"
+spec:
+  ports:
+  - name: psql
+    port: 5432
+  selector:
+    app: {{ $cluster_name }}-psql
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $cluster_name }}-root-psql
+  annotations:
+    werf.io/weight: "-200"
+spec:
+  ports:
+  - name: psql
+    port: 5432
+  selector:
+    app: {{ $cluster_name }}-psql
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ $cluster_name }}-psql
+  annotations:
+    werf.io/weight: "-200"
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: StatefulSet
+    name: {{ $cluster_name }}-psql
+  updatePolicy:
+    updateMode: "Off"
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $cluster_name }}-psql
+  annotations:
+    werf.io/weight: "-200"
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: {{ $cluster_name }}-psql
+
+{{- end }}
+{{- end }}

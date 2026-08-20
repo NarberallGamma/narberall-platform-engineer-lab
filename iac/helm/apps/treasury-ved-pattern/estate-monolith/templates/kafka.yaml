@@ -1,0 +1,12 @@
+{{- if .Values.kafkaHA.enabled }}
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: {{ .Release.Name }}-ha
+  labels:
+    {{- include "estate.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.kafkaHA.spec }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: feed-rss
+description: RSS poller CronJob. One chart, many helmfile releases with shifted schedules
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

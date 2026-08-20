@@ -12,10 +12,11 @@ I talk to business first: **can the infra do what the product needs**, **how fas
 | Keep it alive | Accompany: incidents, HA, brokers, DBMS, identity. **Minimal windows**, **~99.9% SLA** | Same day for P1; documented after |
 | Nobody wrote it down | Runbooks, diagrams, inventory, audit-walkable Git | Days, in parallel with the first apply |
 | Hand-built estate | Audit, inventory, import or wrap, runbooks, alerts | Days to first clean `plan`; weeks to stop click-ops |
-| Bill too high | Right-size, kill idle, **park non-prod at night** (start/stop schedules on Huawei-class / cloud.ru and the same idea on AWS) | First cuts in days; schedule lives in git |
+| Bill too high | Right-size, kill idle, **park non-prod at night** (start/stop schedules on Huawei-class / cloud.ru and the same idea on AWS). Host proof: [`../iac/ansible/`](../iac/ansible/), [case 10](../case-studies/10-ansible-estate.md) | First cuts in days; schedule lives in git |
 | Paper and tickets are slow | **OCR + LLM** so accounting, analysts, and developers stop retyping PDFs. Private GPU API + Nextcloud/n8n on one Ansible tree: [case 01](../case-studies/01-ai-llm-platform.md), [`../iac/ansible/reference/ansible-llm-collab/`](../iac/ansible/reference/ansible-llm-collab/) | Usable API in 1–2 weeks (see packages) |
 | GPU / chat / RAG | Local Ollama / vLLM-class serve, vector store, optional Karpenter-class GPU scale | Sprint, not a research programme |
-| Engineers paste tenant data or click the same ops | IDE as platform: MCP, local LLM when VRAM fits, API when not. **Same kit on Linux, macOS, or WSL** | Hours to a day on a new laptop |
+| Engineers paste tenant data or click the same ops | Multi-agent desk: Cursor, Claude Code, Codex, local LLM; MCP + wrappers. **Same kit on Linux, macOS, or WSL** | Hours to a day on a new laptop |
+| On-call clicks Grafana / Jira / Vault for every change | I speak those **product APIs**. New views and alert rules the same day. Scripts + agents for the rest | Hours for a view; days to stop click-ops |
 | Must move clouds (when asked) | Same platform shape on the next API. I do this **fast**; many treat it as a year. Example: VK Cloud / NOVA-class → Huawei-class Advanced | Design in days; window in hours |
 
 International contracts: the same conversation. Class of cloud (AWS-shaped Huawei, OpenStack, VCD, Selectel) is a footnote so a non-RU buyer can map the skill. The buying question is still: **when does the product ship, and what does it cost to keep on**.
@@ -27,8 +28,10 @@ Full six-year narrative: [`experience.md`](experience.md). Diagrams for managers
 - Greenfield: apply from reusable modules and a one-button host CI (Terraform → Ansible → Vault → metrics → docs).
 - Legacy: import until `plan` is clean. Proof already in the lab: [case 05](../case-studies/05-legacy-estate-as-code.md) (70+ VMs).
 - CI: **Jenkins** and **GitLab CI + Argo CD** so a branch or tag is the release, not a meeting.
+- Cluster package: Helm + Argo bootstrap on an existing cluster, plus one richest product chart per mechanic. Proof: [`../iac/helm/`](../iac/helm/), [`../iac/helm/apps/`](../iac/helm/apps/), [case 11](../case-studies/11-helm-estate.md).
 - AI: OCR/LLM is a **multiplier** on document flow (finance, legal, analysts) and on developer/ops questions. Not a demo chatbot.
-- Workstation: MCP + scripts so Terraform, Ansible, tickets, and GPU jobs run from the IDE. Bootstrap is bash, Docker, and env files — **not a Windows/WSL lock-in**.
+- Workstation: MCP + scripts so Terraform, Ansible, tickets, and GPU jobs run from Cursor, Claude Code, Codex, or a local-model wrapper. That is current practice. The same charts, playbooks, CI, and bash I still write by hand when required: about **four years** of that work predates coding agents, and much of the public lab is from then. Agents make the calendar shorter. They are not a substitute for having done the job. Bootstrap is bash, Docker, and env files, **not a Windows/WSL lock-in**.
+- Monitoring and the rest of the estate are **APIs I already use**: Grafana (new views the same day), Prometheus / VictoriaMetrics, OpenObserve, Elasticsearch, Vault, Argo CD, JSM, GitLab, n8n. Proof: [`sre/`](sre/), [`../architecture/05-sre.md`](../architecture/05-sre.md), [case 10](../case-studies/10-ansible-estate.md) (host scrape), [case 11](../case-studies/11-helm-estate.md) (in-cluster overlay). Tokens and agents: [`security-ai.md`](security-ai.md).
 
 ## Cheaper
 

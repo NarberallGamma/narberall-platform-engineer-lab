@@ -4,7 +4,7 @@
 
 Code proof for [`../cloud/`](../cloud/). Layout matches a real IaC repo: **one folder per cloud**, shared modules, small examples.
 
-Experience and keywords live under [`../cloud/`](../cloud/). This directory is the `.tf` / Terragrunt tree. CI that applies this tree and then calls Ansible: [`../ci/`](../ci/).
+Experience and keywords live under [`../cloud/`](../cloud/). This directory is the `.tf` / Terragrunt tree. CI that applies this tree and then calls Ansible: [`../ci/`](../ci/). The cluster package (Helm / GitOps) is the sibling [`../helm/`](../helm/), not a folder under this tree.
 
 Layout is meant to be **obvious**: one folder per cloud, shared `modules`, `live` / stacks for apply units — not a dump monorepo of unrelated products. Secrets stay out of git (`SANITIZE.md`); production estates use Vault / ESO / protected CI, introduced from scratch when missing.
 
@@ -69,6 +69,7 @@ flowchart TB
 
 - CI catalog (turnkey map + pipelines): [`../ci/`](../ci/)
 - Ansible (what CI runs on hosts after apply): [`../ansible/`](../ansible/)
+- Helm (cluster package sibling): [`../helm/`](../helm/)
 
 ## Case studies
 

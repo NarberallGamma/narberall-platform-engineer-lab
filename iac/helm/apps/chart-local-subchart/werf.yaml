@@ -1,0 +1,26 @@
+project: orders-app
+configVersion: 1
+
+---
+image: backend
+from: php:8.4-fpm
+
+---
+image: frontend
+from: nginx:1.24-alpine
+
+---
+image: postgres
+from: postgres:13.10
+
+---
+image: rabbitmq
+from: rabbitmq:3.10.2-management
+
+---
+image: php-fpm-exporter
+from: flant/php-fpm-exporter:v0.3.3
+
+---
+image: init
+from: alpine:3.17

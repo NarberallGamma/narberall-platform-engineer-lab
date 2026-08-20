@@ -1,0 +1,162 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Panel 1: COMPLETED requests in estate_web (ds_psql) where public.balance still shows token_balance ≥ 1. Panel 2: estate_ledger_adapter (ds_psql_adapter) public.wallet_tx FATAL_ERROR for TRC20/ERC20 only (test bid_id excluded)  -  bid_id, created_at, send_at (no updated_at on table; aligned with alert refId D). Typical flow for panel 1: transit_wallet, update-balances, re-check estate_web / estate_contract.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "${ds_psql}" },
+      "description": "Tracks COMPLETED requests whose balance row may be stale (token_balance ≥ 1 excludes dust). Excluded request_id: 00000000-0000-4000-8000-000000000001 (TRX transit CHANGE_ME, manually acknowledged stale balance 2026-07-15). If rows appear here, check adapter transit_wallet for the address, refresh via estate-ledger-adapter update-balances when possible, then verify balances in estate_web and estate_contract.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "footer": { "reducers": [] },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "status_date" }]
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${ds_psql}" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT r.id, r.transit_wallet, b.token_balance, r.status_date\nFROM public.request AS r\nJOIN public.balance b ON r.id = b.request_id\nWHERE r.status = 'COMPLETED' AND b.token_balance >= 1\n  AND r.id NOT IN (\n    '00000000-0000-4000-8000-000000000001'\n  )\nORDER BY r.status_date DESC;",
+          "refId": "A",
+          "sql": {
+            "columns": [{ "parameters": [], "type": "function" }],
+            "groupBy": [{ "property": { "type": "string" }, "type": "groupBy" }],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "COMPLETED + token_balance ≥ 1 (no dust)",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "${ds_psql_adapter}" },
+      "description": "Lists wallet_tx rows with status FATAL_ERROR, tx_type TRC20_TRANSFER or ERC20_TRANSFER only. Excluded bid_id values are documented placeholders (test and resolved tickets). Columns created_at and send_at match the alert rule refId D (estate-databases-global.yaml). If rows appear, note bid_id and follow runbook: confirm single FATAL per bid, then re-queue via NEW + new id on wallet_tx if agreed with the product owner.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "footer": { "reducers": [] },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 14 },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${ds_psql_adapter}" },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT bid_id, id AS wallet_tx_id, status, tx_type, created_at, send_at\nFROM public.wallet_tx\nWHERE status = 'FATAL_ERROR'\n  AND (tx_type = 'TRC20_TRANSFER' OR tx_type = 'ERC20_TRANSFER')\n  AND bid_id NOT IN (\n    '00000000-0000-4000-8000-000000000002',\n    '00000000-0000-4000-8000-000000000003',\n    '00000000-0000-4000-8000-000000000004',\n    '00000000-0000-4000-8000-000000000005',\n    '00000000-0000-4000-8000-000000000006',\n    '00000000-0000-4000-8000-000000000007'\n  )\nORDER BY bid_id, send_at DESC NULLS LAST, created_at DESC NULLS LAST;",
+          "refId": "A",
+          "sql": {
+            "columns": [{ "parameters": [], "type": "function" }],
+            "groupBy": [{ "property": { "type": "string" }, "type": "groupBy" }],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "estate_ledger_adapter  -  wallet_tx FATAL_ERROR (bid_id)",
+      "type": "table"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["Estate", "PostgreSQL", "Databases", "estate_web", "estate_ledger_adapter", "wallet_tx"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "PostgreSQL (estate_web)",
+        "multi": false,
+        "name": "ds_psql",
+        "options": [],
+        "query": "postgres",
+        "refresh": 1,
+        "regex": ".*estate-web.*",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "estate-prod-postgresql-estate-ledger-adapter",
+          "value": "cfjv6d9key8zka"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "PostgreSQL (estate_ledger_adapter)",
+        "multi": false,
+        "name": "ds_psql_adapter",
+        "options": [],
+        "query": "postgres",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Estate / Databases / Global",
+  "uid": "estate_databases_global",
+  "version": 2,
+  "weekStart": ""
+}

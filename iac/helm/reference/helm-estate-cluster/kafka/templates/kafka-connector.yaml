@@ -1,0 +1,24 @@
+{{- if .Values.kafkaConnector }}
+{{- $vaultSecret := lookup "v1" "Secret" "kafka" "kafka-vault-credentials" }}
+{{- $postgresUser := "app_user" }}
+{{- $postgresPassword := "VAULT_POSTGRES_PASSWORD_PLACEHOLDER" }}
+{{- if $vaultSecret }}
+  {{- $postgresUser = $vaultSecret.data.postgresUser | b64dec }}
+  {{- $postgresPassword = $vaultSecret.data.postgresPassword | b64dec }}
+{{- end }}
+{{- range .Values.kafkaConnector }}
+{{- if (.enabled | default true) }}
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata:
+  name: {{ $.Release.Name }}-{{ .name }}-connector
+  labels:
+    {{- include "kafka.labels" $ | nindent 4 }}
+    strimzi.io/cluster: {{ $.Release.Name }}-{{ .kafkaConnectName }}
+spec:
+  {{- $specYaml := toYaml .spec | replace "VAULT_POSTGRES_USER" $postgresUser | replace "VAULT_POSTGRES_PASSWORD" $postgresPassword }}
+  {{- $specYaml | nindent 2 }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,152 @@
+{{- if include "fl.isTrue" (list $ . $.Values.migrations.enabled) }}
+{{ $dry_run := include "fl.isTrue" (list $ . $.Values.migrations.dry_run) }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-migrate-orders-delivery-{{ now | unixEpoch }}
+  annotations:
+    werf.io/weight: "-100"
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      name: {{ .Chart.Name }}-migrate-orders-delivery
+    spec:
+      restartPolicy: Never
+
+      {{- include "imagePullSecrets" . | indent 6 }}
+      {{- include "tolerations" . | indent 6 }}
+      {{- include "nodeSelector" . | indent 6 }}
+      {{- include "priorityClassName" . | indent 6 }}
+
+      initContainers:
+        {{ include "init-psql-orders" . | indent 8 }}
+
+      containers:
+      - name: migrate
+        image: {{ index .Values.werf.image "backend" }}
+        command:
+          - vendor/bin/phinx
+          - migrate
+          - -c
+          - ./migrations/orders_delivery.php
+          {{- if $dry_run }}
+          - --dry-run
+          {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ $.Chart.Name }}-env
+          - secretRef:
+              name: {{ $.Chart.Name }}-env
+        env:
+        - name: ORDERS_DELIVERY_APPLICATION_USER
+          value: $(DB_ROOT_USER)
+        - name: ORDERS_DELIVERY_APPLICATION_USER_PASS
+          value: $(DB_ROOT_PASS)
+        - name: DB_ROOT_USER
+          value: $(DB_ROOT_USER)
+        - name: DB_ROOT_PASS
+          value: $(DB_ROOT_PASS)
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-migrate-report-{{ now | unixEpoch }}
+  annotations:
+    werf.io/weight: "-100"
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      name: {{ .Chart.Name }}-migrate-report
+    spec:
+      restartPolicy: Never
+
+      {{- include "imagePullSecrets" . | indent 6 }}
+      {{- include "tolerations" . | indent 6 }}
+      {{- include "nodeSelector" . | indent 6 }}
+      {{- include "priorityClassName" . | indent 6 }}
+
+      initContainers:
+        {{ include "init-psql-report" . | indent 8 }}
+
+      containers:
+      - name: migrate
+        image: {{ index .Values.werf.image "backend" }}
+        command:
+          - vendor/bin/phinx
+          - migrate
+          - -c
+          - ./migrations/report.php
+          {{- if $dry_run }}
+          - --dry-run
+          {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ $.Chart.Name }}-env
+          - secretRef:
+              name: {{ $.Chart.Name }}-env
+        env:
+        - name: REPORT_APPLICATION_USER
+          value: $(REPORT_ROOT_USER)
+        - name: REPORT_APPLICATION_USER_PASS
+          value: $(REPORT_ROOT_PASS)
+        - name: DB_ROOT_USER
+          value: $(REPORT_ROOT_USER)
+        - name: DB_ROOT_PASS
+          value: $(REPORT_ROOT_PASS)
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Chart.Name }}-migrate-history-{{ now | unixEpoch }}
+  annotations:
+    werf.io/weight: "-100"
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      name: {{ .Chart.Name }}-migrate-history
+    spec:
+      restartPolicy: Never
+
+      {{- include "imagePullSecrets" . | indent 6 }}
+      {{- include "tolerations" . | indent 6 }}
+      {{- include "nodeSelector" . | indent 6 }}
+      {{- include "priorityClassName" . | indent 6 }}
+
+      initContainers:
+        {{ include "init-psql-history" . | indent 8 }}
+
+      containers:
+      - name: migrate
+        image: {{ index .Values.werf.image "backend" }}
+        command:
+          - vendor/bin/phinx
+          - migrate
+          - -c
+          - ./migrations/history.php
+          {{- if $dry_run }}
+          - --dry-run
+          {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ $.Chart.Name }}-env
+          - secretRef:
+              name: {{ $.Chart.Name }}-env
+        env:
+        - name: HISTORY_APPLICATION_USER
+          value: $(HISTORY_ROOT_USER)
+        - name: HISTORY_APPLICATION_USER_PASS
+          value: $(HISTORY_ROOT_PASS)
+        - name: DB_ROOT_USER
+          value: $(HISTORY_ROOT_USER)
+        - name: DB_ROOT_PASS
+          value: $(HISTORY_ROOT_PASS)
+{{- end }}

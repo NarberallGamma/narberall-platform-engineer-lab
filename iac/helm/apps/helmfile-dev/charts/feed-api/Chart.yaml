@@ -1,0 +1,6 @@
+apiVersion: v2
+name: feed-api
+description: HTTP API for a feed pipeline (health probe, optional memory PVC, per-stand Secret)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

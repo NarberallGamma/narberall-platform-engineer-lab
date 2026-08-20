@@ -1,0 +1,10 @@
+resources:
+  crons:
+    requests:
+      cpu:
+        _default: "500m"
+      memory:
+        _default: "512Mi"
+    limits:
+      memory:
+        _default: "512Mi"

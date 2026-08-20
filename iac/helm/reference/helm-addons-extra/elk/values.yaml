@@ -1,0 +1,404 @@
+# Werf injects global.env, werf.namespace, werf.image at render.
+# Placeholders so templates that read auth / images stay explicit.
+global:
+  env: production
+
+werf:
+  namespace: logging
+  image:
+    elasticsearch-exporter: quay.io/prometheuscommunity/elasticsearch-exporter:v1.3.0
+    ubuntu: ubuntu:24.04
+
+auth:
+  _default: CHANGE_ME
+  alt: CHANGE_ME
+
+restartPolicy: Always
+
+elasticsearch:
+  version: 8.12.0
+
+  count: 5
+  java_opts:
+    _default: "-Xms10g -Xmx10g -XX:ActiveProcessorCount=3 -XX:InitiatingHeapOccupancyPercent=60 -XX:G1HeapRegionSize=4m -XX:MaxGCPauseMillis=200 -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom"
+
+  resources: |
+    requests:
+      cpu: 3000m
+      memory: 12Gi
+    limits:
+      memory: 16Gi
+
+  storage:
+    _default: 3100Gi
+
+  storageClassName:
+    _default: managed-standard-ssd
+    alt: localpath-sts
+
+  nodeSelector:
+    _default: |
+      "node-role.kubernetes.io/logging": ""
+
+  tolerations:
+    _default: |
+      - key: dedicated
+        operator: Equal
+        value: logging
+
+kibana:
+  version: 8.12.0
+  count: 2
+  ingress:
+    host: kibana.example.com
+    secretName: wildcard-tls
+  resources: |
+    requests:
+      cpu: 1.5
+      memory: 4Gi
+    limits:
+      cpu: 2
+      memory: 5Gi
+
+logshipper:
+  tls:
+    caFile:
+      _default: CHANGE_ME
+      alt: CHANGE_ME
+    verifyHostname: false
+
+  logdestinations:
+    - name: es-storage-app
+      index: k8s-app-v10-%F
+    - name: es-storage-app-dashboard-api
+      index: k8s-app-dashboard-api-%F
+    - name: es-storage-app-gra
+      index: k8s-app-gra-v10-%F
+    - name: es-storage-stage-app
+      index: k8s-app-stage-v10-%F
+    - name: es-storage-dev-app
+      index: k8s-app-dev-v10-%F
+    - name: es-storage-asa-dev
+      index: k8s-asa-dev-%F
+    - name: es-storage-asa-prod
+      index: k8s-asa-prod-%F
+    - name: es-storage-ua-dev
+      index: k8s-ua-dev-%F
+    - name: es-storage-ua-prod
+      index: k8s-ua-prod-%F
+
+  loggingconfigs:
+    - name: app-logs
+      dref: es-storage-app
+      kubernetesPods:
+        labelSelector:
+          matchExpressions:
+            - key: logs
+              operator: In
+              values:
+                - dashboard-api
+            - key: sdk
+              operator: NotIn
+              values:
+                - dashboard-api-sdk-api-low
+            - key: sdk
+              operator: NotIn
+              values:
+                - dashboard-api-sdk-api-high
+        namespaceSelector:
+          matchNames:
+            - production
+      logFilter:
+        - field: message
+          operator: Exists
+
+    - name: app-logs-dashboard-api
+      dref: es-storage-app-dashboard-api
+      kubernetesPods:
+        labelSelector:
+          matchLabels:
+            logs: dashboard-api
+            app: dashboard-api-dashboard-api
+        namespaceSelector:
+          matchNames:
+            - production
+      logFilter:
+        - field: message
+          operator: Exists
+
+    - name: app-logs-gra
+      dref: es-storage-app-gra
+      kubernetesPods:
+        namespaceSelector:
+          matchNames:
+            - gra-production
+        labelSelector:
+          matchLabels:
+            logs: dashboard-api
+      logFilter:
+        - field: message
+          operator: Exists
+
+    - name: app-logs-stage
+      dref: es-storage-stage-app
+      kubernetesPods:
+        namespaceSelector:
+          matchNames:
+            - stage
+        labelSelector:
+          matchLabels:
+            logs: dashboard-api
+      logFilter:
+        - field: message
+          operator: Exists
+
+    - name: app-logs-dev
+      dref: es-storage-dev-app
+      kubernetesPods:
+        namespaceSelector:
+          matchNames:
+            - dev
+        labelSelector:
+          matchLabels:
+            logs: dashboard-api
+      logFilter:
+        - field: message
+          operator: Exists
+
+    - name: app-logs-asa-dev
+      dref: es-storage-asa-dev
+      kubernetesPods:
+        namespaceSelector:
+          matchNames:
+            - asa-dev
+        labelSelector:
+          matchLabels:
+            logs: asa-analytics
+      logFilter:
+        - field: message
+          operator: Exists
+
+    - name: app-logs-asa-prod
+      dref: es-storage-asa-prod
+      kubernetesPods:
+        namespaceSelector:
+          matchNames:
+            - asa-production
+        labelSelector:
+          matchLabels:
+            logs: asa-analytics
+      logFilter:
+        - field: message
+          operator: Exists
+
+    - name: app-logs-ua-dev
+      dref: es-storage-ua-dev
+      kubernetesPods:
+        namespaceSelector:
+          matchNames:
+            - ua-dev
+        labelSelector:
+          matchLabels:
+            logs: user-acquisition
+      logFilter:
+        - field: message
+          operator: Exists
+
+    - name: app-logs-ua-prod
+      dref: es-storage-ua-prod
+      kubernetesPods:
+        namespaceSelector:
+          matchNames:
+            - ua-production
+        labelSelector:
+          matchLabels:
+            logs: user-acquisition
+      logFilter:
+        - field: message
+          operator: Exists
+
+    - name: config-elk-ls-sdk-api-low
+      dref: elk-ls
+      kubernetesPods:
+        labelSelector:
+          matchLabels:
+            sdk: dashboard-api-sdk-api-low
+        namespaceSelector:
+          matchNames:
+            - production
+            - dev
+      logFilter:
+        - field: message
+          operator: Exists
+
+    - name: config-elk-ls-sdk-api-high
+      dref: elk-ls
+      kubernetesPods:
+        labelSelector:
+          matchLabels:
+            sdk: dashboard-api-sdk-api-high
+        namespaceSelector:
+          matchNames:
+            - production
+            - dev
+      logFilter:
+        - field: message
+          operator: Exists
+
+    # - name: vector-logstash-loki-ingress
+    #   dref: elk-ls
+    #   kubernetesPods:
+    #     namespaceSelector:
+    #       matchNames:
+    #         - d8-ingress-nginx
+    #   logFilter:
+    #     - field: namespace
+    #       operator: Exists
+    #     - field: namespace
+    #       operator: Regex
+    #       values:
+    #         - ^(production|dev|asa-dev|asa-production|gra-production|stage)$
+
+rollover:
+  delete:
+    age:
+      k8s_app:
+        _default: 8d
+      dashboard_api_sdk:
+        _default: 2d
+      k8s-app-dashboard-api:
+        _default: 30d
+
+exporter:
+  replicas: 1
+
+  image:
+    repository: justwatch/elasticsearch_exporter
+    tag: 1.1.0
+    pullPolicy: IfNotPresent
+    pullSecret: ""
+
+  securityContext: |
+    runAsNonRoot: true
+    runAsUser: 1000
+
+  nodeSelector:
+    _default: |
+      "node-role.kubernetes.io/logging": ""
+
+  tolerations:
+    _default: |
+      - key: dedicated
+        operator: Equal
+        value: logging
+
+logstash:
+  enabled: true
+  fullnameOverride: "elk"
+  count: 1
+  version: 8.12.0
+  config:
+    log.level: info
+  elasticsearchRefs:
+    - clusterName: elk
+      name: elk
+  pipelines:
+    - config.string: |
+        input {
+          tcp {
+            port => 12345
+            codec => json
+          }
+          beats {
+            port => 5044
+          }
+        }
+        filter {
+          json {
+            skip_on_invalid_json => true
+            source => "message"
+            target => "json"
+            add_tag => ["json_parsed"]
+          }
+          if [json][data][namespace] == "dev" {
+            mutate {
+              add_field => { "[@metadata][target_index]" => "dashboard-api-sdk-dev-%{+YYYY.MM.dd}" }
+            }
+          } else {
+            mutate {
+              add_field => { "[@metadata][target_index]" => "dashboard-api-sdk-%{+YYYY.MM.dd}" }
+            }
+          }
+          mutate {
+            rename => {
+              "[json][response_data]" => "response_data"
+              "[json][data][is_observer]" => "data.is_observer"
+              "[json][data][log_level]" => "data.log_level"
+              "[json][data][sdk_v]" => "data.sdk_v"
+              "[json][data][url_mask]" => "data.url_mask"
+              "[json][data][code]" => "data.code"
+              "[json][data][is_sandbox]" => "data.is_sandbox"
+              "[json][data][os]" => "data.os"
+              "[json][data][token]" => "data.token"
+              "[json][data][http_method]" => "data.http_method"
+              "[json][data][is_storekit2]" => "data.is_storekit2"
+              "[json][data][masked_request]" => "data.masked_request"
+              "[json][data][cross_version]" => "data.cross_version"
+              "[json][data][cross_platform]" => "data.cross_platform"
+              "[json][data][request_data]" => "data.request_data"
+              "[json][data][response_data]" => "data.response_data"
+              "[json][data][log_type]" => "data.log_type"
+              "[json][data][namespace]" => "data.namespace"  # Сохраняем namespace в конечном документе
+            }
+            remove_field => ["message", "json"]
+          }
+          date {
+            match => ["[timestamp]", "ISO8601"]
+            target => "@timestamp"
+            remove_field => ["timestamp"]
+          }
+        }
+        output {
+          elasticsearch {
+            hosts => ["${ELK_ES_HOSTS}"]
+            user => "${ELK_ES_USER}"
+            password => "${ELK_ES_PASSWORD}"
+            ssl_certificate_authorities => ["${ELK_ES_SSL_CERTIFICATE_AUTHORITY}"]
+            index => "%{[@metadata][target_index]}"
+            data_stream => false
+          }
+        }
+  roleName: "elasticsearch-logstash-role"
+  roles:
+    eck_logstash_user_role:
+      cluster: [ "monitor", "manage_ilm", "read_ilm", "manage_logstash_pipelines", "manage_index_templates", "cluster:admin/ingest/pipeline/get"]
+      indices:
+      - names: [ "dashboard-api-sdk-*", "dashboard-api-sdk-", "logstash", "logstash-*", "ecs-logstash", "ecs-logstash-*", "logs-*", "metrics-*", "synthetics-*", "traces-*" ]
+        privileges: [ "manage", "write", "create_index", "read", "view_index_metadata", "auto_configure", "all" ]
+
+  auth:
+    roles:
+      - secretName: elasticsearch-logstash-role
+        roleName: eck_logstash_user_role
+
+  services:
+    - name: tcp
+      service:
+        spec:
+          ports:
+          - name: tcp-json
+            port: 12345
+            protocol: TCP
+          - name: filebeat
+            port: 5044
+            protocol: TCP
+  podTemplate:
+    spec:
+      imagePullSecrets:
+        - name: registrysecret
+      nodeSelector:
+        node-role.kubernetes.io/sts: ""
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: sts

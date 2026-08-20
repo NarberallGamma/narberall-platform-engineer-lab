@@ -1,0 +1,19 @@
+{{- if or ( eq .Values.werf.env "dev" ) ( eq .Values.werf.env "stage" ) }}
+{{ $portalhost := pluck .Values.werf.env .Values.portal.host | first | default .Values.portal.host._default }}
+---
+apiVersion: deckhouse.io/v1alpha1
+kind: DexAuthenticator
+metadata:
+  name: {{ .Chart.Name }}-{{ .Values.werf.env }}
+spec:
+  allowedGroups:
+  - platform
+  - app-admin
+  - app-staff
+  - app-guest
+  applicationDomain: {{ $portalhost }}
+  sendAuthorizationHeader: false
+  applicationIngressCertificateSecretName: "{{ .Chart.Name }}-{{ .Values.werf.env }}"
+  applicationIngressClassName: "nginx"
+  keepUsersLoggedInFor: "720h"
+{{- end }}

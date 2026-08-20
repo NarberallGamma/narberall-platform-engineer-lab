@@ -1,0 +1,15 @@
+{{- if eq .Values.werf.env "production" }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-deploy-script
+  labels:
+    app: {{ .Chart.Name }}-deploy-script
+  annotations:
+    werf.io/weight: "-200"
+data:
+  deploy_to_bucket.sh: |
+    cd $UPLOAD_DIR
+    aws --endpoint-url {{.Values.portal.job.s3_endpoint}} s3 sync ./ s3://{{ .Values.portal.job.bucket }}/
+{{- end }}

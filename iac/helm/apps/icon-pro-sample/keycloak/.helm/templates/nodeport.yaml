@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop-keycloak-nodeport
+spec:
+  ports:
+  - name: http 
+    nodePort: {{ .Values.nodeport }} 
+    port: 8080 
+    targetPort: 8080 
+  selector:
+    app.kubernetes.io/instance: shop-keycloak
+    app.kubernetes.io/name: shop-keycloak
+  type: NodePort

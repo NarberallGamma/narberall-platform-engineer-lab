@@ -1,0 +1,41 @@
+ovpnAdmin:
+  repo: ghcr.io/palark/ovpn-admin/ovpn-admin
+
+openvpn:
+  repo: ghcr.io/palark/ovpn-admin/openvpn
+  subnet: 172.16.200.0/255.255.255.0
+  # LoadBalancer or ExternalIP or HostPort
+  inlet: HostPort
+  #
+  # If inlet: ExternalIP
+  # externalIP: 203.0.113.10
+  # externalPort: 1194
+  #
+  # If inlet: HostPort
+  hostPort: 1194
+  # Domain or IP used by clients to reach the OpenVPN server
+  # externalHost: vpn.example.com
+
+# -- Node selector configuration.
+nodeSelector: {}
+
+# -- Tolerations for node taints.
+tolerations: []
+
+ingress:
+  # -- Enable ingress for the admin UI only.
+  enabled: false
+
+  # -- Ingress class name.
+  className: ""
+
+  # -- Annotations to be added to the ingress.
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+
+  domain: vpn-admin.example.com
+
+  basicAuth:
+    user: admin
+    password: CHANGE_ME

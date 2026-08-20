@@ -1,0 +1,73 @@
+# External Secrets Operator overlay (official external-secrets chart).
+# Chart pin: 2.9.0 / appVersion v2.9.0.
+# Non-HA lab pin: one replica for controller, webhook, and certController.
+# ClusterSecretStore and Vault auth live in the estate cluster kit, not here.
+# A private image mirror would be example.registry/external-secrets/external-secrets.
+
+installCRDs: true
+
+# Cluster CoreDNS may not resolve the external Vault FQDN.
+# hostAliases keep the TLS hostname while routing to a private IP.
+global:
+  hostAliases:
+    - ip: "10.10.4.10"
+      hostnames:
+        - "vault.example.com"
+
+replicaCount: 1
+leaderElect: false
+
+image:
+  repository: ghcr.io/external-secrets/external-secrets
+  pullPolicy: IfNotPresent
+  # tag empty = Chart.yaml appVersion (v2.9.0)
+
+# Vendored 2.9.0 tree includes this subchart. Unused on this install.
+bitwarden-sdk-server:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+podDisruptionBudget:
+  enabled: false
+
+serviceMonitor:
+  enabled: false
+
+webhook:
+  create: true
+  replicaCount: 1
+  failurePolicy: Fail
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  podDisruptionBudget:
+    enabled: false
+
+certController:
+  create: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  podDisruptionBudget:
+    enabled: false
+
+# Cluster-wide processing (ExternalSecret / ClusterSecretStore in all namespaces)
+processClusterExternalSecret: true
+processClusterStore: true
+processClusterPushSecret: true

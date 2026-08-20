@@ -1,0 +1,44 @@
+replicaCount: 1
+
+imagePullSecrets: []
+
+image:
+  repository: example.registry/apps/feed-api
+  tag: latest
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 8400
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+persistence:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 2Gi
+
+# Non-sensitive environment variables
+env:
+  - name: BRIDGE_ENABLED
+    value: "0"
+  - name: BRIDGE_MAX_AGENTS
+    value: "2"
+  - name: BRIDGE_AGENT_TIMEOUT
+    value: "600"
+  - name: BRIDGE_QUEUE_MAX
+    value: "100"
+  - name: BRIDGE_DEDUP_WINDOW
+    value: "60"
+
+# Sensitive data. Stored as a Kubernetes Secret (set per stand in helmfile values).
+secrets: {}
+#  WEBHOOK_URL: "CHANGE_ME"
+#  CALLBACK_URL: "CHANGE_ME"
+#  WEBHOOK_TOKEN: "CHANGE_ME"

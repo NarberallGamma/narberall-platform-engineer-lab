@@ -1,0 +1,21 @@
+apiVersion: v2
+name: elk
+description: Elasticsearch, Kibana, Logstash, and Deckhouse logshipper overlay
+type: application
+version: 0.1.0
+appVersion: "8.12.0"
+
+dependencies:
+  - name: eck-logstash
+    alias: logstash
+    condition: logstash.enabled
+    tags:
+      - elk
+      - logstash
+    repository: "https://helm.elastic.co"
+    version: "0.11.0"
+    export-values:
+      - parent: werf
+        child: werf
+      - parent: werf.image.logstash
+        child: image

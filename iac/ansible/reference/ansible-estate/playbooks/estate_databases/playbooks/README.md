@@ -1,3 +1,7 @@
+# Estate PostgreSQL playbooks (RDS)
+
+English: playbooks in this folder recreate RDS PostgreSQL databases, split Flyway/DDL vs app DML users (`schema_flyway` / `treasury_user`), and grant extra **read-only** and **read-write** accounts across user schemas. Destructive restore is labelled below. Hub: [`../../../`](../../../). Case: [`../../../../../../../case-studies/10-ansible-estate.md`](../../../../../../../case-studies/10-ansible-estate.md).
+
 # Плейбуки управления базами estate (PostgreSQL)
 
 В этой папке плейбуки для работы с RDS PostgreSQL проекта estate: пересоздание баз данных, настройка разделения пользователей (schema_flyway / treasury_user), создание **read-only** учёток и **read-write** учёток (DML и CREATE) во **всех пользовательских схемах** каждой БД.

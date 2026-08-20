@@ -22,4 +22,4 @@
 - Case study: `case-studies/02-cloud-platform-turnkey.md`
 - VCD + one-button host CI: `case-studies/06-vmware-vcd-greenfield.md`, `iac/ci/`
 - Huawei compute catalog (split state): `case-studies/07-huawei-compute-catalog.md`, `iac/terraform/cloud-ru-compute/`
-- Code: `iac/terraform/`, `reference/monitoring-starter/`
+- Code: `iac/terraform/`, `iac/ansible/reference/monitoring-starter/`

@@ -45,7 +45,7 @@ What that class of work actually demands:
 
 B2B and P2P platforms in this era were the same idea: counterparties, ledgers, and SLAs, not a brochure site.
 
-Identity in front of that class of estate is also coded: Access Manager + Identity Gateway (YARP) + Redis + Postgres as Ansible, Docker Swarm first, same roles later for Kubernetes. Public tree: [`../reference/ansible-payments-idplat/`](../reference/ansible-payments-idplat/), [case 08](../case-studies/08-payments-swarm-autodeploy.md).
+Identity in front of that class of estate is also coded: Access Manager + Identity Gateway (YARP) + Redis + Postgres as Ansible, Docker Swarm first, same roles later for Kubernetes. Public tree: [`../iac/ansible/reference/ansible-payments-idplat/`](../iac/ansible/reference/ansible-payments-idplat/), [case 08](../case-studies/08-payments-swarm-autodeploy.md).
 
 ### Blockchain and smart-contract programmes
 
@@ -71,7 +71,7 @@ Loaded **Kubernetes** (prod + preprod): **Helm + Argo CD**, **Vault / ESO**, **K
 
 ### Document AI and enterprise capture
 
-OCR and capture (ContentCapture-class) to structured JSON, then LLM extract, handoff to **1C** / ERP. Private GPU API so finance data does not go into a public chat. Cases 01 and 03 in the lab.
+OCR and capture (ContentCapture-class) to structured JSON, then LLM extract, handoff to **1C** / ERP. Private GPU API so finance data does not go into a public chat. Cases 01 and 03 in the lab. Workstation side (same calendar, **any Unix-like OS**): MCP + async Replicate CLI under [`../practice/workstation/`](../practice/workstation/).
 
 ### Enterprise ITSM / EDO / CRM
 
@@ -222,7 +222,7 @@ That is why hardware/OS depth and Cisco-style incident method in this lab are no
 - Observability / SRE: **Prometheus, Alertmanager, Grafana**, **OpenObserve + OTel Collector**, **Loki**, **ELK / Logstash / Kibana**, **Graylog**, **Jaeger**
 - **CI catalog:** Terraform / guest init → Ansible → Vault → monitoring → docs, plus Java and other builds, publish, Sonar/Trivy/OSV, auto MR, deploy, revoke/cleanup. **Jenkins** (plugins, K8s workers) and **GitLab CI + Argo CD**. Detail: [`../iac/ci/`](../iac/ci/)
 - **Huawei compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport ECS in a root that catalogs sibling Terragrunt network state. Detail: [`../iac/terraform/cloud-ru-compute/`](../iac/terraform/cloud-ru-compute/)
-- **Payments identity Ansible:** Swarm autodeploy of AM / IG / Redis / Postgres, same roles for Kubernetes. Detail: [`../reference/ansible-payments-idplat/`](../reference/ansible-payments-idplat/)
+- **Payments identity Ansible:** Swarm autodeploy of AM / IG / Redis / Postgres, same roles for Kubernetes. Detail: [`../iac/ansible/reference/ansible-payments-idplat/`](../iac/ansible/reference/ansible-payments-idplat/)
 - **Education:** B.Sc. 09.03.02 Information Systems and Technologies, SPbSUT (Bonch-Bruevich); Cisco labs, campus servers/networks; Windows Server practice at IT companies during studies
 
 Cloud, Kubernetes, DBMS, SLA, and security defaults: [root README](../README.md) and [positioning](positioning.md).

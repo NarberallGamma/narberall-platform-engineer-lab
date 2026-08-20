@@ -31,5 +31,6 @@ Linux, Docker, nginx, llama.cpp / GPU, Ansible, optional RAG edge
 
 ## Links
 
-- Reference: [`reference/ai/llm-compose-kit/`](../reference/ai/llm-compose-kit/)
+- Reference: [`practice/home-lab/reference/ai/llm-compose-kit/`](../practice/home-lab/reference/ai/llm-compose-kit/)
 - Home lab GPU story: [`practice/home-lab/ai-lab.md`](../practice/home-lab/ai-lab.md)
+- Workstation MCP + CLI: [`practice/workstation/reference/mcp-replicate/`](../practice/workstation/reference/mcp-replicate/)

@@ -44,7 +44,7 @@ override.tf.json
 *.retry
 .vault_pass
 .vault_pass.txt
-reference/**/artifacts/
+**/reference/**/artifacts/
 
 # Node / site build
 node_modules/

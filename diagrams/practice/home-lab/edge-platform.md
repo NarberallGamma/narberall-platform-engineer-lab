@@ -16,4 +16,4 @@ flowchart TB
 ```
 
 Practice: [`../../../practice/home-lab/edge-platform.md`](../../../practice/home-lab/edge-platform.md).  
-Code: [`../../../reference/ansible-edge/`](../../../reference/ansible-edge/), [`../../../iac/ansible/`](../../../iac/ansible/).
+Code: [`../../../iac/ansible/reference/ansible-edge/`](../../../iac/ansible/reference/ansible-edge/), [`../../../iac/ansible/`](../../../iac/ansible/).

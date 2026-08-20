@@ -12,9 +12,10 @@ practice/home-lab/
   edge-platform.md      # Ansible + Docker: 3X-UI / Xray from zero
   android-ssh.md        # Android + Docker SSH failover client
   pet-projects.md       # Small Linux userspace / forks
+  reference/            # AI compose, SSH clients, snap-pair
 ```
 
-Workstation automation (Cursor, MCP, WSL): [`../workstation/`](../workstation/).
+Workstation automation (MCP, local/API models, SSH/kube/Ansible scripts; **Linux, macOS, or WSL**): [`../workstation/`](../workstation/), code under [`../workstation/reference/`](../workstation/reference/).
 
 ## Map
 
@@ -59,5 +60,5 @@ flowchart TB
 
 Sanitize: no personal LAN IPs, hostnames, VPS addresses, panel URLs, or credentials.
 
-Proof of code lives under [`../../reference/`](../../reference/) (Ansible, SSH clients, AI compose, snap-pair).
+Proof of code lives under [`reference/`](reference/) (AI compose, SSH clients, snap-pair). Ansible kits: [`../../iac/ansible/reference/`](../../iac/ansible/reference/).
 

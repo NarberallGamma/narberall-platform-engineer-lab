@@ -6,7 +6,7 @@
 
 | Existing proof | What it is |
 |----------------|------------|
-| [`../../../reference/ai/llm-compose-kit/`](../../../reference/ai/llm-compose-kit/) | Ollama-class GPU serve (Compose) |
+| [`../../../practice/home-lab/reference/ai/llm-compose-kit/`](../../../practice/home-lab/reference/ai/llm-compose-kit/) | Ollama-class GPU serve (Compose) |
 | [`../../../practice/home-lab/ai-lab.md`](../../../practice/home-lab/ai-lab.md) | Workstation / lab GPU story |
 | [`../../../case-studies/01-ai-llm-platform.md`](../../../case-studies/01-ai-llm-platform.md) | Inference platform case |
 | [`../../../case-studies/03-document-ai-pipeline.md`](../../../case-studies/03-document-ai-pipeline.md) | OCR → JSON → LLM |

@@ -73,11 +73,11 @@ Slim public kits (no dest/SNI values, no panel passwords, no real inventory). Th
 
 | Kit | Path |
 |-----|------|
-| Host baseline | [`../../reference/ansible-bootstrap/`](../../reference/ansible-bootstrap/) |
-| Edge panel role | [`../../reference/ansible-edge/`](../../reference/ansible-edge/) (`roles/xui_docker/`, playbooks `xui_main.yml` / `xui_proxy.yml`) |
-| Host metrics | [`../../reference/monitoring-starter/`](../../reference/monitoring-starter/) |
-| Runner image | [`../../reference/utilities/ansible-runner/`](../../reference/utilities/ansible-runner/) |
-| SSH clients | [`../../reference/apps/ssh-tunnel-android/`](../../reference/apps/ssh-tunnel-android/), [`../../reference/apps/ssh-tunnel-docker/`](../../reference/apps/ssh-tunnel-docker/) |
+| Host baseline | [`../../iac/ansible/reference/ansible-bootstrap/`](../../iac/ansible/reference/ansible-bootstrap/) |
+| Edge panel role | [`../../iac/ansible/reference/ansible-edge/`](../../iac/ansible/reference/ansible-edge/) (`roles/xui_docker/`, playbooks `xui_main.yml` / `xui_proxy.yml`) |
+| Host metrics | [`../../iac/ansible/reference/monitoring-starter/`](../../iac/ansible/reference/monitoring-starter/) |
+| Runner image | [`../../iac/ansible/reference/ansible-runner/`](../../iac/ansible/reference/ansible-runner/) |
+| SSH clients | [`reference/apps/ssh-tunnel-android/`](reference/apps/ssh-tunnel-android/), [`reference/apps/ssh-tunnel-docker/`](reference/apps/ssh-tunnel-docker/) |
 
 IaC map: [`../../iac/ansible/`](../../iac/ansible/).
 

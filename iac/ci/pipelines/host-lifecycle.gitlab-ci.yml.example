@@ -18,7 +18,7 @@ stages:
 
 variables:
   TF_ROOT: iac/terraform/vmware
-  ANSIBLE_PLAYBOOK: reference/ansible-bootstrap/vcd-post-apply.yml.example
+  ANSIBLE_PLAYBOOK: iac/ansible/reference/ansible-bootstrap/vcd-post-apply.yml.example
 
 .tf:
   image: hashicorp/terraform:1.5

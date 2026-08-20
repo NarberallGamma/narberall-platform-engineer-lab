@@ -8,8 +8,8 @@ Prefer SVG/PNG from Excalidraw/draw.io, or Mermaid next to the case / practice p
 |------|-----|
 | [`case-studies/`](case-studies/) | Architecture for published case studies (01-09, including Selectel VPC + dedicated Proxmox) |
 | [`iac/`](iac/) | CI turnkey (Jenkins + GitLab CI, build/publish/revoke) |
-| [`practice/home-lab/`](practice/home-lab/) | Dual-boot, local AI, Ansible edge, Android SSH |
+| [`practice/home-lab/`](practice/home-lab/) | Dual-boot, local AI, Ansible edge, Android SSH (AI-lab mermaid includes Replicate MCP) |
 
-Code those diagrams point at: [`../iac/`](../iac/) (cloud, terraform, ansible, ci), [`../reference/`](../reference/), [`../practice/`](../practice/).
+Code those diagrams point at: [`../iac/`](../iac/) (cloud, terraform, ansible, ci) and [`../practice/`](../practice/) (including each catalog `reference/`).
 
 No real IPs or client hostnames in labels.

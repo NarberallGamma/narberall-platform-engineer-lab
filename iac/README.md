@@ -12,7 +12,7 @@ This is a curated, sanitized lab. Full client and employer trees stay private (a
 iac/
   cloud/        # Experience by platform. Keywords, scope, links into code.
   terraform/    # Code. One folder per cloud, plus shared modules and examples.
-  ansible/      # Day-2 Linux / edge: map into reference/ansible-*
+  ansible/      # Day-2 Linux / edge + reference/ kits (same habit as terraform/)
   ci/           # CI catalog: turnkey map + sanitized pipelines/
 ```
 
@@ -32,7 +32,7 @@ flowchart TB
     CI[ci/]
   end
   Cloud -->|cross-links| TF
-  ANS -->|cross-links| RefAns[reference/ansible-edge]
+  ANS -->|code| RefAns[ansible/reference]
   CI -->|cross-links| TF
   CI -->|cross-links| ANS
   TF --> AWS[aws/root + aws/accounts + aws/live]

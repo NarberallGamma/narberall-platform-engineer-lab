@@ -1,0 +1,60 @@
+{
+  "version": "1",
+  "allowed_roots": [
+    "${HOME}/scripts",
+    "${HOME}/git"
+  ],
+  "categories": {
+    "ssh": [
+      "utility/mcp_ssh_env.sh",
+      "utility/fix-ssh-config-paths.sh",
+      "utility/ssh/tools/ssh_probe_aliases.sh",
+      "utility/ssh/tools/ssh_verify_aliases.sh",
+      "utility/ssh/tools/ssh_deploy_admin.sh"
+    ],
+    "kube": [
+      "k8s/kube-switch.sh",
+      "k8s/kube-logs.sh",
+      "utility/k8s/argocd_deploy_verify.sh"
+    ],
+    "ansible": [
+      "utility/ansible/ansible_agent_run.sh"
+    ],
+    "git": [
+      "utility/git/tools/list_dirty_repos.sh",
+      "utility/git/tools/normalize_worktree_before_dirty_check.sh",
+      "utility/git/tools/diagnose_shadow_diff.sh",
+      "utility/git/tools/restore_shadow_changes.sh",
+      "utility/git/git_commit_push.sh",
+      "utility/git/tools/verify_push_status.sh"
+    ],
+    "itsm": [
+      "utility/servicedesk/sd_search.sh",
+      "utility/servicedesk/sd_my_open.sh",
+      "utility/servicedesk/sd_issue.sh",
+      "utility/servicedesk/sd_comment.sh",
+      "utility/servicedesk/sd_create.sh",
+      "utility/servicedesk/sd_transition.sh",
+      "utility/servicedesk/sd_assign.sh",
+      "utility/servicedesk/sd_attach.sh"
+    ],
+    "wiki": [
+      "utility/confluence/cf_search.sh",
+      "utility/confluence/cf_space.sh",
+      "utility/confluence/cf_page.sh",
+      "utility/confluence/cf_page_create.sh",
+      "utility/confluence/cf_page_update.sh",
+      "utility/confluence/cf_page_delete.sh",
+      "utility/confluence/cf_verify.sh"
+    ],
+    "secrets": [
+      "utility/list_secrets_env.sh"
+    ],
+    "certs": [
+      "utility/certs/check_acme_txt.sh"
+    ],
+    "index": [
+      "utility/cursorindexingignore.common"
+    ]
+  }
+}

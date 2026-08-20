@@ -30,7 +30,7 @@ One container: six `ssh -N -L` processes + nginx **stream** balancer. Host publi
 
 This is the same reliability pattern as the Ansible `ssh_tunnel` role on the jump (restricted users, `permitopen`, socat). Client and server were designed together.
 
-Proof of code: [`../../reference/apps/ssh-tunnel-android/`](../../reference/apps/ssh-tunnel-android/), [`../../reference/apps/ssh-tunnel-docker/`](../../reference/apps/ssh-tunnel-docker/). Jump socat: [`../../reference/ansible-edge/`](../../reference/ansible-edge/).
+Proof of code: [`reference/apps/ssh-tunnel-android/`](reference/apps/ssh-tunnel-android/), [`reference/apps/ssh-tunnel-docker/`](reference/apps/ssh-tunnel-docker/). Jump socat: [`../../iac/ansible/reference/ansible-edge/`](../../iac/ansible/reference/ansible-edge/).
 
 ## Diagram
 

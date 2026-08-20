@@ -1,0 +1,817 @@
+#!/usr/bin/env python3
+"""Replicate image CLI — create + poll, live progress, SOCKS CDN, curl uploads."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import mimetypes
+import os
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import threading
+import time
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date, datetime
+from pathlib import Path
+
+import replicate
+from replicate.exceptions import ReplicateError
+
+os.environ.setdefault("PYTHONUNBUFFERED", "1")
+try:
+    sys.stderr.reconfigure(line_buffering=True)
+    sys.stdout.reconfigure(line_buffering=True)
+except (AttributeError, OSError):
+    pass
+
+DEFAULT_MODELS = {
+    "flux-kontext-pro": "black-forest-labs/flux-kontext-pro",
+    "flux-2-pro": "black-forest-labs/flux-2-pro",
+    "flux-schnell": "black-forest-labs/flux-schnell",
+    "nano-banana-2": "google/nano-banana-2",
+    "nano-banana-pro": "google/nano-banana-pro",
+    "gpt-image-2": "openai/gpt-image-2",
+}
+
+FORMAT_EXT = {"png": ".png", "jpg": ".jpg", "jpeg": ".jpg", "webp": ".webp"}
+GPT_QUALITY = frozenset({"low", "medium", "high"})
+TERMINAL = frozenset({"succeeded", "failed", "canceled"})
+POLL_INTERVAL_SEC = 2
+MAX_WAIT_SEC = 30 * 60
+CONNECT_TIMEOUT = 15
+READ_TIMEOUT = 600
+UPLOAD_TIMEOUT = 90
+CDN_STALL_SEC = 45
+MIN_DOWNLOAD_BYTES = 8 * 1024
+DEFAULT_SOCKS_HOST = "127.0.0.1"
+DEFAULT_SOCKS_PORT = 10808
+
+
+_PRINT_LOCK = threading.Lock()
+
+
+class Progress:
+    def __init__(self, enabled: bool, prefix: str = "") -> None:
+        self.enabled = enabled
+        self.prefix = f"[{prefix}] " if prefix else ""
+        self.phases: dict[str, float] = {}
+        self._phase_start = time.monotonic()
+        self._current = "init"
+
+    def phase(self, name: str) -> None:
+        now = time.monotonic()
+        if self._current != "init":
+            self.phases[self._current] = now - self._phase_start
+        self._current = name
+        self._phase_start = now
+        if self.enabled:
+            with _PRINT_LOCK:
+                print(f"\n== {self.prefix}{name.upper()} ==", file=sys.stderr, flush=True)
+
+    def info(self, msg: str) -> None:
+        if self.enabled:
+            with _PRINT_LOCK:
+                print(f"  {self.prefix}{msg}", file=sys.stderr, flush=True)
+
+    def finish(self) -> dict[str, float]:
+        now = time.monotonic()
+        self.phases[self._current] = now - self._phase_start
+        return self.phases
+
+    def summary(self, saved: Path) -> None:
+        if not self.enabled:
+            return
+        total = sum(self.phases.values())
+        print("\n== SUMMARY ==", file=sys.stderr, flush=True)
+        for name, sec in self.phases.items():
+            print(f"  {name:10s} {sec:6.1f}s", file=sys.stderr, flush=True)
+        print(f"  {'total':10s} {total:6.1f}s", file=sys.stderr, flush=True)
+        print(f"  saved: {saved}", file=sys.stderr, flush=True)
+
+
+def load_token() -> str:
+    cred = Path.home() / ".config" / "replicate" / "credentials.env"
+    if not cred.is_file():
+        sys.exit(f"Missing credentials: {cred}")
+    for line in cred.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line.startswith("REPLICATE_API_TOKEN="):
+            return line.split("=", 1)[1].strip()
+    sys.exit(f"REPLICATE_API_TOKEN not found in {cred}")
+
+
+def client() -> replicate.Client:
+    token = load_token()
+    os.environ["REPLICATE_API_TOKEN"] = token
+    return replicate.Client(api_token=token, timeout=180.0)
+
+
+def socks_url(explicit: str | None, disabled: bool) -> str | None:
+    if disabled:
+        return None
+    if explicit:
+        return explicit
+    env = os.environ.get("REPLICATE_SOCKS", "").strip()
+    if env:
+        return env
+    sock = socket.socket()
+    sock.settimeout(0.25)
+    try:
+        sock.connect((DEFAULT_SOCKS_HOST, DEFAULT_SOCKS_PORT))
+        return f"socks5h://{DEFAULT_SOCKS_HOST}:{DEFAULT_SOCKS_PORT}"
+    except OSError:
+        return None
+    finally:
+        sock.close()
+
+
+def resolve_output_dir(custom: str | None) -> Path:
+    out = Path(custom).expanduser() if custom else Path("/tmp") / date.today().isoformat()
+    out.mkdir(parents=True, exist_ok=True)
+    return out
+
+
+def slugify(text: str) -> str:
+    text = re.sub(r"[^a-z0-9]+", "-", text.lower())
+    return text.strip("-")[:60] or "image"
+
+
+def fmt_bytes(n: int) -> str:
+    if n < 1024:
+        return f"{n} B"
+    if n < 1024 * 1024:
+        return f"{n / 1024:.1f} KB"
+    return f"{n / (1024 * 1024):.2f} MB"
+
+
+def fmt_speed(bps: float) -> str:
+    if bps < 1024:
+        return f"{bps:.0f} B/s"
+    if bps < 1024 * 1024:
+        return f"{bps / 1024:.1f} KB/s"
+    return f"{bps / (1024 * 1024):.1f} MB/s"
+
+
+def collect_outputs(output) -> list:
+    items: list = []
+    if output is None:
+        return items
+    if isinstance(output, list):
+        for x in output:
+            items.extend(collect_outputs(x))
+    else:
+        items.append(output)
+    return items
+
+
+def output_to_url(item) -> str | None:
+    if isinstance(item, str) and item.startswith("http"):
+        return item
+    url = getattr(item, "url", None)
+    if url:
+        return str(url)
+    if isinstance(item, dict):
+        for key in ("url", "image"):
+            if key in item and isinstance(item[key], str):
+                return item[key]
+    return None
+
+
+def curl_base(proxy: str | None, noproxy: bool) -> list[str]:
+    cmd = ["curl", "-fSL", "--connect-timeout", str(CONNECT_TIMEOUT)]
+    if noproxy:
+        cmd.extend(["--noproxy", "*"])
+    elif proxy:
+        cmd.extend(["-x", proxy])
+    return cmd
+
+
+def upload_via_curl(path: Path, token: str, proxy: str | None, prog: Progress) -> str:
+    mime, _ = mimetypes.guess_type(str(path))
+    mime = mime or "application/octet-stream"
+    attempts: list[tuple[str, str | None, bool]] = []
+    if proxy:
+        attempts.append(("socks", proxy, False))
+    attempts.append(("direct", None, True))
+    last_err = ""
+    for label, px, noproxy in attempts:
+        prog.info(f"upload {path.name} via curl/{label} ({fmt_bytes(path.stat().st_size)})")
+        cmd = curl_base(px, noproxy) + [
+            "--max-time",
+            str(UPLOAD_TIMEOUT),
+            "-H",
+            f"Authorization: Bearer {token}",
+            "-F",
+            f"content=@{path};type={mime};filename={path.name}",
+            "-F",
+            f"filename={path.name}",
+            "https://api.replicate.com/v1/files",
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            last_err = (proc.stderr or proc.stdout or f"exit {proc.returncode}").strip()
+            prog.info(f"  {label} failed: {last_err[:180]}")
+            continue
+        try:
+            data = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            last_err = proc.stdout[:200]
+            continue
+        ref = (data.get("urls") or {}).get("get") or data.get("url")
+        if not ref:
+            last_err = str(data)[:200]
+            continue
+        prog.info(f"  -> {ref}")
+        return str(ref)
+    raise RuntimeError(f"files API upload failed for {path.name}: {last_err}")
+
+
+def upload_refs(paths: list[Path], token: str, proxy: str | None, prog: Progress) -> list[str]:
+    refs: list[str] = []
+    for i, path in enumerate(paths, 1):
+        if not path.is_file():
+            sys.exit(f"ref not found: {path}")
+        prog.info(f"ref {i}/{len(paths)}: {path}")
+        refs.append(upload_via_curl(path, token, proxy, prog))
+    return refs
+
+
+def build_input(
+    model: str,
+    prompt: str,
+    refs: list[str],
+    output_format: str,
+    output_quality: int | None,
+    aspect_ratio: str | None,
+    model_quality: str | None,
+    extra: dict,
+) -> dict:
+    inp: dict = {"prompt": prompt}
+    fmt = output_format.lower()
+    if fmt in FORMAT_EXT:
+        inp["output_format"] = "jpg" if fmt == "jpeg" else fmt
+    if aspect_ratio:
+        inp["aspect_ratio"] = aspect_ratio
+    if "gpt-image" in model:
+        inp["quality"] = model_quality or "high"
+        if refs:
+            inp["input_images"] = refs
+    else:
+        if output_quality is not None and fmt in ("webp", "jpg", "jpeg"):
+            inp["output_quality"] = output_quality
+        if refs:
+            if "flux-kontext" in model or "flux-2" in model:
+                inp["input_image" if len(refs) == 1 else "image_input"] = (
+                    refs[0] if len(refs) == 1 else refs
+                )
+            elif "nano-banana" in model:
+                inp["image_input"] = refs
+            else:
+                inp["image"] = refs[0] if len(refs) == 1 else refs
+    inp.update(extra)
+    return inp
+
+
+def poll_prediction(prediction, prog: Progress) -> replicate.Prediction:
+    started = time.monotonic()
+    last_status = None
+    last_log_len = 0
+    last_heartbeat = 0.0
+
+    while prediction.status not in TERMINAL:
+        elapsed = time.monotonic() - started
+        if elapsed > MAX_WAIT_SEC:
+            sys.exit(f"Timeout after {MAX_WAIT_SEC:.0f}s (prediction {prediction.id})")
+
+        logs = prediction.logs or ""
+        if len(logs) > last_log_len:
+            chunk = logs[last_log_len:].rstrip()
+            if chunk:
+                for line in chunk.splitlines():
+                    prog.info(f"log: {line}")
+            last_log_len = len(logs)
+
+        if prediction.status != last_status:
+            prog.info(f"t+{elapsed:5.1f}s  status={prediction.status}")
+            last_status = prediction.status
+            last_heartbeat = time.monotonic()
+        elif time.monotonic() - last_heartbeat >= 10:
+            prog.info(f"t+{elapsed:5.1f}s  still {prediction.status}...")
+            last_heartbeat = time.monotonic()
+
+        time.sleep(POLL_INTERVAL_SEC)
+        try:
+            prediction.reload()
+        except Exception as exc:  # noqa: BLE001
+            prog.info(f"t+{elapsed:5.1f}s  poll retry after {exc}")
+            continue
+
+    if prediction.status == "failed":
+        sys.exit(f"Prediction failed: {prediction.error}")
+    if prediction.status == "canceled":
+        sys.exit(f"Prediction canceled: {prediction.id}")
+
+    logs = prediction.logs or ""
+    if len(logs) > last_log_len:
+        for line in logs[last_log_len:].splitlines():
+            if line.strip():
+                prog.info(f"log: {line}")
+    prog.info(f"done in {time.monotonic() - started:.1f}s  metrics={prediction.metrics}")
+    return prediction
+
+
+def download_curl(
+    url: str,
+    dest: Path,
+    prog: Progress,
+    proxy: str | None,
+    noproxy: bool,
+) -> None:
+    if not shutil.which("curl"):
+        raise RuntimeError("curl not found")
+
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    if tmp.exists():
+        tmp.unlink()
+
+    via = "noproxy" if noproxy else (f"socks {proxy}" if proxy else "system")
+    prog.info(f"cdn: replicate.delivery via {via}")
+    prog.info(f"url: {url[:88]}...")
+
+    cmd = curl_base(proxy, noproxy) + [
+        "--max-time",
+        str(READ_TIMEOUT),
+        "--retry",
+        "3",
+        "--retry-delay",
+        "2",
+        "--retry-all-errors",
+        "-o",
+        str(tmp),
+        "-w",
+        "curl_meta size=%{size_download} speed=%{speed_download} time=%{time_total}\\n",
+        url,
+    ]
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    t0 = time.monotonic()
+    last_size = -1
+    last_change = t0
+    last_print = 0.0
+
+    while proc.poll() is None:
+        now = time.monotonic()
+        size = tmp.stat().st_size if tmp.exists() else 0
+        if size != last_size:
+            last_size = size
+            last_change = now
+        elif size == 0 and now - t0 > CDN_STALL_SEC:
+            proc.kill()
+            raise TimeoutError(f"no bytes in {CDN_STALL_SEC}s from CDN ({via})")
+        elif size > 0 and now - last_change > CDN_STALL_SEC:
+            proc.kill()
+            raise TimeoutError(f"CDN stalled at {fmt_bytes(size)} for {CDN_STALL_SEC}s")
+
+        if now - last_print >= 0.5:
+            elapsed = max(now - t0, 0.001)
+            speed = size / elapsed if size else 0.0
+            prog.info(f"  {fmt_bytes(size)} @ {fmt_speed(speed)}")
+            last_print = now
+        time.sleep(0.25)
+
+    stdout, stderr = proc.communicate(timeout=5)
+    curl_tail = (stdout or "").strip()
+    if proc.returncode != 0:
+        raise RuntimeError(f"curl exit {proc.returncode}: {(stderr or curl_tail).strip()}")
+
+    size = tmp.stat().st_size if tmp.exists() else 0
+    if size < MIN_DOWNLOAD_BYTES:
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError(f"download too small ({size} B) via {via}")
+
+    tmp.replace(dest)
+    if curl_tail:
+        prog.info(f"  {curl_tail}")
+    prog.info(f"  saved {fmt_bytes(dest.stat().st_size)} -> {dest.name}")
+
+
+def download_urllib(url: str, dest: Path, prog: Progress) -> None:
+    prog.info("fallback: urllib stream")
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    req = urllib.request.Request(url, headers={"User-Agent": "replicate-img-cli/4.0"})
+    with urllib.request.urlopen(req, timeout=READ_TIMEOUT) as resp, tmp.open("wb") as out:
+        while True:
+            chunk = resp.read(256 * 1024)
+            if not chunk:
+                break
+            out.write(chunk)
+    if tmp.stat().st_size < MIN_DOWNLOAD_BYTES:
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError(f"urllib download too small ({tmp.stat().st_size if tmp.exists() else 0} B)")
+    tmp.replace(dest)
+    prog.info(f"  saved {fmt_bytes(dest.stat().st_size)}")
+
+
+def save_output(url: str, dest: Path, prog: Progress, proxy: str | None) -> None:
+    errors: list[str] = []
+    if proxy:
+        try:
+            download_curl(url, dest, prog, proxy, noproxy=False)
+            return
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"socks: {exc}")
+            prog.info(f"socks download failed: {exc}")
+    try:
+        download_curl(url, dest, prog, proxy=None, noproxy=True)
+        return
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"noproxy: {exc}")
+        prog.info(f"noproxy download failed: {exc}")
+    try:
+        download_urllib(url, dest, prog)
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"urllib: {exc}")
+        sys.exit("download failed: " + " | ".join(errors))
+
+
+def copy_to_dirs(src: Path, extra: list[Path], prog: Progress) -> list[Path]:
+    copied = [src]
+    for dest_dir in extra:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / src.name
+        shutil.copy2(src, dest)
+        prog.info(f"copy -> {dest}")
+        copied.append(dest)
+    return copied
+
+
+def parse_set_args(items: list[str]) -> dict:
+    extra: dict = {}
+    for raw in items:
+        if "=" not in raw:
+            sys.exit(f"--set needs KEY=VALUE, got {raw!r}")
+        key, value = raw.split("=", 1)
+        try:
+            extra[key] = json.loads(value)
+        except json.JSONDecodeError:
+            extra[key] = value
+    return extra
+
+
+def read_prompt(prompt: str | None, prompt_file: str | None) -> str:
+    if prompt and prompt_file:
+        sys.exit("use either --prompt or --prompt-file, not both")
+    if prompt_file:
+        path = Path(prompt_file).expanduser()
+        if prompt_file == "-":
+            return sys.stdin.read()
+        if not path.is_file():
+            sys.exit(f"prompt file not found: {path}")
+        return path.read_text(encoding="utf-8")
+    return prompt or ""
+
+
+def default_format(model: str, explicit: str | None) -> str:
+    if explicit:
+        return explicit
+    if "gpt-image" in model:
+        return "webp"
+    return "png"
+
+
+def dest_name(model_path: str, prediction_id: str, name: str | None, ext: str, index: int, total: int) -> str:
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    slug = slugify(model_path.replace("/", "-"))
+    parts = [slug, stamp]
+    if name:
+        parts.append(slugify(name))
+    else:
+        parts.append(prediction_id[:8])
+    if total > 1:
+        parts.append(str(index + 1))
+    return "-".join(parts) + ext
+
+
+def write_meta(path: Path, payload: dict) -> None:
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8")
+
+
+def save_prediction_outputs(
+    prediction,
+    model_path: str,
+    prompt: str,
+    fmt: str,
+    output_dir: Path,
+    copy_dirs: list[Path],
+    name: str | None,
+    proxy: str | None,
+    prog: Progress,
+    extra_meta: dict | None = None,
+) -> Path:
+    outputs = collect_outputs(prediction.output)
+    if not outputs:
+        meta = output_dir / f"{slugify(model_path)}-output.json"
+        write_meta(meta, prediction.dict() if hasattr(prediction, "dict") else {"id": prediction.id})
+        sys.exit(f"No output; saved {meta}")
+
+    prog.phase("download")
+    saved: list[Path] = []
+    ext = FORMAT_EXT.get(fmt, Path(output_to_url(outputs[0]) or "x.webp").suffix or ".webp")
+    for i, item in enumerate(outputs):
+        url = output_to_url(item)
+        if not url:
+            continue
+        dest = output_dir / dest_name(model_path, prediction.id, name, ext, i, len(outputs))
+        prog.info(f"file {i + 1}/{len(outputs)} -> {dest.name}")
+        save_output(url, dest, prog, proxy)
+        saved.extend(copy_to_dirs(dest, copy_dirs, prog))
+
+    if not saved:
+        sys.exit("No downloadable URLs in output")
+
+    primary = saved[0]
+    meta_payload = {
+        "model": model_path,
+        "prompt": prompt,
+        "output_format": fmt,
+        "prediction_id": prediction.id,
+        "metrics": prediction.metrics,
+        "files": [str(p) for p in saved],
+        "phases_sec": prog.finish(),
+    }
+    if extra_meta:
+        meta_payload.update(extra_meta)
+    meta = output_dir / f"{primary.stem}-meta.json"
+    write_meta(meta, meta_payload)
+    for dest_dir in copy_dirs:
+        shutil.copy2(meta, dest_dir / meta.name)
+    prog.summary(primary)
+    return primary
+
+
+def job_to_args(base: argparse.Namespace, job: dict) -> argparse.Namespace:
+    ns = argparse.Namespace(**vars(base))
+    ns.jobs = None
+    ns.prompt = job.get("prompt")
+    ns.prompt_file = job.get("prompt_file")
+    ns.model = job.get("model", base.model)
+    ns.image = list(job.get("image") or [])
+    ns.output_dir = job.get("output_dir", base.output_dir)
+    ns.copy_to = list(job.get("copy_to") or base.copy_to or [])
+    ns.name = job.get("name")
+    ns.format = job.get("format", base.format)
+    ns.quality = job.get("quality", base.quality)
+    ns.output_quality = job.get("output_quality", base.output_quality)
+    ns.aspect_ratio = job.get("aspect_ratio", base.aspect_ratio)
+    ns.set = list(job.get("set") or [])
+    ns.input_json = job.get("input_json")
+    ns.job_prefix = job.get("name") or job.get("id") or "job"
+    if ns.quality not in GPT_QUALITY and str(ns.quality).isdigit():
+        ns.output_quality = int(ns.quality)
+        ns.quality = "high"
+    return ns
+
+
+def run_one_job(ns: argparse.Namespace) -> tuple[str, str]:
+    path = run_generate(ns)
+    return ns.job_prefix, str(path)
+
+
+def run_jobs_file(args: argparse.Namespace) -> None:
+    path = Path(args.jobs).expanduser()
+    if not path.is_file():
+        sys.exit(f"jobs file not found: {path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    jobs = data.get("jobs", data if isinstance(data, list) else None)
+    if not jobs:
+        sys.exit("jobs JSON needs a non-empty 'jobs' array")
+    workers = args.workers or len(jobs)
+    workers = max(1, min(workers, 8, len(jobs)))
+    print(f"== JOBS == {len(jobs)} job(s), {workers} worker(s)", file=sys.stderr, flush=True)
+    results: list[str] = []
+    errors: list[str] = []
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futs = {pool.submit(run_one_job, job_to_args(args, job)): job for job in jobs}
+        for fut in as_completed(futs):
+            job = futs[fut]
+            tag = job.get("name") or "job"
+            try:
+                name, saved = fut.result()
+                print(f"OK {name}: {saved}", flush=True)
+                results.append(saved)
+            except Exception as exc:  # noqa: BLE001
+                print(f"FAIL {tag}: {exc}", file=sys.stderr, flush=True)
+                errors.append(f"{tag}: {exc}")
+    if errors:
+        sys.exit("jobs failed: " + " | ".join(errors))
+    if not results:
+        sys.exit("no job produced output")
+
+
+def run_generate(args: argparse.Namespace) -> Path:
+    prompt = read_prompt(args.prompt, args.prompt_file)
+    if not prompt.strip():
+        sys.exit("empty prompt")
+
+    prog = Progress(not args.quiet, prefix=getattr(args, "job_prefix", "") or "")
+    token = load_token()
+    proxy = socks_url(args.socks, args.no_socks)
+    cli = client()
+    model_path = DEFAULT_MODELS.get(args.model, args.model)
+    fmt = default_format(model_path, args.format)
+    paths = [Path(p).expanduser() for p in args.image]
+    extra = parse_set_args(args.set)
+    if args.input_json:
+        extra.update(json.loads(Path(args.input_json).expanduser().read_text(encoding="utf-8")))
+
+    output_dir = resolve_output_dir(args.output_dir)
+    copy_dirs = [Path(p).expanduser() for p in args.copy_to]
+
+    prog.phase("setup")
+    prog.info(f"model: {model_path}")
+    prog.info(f"format: {fmt}")
+    prog.info(f"output: {output_dir}")
+    if proxy:
+        prog.info(f"socks: {proxy}")
+    else:
+        prog.info("socks: none (CDN may save 0 bytes without TUN or 127.0.0.1:10808)")
+    if paths:
+        prog.info(f"refs: {len(paths)}")
+
+    refs: list[str] = []
+    if paths:
+        prog.phase("upload")
+        refs = upload_refs(paths, token, proxy, prog)
+
+    prog.phase("create")
+    model_input = build_input(
+        model_path,
+        prompt,
+        refs,
+        fmt,
+        args.output_quality,
+        args.aspect_ratio,
+        args.quality if args.quality in GPT_QUALITY else None,
+        extra,
+    )
+    try:
+        prediction = cli.predictions.create(model=model_path, input=model_input, wait=False)
+    except ReplicateError as exc:
+        sys.exit(f"Replicate API error: {exc}")
+
+    prog.info(f"id: {prediction.id}")
+    prog.info(f"web: https://replicate.com/p/{prediction.id}")
+
+    prog.phase("poll")
+    prediction = poll_prediction(prediction, prog)
+    return save_prediction_outputs(
+        prediction,
+        model_path,
+        prompt,
+        fmt,
+        output_dir,
+        copy_dirs,
+        args.name,
+        proxy,
+        prog,
+        extra_meta={"input_images": refs},
+    )
+
+
+def run_upload_only(args: argparse.Namespace) -> None:
+    prog = Progress(not args.quiet, prefix=getattr(args, "job_prefix", "") or "")
+    token = load_token()
+    proxy = socks_url(args.socks, args.no_socks)
+    paths = [Path(p).expanduser() for p in args.image]
+    if not paths:
+        sys.exit("--upload-only needs at least one --image")
+    prog.phase("upload")
+    if proxy:
+        prog.info(f"socks: {proxy}")
+    refs = upload_refs(paths, token, proxy, prog)
+    for ref in refs:
+        print(ref, flush=True)
+
+
+def run_poll(args: argparse.Namespace) -> Path:
+    if not getattr(args, "job_prefix", None):
+        args.job_prefix = args.name or args.poll or ""
+    prog = Progress(not args.quiet, prefix=getattr(args, "job_prefix", "") or "")
+    proxy = socks_url(args.socks, args.no_socks)
+    cli = client()
+    prog.phase("poll")
+    prog.info(f"id: {args.poll}")
+    if proxy:
+        prog.info(f"socks: {proxy}")
+    prediction = cli.predictions.get(args.poll)
+    prediction = poll_prediction(prediction, prog)
+    model_path = prediction.model or args.model
+    fmt = default_format(str(model_path), args.format)
+    prompt = ""
+    if isinstance(prediction.input, dict):
+        prompt = str(prediction.input.get("prompt") or "")
+    return save_prediction_outputs(
+        prediction,
+        str(model_path),
+        prompt,
+        fmt,
+        resolve_output_dir(args.output_dir),
+        [Path(p).expanduser() for p in args.copy_to],
+        args.name,
+        proxy,
+        prog,
+    )
+
+
+def run_download_url(args: argparse.Namespace) -> Path:
+    prog = Progress(not args.quiet, prefix=getattr(args, "job_prefix", "") or "")
+    proxy = socks_url(args.socks, args.no_socks)
+    output_dir = resolve_output_dir(args.output_dir)
+    url = args.download_url
+    ext = Path(url.split("?", 1)[0]).suffix or ".webp"
+    dest = output_dir / dest_name("download", "manual00", args.name, ext, 0, 1)
+    prog.phase("download")
+    save_output(url, dest, prog, proxy)
+    copy_to_dirs(dest, [Path(p).expanduser() for p in args.copy_to], prog)
+    prog.summary(dest)
+    return dest
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Replicate image generation: any prompt, any refs, live progress, SOCKS CDN"
+    )
+    parser.add_argument("--model", default="gpt-image-2")
+    parser.add_argument("--prompt", help="generation prompt")
+    parser.add_argument("--prompt-file", help="read prompt from file, or - for stdin")
+    parser.add_argument("--output-dir", help="primary output dir (default /tmp/YYYY-MM-DD)")
+    parser.add_argument(
+        "--copy-to",
+        action="append",
+        default=[],
+        help="also copy each saved file + meta here (repeatable)",
+    )
+    parser.add_argument("--image", action="append", default=[], help="local ref image (repeatable)")
+    parser.add_argument("--name", help="filename tag, e.g. c06-merge")
+    parser.add_argument("--format", choices=sorted(FORMAT_EXT), help="png/jpg/webp; gpt defaults to webp")
+    parser.add_argument(
+        "--quality",
+        default="high",
+        help="gpt-image-2: low|medium|high; numeric value is treated as --output-quality",
+    )
+    parser.add_argument("--output-quality", type=int, default=90, help="webp/jpg compression 1-100")
+    parser.add_argument("--aspect-ratio", default="16:9", help="e.g. 3:2, 16:9")
+    parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="extra model input")
+    parser.add_argument("--input-json", help="JSON object merged into model input")
+    parser.add_argument("--socks", help="override proxy, default socks5h://127.0.0.1:10808 if open")
+    parser.add_argument("--no-socks", action="store_true", help="do not use SOCKS even if 10808 is open")
+    parser.add_argument("--upload-only", action="store_true", help="upload --image refs, print file URLs")
+    parser.add_argument("--poll", metavar="ID", help="poll + download an existing prediction")
+    parser.add_argument("--download-url", help="download one CDN URL with SOCKS/progress")
+    parser.add_argument(
+        "--jobs",
+        help="JSON file with a jobs array; run them in parallel (see --workers)",
+    )
+    parser.add_argument("--workers", type=int, default=0, help="parallel workers for --jobs (0 = one per job, max 8)")
+    parser.add_argument("--list-models", action="store_true")
+    parser.add_argument("-q", "--quiet", action="store_true")
+    args = parser.parse_args()
+
+    if args.quality and args.quality not in GPT_QUALITY:
+        if args.quality.isdigit():
+            args.output_quality = int(args.quality)
+            args.quality = "high"
+        else:
+            sys.exit("--quality must be low|medium|high or an integer output-quality")
+
+    if args.list_models:
+        for alias, full in DEFAULT_MODELS.items():
+            print(f"{alias}\t{full}")
+        return
+
+    if args.jobs:
+        run_jobs_file(args)
+        return
+    if args.upload_only:
+        run_upload_only(args)
+        return
+    if args.download_url:
+        print(str(run_download_url(args)))
+        return
+    if args.poll:
+        print(str(run_poll(args)))
+        return
+
+    if not args.prompt and not args.prompt_file:
+        sys.exit("need --prompt or --prompt-file (no hidden default prompt)")
+
+    print(str(run_generate(args)))
+
+
+if __name__ == "__main__":
+    main()

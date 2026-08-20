@@ -175,7 +175,7 @@ A new **server** is the obvious button. Stages can run alone or as one pipeline.
 
 Published example: [`pipelines/host-lifecycle.gitlab-ci.yml.example`](pipelines/host-lifecycle.gitlab-ci.yml.example).  
 Terraform proof (VCD greenfield): [`../terraform/vmware/`](../terraform/vmware/).  
-Ansible post-apply hook: [`../../reference/ansible-bootstrap/vcd-post-apply.yml.example`](../../reference/ansible-bootstrap/vcd-post-apply.yml.example).  
+Ansible post-apply hook: [`../ansible/reference/ansible-bootstrap/vcd-post-apply.yml.example`](../ansible/reference/ansible-bootstrap/vcd-post-apply.yml.example).  
 Ansible map: [`../ansible/`](../ansible/).
 
 ### What those host stages do

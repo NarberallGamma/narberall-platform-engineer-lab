@@ -11,12 +11,16 @@ Terraform slices are done (AWS multi-account, Huawei-class, VK / NOVA-class, VCD
 Ansible already on GitHub (keep as-is, add later):
 
 - [`iac/ansible/README.md`](iac/ansible/README.md)
-- [`reference/ansible-bootstrap/`](reference/ansible-bootstrap/)
-- [`reference/ansible-edge/`](reference/ansible-edge/)
-- [`reference/ansible-payments-idplat/`](reference/ansible-payments-idplat/)
-- [`reference/monitoring-starter/`](reference/monitoring-starter/)
-- [`reference/utilities/ansible-runner/`](reference/utilities/ansible-runner/)
+- [`iac/ansible/reference/ansible-bootstrap/`](iac/ansible/reference/ansible-bootstrap/)
+- [`iac/ansible/reference/ansible-edge/`](iac/ansible/reference/ansible-edge/)
+- [`iac/ansible/reference/ansible-payments-idplat/`](iac/ansible/reference/ansible-payments-idplat/)
+- [`iac/ansible/reference/monitoring-starter/`](iac/ansible/reference/monitoring-starter/)
+- [`iac/ansible/reference/ansible-runner/`](iac/ansible/reference/ansible-runner/)
 - [case 08](case-studies/08-payments-swarm-autodeploy.md)
+
+Repo-root `reference/` is gone. Kits live under each catalog (`iac/ansible/reference/`, `practice/home-lab/reference/`, `practice/workstation/reference/`).
+
+Workstation MCP/scripts pass is in: [`practice/workstation/reference/`](practice/workstation/reference/) (`mcp-replicate/`, `mcp-agent/`, `scripts/`). Next is still Ansible thicken.
 
 ## Next: thicken Ansible (same habit as Terraform)
 

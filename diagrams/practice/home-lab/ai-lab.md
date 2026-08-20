@@ -13,4 +13,4 @@ flowchart LR
 ```
 
 Practice: [`../../../practice/home-lab/ai-lab.md`](../../../practice/home-lab/ai-lab.md).  
-Code: [`../../../reference/ai/`](../../../reference/ai/).
+Code: [`../../../practice/home-lab/reference/ai/`](../../../practice/home-lab/reference/ai/), [`../../../practice/workstation/reference/mcp-replicate/`](../../../practice/workstation/reference/mcp-replicate/).

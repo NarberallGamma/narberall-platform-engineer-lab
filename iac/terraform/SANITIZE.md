@@ -15,4 +15,5 @@ This lab publishes **curated slices**, not full production Terraform trees (secu
 - Selectel: no account IDs, IAM tokens, live project UUIDs, HV FQDNs, or real WAN CIDRs. Public product hostnames (`cloud.api.selcloud.ru`, `s3.ru-1.storage.selcloud.ru`) and volume type names are allowed. Dedicated guests use `pve-sel-0N` and `10.20.22.0/24`
 - Huawei compute catalog: fake UUIDs, documentation CIDRs (`10.10.x.x`), generic hostnames (`gitlab-dev-01`, `vault-prod-01`). No client project names, no live OBS bucket names, no AK/SK
 - Cloudflare: documentation IPs only (`203.0.113.0/24`, `198.51.100.0/24`). No live zone IDs or account IDs
-- Ansible payments identity: no PFX/PEM, no live `passwd.yaml`, no employer brand or AD DNS
+- Ansible payments identity (`iac/ansible/reference/ansible-payments-idplat/`): no PFX/PEM, no live `passwd.yaml`, no employer brand or AD DNS
+- Workstation MCP/scripts (`practice/workstation/reference/`): no API tokens, no live Jira/wiki/GitLab URLs, no host SSH aliases or PEMs. Env files stay `chmod 600` on the machine (`env.example` only in git)

@@ -15,6 +15,7 @@ I talk to business first: **can the infra do what the product needs**, **how fas
 | Bill too high | Right-size, kill idle, **park non-prod at night** (start/stop schedules on Huawei-class / cloud.ru and the same idea on AWS) | First cuts in days; schedule lives in git |
 | Paper and tickets are slow | **OCR + LLM** so accounting, analysts, and developers stop retyping PDFs | Usable API in 1–2 weeks (see packages) |
 | GPU / chat / RAG | Local Ollama / vLLM-class serve, vector store, optional Karpenter-class GPU scale | Sprint, not a research programme |
+| Engineers paste tenant data or click the same ops | IDE as platform: MCP, local LLM when VRAM fits, API when not. **Same kit on Linux, macOS, or WSL** | Hours to a day on a new laptop |
 | Must move clouds (when asked) | Same platform shape on the next API. I do this **fast**; many treat it as a year. Example: VK Cloud / NOVA-class → Huawei-class Advanced | Design in days; window in hours |
 
 International contracts: the same conversation. Class of cloud (AWS-shaped Huawei, OpenStack, VCD, Selectel) is a footnote so a non-RU buyer can map the skill. The buying question is still: **when does the product ship, and what does it cost to keep on**.
@@ -27,6 +28,7 @@ Full six-year narrative: [`experience.md`](experience.md). Diagrams for managers
 - Legacy: import until `plan` is clean. Proof already in the lab: [case 05](../case-studies/05-legacy-estate-as-code.md) (70+ VMs).
 - CI: **Jenkins** and **GitLab CI + Argo CD** so a branch or tag is the release, not a meeting.
 - AI: OCR/LLM is a **multiplier** on document flow (finance, legal, analysts) and on developer/ops questions. Not a demo chatbot.
+- Workstation: MCP + scripts so Terraform, Ansible, tickets, and GPU jobs run from the IDE. Bootstrap is bash, Docker, and env files — **not a Windows/WSL lock-in**.
 
 ## Cheaper
 

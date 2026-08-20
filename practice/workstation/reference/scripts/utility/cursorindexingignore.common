@@ -1,0 +1,76 @@
+# Cursor: exclude from codebase index only (files still readable via @ mention)
+# Syntax: gitignore globs. Use *.ext for extensions, not .ext
+#
+# Canonical fragment: copy into each project root .cursorindexingignore
+# or regenerate via: bash scripts/utility/sync_cursorindexingignore.sh
+
+# --- Git internals (many nested repos) ---
+**/.git/
+
+# --- Third-party / vendored dependencies ---
+**/vendor/
+**/node_modules/
+**/.gradle/
+**/.m2/
+**/target/
+**/.pnpm-store/
+**/.yarn/
+**/.claude/
+
+# --- Terraform cache and state ---
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# --- Build, cache, virtualenv ---
+**/dist/
+**/build/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.cache/
+**/.tox/
+**/.venv/
+**/venv/
+**/.ansible/
+**/.molecule/
+**/.galaxy/
+
+# --- notes / chat dumps: raw diagnostics, not configs ---
+notes/**/diagnostics/
+notes/**/logs/
+notes/**/logs_current/
+notes/**/logs_export/
+notes/**/journal_export/
+notes/**/main_reference/
+notes/**/vendor_reference/
+notes/**/external-*-repo/
+notes/**/*.log
+notes/**/*.out
+notes/**/*.har
+notes/**/*.zip
+notes/**/*.tar
+notes/**/*.tar.gz
+notes/**/*.tgz
+notes/**/*.7z
+notes/**/*.png
+notes/**/*.jpg
+notes/**/*.jpeg
+notes/**/*.webp
+notes/**/*.gif
+
+# --- Binary and media (low value for AI search) ---
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+*.iso
+*.mp4
+*.avi
+*.wav
+*.pdf
+*.deb

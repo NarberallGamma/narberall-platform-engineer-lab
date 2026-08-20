@@ -21,4 +21,5 @@ Fits a new stack or an existing GPU/VM that needs to become an operable API quic
 ## Proof in this repo
 
 - Case study: `case-studies/01-ai-llm-platform.md`
-- Code: `reference/ai/llm-compose-kit/`
+- Code: `practice/home-lab/reference/ai/llm-compose-kit/`
+- Workstation MCP + CLI (Linux / macOS / WSL): `practice/workstation/reference/`

@@ -18,4 +18,4 @@ One owner from infra to documentation and observability, including application *
 ## Proof in this repo
 
 - Case studies `01`–`03`
-- `reference/apps/`, `reference/utilities/`, `iac/terraform/`, `reference/ai/`
+- `practice/home-lab/reference/apps/`, `iac/ansible/reference/`, `iac/terraform/`, `practice/home-lab/reference/ai/`, `practice/workstation/reference/`

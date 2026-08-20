@@ -26,7 +26,7 @@ CLI and MCP wrappers do **not** inherit KDE system proxy. For outbound APIs + CD
 
 Same pattern I use on VPS work: do not assume "the GUI VPN" is visible to Docker, Ansible, or Python.
 
-Proof of code: [`../../reference/utilities/mcp-replicate/`](../../reference/utilities/mcp-replicate/) (wrapper does not inherit the desktop proxy).
+Proof of code: [`../workstation/reference/mcp-replicate/`](../workstation/reference/mcp-replicate/) (wrapper leaves API direct; `replicate-img` uses SOCKS only for CDN).
 
 See [`../../diagrams/practice/home-lab/networking.md`](../../diagrams/practice/home-lab/networking.md).
 

@@ -2,7 +2,7 @@
 
 **Business:** a private GPU API so document and analysis work stays off public chats. Hardware list below is unchanged. Manager page: [`../../architecture/01-llmops.md`](../../architecture/01-llmops.md).
 
-**Role:** GPU workstation for inference, LoRA training, and API-backed generation. Local when it fits VRAM; MCP/API when the model does not.
+**Role:** GPU workstation for inference, LoRA training, and API-backed generation. Local when it fits VRAM; MCP/API when the model does not. Compose and the Replicate CLI are the same on **WSL, native Linux, or another Unix box** — the GPU host is not locked to Windows.
 
 ## Hardware (generic)
 
@@ -11,8 +11,8 @@ RTX 4080 **16 GB**, Ryzen 9 9950X3D, 64 GB RAM. That bounds what runs locally vs
 ## CUDA baseline
 
 - `nvidia-open` + CUDA 13 + `nvcc` + `nvidia-smi` / `nvtop`
-- Docker with GPU (first on **WSL2**: 32 GB RAM / 6 cores assigned to the VM; then **native Arch**)
-- Same compose/image workflow on both substrates so the lab survived the OS migration
+- Docker with GPU (first on **WSL2**: 32 GB RAM / 6 cores assigned to the VM; then **native Arch**; same compose on any host with NVIDIA Container Toolkit)
+- Same compose/image workflow on each substrate so the lab survived the OS migration and copies onto the next machine
 
 ## Image generation (Stable Diffusion)
 
@@ -54,10 +54,10 @@ Async poll is the production pattern (connect timeouts vs GPU cold start). CDN d
 
 | Kit | Path |
 |-----|------|
-| Ollama compose | [`../../reference/ai/llm-compose-kit/`](../../reference/ai/llm-compose-kit/) |
-| SD GPU compose | [`../../reference/ai/sd-compose/`](../../reference/ai/sd-compose/) |
-| Kohya LoRA preset | [`../../reference/ai/kohya-lora-preset.example.md`](../../reference/ai/kohya-lora-preset.example.md) |
-| Replicate MCP wrapper | [`../../reference/utilities/mcp-replicate/`](../../reference/utilities/mcp-replicate/) |
+| Ollama compose | [`reference/ai/llm-compose-kit/`](reference/ai/llm-compose-kit/) |
+| SD GPU compose | [`reference/ai/sd-compose/`](reference/ai/sd-compose/) |
+| Kohya LoRA preset | [`reference/ai/kohya-lora-preset.example.md`](reference/ai/kohya-lora-preset.example.md) |
+| Replicate MCP + `replicate-img` | [`../workstation/reference/mcp-replicate/`](../workstation/reference/mcp-replicate/) |
 
 ## Diagram
 

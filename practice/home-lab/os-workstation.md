@@ -48,7 +48,7 @@ Automation:
 
 This is the same idea as cloud: backup before mutate, restore as a unit, logs kept out of the snapshot so forensics survive.
 
-Proof of code: [`../../reference/utilities/snap-pair/`](../../reference/utilities/snap-pair/).
+Proof of code: [`reference/snap-pair/`](reference/snap-pair/).
 
 ## GPU / CUDA
 

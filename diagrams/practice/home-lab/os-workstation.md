@@ -28,4 +28,4 @@ flowchart TB
 ```
 
 Practice: [`../../../practice/home-lab/os-workstation.md`](../../../practice/home-lab/os-workstation.md).  
-Code: [`../../../reference/utilities/snap-pair/`](../../../reference/utilities/snap-pair/).
+Code: [`../../../practice/home-lab/reference/snap-pair/`](../../../practice/home-lab/reference/snap-pair/).

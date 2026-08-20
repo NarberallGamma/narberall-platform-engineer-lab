@@ -9,7 +9,7 @@ Leitmotif: [`../docs/for-business.md`](../docs/for-business.md). Headline is **f
 | Page | Audience question | Existing proof |
 |------|-------------------|----------------|
 | [Days, not months](00-days-not-months.md) | How fast is a usable platform, and is it written down? | Cases 02, 05, 06, 07, CI catalog |
-| [LLMOps / AI](01-llmops.md) | Why GPU and OCR, not a toy chat? | Cases 01, 03, `reference/ai/` |
+| [LLMOps / AI](01-llmops.md) | Why GPU and OCR, and why the IDE is part of the platform? | Cases 01, 03, `practice/home-lab/reference/ai/`, `practice/workstation/` (any OS) |
 | [FinOps / night park](02-finops-night-park.md) | How does the bill drop without a rewrite? | Huawei-class schedule pattern |
 | [Reusable units](03-reuse-modules.md) | What can be applied again next week? | `iac/terraform/modules`, AWS live, GitLab CI |
 | [Cloud move](04-seamless-move.md) | When we must change clouds, can the freeze stay hours? | VK + Huawei-class trees (one skill among many) |
@@ -22,4 +22,5 @@ flowchart TB
   Days --> TF[Existing iac/terraform]
   Bill --> Park[Night park / right-size]
   AI --> OCR[OCR plus LLM]
+  AI --> Desk[IDE MCP any OS]
 ```

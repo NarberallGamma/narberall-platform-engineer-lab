@@ -25,5 +25,5 @@ Link: `../diagrams/case-studies/<name>.svg` (or Mermaid below)
 
 ## Links
 
-- Reference code: `../iac/terraform/...` or `../reference/...`
+- Reference code: `../iac/terraform/...` or `../iac/ansible/reference/...` or `../practice/.../reference/...`
 - Live site card: _(site path)_

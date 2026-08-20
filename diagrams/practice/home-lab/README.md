@@ -10,4 +10,4 @@ Sanitize: no IPs, hostnames, or SSIDs.
 | [`edge-platform.md`](edge-platform.md) | Ansible mains + jump + SSH failover |
 | [`android-ssh.md`](android-ssh.md) | Six SSH sessions + round-robin balancer |
 
-Code: [`../../../reference/`](../../../reference/).
+Code: [`../../../practice/home-lab/reference/`](../../../practice/home-lab/reference/), [`../../../iac/ansible/reference/`](../../../iac/ansible/reference/).

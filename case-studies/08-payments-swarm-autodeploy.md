@@ -27,7 +27,7 @@ See diagram: [`diagrams/case-studies/08-payments-swarm-autodeploy.md`](../diagra
 8) Same child roles + k8s_service when deploy_to_k8s=true
 ```
 
-Honest scope: host OS, Docker CE, and SSH harden are [`reference/ansible-bootstrap/`](../reference/ansible-bootstrap/). This tree assumes a Swarm manager (or a kube context) already exists.
+Honest scope: host OS, Docker CE, and SSH harden are [`iac/ansible/reference/ansible-bootstrap/`](../iac/ansible/reference/ansible-bootstrap/). This tree assumes a Swarm manager (or a kube context) already exists.
 
 ## What shipped
 
@@ -49,7 +49,7 @@ Ansible, Docker Swarm (`docker_swarm_service` / stack), Kubernetes (Deployment /
 
 ## Links
 
-- Sanitized code: [`reference/ansible-payments-idplat/`](../reference/ansible-payments-idplat/)
+- Sanitized code: [`iac/ansible/reference/ansible-payments-idplat/`](../iac/ansible/reference/ansible-payments-idplat/)
 - Ansible hub: [`iac/ansible/`](../iac/ansible/)
 - Payments narrative: [`docs/experience.md`](../docs/experience.md)
-- Host baseline (separate): [`reference/ansible-bootstrap/`](../reference/ansible-bootstrap/)
+- Host baseline (separate): [`iac/ansible/reference/ansible-bootstrap/`](../iac/ansible/reference/ansible-bootstrap/)

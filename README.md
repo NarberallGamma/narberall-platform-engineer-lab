@@ -2,7 +2,7 @@
 
 **Platform Engineer. AI and turnkey cloud delivery. Six years, senior in these niches.**
 
-**For business first:** I can do **whatever the infra needs** (stand up, accompany, document, incident, cost, identity, data, CI) and I do it **fast**. Baseline in **days to a couple of weeks**, not a quarter of workshops. Everything written down so the next person and audit can follow it. **Minimal change windows**, **~99.9% SLA**. Cloud move is one of the things I also do quickly (people treat it as a year). Idle non-prod can **park at night**. OCR/LLM exists to **speed accounting, analysts, and developers**, not to demo a chatbot. Diagrams: [`architecture/`](architecture/). Outcomes: [`docs/for-business.md`](docs/for-business.md). LLMOps: [`architecture/01-llmops.md`](architecture/01-llmops.md).
+**For business first:** I can do **whatever the infra needs** (stand up, accompany, document, incident, cost, identity, data, CI) and I do it **fast**. Baseline in **days to a couple of weeks**, not a quarter of workshops. Everything written down so the next person and audit can follow it. **Minimal change windows**, **~99.9% SLA**. Cloud move is one of the things I also do quickly (people treat it as a year). Idle non-prod can **park at night**. OCR/LLM exists to **speed accounting, analysts, and developers**, not to demo a chatbot. The same calendar includes a **repeatable IDE workstation** (MCP + local or API models) so that work does not depend on a public chat or a Windows-only box. Diagrams: [`architecture/`](architecture/). Outcomes: [`docs/for-business.md`](docs/for-business.md). LLMOps: [`architecture/01-llmops.md`](architecture/01-llmops.md). Workstation: [`practice/workstation/`](practice/workstation/).
 
 I design and ship platforms end to end: cloud project bootstrap (IAM, VPC, networking), compute, managed data, Kubernetes, CI/CD, application and utility code, documentation, and monitoring.
 
@@ -23,17 +23,21 @@ This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terra
 | Hiring manager / lead | [`docs/experience.md`](docs/experience.md) (including [education](docs/experience.md#education)) then [`iac/cloud/`](iac/cloud/) then [case studies](#case-studies-iac-related) |
 | Engineer reviewing IaC | [`iac/terraform/`](iac/terraform/) |
 | Engineer reviewing legacy-as-code | [`iac/cloud/vk-cloud.md`](iac/cloud/vk-cloud.md) then [`case-studies/05-legacy-estate-as-code.md`](case-studies/05-legacy-estate-as-code.md) |
-| Engineer reviewing Ansible / edge | [`iac/ansible/`](iac/ansible/) then [`reference/ansible-edge/`](reference/ansible-edge/) |
-| Engineer reviewing payments identity Ansible | [`reference/ansible-payments-idplat/`](reference/ansible-payments-idplat/) then [case 08](case-studies/08-payments-swarm-autodeploy.md) |
+| Engineer reviewing Ansible / edge | [`iac/ansible/`](iac/ansible/) then [`iac/ansible/reference/ansible-edge/`](iac/ansible/reference/ansible-edge/) |
+| Engineer reviewing payments identity Ansible | [`iac/ansible/reference/ansible-payments-idplat/`](iac/ansible/reference/ansible-payments-idplat/) then [case 08](case-studies/08-payments-swarm-autodeploy.md) |
 | Engineer reviewing CI (infra + builds + gates) | [`iac/ci/`](iac/ci/) then [`diagrams/iac/ci-turnkey.md`](diagrams/iac/ci-turnkey.md) |
 | Engineer reviewing OS / hardware depth | [`practice/home-lab/os-workstation.md`](practice/home-lab/os-workstation.md) |
+| Engineer reviewing MCP / local AI workstation | [`practice/workstation/`](practice/workstation/) then [`practice/workstation/reference/`](practice/workstation/reference/) (Linux, macOS, or WSL — same wrappers) |
 
 ```text
 iac/
   cloud/        # Experience by platform (keywords + links)
   terraform/    # Code, one folder per cloud
-  ansible/      # Day-2 Linux / Xray / payments identity → reference/ansible-*
+  ansible/      # Day-2 Linux / Xray / payments identity + reference/ kits
   ci/           # CI catalog: turnkey map + sanitized pipelines/
+practice/
+  workstation/  # MCP + local/API models; bash/Docker kit, any OS
+  home-lab/     # GPU compose, OS/hardware, Ansible edge
 ```
 
 ---
@@ -90,7 +94,7 @@ flowchart TB
   end
   clouds --> Own[End-to-end ownership]
   Own --> IaC[iac/cloud + iac/terraform]
-  Own --> ANS[iac/ansible + reference/ansible-edge + payments-idplat]
+  Own --> ANS[iac/ansible + reference kits]
   Own --> K8s[Kubernetes CI CD]
 ```
 
@@ -268,7 +272,7 @@ All cloud write-ups and Terraform live under **[`iac/`](iac/)**.
 |-------|-----|
 | [`iac/cloud/`](iac/cloud/) | Experience by platform, with links into code |
 | [`iac/terraform/README.md`](iac/terraform/README.md) | Code navigation hub |
-| [`iac/ansible/`](iac/ansible/) | Day-2 Ansible map → `reference/ansible-*` |
+| [`iac/ansible/`](iac/ansible/) | Day-2 Ansible map + kits under `iac/ansible/reference/` |
 | [`iac/ci/`](iac/ci/) | **CI catalog:** turnkey map (Jenkins + GitLab CI, Java builds, gates, MR, revoke) |
 | [`iac/terraform/vmware/`](iac/terraform/vmware/) | **VCD greenfield:** catalog, guest init, DB-class VM, `vmware/vcd` |
 | [`iac/terraform/RESOURCES.md`](iac/terraform/RESOURCES.md) | Clouds × resource types in code |
@@ -292,7 +296,7 @@ flowchart TB
     CI[ci/ one-button]
   end
   Cloud --> TF
-  ANS --> RefA[reference/ansible-edge]
+  ANS --> RefA[ansible/reference]
   CI --> TF
   CI --> ANS
   TF --> AWS[aws]
@@ -327,7 +331,7 @@ flowchart LR
   Cloud[iac/cloud] --> Hire
   TF[iac/terraform] --> Hire
   ANS[iac/ansible] --> Hire
-  REF[reference] --> Hire
+  PRAC[practice] --> Hire
 ```
 
 ---
@@ -341,8 +345,7 @@ flowchart LR
 | [`iac/`](iac/) | **IaC hub:** cloud experience + Terraform / Terragrunt + Ansible map |
 | [`case-studies/`](case-studies/) | Problem → architecture → result |
 | [`packages/`](packages/) | Fixed-scope offers |
-| [`reference/`](reference/) | Non-TF reference kits (AI compose, Ansible, monitoring, apps) |
-| [`practice/`](practice/) | Workstation MCP + home lab (OS/hardware/BIOS, AI, Ansible edge) |
+| [`practice/`](practice/) | **Same offer, engineer loop:** MCP + local/API models (hours on Linux, macOS, or WSL) plus home lab (OS/hardware/BIOS, GPU compose, Ansible edge). Kits under each catalog `reference/` |
 | [`diagrams/`](diagrams/) | Architecture diagrams |
 | [`site/`](site/) | Portfolio website source |
 | [`docs/`](docs/) | Positioning, six-year experience narrative, sanitize checklist |

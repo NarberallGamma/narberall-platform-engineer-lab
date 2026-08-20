@@ -18,4 +18,4 @@ flowchart LR
 ```
 
 Practice: [`../../../practice/home-lab/android-ssh.md`](../../../practice/home-lab/android-ssh.md).  
-Code: [`../../../reference/apps/ssh-tunnel-android/`](../../../reference/apps/ssh-tunnel-android/), [`../../../reference/apps/ssh-tunnel-docker/`](../../../reference/apps/ssh-tunnel-docker/).
+Code: [`../../../practice/home-lab/reference/apps/ssh-tunnel-android/`](../../../practice/home-lab/reference/apps/ssh-tunnel-android/), [`../../../practice/home-lab/reference/apps/ssh-tunnel-docker/`](../../../practice/home-lab/reference/apps/ssh-tunnel-docker/).

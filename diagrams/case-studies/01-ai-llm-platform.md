@@ -11,4 +11,4 @@ flowchart LR
 ```
 
 Case study: [`../../case-studies/01-ai-llm-platform.md`](../../case-studies/01-ai-llm-platform.md).  
-Code: [`../../reference/ai/llm-compose-kit/`](../../reference/ai/llm-compose-kit/), [`../../practice/home-lab/ai-lab.md`](../../practice/home-lab/ai-lab.md).
+Code: [`../../practice/home-lab/reference/ai/llm-compose-kit/`](../../practice/home-lab/reference/ai/llm-compose-kit/), [`../../practice/home-lab/ai-lab.md`](../../practice/home-lab/ai-lab.md).

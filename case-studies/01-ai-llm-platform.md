@@ -41,10 +41,10 @@ See diagram: [`diagrams/case-studies/01-ai-llm-platform.md`](../diagrams/case-st
 
 ## Results
 
-- The GPU node is a `--limit`, not a rebuild
-- ACL reapply is GitOps (playbook or n8n), not a per-client SSH session
-- Reviewers see a real collab inventory next to the LLM roles, not a single nginx demo
-- Home-lab compose remains the workstation story; this tree is the estate story
+- **1–2 weeks** to a usable private `/v1` API once the GPU host and inventory exist (package calendar)
+- **Hours for the next client folder:** `--limit` + n8n/playbook ACL, not a per-tenant SSH week
+- **Ship:** accounting and analysts stop pasting tenant data into a public chat. Collab plane stays on the same inventory
+- Home-lab compose is the workstation story. This tree is the estate story
 
 ## Stack
 

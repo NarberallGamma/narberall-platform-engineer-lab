@@ -19,7 +19,9 @@ Link: `../diagrams/case-studies/<name>.md` (Mermaid in that file)
 
 ## Results
 
-- \<metric or qualitative outcome\>
+- **Calendar:** days / hours vs the old path (console week, quarter, Friday meeting)
+- **Ship:** what the product team can do the next day (apply, include, `--limit`)
+- **Accompany:** next change cost (same inventory, same hub, same overlay)
 
 ## Stack
 

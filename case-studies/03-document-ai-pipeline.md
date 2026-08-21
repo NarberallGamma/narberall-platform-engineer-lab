@@ -33,10 +33,9 @@ See diagram: [`diagrams/case-studies/03-document-ai-pipeline.md`](../diagrams/ca
 
 ## Results
 
-- Capture and extract are inventory and an API, not a one-off desktop install
-- Tenant documents stay on the private path (OCR host + private LLM)
-- Reviewers see the document loop next to case 01, not a second GPU demo
-- No invented throughput numbers in this public slice
+- **Same 1–2 week API path as case 01:** capture + extract ride the private `/v1`, not a desktop install
+- **Ship:** invoice / contract / ticket loops stop at structured JSON. Accounting and analysts stop retyping PDFs
+- **Accompany:** OCR host stays inventory next to Nextcloud and n8n. No pages-per-hour invented in this public slice
 
 ## Stack
 

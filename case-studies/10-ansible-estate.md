@@ -37,10 +37,10 @@ Honest scope: network and CCE stay in Terraform. This tree assumes SSH reachabil
 
 ## Results
 
-- A host change is a playbook limit, not a rebuild
-- Preprod reuses the same roles
-- Reviewers see a real docker-app graph, not a single nginx demo
-- Host node-exporter is the scrape half of the same SRE story as the Helm Grafana overlay ([case 11](11-helm-estate.md), [`../architecture/05-sre.md`](../architecture/05-sre.md)). Prom to VictoriaMetrics and host Grafana live in the sibling Ansible kits linked below.
+- **Hours per host, not a rebuild:** `--limit` + shared `docker_app`. Preprod is the same roles, other inventory
+- **Night park in git:** idle non-prod stops paying 24/7 ECS/CCE. First cuts in days ([`../architecture/02-finops-night-park.md`](../architecture/02-finops-night-park.md))
+- **Ship:** Vault, cert path, and RDS users (Flyway vs app DML, RO/RW) are playbooks. Product wait on a host change drops to a limit
+- Host `:9100` is the scrape half of [case 11](11-helm-estate.md). Prom → VictoriaMetrics and host Grafana live in the sibling kits below
 
 ## Stack
 

@@ -38,9 +38,9 @@ Honest scope: Edge NAT / FW / VPN stay outside Terraform (role has no Gateway Ma
 
 ## Results
 
-- First boot: SSH as `ubuntu` and extra admin, root SSH off, NIC up, default route in place
-- Next guests are another `vm-*.tf` + the same CI jobs, not a new console ritual
-- Docs/diagrams can be a pipeline stage (facts in; optional **local** LLM rewrite so nothing confidential leaves the network)
+- **First boot in one apply:** SSH as `ubuntu` + admin, root SSH off, NIC up, default route. Initscript under the **1500**-character VCD cap
+- **Next guest in hours:** another `vm-*.tf` + the same CI stages (plan → apply → Ansible → Vault → metrics → docs), not a new console ritual
+- **Ship:** docs can be a pipeline stage (facts in; optional local LLM rewrite so nothing confidential leaves the network)
 
 ## Stack
 

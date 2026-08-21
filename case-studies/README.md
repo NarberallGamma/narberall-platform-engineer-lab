@@ -1,6 +1,6 @@
 # Case studies
 
-**Business first:** LLMOps (01, 03) is process speed. Cloud cases are days-to-weeks, audit, and a planned move. Manager hub: [`../architecture/`](../architecture/). Buyer page: [`../docs/for-business.md`](../docs/for-business.md). Existing case bodies stay; more cases can be added later.
+**Business first:** LLMOps (01, 03) is process speed. Cloud cases are days-to-weeks, audit, and a planned move. Each **Results** block leads with calendar and counts (days / hours / 70+ VMs), not a soft recap. Manager hub (short on purpose): [`../architecture/`](../architecture/). Buyer page: [`../docs/for-business.md`](../docs/for-business.md).
 
 NDA-safe narratives. Each links to diagrams and related code under `iac/` (Terraform, Ansible, Helm kits, Docker / Compose, and CI pipelines) and `practice/` (home-lab kits and workstation MCP).
 

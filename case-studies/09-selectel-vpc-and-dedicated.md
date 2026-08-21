@@ -33,9 +33,9 @@ Selectel (RU cloud + DC)
 
 ## Results
 
-- Two Selectel products described as code instead of console-only
-- Transferable story for international readers: OpenStack IaaS + Proxmox VE on a top-tier RU provider
-- No dump of live account IDs, HV FQDNs, or WAN CIDRs
+- **Days to both APIs as code:** Selectel VPC (OpenStack) and dedicated Proxmox, not two console estates
+- **Next stand in hours** once modules exist: same OpenStack / Proxmox habit, not a quarter of click-ops
+- **Transfer:** international readers map VPC → OpenStack, dedicated → Proxmox VE. Live account IDs and WAN CIDRs stay out
 
 ## Stack and platforms
 

@@ -55,11 +55,10 @@ Honest scope: one mechanic per image, not a hundred-plus shop clones. CloudEye G
 
 ## Results
 
-- A new service reuses a parent image. Reviewers parse one Dockerfile per class
-- Host GitLab, Vault, and cybersec metrics are `compose up` with example env files
-- Helm remains the cluster package. Compose remains the VM and laptop path
-- Night-park, CloudEye, and EDR coverage stay complementary to Ansible and the Helm overlay
-- CI catalog is living kits under [`iac/ci/`](../iac/ci/). This case does not claim those pipeline files
+- **Hours for the next service:** one parent image, one Dockerfile per mechanic, not a hundred-plus shop twins
+- **Minutes to `compose up`:** host GitLab, Vault, and sec-stack with example env. Laptop Java stand is six small files, not a CCE
+- **Ship:** registry is the hand-off. Helm or Compose is the next button. Night-park / CloudEye / EDR stay complementary to Ansible and the overlay
+- Pipeline YAML lives in [case 13](13-ci-pipelines.md). This case is the build context
 
 ## Stack
 

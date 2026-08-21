@@ -52,11 +52,10 @@ These kits are not the CCE envelope above. They are the rest of the published He
 
 ## Results
 
-- A cluster envelope change is a chart or values PR, not a console ritual
-- Infra charts move through CI `helm upgrade`; product apps wait on the Argo door
-- Reviewers parse custom CRs and Connect templates, not a tarball dump
-- Host scrape and in-cluster overlay stay complementary
-- On-call gets Grafana views and alert groups I can add or edit the same day (Grafana HTTP + git). CloudEye exporters close the managed-broker blind spot. Manager page: [`../architecture/05-sre.md`](../architecture/05-sre.md)
+- **Hours once the cluster exists:** envelope is a chart/values PR + `helm upgrade`, not a console week
+- **Same-day on-call views:** **12** Grafana alert groups and **14** dashboard JSON in git. New Kafka-lag or RDS view is hours, not a ticket week
+- **Ship:** product apps wait on the Argo door. One richest chart per mechanic under [`iac/helm/apps/`](../iac/helm/apps/), not thirty shop copies
+- Host scrape stays Ansible ([case 10](10-ansible-estate.md)). This case is the in-cluster overlay. Manager page: [`../architecture/05-sre.md`](../architecture/05-sre.md)
 
 ## Stack
 

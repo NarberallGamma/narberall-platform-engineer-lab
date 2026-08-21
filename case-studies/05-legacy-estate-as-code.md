@@ -39,9 +39,9 @@ Honest scope: managed DBaaS and object-storage buckets stayed out when the servi
 
 ## Results
 
-- Click-ops estate represented in code and state **without recreating** a single production VM or network
-- `terraform plan` converged to no unintended changes
-- Next changes (resize, replace, add) have a single source of truth: catalog + purpose files
+- **70+ VMs, 200+ state addresses,** zero rebuilds: not one production VM or network recreated
+- **Days to `plan` with no changes:** next resize / replace / add is apply, not a console week
+- **Ship:** catalog + purpose files. A successor extends HCL instead of tribal click-ops
 
 ## Stack
 

@@ -29,9 +29,9 @@ See diagram: [`diagrams/case-studies/04-terraform-brownfield-import.md`](../diag
 
 ## Results
 
-- Hand-built estate represented in state without recreating production
-- `terraform plan` converged to no unintended changes
-- Team gained a single source of truth for further changes (scale, replace, add)
+- **No rebuild:** live VPC, compute, DB, and clusters imported. Production stayed up
+- **Days to a clean `plan`:** next scale / replace / add is apply, not a console week
+- **Ship:** one source of truth. Product wait on click-ops for infra changes drops to a PR + apply
 
 ## Stack
 

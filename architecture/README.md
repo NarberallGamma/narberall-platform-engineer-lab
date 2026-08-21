@@ -1,6 +1,6 @@
 # Architecture cases (for managers)
 
-Leads and founders do not read a thousand lines of Terraform. These pages are **short architectural reviews**: one diagram, one business sentence, links into the existing lab. Nothing below replaces [`../case-studies/`](../case-studies/) or [`../diagrams/`](../diagrams/). Those stay the source of the longer stories and the mermaid already published.
+Leads and founders do not read a thousand lines of Terraform. These pages stay **short on purpose**: one diagram, one business sentence, a calendar, links into the lab. They are not a second copy of [`../case-studies/`](../case-studies/). Cases carry the longer story, the mermaid, and the **Results** (days / hours / counts). This folder is the manager index.
 
 Diagrams live in git as **Mermaid** (GitHub renders them; same idea as Eraser / Structurizr C4: boxes and flows, not a slide pack). Export to SVG later if a site needs it.
 

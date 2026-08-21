@@ -39,9 +39,9 @@ Honest scope: host OS, Docker CE, and SSH harden are [`iac/ansible/reference/ans
 
 ## Results
 
-- One inventory drives Swarm today and Kubernetes later
-- First-boot is a coded job with retries, not a wiki of docker commands
-- Reviewers and automated parsers see a real autodeploy graph, not a truncated sample
+- **One inventory, two runtimes:** Swarm today, Kubernetes later. Cutover is role vars, not a second project
+- **Hours to first-boot:** coded job with retries, not a wiki of `docker` commands
+- **Ship:** identity / payment plane deploys the same graph every time. Reviewers see the real autodeploy, not a truncated sample
 
 ## Stack
 

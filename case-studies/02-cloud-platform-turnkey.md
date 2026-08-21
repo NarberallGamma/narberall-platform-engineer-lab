@@ -42,9 +42,9 @@ VPC / subnets / routes / security
 
 ## Results
 
-- New environments described as code instead of console clicks
-- Same module patterns reused across projects (faster next stand)
-- Clear ownership: one engineer accountable for design → apply → operate → handoff
+- **Days to a couple of weeks** to a usable baseline (IAM, VPC, compute, data, path to Kubernetes and CI), not a quarter of workshops
+- **Next env in hours:** same modules + Terragrunt live. Minutes for VPC+VM after inputs exist
+- **Ship + accompany:** one owner from apply to handoff. Audit walks folders, not a Slack thread after invoice
 
 ## Stack and platforms
 

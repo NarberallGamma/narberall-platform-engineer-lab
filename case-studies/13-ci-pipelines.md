@@ -48,12 +48,10 @@ Honest scope: one include per mechanic. `jobs/build/*` stay commented. Helmfile 
 
 ## Results
 
-- A new service includes a hub. Reviewers parse one file per class
-- Cutover is a numbered pipeline (preflight → approve → merge → Ansible VM)
-- Preview namespaces carry an expiry stamp and a cleanup job
-- SonarQube and Trivy are job bodies a lead can open. OSV is the same habit; no invented YAML
-- Jenkins and GitLab both appear because both ran in production
-- Helm remains the cluster package. Docker remains the build context. This case is the button
+- **Hours to attach a hub:** one `include:` instead of fifty copied job files. Review and canary are a click, not a Friday `kubectl`
+- **Minutes after runners exist:** host one-button (plan → apply → Ansible → Vault → metrics → docs)
+- **Ship:** branch or tag is the release. Cutover is a numbered pipeline. Preview NS expire
+- SonarQube and Trivy are published job bodies. Helm is [case 11](11-helm-estate.md). Docker is [case 12](12-docker-images.md). This case is the button
 
 ## Stack
 

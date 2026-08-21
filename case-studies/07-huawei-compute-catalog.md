@@ -38,10 +38,9 @@ Honest scope: Istio / ESO live in cluster-resources, not this root. Kafka / OBS 
 
 ## Results
 
-- Click-ops compute has a source of truth without touching NGFW or node-pool ECS
-- Next host is another `ecs-*.tf` + the project keypair, not a new console ritual
-- Audit can print IDs without a write stack
-- Same AWS-shaped model as the generic Huawei folder (VPC, ECS/EC2, CCE/EKS, RDS, OBS/S3)
+- **Days to a catalog, not a rewrite:** click-ops CCE / RDS / purpose ECS in state. NGFW and node-pool ECS stay untouched
+- **Next host in hours:** another `ecs-*.tf` + the project keypair, not a console week
+- **Ship / audit:** IDs printable without a write stack. AWS-shaped model (VPC, ECS/EC2, CCE/EKS, RDS, OBS/S3)
 
 ## Stack
 

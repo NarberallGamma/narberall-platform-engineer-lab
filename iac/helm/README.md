@@ -94,7 +94,7 @@ Multiple complementary layers. Do not merge them into one compose or one chart.
 | Layer | Where it lives | What it is |
 |-------|----------------|------------|
 | Host / cybersec | [`../ansible/reference/ansible-app-platform/`](../ansible/reference/ansible-app-platform/) `monitoring_deploy` | Prometheus remote_write **VictoriaMetrics**, Kubernetes SD, blackbox, cAdvisor |
-| Host Grafana + VM | [`../ansible/reference/ansible-llm-collab/extras/sec-stack/`](../ansible/reference/ansible-llm-collab/extras/sec-stack/) | Roles for VictoriaMetrics + Grafana + vmalert + PAN-OS / EDR exporters. Compose `stack/` is not published |
+| Host Grafana + VM | [`../ansible/reference/ansible-llm-collab/extras/sec-stack/`](../ansible/reference/ansible-llm-collab/extras/sec-stack/) | Roles for VictoriaMetrics + Grafana + vmalert + PAN-OS / EDR exporters. Compose `stack/` **is published**: [`../docker/compose/sec-stack/`](../docker/compose/sec-stack/) and [`../ansible/reference/ansible-llm-collab/extras/sec-stack/stack/`](../ansible/reference/ansible-llm-collab/extras/sec-stack/stack/) |
 | Host node scrape | [`../ansible/reference/ansible-estate/`](../ansible/reference/ansible-estate/) node-exporter | `:9100` on the VM, TLS watch next to it |
 | Host sar (not Prom) | [`../ansible/reference/monitoring-starter/`](../ansible/reference/monitoring-starter/) | sysstat / vnstat before a full scrape estate |
 | In-cluster overlay | [`reference/helm-estate-cluster/monitoring/`](reference/helm-estate-cluster/monitoring/) | **12** provisioned Grafana alert files, **14** dashboard JSON artefacts (sidecar off), two cloud exporters, OpenObserve collector |

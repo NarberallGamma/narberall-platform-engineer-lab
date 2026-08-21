@@ -1,0 +1,4 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# min	hour	day	month	weekday	command
+1 1 * * 0 /docker/kafka/check-and-restart.sh

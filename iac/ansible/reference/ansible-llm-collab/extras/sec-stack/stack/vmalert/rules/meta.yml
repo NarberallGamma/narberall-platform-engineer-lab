@@ -1,0 +1,21 @@
+groups:
+  - name: meta
+    rules:
+      # Deadman switch: алерт горит ВСЕГДА. Alertmanager шлёт его в heartbeat-
+      # receiver (healthchecks.io и т.п.); если пинги прекратились — значит
+      # умер сам мониторинг. Без этого падение стека никто не заметит.
+      - alert: DeadManSwitch
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: "Heartbeat мониторинга (должен гореть всегда)"
+
+      # Общая сетка на потерянные таргеты, не покрытые специфичными алертами.
+      - alert: ScrapeTargetDown
+        expr: up{job!~"panos|teleport|node"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Таргет {{ $labels.instance }} (job={{ $labels.job }}) не скрейпится 10 минут"

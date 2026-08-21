@@ -1,0 +1,26 @@
+{
+  "project-e": {
+    "username": "CHANGE_ME",
+    "password": "CHANGE_ME",
+    "url": "https://edr.example.com:8080",
+    "use_proxy": false
+  },
+  "project-c": {
+    "username": "CHANGE_ME",
+    "password": "CHANGE_ME",
+    "url": "https://edr.example.com:8080",
+    "use_proxy": false
+  },
+  "project-b": {
+    "username": "CHANGE_ME",
+    "password": "CHANGE_ME",
+    "url": "https://edr.example.com:8080",
+    "use_proxy": false
+  },
+  "project-a": {
+    "username": "CHANGE_ME",
+    "password": "CHANGE_ME",
+    "url": "https://edr.example.com:8080",
+    "use_proxy": false
+  }
+}

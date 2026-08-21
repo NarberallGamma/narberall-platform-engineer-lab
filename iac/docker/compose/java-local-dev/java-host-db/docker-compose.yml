@@ -1,0 +1,15 @@
+services:
+  shop-rate:
+    image: 'shop-rate:latest'
+    container_name: shop-rate
+    ports:
+      - '8080:8080'
+      - '5005:5005'
+    build:
+      context: .
+    environment:
+      # the container app points at Postgres on the host
+      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/shop_rate
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: CHANGE_ME
+      dockerfile: Dockerfile

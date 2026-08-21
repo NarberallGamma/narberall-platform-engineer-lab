@@ -8,19 +8,23 @@ The habit is the same on old repos and new ones: **infrastructure, builds, publi
 
 Sanitized pipeline **code** lands under [`pipelines/`](pipelines/) as it is cleaned. This page is the **full map**. One host-lifecycle example is already there; the rest of the shapes below are described first on purpose.
 
-Terraform creates (or imports) the thing. Ansible makes the guest operable. Helm / Argo bootstrap lives in [`../helm/`](../helm/) ([case 11](../../case-studies/11-helm-estate.md)); **CI is still the button** that runs the right slice. Application pipelines build and gate the artefact. The IaC folders are siblings:
+Terraform creates (or imports) the thing. Ansible makes the guest operable. Helm / Argo bootstrap lives in [`../helm/`](../helm/) ([case 11](../../case-studies/11-helm-estate.md)); **CI is still the button** that runs the right slice. Application pipelines build and gate the artefact. The sibling **build context** is [`../docker/images/`](../docker/images/) ([case 12](../../case-studies/12-docker-images.md)). Pipelines stay here. The IaC folders are siblings:
 
 | Folder | Owns |
 |--------|------|
 | [`../terraform/`](../terraform/) | Cloud APIs, state, guest init / cloud-init, Kubernetes as code |
 | [`../ansible/`](../ansible/) | On the host (packages, harden, EDR, metrics) |
 | [`../helm/`](../helm/) | Cluster package, GitOps, Argo bootstrap |
+| [`../docker/images/`](../docker/images/) | Dockerfile build context. One mechanic per image |
+| [`../docker/compose/`](../docker/compose/) | Host and local `compose up` after the image exists |
 | **this catalog** | Pipelines that call those, plus build / publish / deploy / revoke |
 
 ```text
 iac/ci/                 # this hub (the story lives here)
   SANITIZE.md
   pipelines/            # sanitized GitLab CI / Jenkinsfiles (grows over time)
+# sibling: ../docker/images/   (build context; pipelines stay here)
+# sibling: ../docker/compose/  (host / local up)
 ```
 
 Private runner tags, Vault paths, and tenant names stay out. See [`SANITIZE.md`](SANITIZE.md).
@@ -32,9 +36,11 @@ Diagrams: [`../../diagrams/iac/ci-turnkey.md`](../../diagrams/iac/ci-turnkey.md)
 flowchart LR
   CI[iac/ci] --> TF[iac/terraform]
   CI --> ANS[iac/ansible]
+  CI --> Dock[iac/docker/images]
   TF --> Guest[guest init / cloud-init]
   ANS --> Day2[packages harden EDR]
-  CI --> Build[build publish gates]
+  Dock --> Build[build publish gates]
+  CI --> Build
   CI --> Vault[Vault]
   CI --> Mon[monitoring]
   CI --> Docs[inventory + diagrams]
@@ -100,7 +106,7 @@ Typical build stages (best practice, as in the private repos):
 4. Package (JAR, image, chart)
 5. Attach the git SHA and a version to the artefact
 
-Fifty-plus microservice estates share **base images** and pipeline includes so fifty Dockerfiles are not patched by hand. Heavy JVM monoliths use the same gates; the build is longer, the dump/GC story stays in [experience](../../docs/experience.md).
+Fifty-plus microservice estates share **base images** and pipeline includes so fifty Dockerfiles are not patched by hand. Those parents live under [`../docker/images/`](../docker/images/). Heavy JVM monoliths use the same gates; the build is longer, the dump/GC story stays in [experience](../../docs/experience.md).
 
 ### 4. Publish
 
@@ -198,7 +204,7 @@ The same bar applies to **app releases**, **infra changes**, and **data migratio
 |-----|--------------------------------------|
 | This map + diagrams | App build / Java Maven-Gradle includes |
 | Host-lifecycle GitLab example | Publish + promote + Argo sync examples |
-| Cross-links to Terraform and Ansible | Jenkinsfile equivalents (host + JVM build) |
+| Cross-links to Terraform, Ansible, Helm, and [`../docker/images/`](../docker/images/) | Jenkinsfile equivalents (host + JVM build) |
 | | MR bot / auto-MR skeleton |
 | | Revoke / preview-teardown jobs |
 
@@ -210,6 +216,7 @@ Not claimed: every private pipeline is already in git here. Not published: Edge 
 
 - [VMware VCD from zero + one-button host lifecycle](../../case-studies/06-vmware-vcd-greenfield.md)
 - [Greenfield turnkey](../../case-studies/02-cloud-platform-turnkey.md)
+- [Docker images and Compose](../../case-studies/12-docker-images.md)
 
 ## Keywords
 

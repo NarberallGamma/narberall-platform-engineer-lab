@@ -1,0 +1,105 @@
+# Скопировать в config.yaml; секреты не коммитировать. CONFIG_FILE или /etc/cert-orchestrator/config.yaml
+# REG.RU: letsencrypt.regru или env REG_RU_DNS_USERNAME / REG_RU_DNS_PASSWORD
+# K8s: env K8S_TOKEN + kubernetes.api_server / ca_cert_path (CA mount с хоста).
+# SSH: identity_file для nginx_remotes. targets.*.host — reachable из контейнера.
+
+meta:
+  environment: preprod
+  timezone: Europe/Moscow
+
+schedule:
+  days_interval: 7
+  renew_on_container_start: true
+  weekday: tuesday
+  time_hhmm: "10:00"
+  poll_interval_seconds: 3600
+
+letsencrypt:
+  email: admin@example.com
+  domain: preprod.example.com
+  regru:
+    dns_username: "CHANGE_ME"
+    dns_password: "CHANGE_ME"
+  regru_ini_path: ""
+  live_dir: /etc/letsencrypt/live/preprod.example.com
+  certbot_extra_args: []
+  dns_propagation_seconds: 360
+
+timeouts:
+  certbot_seconds: 1800
+  kubectl_seconds: 300
+  ssh_connect_seconds: 60
+  ssh_command_seconds: 300
+  openssl_checkend_seconds: 86400
+
+kubernetes:
+  enabled: true
+  api_server: "https://10.10.0.10:5443"
+  ca_cert_path: /run/cert-orchestrator/k8s-ca.crt
+  namespace_secrets:
+    - namespace: argocd
+      secret_name: wildcard-tls
+    - namespace: default
+      secret_name: wildcard-tls
+    - namespace: external-secret-manager
+      secret_name: wildcard-tls
+    - namespace: ingress-nginx
+      secret_name: wildcard-tls
+    - namespace: istio-system
+      secret_name: wildcard-tls
+    - namespace: kafka
+      secret_name: wildcard-tls
+    - namespace: keycloak
+      secret_name: wildcard-tls
+    - namespace: kube-node-lease
+      secret_name: wildcard-tls
+    - namespace: kube-public
+      secret_name: wildcard-tls
+    - namespace: kube-system
+      secret_name: wildcard-tls
+    - namespace: monitoring
+      secret_name: wildcard-tls
+    - namespace: estate
+      secret_name: wildcard-tls
+
+targets:
+  nginx_remotes:
+    enabled: true
+    hosts:
+      - host: "10.10.0.20"
+        user: estate-cert-orchestrator
+        identity_file: /ssh/id_estate
+        ssl_dir: /etc/nginx/ssl
+      - host: "10.10.0.21"
+        user: estate-cert-orchestrator
+        identity_file: /ssh/id_estate
+        ssl_dir: /docker/apps/edge-lb/certs
+        nginx_container: edge-lb-nginx
+        cert_basename: preprod.example.com
+
+telegram:
+  bot_token: "CHANGE_ME"
+  chat_ids: [-1000000000001]
+  connect_timeout_seconds: 30
+  total_timeout_seconds: 90
+  retry_attempts: 5
+  retry_delay_seconds: 6
+  notify_on:
+    container_start: true
+    errors: true
+    renewal_started: true
+    renewal_finished: true
+    per_host_result: true
+    next_rotation_reminder: true
+
+https_verification:
+  enabled: false
+  ssl_timeout_seconds: 15
+  hosts:
+    - host: preprod.example.com
+      port: 443
+      enabled: true
+
+logging:
+  level: INFO
+  format: text

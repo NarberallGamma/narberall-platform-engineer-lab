@@ -1,0 +1,1 @@
+php-fpm ALL=(ALL) NOPASSWD:SETENV: /usr/libexec/postfix/master

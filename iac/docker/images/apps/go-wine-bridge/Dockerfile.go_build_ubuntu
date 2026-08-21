@@ -1,0 +1,34 @@
+FROM golang:1.19-alpine as builder
+ENV GOARCH=amd64
+
+COPY ./main.go /go/src/github.com/example/market-bridge/main.go
+COPY ./client /go/src/github.com/example/market-bridge/client
+COPY ./server /go/src/github.com/example/market-bridge/server
+COPY ./proto /go/src/github.com/example/market-bridge/proto
+COPY ./go.mod /go/src/github.com/example/market-bridge/go.mod
+COPY ./go.sum /go/src/github.com/example/market-bridge/go.sum
+
+WORKDIR /go/src/github.com/example/market-bridge
+
+RUN apk add --no-cache --virtual build-dependencies --update mingw-w64-gcc gcc libc-dev musl-dev && \
+    go mod download && \
+    GOOS=windows CGO_ENABLED=1 CC="x86_64-w64-mingw32-gcc" CXX="x86_64-w64-mingw32-g++" GOOS=windows GOARCH=amd64 go build -ldflags "-extldflags -static -s -w" -o /go/bin/server.exe main.go
+
+FROM ubuntu:22.04 AS final
+
+
+COPY --from=builder /go/bin/server.exe /usr/bin/market-bridge-server.exe
+COPY ./market-bridge64.dll /usr/bin/
+COPY ./docker/entrypoint_ubuntu.sh /entrypoint_ubuntu.sh
+
+ENV TC_DLL_PATH=/usr/bin/market-bridge64.dll
+
+RUN mkdir logs && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends wine64 && \
+    apt-get clean
+
+# server grpc port
+EXPOSE 50051
+
+ENTRYPOINT ["/entrypoint_ubuntu.sh"]

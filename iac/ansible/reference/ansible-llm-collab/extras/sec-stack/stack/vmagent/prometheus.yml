@@ -1,0 +1,117 @@
+# Скрейп-конфиг vmagent для площадки site-a.
+# Для других площадок (site-b, on-prem) — копия с другим external_labels.site
+# и своими таргетами; remote_write указывает на центральную VictoriaMetrics.
+
+global:
+  scrape_interval: 30s
+  external_labels:
+    site: site-a
+
+scrape_configs:
+  # --- self-monitoring стека -------------------------------------------------
+  - job_name: victoriametrics
+    static_configs:
+      - targets: ["victoriametrics:8428"]
+  - job_name: vmagent
+    static_configs:
+      - targets: ["vmagent:8429"]
+  - job_name: vmalert
+    static_configs:
+      - targets: ["vmalert:8880"]
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["alertmanager:9093"]
+  - job_name: grafana
+    static_configs:
+      - targets: ["grafana:3000"]
+
+  # --- Palo Alto (через panos-exporter, multi-target) -------------------------
+  # В targets — имена файрволов из exporters/panos/config.yml, не IP.
+  - job_name: panos
+    scrape_interval: 60s
+    # экспортер опрашивает PAN-OS API с таймаутом 15с на вызов — дефолтных 10с
+    # скрейпа не хватает, особенно пока файрволы недоступны
+    scrape_timeout: 50s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - ngfw01-site-a
+          - ngfw02-site-a
+          # - ngfw-test-site-a   # сломан, см. exporters/panos/config.yml
+          - ngfw-project-b
+          - ngfw-project-c
+          - ngfw01-project-d
+          - ngfw02-project-d
+          - ngfw01-project-e
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: firewall
+      - target_label: __address__
+        replacement: panos-exporter:9654
+
+  # --- Покрытие EDR -----------------------------------------------------------
+  # Экспортер считает покрытие фоном раз в 6 часов и отдаёт последний снапшот,
+  # поэтому обычный частый скрейп его не нагружает.
+  - job_name: edr
+    scrape_interval: 60s
+    static_configs:
+      - targets: ["edr-exporter:9655"]
+
+  # --- Teleport ---------------------------------------------------------------
+  # На ВМ Teleport должен быть включён диагностический endpoint:
+  # teleport start --diag-addr=0.0.0.0:3000 (см. README). До этого таргет будет down.
+  - job_name: teleport
+    static_configs:
+      - targets: ["teleport.example.com:3000"]
+        labels:
+          service: teleport
+
+  # --- node_exporter на инфраструктурных ВМ -----------------------------------
+  # TODO: раскомментировать с реальными IP (ВМ Teleport + 5 db-ВМ), предварительно
+  # раскатив node_exporter ansible-ролью.
+  # - job_name: node
+  #   static_configs:
+  #     - targets: ["<TELEPORT_IP>:9100"]
+  #       labels:
+  #         role: teleport
+  #     - targets: ["<DB1_IP>:9100", "<DB2_IP>:9100", "<DB3_IP>:9100", "<DB4_IP>:9100", "<DB5_IP>:9100"]
+  #       labels:
+  #         role: teleport-db
+
+  # --- TLS-endpoints: доступность + срок сертификата --------------------------
+  - job_name: blackbox-tls
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://git.example.com              # GitLab — первый реальный TLS-таргет
+          - https://vault.example.com    # Vaultwarden (пароли)
+          # TODO: Teleport proxy, веб-морды файрволов, GP-порталы и т.д.
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: probe_target
+      - target_label: __address__
+        replacement: blackbox:9115
+
+  # --- ICMP: базовая достижимость ----------------------------------------------
+  # Пинг С ЭТОЙ ВМ. Для пингов "от ВМ A к ВМ B" blackbox ставится на ВМ A —
+  # это следующий этап.
+  - job_name: blackbox-icmp
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    static_configs:
+      - targets:
+          - 10.10.1.20   # GitLab; TODO: mgmt-IP файрволов и другие критичные адреса
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: probe_target
+      - target_label: __address__
+        replacement: blackbox:9115

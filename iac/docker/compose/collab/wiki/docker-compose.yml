@@ -1,0 +1,43 @@
+networks:
+  frontend:
+    name: frontend
+    external: true
+
+services:
+  Confluence:
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    container_name: Confluence
+    image: ${CONFLUENCE_IMAGE_TAG}
+    volumes:
+      - ./Volumes/setenv.sh:/opt/atlassian/confluence/bin/setenv.sh:ro
+      - ./Volumes/agent:/var/agent/
+      - ./Volumes/app_data:${DATA_PATH}
+      - ./cacerts:/opt/java/openjdk/lib/security/cacerts:ro
+      - ./Volumes/tomcat_logs:/opt/atlassian/confluence/logs
+
+    environment:
+      TZ: "Europe/Moscow"
+      JVM_MINIMUM_MEMORY: ${CONFLUENCE_JVM_MINIMUM_MEMORY}
+      JVM_MAXIMUM_MEMORY: ${CONFLUENCE_JVM_MAXIMUM_MEMORY}
+      ATL_PROXY_NAME: wiki.example.com
+      ATL_TOMCAT_SECURE: 'true'
+      ATL_TOMCAT_SCHEME: https
+      ATL_PROXY_PORT: 443
+    ports:
+      - 8090:8090
+      - 8091:8091
+    networks:
+      - frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+    dns:
+      - '10.10.1.9'

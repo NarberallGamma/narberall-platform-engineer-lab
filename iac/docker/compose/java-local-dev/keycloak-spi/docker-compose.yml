@@ -1,0 +1,53 @@
+services:
+  keycloak-spi-postgres:
+    image: library/postgres:14
+    container_name: keycloak-spi-postgres
+    restart: on-failure
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: CHANGE_ME
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: pg_isready -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    ports:
+      - "5434:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  keycloak-spi:
+    image: keycloak-spi:latest
+    hostname: keycloak-spi
+    container_name: keycloak-spi
+    command:
+      - start --db postgres --hostname-strict-https false --hostname-strict false --proxy edge --http-enabled true --import-realm --spi-user-profile-legacy-user-profile-read-only-attributes *_RES_ACCESS_MODE
+    environment:
+      KC_DB_URL: jdbc:postgresql://keycloak-spi-postgres:5432/postgres
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: CHANGE_ME
+      KC_DB_SCHEMA: public
+      KC_FEATURES: preview
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: CHANGE_ME
+      KC_LOG_LEVEL: DEBUG
+    volumes:
+      - type: bind
+        source: ./keycloak/import/realm-export.json
+        target: /opt/keycloak/data/import/realm-export.json
+        read_only: true
+    ports:
+      - "8282:8080"
+    depends_on:
+      keycloak-spi-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://0.0.0.0:8080/realms/master"]
+      start_period: 10s
+      interval: 30s
+      retries: 3
+      timeout: 5s

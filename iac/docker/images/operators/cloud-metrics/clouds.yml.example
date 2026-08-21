@@ -1,0 +1,17 @@
+global:
+  prefix: "cloud-provider"
+  scrape_batch_size: 300
+  resource_sync_interval_minutes: 180
+  ignore_ssl_verify: false
+  proxy_schema: ""
+  proxy_host: ""
+  proxy_port: 0
+  proxy_username: ""
+  proxy_password: ""
+  rms_retry_times: 1
+auth:
+  auth_url: "https://iam.example.com/v3"
+  project_name: "{project_name}"
+  access_key: "{access_key}"
+  secret_key: "{secret_key}"
+  region: "{region}"

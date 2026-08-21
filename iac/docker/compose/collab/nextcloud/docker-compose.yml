@@ -1,0 +1,159 @@
+version: '3'
+services:
+
+  clamav:
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    image: "clamav/clamav:stable_base"
+    container_name: "clamav"
+    volumes:
+      # Socket
+      - clamav_data:/tmp
+      # Virus DB
+      - clamav_db:/var/lib/clamav/
+    restart: unless-stopped
+
+  app:
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    container_name: nc_app
+    image: nextcloud:31.0.6-fpm
+    restart: always
+    environment:
+      - LANG=ru_RU.UTF-8
+      - LANGUAGE=ru_RU.UTF-8
+      - LC_ALL=ru_RU.UTF-8
+    expose:
+      - '443'
+      - '80'
+      - '9000'
+    volumes:
+      - ./Volumes/www.conf:/usr/local/etc/php-fpm.d/www.conf
+      - nextcloud_temp:/tmp
+      - nextcloud_data:/var/www/html
+      - clamav_data:/var/run/clamav/
+#      - ./Volumes/app_data:/var/www/html
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt
+    dns:
+      - '10.10.1.9'
+#    restart: unless-stopped
+
+  nginx_server:
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    container_name: nc_nginx
+    image: nginx:1.25.1
+    restart: always
+    ports:
+      - 10.10.1.11:443:443
+    volumes:
+      - /docker/SSL_certs/example:/mycerts
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - nextcloud_data:/var/www/html
+#      - ./Volumes/app_data:/var/www/html
+#      - clients_nc_app_data:/var/www/html
+#  nginx_s3:
+#    container_name: nc_nginx_s3
+#    image: nginx:1.25.1
+#    restart: always
+#    expose:
+#      - 80
+#    volumes:
+#      - /docker/SSL_certs/example:/mycerts
+#      - ./s3_nginx.conf:/etc/nginx/nginx.conf
+#      - nextcloud_data:/var/www/html
+#      - ./Volumes/app_data:/var/www/html
+#      - clients_nc_app_data:/var/www/html
+#    restart: unless-stopped
+
+
+
+  cron:
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    container_name: nc_cron
+    image: nextcloud:apache
+    restart: always
+    volumes:
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt
+      - nextcloud_data:/var/www/html
+#      - ./Volumes/app_data:/var/www/html
+#      - clients_nc_app_data:/var/www/html
+      - ./mycronfile:/var/spool/cron/crontabs/www-data
+      - ./Volumes/www.conf:/usr/local/etc/php-fpm.d/www.conf
+    entrypoint: /cron.sh
+    dns:
+      - '10.10.1.9'
+  #  depends_on:
+  #    - db
+  #  restart: unless-stopped
+  redis:
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    container_name: nc_redis
+    image: redis
+    restart: always
+    expose:
+      - '6379'
+    volumes:
+      - ./Volumes/redis_data:/var/lib/redis
+#    - clients_nc_redis:/var/lib/redis
+    dns:
+      - '10.10.1.9'
+#    restart: unless-stopped
+
+
+#  nextcloud_exporter:
+#    container_name: nc_nextcloud_exporter
+#    image: xperimental/nextcloud-exporter:latest
+#    environment:
+#      NEXTCLOUD_SERVER: "https://fileshare.example.com"
+#      NEXTCLOUD_AUTH_TOKEN: ${authToken}
+#      NEXTCLOUD_LISTEN_ADDRESS: "nextcloud_exporter:9205"
+#      NEXTCLOUD_TIMEOUT: "5s"
+#    expose:
+#       - '9205'
+#    restart: unless-stopped
+#    dns:
+#      - '10.10.1.9'
+
+volumes:
+  'nextcloud_temp':
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./Volumes/nextcloud_temp
+  'nextcloud_data':
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./Volumes/nextcloud_data
+  'clamav_data':
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./Volumes/clamav_data
+  'clamav_db':
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./Volumes/clamav_db

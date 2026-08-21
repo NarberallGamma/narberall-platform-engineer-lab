@@ -8,7 +8,7 @@ I design and ship platforms end to end: cloud project bootstrap (IAM, VPC, netwo
 
 The same ownership covers **greenfield** (empty cloud or rack → production) and **legacy** (hand-built estates → IaC, runbooks, monitoring, cheaper to run). A large share of that work was **loaded production**: high RPS, large user bases, **~99.9% annual SLA**, multi-zone HA, and changes that must not take the product down. Security is in the first delivery (hardening, EDR, least privilege, Vault / ESO, CI gates), not a later project. IaC and pipelines are split and laid out so developers, on-call, and **audit** can follow them. I ship in a **team with a lead** and as the **single platform owner** on one or several concurrent projects (reachable). On later engagements I **trained people and delegated** as a de facto lead while reporting to PMs, CTOs, and project-wide tech leads. About **six years** of that pattern: bank/SBP-class payments, blockchain, delivery e-commerce, 50+ microservice estates and heavy JVM monoliths. About **four of those years** I did Ansible, Helm, CI, bash, and deploys **by hand**, before coding agents existed. Much of this lab is from that period. I use AI now the way any current engineer does (research through drafting charts and pipelines) because the business calendar requires it. I still can without agents. One person is simply slower than ten agents on one task. Full narrative: [`docs/experience.md`](docs/experience.md).
 
-This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terragrunt**, **Ansible**, **Helm** (cluster reference kits and [`iac/helm/apps/`](iac/helm/apps/) samples), diagrams, and the portfolio site source.
+This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terragrunt**, **Ansible**, **Helm** (cluster reference kits and [`iac/helm/apps/`](iac/helm/apps/) samples), **Docker / Compose** (one mechanic per image, host and local stacks under [`iac/docker/`](iac/docker/)), diagrams, and the portfolio site source.
 
 **Live site:** _(add URL after first deploy)_  
 **License:** MIT
@@ -20,7 +20,7 @@ This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terra
 | You are… | Open |
 |-----------|------|
 | Founder / PM / international buyer | [`docs/for-business.md`](docs/for-business.md) then [`architecture/`](architecture/) |
-| Hiring manager / lead | [`docs/experience.md`](docs/experience.md) (including [education](docs/experience.md#education)) then [`iac/cloud/`](iac/cloud/) then [`iac/ansible/`](iac/ansible/) and [`iac/helm/`](iac/helm/) (cluster [`reference/`](iac/helm/reference/) + product samples [`apps/`](iac/helm/apps/)) then [case studies](#case-studies-iac-related) |
+| Hiring manager / lead | [`docs/experience.md`](docs/experience.md) (including [education](docs/experience.md#education)) then [`iac/cloud/`](iac/cloud/) then [`iac/docker/`](iac/docker/) then [`iac/ansible/`](iac/ansible/) and [`iac/helm/`](iac/helm/) (cluster [`reference/`](iac/helm/reference/) + product samples [`apps/`](iac/helm/apps/)) then [case studies](#case-studies-iac-related) |
 | Engineer reviewing IaC | [`iac/terraform/`](iac/terraform/) |
 | Engineer reviewing legacy-as-code | [`iac/cloud/vk-cloud.md`](iac/cloud/vk-cloud.md) then [`case-studies/05-legacy-estate-as-code.md`](case-studies/05-legacy-estate-as-code.md) |
 | Engineer reviewing Ansible / edge | [`iac/ansible/`](iac/ansible/) then [`iac/ansible/reference/ansible-edge/`](iac/ansible/reference/ansible-edge/) |
@@ -29,6 +29,7 @@ This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terra
 | Engineer reviewing GPU/LLM Ansible | [`iac/ansible/reference/ansible-llm-collab/`](iac/ansible/reference/ansible-llm-collab/) then [case 01](case-studies/01-ai-llm-platform.md) |
 | Engineer reviewing Ansible kits (bootstrap, app, backup, AWS, KB, metrics) | [`iac/ansible/reference/`](iac/ansible/reference/) (`ansible-bootstrap`, `ansible-app-platform`, `ansible-backup-borg`, `ansible-aws-hosts`, `ansible-kb-linux`, `monitoring-starter`, `ansible-runner`) |
 | Engineer reviewing Helm / GitOps cluster | [`iac/helm/`](iac/helm/) then [`iac/helm/reference/helm-estate-cluster/`](iac/helm/reference/helm-estate-cluster/) and product samples [`iac/helm/apps/`](iac/helm/apps/) then [`case-studies/11-helm-estate.md`](case-studies/11-helm-estate.md) |
+| Engineer reviewing Docker / Compose | [`iac/docker/`](iac/docker/) then [`iac/docker/images/`](iac/docker/images/) and [`iac/docker/compose/`](iac/docker/compose/) then [`case-studies/12-docker-images.md`](case-studies/12-docker-images.md) |
 | Engineer reviewing CI (infra + builds + gates) | [`iac/ci/`](iac/ci/) then [`diagrams/iac/ci-turnkey.md`](diagrams/iac/ci-turnkey.md) |
 | Engineer reviewing OS / hardware depth | [`practice/home-lab/os-workstation.md`](practice/home-lab/os-workstation.md) |
 | Engineer reviewing MCP / multi-agent workstation | [`practice/workstation/mcp-ops-toolchain.md`](practice/workstation/mcp-ops-toolchain.md) then [`practice/workstation/reference/`](practice/workstation/reference/) and [`docs/security-ai.md`](docs/security-ai.md) (Cursor, Claude Code, Codex, local LLM; Linux, macOS, or WSL) |
@@ -41,6 +42,7 @@ iac/
   terraform/    # Code, one folder per cloud
   ansible/      # Linux / Xray / LLM / estate / payments + reference/ kits
   helm/         # Cluster GitOps: reference/ kits (mesh, ESO, Argo, obs) + apps/ product samples
+  docker/       # Images + Compose: one mechanic per Dockerfile, host/local stacks
   ci/           # CI catalog: turnkey map + sanitized pipelines/
 practice/
   workstation/  # Multi-agent desk + MCP + local/API models; bash/Docker kit, any OS
@@ -103,6 +105,7 @@ flowchart TB
   Own --> IaC[iac/cloud + iac/terraform]
   Own --> ANS[iac/ansible + reference kits]
   Own --> Helm[iac/helm reference + apps]
+  Own --> Dock[iac/docker images + compose]
   Own --> K8s[Kubernetes CI CD]
 ```
 
@@ -283,6 +286,7 @@ All cloud write-ups and Terraform live under **[`iac/`](iac/)**.
 | [`iac/terraform/README.md`](iac/terraform/README.md) | Code navigation hub |
 | [`iac/ansible/`](iac/ansible/) | Ansible map + kits under `iac/ansible/reference/` |
 | [`iac/helm/`](iac/helm/) | Helm / GitOps: cluster kits under `iac/helm/reference/` and curated product samples under `iac/helm/apps/` |
+| [`iac/docker/`](iac/docker/) | **Images + Compose:** one richest Dockerfile per mechanic, host and local stacks |
 | [`iac/ci/`](iac/ci/) | **CI catalog:** turnkey map (Jenkins + GitLab CI, Java builds, gates, MR, revoke) |
 | [`iac/terraform/vmware/`](iac/terraform/vmware/) | **VCD greenfield:** catalog, guest init, DB-class VM, `vmware/vcd` |
 | [`iac/terraform/RESOURCES.md`](iac/terraform/RESOURCES.md) | Clouds × resource types in code |
@@ -304,15 +308,19 @@ flowchart TB
     TF[terraform/ code]
     ANS[ansible/]
     Helm[helm/]
+    Dock[docker/]
     CI[ci/ one-button]
   end
   Cloud --> TF
   ANS --> RefA[ansible/reference]
   Helm --> RefH[helm/reference]
   Helm --> AppsH[helm/apps]
+  Dock --> ImgD[docker/images]
+  Dock --> CompD[docker/compose]
   CI --> TF
   CI --> ANS
   CI --> Helm
+  CI --> Dock
   TF --> AWS[aws]
   TF --> CR[cloud-ru-huawei]
   TF --> CRC[cloud-ru-compute]
@@ -346,6 +354,7 @@ flowchart LR
   TF[iac/terraform] --> Hire
   ANS[iac/ansible] --> Hire
   Helm[iac/helm] --> Hire
+  Dock[iac/docker] --> Hire
   PRAC[practice] --> Hire
 ```
 
@@ -357,7 +366,7 @@ flowchart LR
 |------|------|
 | [`architecture/`](architecture/) | **Manager diagrams** (days, LLMOps, FinOps, reuse, SRE, product APIs, cloud move). Existing case mermaid stays under `diagrams/` |
 | [`docs/for-business.md`](docs/for-business.md) | Days / cheaper / simpler, in buyer language |
-| [`iac/`](iac/) | **IaC hub:** cloud experience + Terraform / Terragrunt + Ansible reference kits + Helm reference kits and `helm/apps/` product samples |
+| [`iac/`](iac/) | **IaC hub:** cloud experience + Terraform / Terragrunt + Ansible reference kits + Helm reference kits and `helm/apps/` product samples + Docker images and Compose stacks |
 | [`case-studies/`](case-studies/) | Problem → architecture → result |
 | [`packages/`](packages/) | Fixed-scope offers |
 | [`practice/`](practice/) | **Same offer, engineer loop:** MCP + local/API models (hours on Linux, macOS, or WSL) plus home lab (OS/hardware/BIOS, GPU compose, Ansible edge). Kits under each catalog `reference/`. Helm product samples: [`iac/helm/apps/`](iac/helm/apps/), not under `practice/` |
@@ -382,6 +391,7 @@ LLMOps first (process speed), then cloud:
 - [Selectel VPC + dedicated Proxmox](case-studies/09-selectel-vpc-and-dedicated.md)
 - [Huawei-class estate Ansible](case-studies/10-ansible-estate.md)
 - [Helm estate / GitOps cluster](case-studies/11-helm-estate.md)
+- [Docker images and Compose stacks](case-studies/12-docker-images.md)
 
 ---
 

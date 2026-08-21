@@ -1,0 +1,132 @@
+groups:
+  - name: palo-alto
+    rules:
+      - alert: PanosUnreachable
+        expr: panos_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PAN-OS {{ $labels.firewall }} недоступен по XML API"
+          description: "Экспортер не может опросить файрвол 5 минут. Проверить mgmt-доступность и API-ключ."
+
+      - alert: PanosCollectSectionErrors
+        # Секция сбора падает по ошибке XML API, хотя сам файрвол отвечает.
+        # Раньше это было видно только косвенно — по флапу зависящих алертов.
+        # Порог "3 за час", а не мгновенный: одиночную ошибку гасит ретрай в
+        # экспортере, а вот систематическая (сломанный xpath, недостаточные
+        # права у sec-stack, перегруз mgmt-плоскости) должна быть видна.
+        expr: sum_over_time(panos_collect_errors[1h]) >= 3
+        labels:
+          severity: warning
+        annotations:
+          summary: "Секция {{ $labels.section }} на {{ $labels.firewall }} падает с ошибкой"
+          description: "Больше 3 сбоев сбора за час. Смотреть логи: docker logs sec-stack-panos-exporter-1."
+
+      - alert: PanosHAFailover
+        # Смена active<->passive за последние 30м. Срабатывает один раз после факта.
+        # changes_prometheus, не changes: в MetricsQL changes() считает появление
+        # новой серии изменением -> ложный "failover" при первом скрейпе устройства.
+        expr: changes_prometheus(panos_ha_local_state_active[30m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "HA failover на {{ $labels.firewall }}"
+          description: "Локальная HA-роль изменилась за последние 30 минут."
+
+      - alert: PanosHAUnhealthyState
+        # Любое состояние кроме active/passive: suspended, non-functional, initial...
+        expr: >
+          panos_ha_state_info{local_state!~"active|passive"} == 1
+          or panos_ha_state_info{peer_state!~"active|passive"} == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Нездоровое состояние HA на {{ $labels.firewall }}"
+          description: "local={{ $labels.local_state }} peer={{ $labels.peer_state }}"
+
+      - alert: PanosIpsecTunnelDown
+        # max_over_time(...[6m]) == 0, а не `== 0` + for: 5m. Смысл тот же
+        # ("SA нет ~5 минут"), но выражение переживает дыру в серии: разовая
+        # ошибка XML API роняла секцию ipsec на один скрейп, серии пропадали,
+        # vmalert сбрасывал алерт в resolved и через 5m активировал заново —
+        # в чат летело ложное "погасло" и следом "загорелось" (12.08, 03:37).
+        #
+        # role: критом алертим только рабочие туннели. reserve (резерв, штатно
+        # лежит) и broken (заведомо неподнимаемый) — метка ставится в config.yml
+        # экспортера или маркером [sec-stack:role=...] в comment туннеля на PAN-OS.
+        #
+        # max_over_time(...[7d]) == 1 — страховка от недонастроенных туннелей:
+        # свежесозданный ipsec, который ещё ни разу не поднимался, молчит, пока
+        # не заработает хоть раз. Лежащие дольше 7 дней ловит PanosIpsecTunnelStale.
+        #
+        # На не-активной ноде HA-пары (passive/suspended) IPsec SA отсутствуют
+        # штатно — алертим только про ноды, которые реально держат трафик.
+        # min_over_time, а не мгновенное значение: иначе один упавший скрейп
+        # секции ha снимает подавление и с ngfw02-site-a прилетает залп из 19 критов.
+        # Побочный эффект полезен: после failover туннели молчат ещё 10 минут,
+        # пока SA поднимаются.
+        # unless, а не `and ... == 1`: у standalone-файрволов (panos_ha_enabled=0)
+        # серии panos_ha_local_state_active нет вообще, и join через `and`
+        # выкосил бы их алерты целиком.
+        expr: >
+          max_over_time(panos_ipsec_tunnel_up{role="primary"}[6m]) == 0
+          and max_over_time(panos_ipsec_tunnel_up{role="primary"}[7d]) == 1
+          unless on(firewall) min_over_time(panos_ha_local_state_active[10m]) == 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "IPsec-туннель {{ $labels.tunnel }} на {{ $labels.firewall }} не активен"
+          description: "SA туннеля отсутствует в 'show vpn ipsec-sa' более 6 минут."
+
+      - alert: PanosIpsecTunnelStale
+        # Туннель работал в пределах месяца, но лежит уже неделю: из критов он
+        # выпал (см. окно 7d выше), а разбираться всё равно надо. warning —
+        # в рабочий чат, не в critical. Чтобы замолчал совсем —
+        # role: broken в config.yml экспортера либо disabled на самом PAN-OS.
+        expr: >
+          max_over_time(panos_ipsec_tunnel_up{role="primary"}[7d]) == 0
+          and max_over_time(panos_ipsec_tunnel_up{role="primary"}[30d]) == 1
+          unless on(firewall) min_over_time(panos_ha_local_state_active[10m]) == 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "IPsec-туннель {{ $labels.tunnel }} на {{ $labels.firewall }} лежит больше недели"
+          description: "Последняя активная SA — больше 7 дней назад. Починить, либо проставить role: reserve/broken."
+
+      - alert: PanosLicenseExpired
+        expr: panos_license_expired == 1
+        labels:
+          severity: critical
+        annotations:
+          summary: "Лицензия {{ $labels.feature }} на {{ $labels.firewall }} истекла"
+
+      - alert: PanosLicenseExpiringSoon
+        expr: 0 < (panos_license_expiry_timestamp_seconds - time()) < 86400 * 60
+        labels:
+          severity: warning
+        annotations:
+          summary: "Лицензия {{ $labels.feature }} на {{ $labels.firewall }} истекает менее чем через 60 дней"
+
+      - alert: PanosCertificateExpiring
+        expr: 0 < (panos_certificate_expiry_timestamp_seconds - time()) < 86400 * 30
+        labels:
+          severity: warning
+        annotations:
+          summary: "Сертификат {{ $labels.certificate }} на {{ $labels.firewall }} истекает менее чем через 30 дней"
+
+      - alert: PanosCertificateExpiringCritical
+        expr: (panos_certificate_expiry_timestamp_seconds - time()) < 86400 * 7
+        labels:
+          severity: critical
+        annotations:
+          summary: "Сертификат {{ $labels.certificate }} на {{ $labels.firewall }} истекает менее чем через 7 дней"
+
+      - alert: PanosSessionUsageHigh
+        expr: panos_sessions_active / panos_sessions_max > 0.8
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Таблица сессий {{ $labels.firewall }} заполнена более чем на 80%"

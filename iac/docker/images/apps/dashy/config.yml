@@ -1,0 +1,146 @@
+pageInfo:
+  title: Hello, Guys
+  description: Link panel for internal services
+  logo: https://example.com/assets/dashboard-logo.png
+
+# Optional app settings and configuration
+appConfig:
+  statusCheck: false
+  theme: charry-blossom
+  fontAwesomeKey: CHANGE_ME
+  customCss: ".clock p.time { font-size: 3rem !important; }"
+  layout: vertical
+  iconSize: small
+
+# Main content - An array of sections, each containing an array of items
+sections:
+  - name: Today
+    icon: far fa-smile-beam
+    displayData:
+      collapsed: false
+      hideForGuests: false
+    widgets:
+      - type: clock
+        options:
+          timezone: local
+      - type: weather
+        options:
+          apiKey: CHANGE_ME
+          city: ExampleCity
+      - type: weather
+        options:
+          apiKey: CHANGE_ME
+          city: ExampleCity2
+      - type: crypto-watch-list
+        options:
+          currency: USD
+          sortBy: marketCap
+          assets:
+            - bitcoin
+            - ethereum
+            - doge
+            - shib
+            - solana
+            - binancecoin
+            - chainlink
+            - link
+
+  - name: Production
+    icon: far fa-code
+    items:
+      - title: Admin panel
+        icon: fas fa-desktop
+        url: https://admin.example.com
+      - title: Gitlab
+        icon: "🦊"
+        url: https://git.example.com/estate/shop-app
+      - title: Kubernetes
+        icon: si-kubernetes
+        color: "#326CE5"
+        url: https://dashboard.kube.example.com/#/workloads?namespace=production
+      - title: Dagit backend
+        icon: "🐳"
+        url: https://dagit-production.kube.example.com
+      - title: Dagit analytics
+        icon: "🐳"
+        url: https://dagit-production-analytics.kube.example.com
+      - title: Kafka
+        icon: si-apachekafka
+        url: https://kafka-ui.production.kube.example.com
+        color: "#009FE3"
+      - title: Rabbitmq
+        icon: "si-rabbitmq"
+        color: "#FF6600"
+        url: http://rabbitmq.production.svc.cluster.local:15672/
+      - title: Bar collector
+        icon: "si-barmenia"
+        color: "#009FE3"
+        url: http://bar-collector.production.svc.cluster.local:8000/history
+      - title: tactics-state-storage
+        icon: si-redis
+        url: http://tactics-state-storage.production.svc.cluster.local:8001
+        color: "#FF0000"
+      - title: Grafana
+        subItems:
+          - title: Dashboards
+            url: https://grafana.kube.example.com/dashboards
+            icon: si-grafana
+            color: "#F46800"
+          - title: Loki
+            url: https://grafana.kube.example.com/explore
+            icon: ":link:"
+      - title: Security
+        icon: favicon
+        subItems:
+          - title: OpenVPN
+            url: https://openvpn-admin.kube.example.com/
+            icon: "🔒"
+          - title: "Keycloak Prod"
+            icon: "🔑"
+            url: https://keycloak.kube.example.com
+      - title: Prometheus
+        icon: si-prometheus
+        color: "#E6522C"
+        url: https://grafana.kube.example.com/prometheus
+      - title: Superset
+        icon: "si-apachesuperset"
+        color: "#20A6C9"
+        url: https://superset.kube.example.com
+      - title: Documentation
+        subItems:
+          - title: Rust Documentation
+            url: http://docs.production.svc.cluster.local:8000/core/
+            icon: si-rust
+            color: "#000000"
+          - title: Analytics Wiki
+            url: https://git.example.com/analytics/-/wikis/home
+            icon: si-gitlab
+            color: "#E24329"
+          - title: Pritunl
+            url: https://git.example.com/estate/shop-app/-/issues/1
+            icon: 🌐
+
+  - name: Dev
+    icon: far fa-code
+    items:
+      - title: Admin panel
+        icon: fas fa-desktop
+        url: https://admin-dev.kube.example.com/
+      - title: Kubernetes
+        icon: si-kubernetes
+        color: "#326CE5"
+        url: https://dashboard-dev.kube.example.com
+      - title: Dagit analytics
+        icon: "🐳"
+        url: https://dagit-dev.kube.example.com/overview/activity/timeline
+      - title: Grafana
+        icon: si-grafana
+        color: "#F46800"
+        subItems:
+          - title: Dashboards
+            url: https://grafana-dev.kube.example.com/dashboards
+            icon: si-grafana
+            color: "#F46800"
+          - title: Loki
+            url: https://grafana-dev.kube.example.com/explore
+            icon: ":link:"

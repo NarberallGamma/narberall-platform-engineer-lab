@@ -1,0 +1,236 @@
+services:
+    shop-dashboard-mysql:
+      # platform: linux/arm64/v8 # NOTE: this line only for arm M1 processors
+      image: mysql:8.0
+      container_name: shop-dashboard-mysql
+      ports:
+        - "1002:3306"
+      command: >
+              --default-authentication-plugin=mysql_native_password
+              --secure-file-priv=NULL
+      environment:
+        MYSQL_ROOT_PASSWORD: CHANGE_ME
+        MYSQL_DATABASE: shop_dashboard
+        MYSQL_USER: shop_dashboard
+        MYSQL_PASSWORD: CHANGE_ME
+      restart: always
+      volumes:
+        - /etc/localtime:/etc/localtime:ro
+      cap_add:
+        - SYS_NICE
+
+    shop-dashboard-phpmyadmin:
+      image: phpmyadmin/phpmyadmin
+      container_name: shop-dashboard-phpmyadmin
+      ports:
+        - '1005:80'
+      links:
+        - shop-dashboard-mysql
+      environment:
+        - MYSQL_ROOT_PASSWORD=CHANGE_ME
+        - PMA_HOST=shop-dashboard-mysql
+        - PMA_PORT=3306
+      restart: always
+      volumes:
+        - /etc/localtime:/etc/localtime:ro
+
+    sidecar-mysql:
+        image: mysql:8.0
+        #platform: linux/arm64
+        restart: always
+        container_name: sidecar-mysql
+        working_dir: /application
+        command: mysqld --sql-mode="NO_ENGINE_SUBSTITUTION" --explicit_defaults_for_timestamp=0 --default-time-zone='+02:00'
+        volumes:
+            - ../../images/apps/php-fpm/sidecar-mysql:/var/dumps
+            - ../../images/apps/php-fpm/sidecar-mysql:/docker-entrypoint-initdb.d
+        environment:
+            MYSQL_ROOT_PASSWORD: CHANGE_ME
+            MYSQL_DATABASE: one
+            MYSQL_DATABASE_2: two
+            MYSQL_DATABASE_3: three
+            MYSQL_USER: admin
+            MYSQL_PASSWORD: CHANGE_ME
+        ports:
+            - "9082:3306"
+
+    sidecar-phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        container_name: sidecar-phpmyadmin
+        ports:
+            - '1006:80'
+        links:
+            - sidecar-mysql
+        environment:
+            - MYSQL_ROOT_PASSWORD=CHANGE_ME
+            - PMA_HOST=sidecar-mysql
+            - PMA_PORT=3306
+        restart: always
+        volumes:
+            - /etc/localtime:/etc/localtime:ro
+
+    shop-dashboard-nginx:
+      build: ../../images/apps/nginx-php
+      ports:
+        - "1001:80"
+        - "1111:443"
+      container_name: shop-dashboard-nginx
+      command: nginx -g "daemon off;"
+      volumes:
+        - /path/to/app:/app
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-dashboard-php1
+        - shop-dashboard-php2
+        - shop-dashboard-php3
+      restart: always
+
+    shop-dashboard-migration:
+      build: ../../images/apps/php-fpm
+      container_name: shop-dashboard-migration
+      working_dir: /app
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.2/fpm/conf.d/99-overrides.ini
+        - ../../images/apps/php-fpm/migrate.sh:/migrate.sh
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-dashboard-mysql
+      command: /bin/bash -c "chmod +x /migrate.sh; /migrate.sh; "
+      env_file:
+        - shop-dashboard.env.example
+
+    shop-dashboard-php1:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-dashboard-php1
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.2/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+        - /etc/ca-certificates.conf:/etc/ca-certificates.conf
+      links:
+        - shop-dashboard-mysql
+        - shop-dashboard-memcached
+        - shop-dashboard-memcached2
+        - shop-dashboard-memcached3
+      env_file:
+        - shop-dashboard.env.example
+      restart: always
+      environment:
+          PHP_IDE_CONFIG: "serverName=Docker"
+          XDEBUG_MODE: "debug"
+          XDEBUG_CONFIG: "client_host=host.docker.internal"
+
+    shop-dashboard-php2:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-dashboard-php2
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.2/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+        - /etc/ca-certificates.conf:/etc/ca-certificates.conf
+      links:
+        - shop-dashboard-mysql
+        - shop-dashboard-memcached
+        - shop-dashboard-memcached2
+        - shop-dashboard-memcached3
+      env_file:
+        - shop-dashboard.env.example
+      restart: always
+      environment:
+          PHP_IDE_CONFIG: "serverName=Docker"
+          XDEBUG_MODE: "debug"
+          XDEBUG_CONFIG: "client_host=host.docker.internal"
+
+    shop-dashboard-php3:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-dashboard-php3
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.2/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+        - /etc/ca-certificates.conf:/etc/ca-certificates.conf
+      links:
+        - shop-dashboard-mysql
+        - shop-dashboard-memcached
+        - shop-dashboard-memcached2
+        - shop-dashboard-memcached3
+      env_file:
+        - shop-dashboard.env.example
+      restart: always
+      environment:
+          PHP_IDE_CONFIG: "serverName=Docker"
+          XDEBUG_MODE: "debug"
+          XDEBUG_CONFIG: "client_host=host.docker.internal"
+
+    shop-dashboard-composer:
+      build: ../../images/apps/composer
+      container_name: shop-dashboard-composer
+      working_dir: /app
+      volumes:
+        - /path/to/app:/app
+      environment:
+        - COMPOSER_MEMORY_LIMIT=-1
+      deploy:
+        resources:
+          limits:
+            cpus: '0.50'
+            memory: 2024M
+
+    shop-dashboard-node:
+      build: ../../images/apps/node-vite
+      container_name: shop-dashboard-node
+      working_dir: /app
+      volumes:
+        - /path/to/app:/app
+
+    shop-dashboard-memcached:
+      image: memcached
+      container_name: shop-dashboard-memcached
+      restart: always
+
+    shop-dashboard-memcached2:
+      image: memcached
+      container_name: shop-dashboard-memcached2
+      restart: always
+
+    shop-dashboard-memcached3:
+      image: memcached
+      container_name: shop-dashboard-memcached3
+      restart: always
+
+    shop-dashboard-worker:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-dashboard-worker
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.2/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-dashboard-mysql
+      env_file:
+        - shop-dashboard.env.example
+      restart: always
+      command: /bin/bash -c "php artisan queue:work database --queue=shop-dashboard"
+
+    shop-dashboard-cron:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-dashboard-cron
+      restart: "always"
+      links:
+        - shop-dashboard-mysql
+        - shop-dashboard-memcached
+        - shop-dashboard-memcached2
+        - shop-dashboard-memcached3
+      env_file:
+        - shop-dashboard.env.example
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.2/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+      command: /bin/bash /app/.docker/images/php/cron.sh

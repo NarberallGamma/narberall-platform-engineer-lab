@@ -1,0 +1,44 @@
+version: '3'
+services:
+    cli:
+        image: ${DOCKER_REPOSITORY}/shop-app/${APP_NAME}:${APP_VERSION}
+        container_name: ${APP_NAME}-cli
+        volumes:
+            - app-logs:/app/storage/logs
+    consumer-clients:
+        image: ${DOCKER_REPOSITORY}/shop-app/${APP_NAME}:${APP_VERSION}
+        container_name: consumer-clients
+        command: "php artisan amqp:consume clients"
+        restart: always
+        volumes:
+            - app-logs:/app/storage/logs
+    consumer-clientsBalance:
+        image: ${DOCKER_REPOSITORY}/shop-app/${APP_NAME}:${APP_VERSION}
+        container_name: consumer-clientsBalance
+        command: "php artisan amqp:consume clientsBalance"
+        restart: always
+        volumes:
+            - app-logs:/app/storage/logs
+    consumer-contractors:
+        image: ${DOCKER_REPOSITORY}/shop-app/${APP_NAME}:${APP_VERSION}
+        container_name: consumer-contractors
+        command: "php artisan amqp:consume contractors"
+        restart: always
+        volumes:
+            - app-logs:/app/storage/logs
+    consumer-contractorsBalance:
+        image: ${DOCKER_REPOSITORY}/shop-app/${APP_NAME}:${APP_VERSION}
+        container_name: consumer-contractorsBalance
+        command: "php artisan amqp:consume contractorsBalance"
+        restart: always
+        volumes:
+            - app-logs:/app/storage/logs
+    consumer-subscribeWebhook:
+        image: ${DOCKER_REPOSITORY}/shop-app/${APP_NAME}:${APP_VERSION}
+        container_name: consumer-subscribeWebhook
+        command: "php artisan amqp:consume subscribeWebhook"
+        restart: always
+        volumes:
+            - app-logs:/app/storage/logs
+volumes:
+    app-logs:

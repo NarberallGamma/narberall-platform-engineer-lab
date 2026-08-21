@@ -1,0 +1,292 @@
+# Reference OCR stack (secrets stay in .env).
+# CONTENTCAPTURE_APPSERVER: procserver/procstation use https://host:8443; web* services use …/ContentCapture/Server.
+services:
+  # ==============================================
+  # 1. PostgreSQL 16 (vendor guide: PostgreSQL 15+)
+  # ==============================================
+  postgres:
+    image: postgres:16-bookworm
+    container_name: cc-postgres
+    network_mode: host
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: content_capture
+      TZ: Europe/Moscow
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./logs_postgres:/var/log/postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d content_capture"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  # ==============================================
+  # 2. Application server
+  # ==============================================
+  appserver:
+    image: dockerregistry.content.ai/contentcapture/appserver:14.12.0
+    container_name: cc-appserver
+    network_mode: host
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - CONTENTCAPTURE_SELF_DISPLAY_NAME=app_server
+      - CONTENTCAPTURE_BASE_URL=ContentCapture/Server
+      - CONTENTCAPTURE_DB_SERVER_TYPE=PostgreSql
+      - CONTENTCAPTURE_MACHINEKEY_ALGORITHMNAME=Auto
+      - CONTENTCAPTURE_FILESTORAGE_ROOT_PATH=/var/FileStorage/
+      - CONTENTCAPTURE_BASE_LOG_PATH=/var/log/ContentCapture/
+      - CONTENTCAPTURE_DB_CONNECTION_STRING=${CONTENTCAPTURE_DB_CONNECTION_STRING}
+      - CONTENTCAPTURE_MACHINEKEY_VALIDATIONKEY=${CONTENTCAPTURE_MACHINEKEY_VALIDATIONKEY}
+      - CONTENTCAPTURE_MACHINEKEY_DECRYPTIONKEY=${CONTENTCAPTURE_MACHINEKEY_DECRYPTIONKEY}
+      - CONTENTCAPTURE_USE_HTTP=false
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=${ASPNETCORE_Kestrel__Certificates__Default__Password}
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=${ASPNETCORE_Kestrel__Certificates__Default__Path}
+      - ASPNETCORE_URLS=https://+:8443
+     # - ASPNETCORE_URLS=http://+:80
+      - TZ=Europe/Moscow
+#    ports:
+#      - "8099:80"
+#      - "8100:443"
+    volumes:
+      - ./Certificate:/https:ro
+      - ./file_storage:/var/FileStorage:rw
+      - ./logs_appserver:/var/log/ContentCapture:rw
+#      - /etc/hosts:/etc/hosts:ro
+     # - /etc/timezone:/etc/timezone:ro
+     # - /etc/localtime:/etc/localtime:ro
+    extra_hosts:
+      - "localhost:127.0.0.1"
+#      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+  # ==============================================
+  # 3. Processing server
+  # ==============================================
+  procserver:
+    image: dockerregistry.content.ai/contentcapture/procserver:14.12.0-765581
+    container_name: cc-procserver
+    network_mode: host
+    depends_on:
+      - appserver
+    environment:
+      - CONTENTCAPTURE_SELF_DISPLAY_NAME=proc_server
+      - CONTENTCAPTURE_SELF_NETWORK_NAME=procserver
+      - CONTENTCAPTURE_APPSERVER=https://cc.example.com:8443
+      - CONTENTCAPTURE_APPSERVER_BASIC_AUTH_USER=${CONTENTCAPTURE_APPSERVER_BASIC_AUTH_USER}
+      - CONTENTCAPTURE_APPSERVER_BASIC_AUTH_PASSWORD=${CONTENTCAPTURE_APPSERVER_BASIC_AUTH_PASSWORD}
+      - CONTENTCAPTURE_LICENSING_SERVER=cc.example.com
+      - TZ=Europe/Moscow
+      - ASPNETCORE_URLS=https://+:8443
+#    ports:
+#      - "10024:10024"
+    volumes:
+      - ./Processing:/root/.contentcapture:rw,shared
+     # - /etc/timezone:/etc/timezone:ro
+     # - /etc/localtime:/etc/localtime:ro
+#    extra_hosts:
+#      - "localhost:127.0.0.1"
+#      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+  # ==============================================
+  # 4. Processing station
+  # ==============================================
+  procstation:
+    image: dockerregistry.content.ai/contentcapture/procstation:14.12.0-765581
+    container_name: cc-procstation
+    network_mode: host
+    depends_on:
+      - procserver
+    environment:
+      - CONTENTCAPTURE_SELF_DISPLAY_NAME=proc_station_01
+      - CONTENTCAPTURE_SELF_NETWORK_NAME=procstation
+      - CONTENTCAPTURE_PROCSERVER=localhost
+      - CONTENTCAPTURE_APPSERVER=https://cc.example.com:8443
+      - CONTENTCAPTURE_APPSERVER_BASIC_AUTH_USER=${CONTENTCAPTURE_APPSERVER_BASIC_AUTH_USER}
+      - CONTENTCAPTURE_APPSERVER_BASIC_AUTH_PASSWORD=${CONTENTCAPTURE_APPSERVER_BASIC_AUTH_PASSWORD}
+      - CONTENTCAPTURE_LICENSING_SERVER=cc.example.com
+      - TZ=Europe/Moscow
+#    ports:
+#      - "10025:10025"
+    volumes:
+      - ./Processing:/root/.contentcapture:rw,shared
+     # - /etc/timezone:/etc/timezone:ro
+     # - /etc/localtime:/etc/localtime:ro
+      # optional Samba bind: create the host path or leave the line commented
+      # - /path/to/samba:/mnt/samba:rw,shared
+    entrypoint: CaptureProcStation
+#    extra_hosts:
+#      - "localhost:127.0.0.1"
+#      - "127.0.0.1:127.0.0.1"
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # ==============================================
+  # 5. Licensing server (unused in this snapshot)
+  # ==============================================
+  # 6. WebLogin
+  # ==============================================
+  weblogin:
+    image: dockerregistry.content.ai/contentcapture/weblogin:14.12.0
+    container_name: cc-weblogin
+    network_mode: host
+    depends_on:
+      - appserver
+    environment:
+      - CONTENTCAPTURE_SELF_DISPLAY_NAME=webstation_login
+      - CONTENTCAPTURE_APPSERVER=https://cc.example.com:8443/ContentCapture/Server
+      - CONTENTCAPTURE_APPSERVER_BASIC_AUTH_USER=${CONTENTCAPTURE_APPSERVER_BASIC_AUTH_USER}
+      - CONTENTCAPTURE_APPSERVER_BASIC_AUTH_PASSWORD=${CONTENTCAPTURE_APPSERVER_BASIC_AUTH_PASSWORD}
+      - CONTENTCAPTURE_MONITORING_STATION_URL=https://cc.example.com/monitoring
+      - CONTENTCAPTURE_LOGIN_STATION_URL=https://cc.example.com/
+      - CONTENTCAPTURE_VERIFICATION_STATION_URL=https://cc.example.com/verification
+      - CONTENTCAPTURE_SCANNING_STATION_URL=https://cc.example.com/scanning
+      - CONTENTCAPTURE_APPSERVER_BASIC_AUTH_ENABLED=true
+      - CONTENTCAPTURE_TRUST_ALL_CERTIFICATES=false
+      - CONTENTCAPTURE_BASE_LOG_PATH=/var/log/ContentCapture
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=${ASPNETCORE_Kestrel__Certificates__Default__Password}
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=${ASPNETCORE_Kestrel__Certificates__Default__Path}
+      - ASPNETCORE_URLS=https://+:9101;http://+:9001
+     # - ASPNETCORE_URLS=http://+:80
+      - TZ=Europe/Moscow
+#    ports:
+#      - "9001:80"
+#      - "9101:443"
+    volumes:
+      - ./Certificate:/https:ro
+      - ./Logs:/var/log/ContentCapture:rw
+     # - /etc/timezone:/etc/timezone:ro
+     # - /etc/localtime:/etc/localtime:ro
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # ==============================================
+  # 7. Verification web station
+  # ==============================================
+  webverification:
+    image: dockerregistry.content.ai/contentcapture/webverification:14.12.0
+    container_name: cc-webverification
+    network_mode: host
+    depends_on:
+      - appserver
+    environment:
+      - CONTENTCAPTURE_SELF_DISPLAY_NAME=webstation_verification
+      - CONTENTCAPTURE_APPSERVER=https://cc.example.com:8443/ContentCapture/Server
+      - CONTENTCAPTURE_VERIFICATION_STATION_URL=https://cc.example.com/verification
+      - CONTENTCAPTURE_SCANNING_STATION_URL=https://cc.example.com/scanning
+      - CONTENTCAPTURE_LOGIN_STATION_URL=https://cc.example.com/
+      - CONTENTCAPTURE_BASE_LOG_PATH=/var/log/ContentCapture
+      - CONTENTCAPTURE_TRUST_ALL_CERTIFICATES=false
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=${ASPNETCORE_Kestrel__Certificates__Default__Password}
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=${ASPNETCORE_Kestrel__Certificates__Default__Path}
+      - ASPNETCORE_URLS=https://+:9103;http://+:9003
+     # - ASPNETCORE_URLS=http://+:80
+      - TZ=Europe/Moscow
+#    ports:
+#      - "9003:80"
+#      - "9103:443"
+    volumes:
+      - ./Certificate:/https:ro
+      - ./Logs:/var/log/ContentCapture:rw
+     # - /etc/timezone:/etc/timezone:ro
+     # - /etc/localtime:/etc/localtime:ro
+#   extra_hosts:
+#     - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+  # ==============================================
+  # 8. Scanning web station
+  # ==============================================
+  webscanning:
+    image: dockerregistry.content.ai/contentcapture/webscanning:14.12.0
+    container_name: cc-webscanning
+    network_mode: host
+    depends_on:
+      - appserver
+    environment:
+      - CONTENTCAPTURE_SELF_DISPLAY_NAME=webstation_scanning
+      - CONTENTCAPTURE_APPSERVER=https://cc.example.com:8443/ContentCapture/Server
+      - CONTENTCAPTURE_SCANNING_STATION_URL=https://cc.example.com/scanning
+      - CONTENTCAPTURE_LOGIN_STATION_URL=https://cc.example.com/
+      - CONTENTCAPTURE_TRUST_ALL_CERTIFICATES=false
+      - CONTENTCAPTURE_BASE_LOG_PATH=/var/log/ContentCapture/
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=${ASPNETCORE_Kestrel__Certificates__Default__Password}
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=${ASPNETCORE_Kestrel__Certificates__Default__Path}
+      - ASPNETCORE_URLS=https://+:9104;http://+:9004
+     # - ASPNETCORE_URLS=http://+:80
+      - TZ=Europe/Moscow
+#    ports:
+#      - "9004:80"
+#      - "9104:443"
+    volumes:
+      - ./Certificate:/https:ro
+      - ./Logs:/var/log/ContentCapture:rw
+     # - /etc/timezone:/etc/timezone:ro
+     # - /etc/localtime:/etc/localtime:ro
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # ==============================================
+  # 9. Monitoring / admin console
+  # ==============================================
+  webmonitoring:
+    image: dockerregistry.content.ai/contentcapture/webmonitoring:14.12.0
+    container_name: cc-webmonitoring
+    network_mode: host
+    depends_on:
+      postgres:
+        condition: service_healthy
+      appserver:
+        condition: service_started
+    environment:
+      - CONTENTCAPTURE_SELF_DISPLAY_NAME=webstation_monitoring
+      - CONTENTCAPTURE_DB_CONNECTION_STRING=${CONTENTCAPTURE_DB_CONNECTION_STRING}
+      - CONTENTCAPTURE_DB_SERVER_TYPE=PostgreSql
+      - CONTENTCAPTURE_APPSERVER=https://cc.example.com:8443/ContentCapture/Server
+      - CONTENTCAPTURE_MONITORING_STATION_URL=https://cc.example.com/monitoring
+      - CONTENTCAPTURE_LOGIN_STATION_URL=https://cc.example.com/
+      - CONTENTCAPTURE_TRUST_ALL_CERTIFICATES=false
+      - CONTENTCAPTURE_BASE_LOG_PATH=/var/log/ContentCapture/
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=${ASPNETCORE_Kestrel__Certificates__Default__Password}
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=${ASPNETCORE_Kestrel__Certificates__Default__Path}
+      - ASPNETCORE_URLS=https://+:9102;http://+:9002
+     # - ASPNETCORE_URLS=http://+:80
+      - TZ=Europe/Moscow
+#    ports:
+#      - "9002:80"
+#      - "9102:443"
+    volumes:
+      - ./Certificate:/https:ro
+      - ./Logs:/var/log/ContentCapture:rw
+     # - /etc/timezone:/etc/timezone:ro
+     # - /etc/localtime:/etc/localtime:ro
+    extra_hosts:
+      - "localhost:127.0.0.1"
+#     - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # ==============================================
+  # 10. Nginx
+  # ==============================================
+  nginx:
+    image: nginx:alpine
+    container_name: cc-nginx
+    network_mode: host
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./Certificate:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - weblogin
+      - webmonitoring
+      - webverification
+      - webscanning
+      - appserver
+    restart: unless-stopped

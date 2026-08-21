@@ -1,0 +1,23 @@
+{{/* Компактные телеграм-сообщения sec-stack (parse_mode HTML).
+     Лимит telegram 4096 символов -> показываем максимум 8 алертов из группы. */}}
+{{ define "sec-stack.telegram" }}
+{{- if .Alerts.Firing }}
+{{- if eq .CommonLabels.severity "critical" }}🔴{{ else }}🟠{{ end }} <b>{{ .CommonLabels.alertname }}</b> — горит: {{ len .Alerts.Firing }}
+{{- range $i, $a := .Alerts.Firing }}
+{{- if lt $i 8 }}
+▪️ {{ $a.Annotations.summary }}{{ if $a.GeneratorURL }} <a href="{{ $a.GeneratorURL }}">📈</a>{{ end }}
+{{- end }}
+{{- end }}
+{{- if gt (len .Alerts.Firing) 8 }}
+<i>…показаны 8 из {{ len .Alerts.Firing }}, полный список — <a href="http://10.10.1.10:3000/d/sec-stack-overview">на дашборде</a></i>
+{{- end }}
+{{- end }}
+{{- if .Alerts.Resolved }}
+✅ <b>{{ .CommonLabels.alertname }}</b> — погасло: {{ len .Alerts.Resolved }}
+{{- range $i, $a := .Alerts.Resolved }}
+{{- if lt $i 8 }}
+▪️ {{ $a.Annotations.summary }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{ end }}

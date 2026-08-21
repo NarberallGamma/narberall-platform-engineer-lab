@@ -1,0 +1,16 @@
+---
+# Collections baked into the Ansible CI image (prepare_servers, Vault, db_restore).
+# Estate flow plus community.postgresql for db_restore. Not creator-ee.
+collections:
+  - name: community.general
+    version: ">=8.0.0"
+  - name: community.docker
+    version: ">=3.0.0"
+  - name: community.postgresql
+    version: ">=3.0.0"
+  - name: ansible.posix
+    version: ">=1.5.0"
+  - name: community.crypto
+    version: ">=2.0.0"
+  - name: community.hashi_vault
+    version: ">=7.0.0"

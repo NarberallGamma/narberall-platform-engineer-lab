@@ -1,0 +1,45 @@
+# Хосты, исключённые из расчёта EDR-покрытия (appliance, сетевое железо и т.п.)
+# Исключённые хосты остаются в edr_coverage_report.csv с флагом excluded=True,
+# но не учитываются в метриках.
+#
+# Правила применяются в порядке: global → company.
+# Хост исключается, если совпадает хотя бы одно правило из любой секции.
+
+# Применяется ко всем компаниям
+global:
+  # Glob-паттерны по hostname (регистронезависимо). * — любая подстрока, ? — один символ.
+  patterns:
+    - "ngfw*"          # межсетевые экраны
+    - "*-ngfw-*"       # ngfw-ноды в середине имени (в т.ч. из облачного тега NGFW)
+#    - "palo-*"        # Palo Alto
+#    - "*.oob"         # out-of-band management
+  # Точные имена хостов (регистронезависимо)
+  hostnames: []
+  # IP-адреса (точное совпадение с полем sourceip)
+  ips: []
+  # OU из Active Directory: хост исключается, если его DN содержит любой из этих суффиксов.
+  # Указывается как часть DN, начиная с OU= (регистронезависимо).
+  ous: []
+
+# Дополнения для конкретных компаний (добавляются к global, не заменяют)
+companies:
+  my-company:
+    patterns:
+      - "printer-*"
+      - "ups-*"
+      - "kvm-*"
+    hostnames:
+      - "mgmt-idrac-01"
+      - "mgmt-idrac-02"
+    ips:
+      - "192.168.1.1"
+    ous:
+      - "OU=Network Devices,DC=corp,DC=example,DC=com"
+      - "OU=Printers,DC=corp,DC=example,DC=com"
+
+  other-company:
+    patterns:
+      - "checkpoint-*"
+    hostnames: []
+    ips: []
+    ous: []

@@ -1,0 +1,76 @@
+# CI для git.example.com: собирает образ экспортера и кладёт в registry этого
+# проекта. Стек sec-stack подтягивает его по версии (см. stack/docker-compose.yml
+# в sec-stack) — исходники на ВМ мониторинга не едут вообще.
+#
+# Образ собирается kaniko: privileged-раннер и docker:dind не нужны.
+#
+# Требование к раннеру одно: он должен быть доступен этому проекту (групповой
+# раннер либо зарегистрированный сюда отдельно).
+#
+# Пуш в registry идёт под CI_JOB_TOKEN собственного проекта — отдельных
+# кредов заводить не нужно.
+
+stages: [lint, build]
+
+default:
+  interruptible: true
+  tags:
+    - sec-stack-runner
+
+lint:
+  stage: lint
+  image: python:3.12-slim
+  script:
+    - python -m py_compile edr_exporter.py merge3.py vkcloud.py sbercloud-adv.py active-directory.py vendor-edr.py edr_report.py
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG
+
+# Тесты матчинга: правила, которые уже ломались молча (имена, дубли, проход по
+# IP). Данных из облаков и EDR не требуют — фикстуры собираются в самих тестах.
+test:
+  stage: lint
+  image: python:3.12-slim
+  script:
+    - pip install --no-cache-dir uv
+    - uv sync --group dev --frozen
+    - uv run pytest -q
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG
+
+build:image:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:v1.24.0-debug
+    entrypoint: [""] # у образа свой entrypoint, gitlab-runner'у нужен пустой
+  script:
+    # Креды registry для kaniko: он читает их из docker-конфига, docker login тут
+    # неоткуда взять — демона нет by design
+    - mkdir -p /kaniko/.docker
+    - |
+      AUTH=$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')
+      printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$AUTH" > /kaniko/.docker/config.json
+    # По тегу — релизная версия (её и пинит sec-stack), с main — плавающий edge
+    # для проверок; на проде плавающий тег не используем.
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        TAGS="$CI_COMMIT_TAG latest"
+      else
+        TAGS="edge main-$CI_COMMIT_SHORT_SHA"
+      fi
+      DESTINATIONS=""
+      for t in $TAGS; do
+        DESTINATIONS="$DESTINATIONS --destination $CI_REGISTRY_IMAGE:$t"
+        echo "будет опубликован $CI_REGISTRY_IMAGE:$t"
+      done
+      # один проход сборки, несколько тегов на выходе
+      /kaniko/executor \
+        --context "$CI_PROJECT_DIR" \
+        --dockerfile "$CI_PROJECT_DIR/Dockerfile" \
+        $DESTINATIONS
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"

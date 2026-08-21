@@ -1,0 +1,45 @@
+image: docker:20.10
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+  REGISTRY_URL: "example.registry"
+  HELMFILE_VERSION: "0.169.1"
+  HELM_VERSION: "3.18.6"
+  KUBECTL_VERSION: "v1.34.3"
+  IMAGE_REPO: "${REGISTRY_URL}/ci/helmfile"
+
+stages:
+  - build
+
+.docker_build:
+  stage: build
+  when: manual
+  only:
+    - main
+  tags:
+    - docker
+  before_script:
+    - timeout 30 sh -c 'while ! docker info >/dev/null 2>&1; do sleep 1; done' || true
+    - docker version
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$REGISTRY_URL"
+  script:
+    - docker build
+      --build-arg HELMFILE_VERSION="${HELMFILE_VERSION}"
+      --build-arg KUBECTL_VERSION="${BUILD_KUBECTL_VERSION}"
+      -f Dockerfile
+      -t "${IMAGE_REPO}:${IMAGE_TAG}"
+      .
+    - docker push "${IMAGE_REPO}:${IMAGE_TAG}"
+
+build-helmfile-baseline:
+  extends: .docker_build
+  variables:
+    BUILD_KUBECTL_VERSION: ""
+    IMAGE_TAG: "${HELMFILE_VERSION}-helm${HELM_VERSION}"
+
+build-helmfile-kubectl:
+  extends: .docker_build
+  variables:
+    BUILD_KUBECTL_VERSION: "${KUBECTL_VERSION}"
+    IMAGE_TAG: "${HELMFILE_VERSION}-helm${HELM_VERSION}-kubectl1.34.3"

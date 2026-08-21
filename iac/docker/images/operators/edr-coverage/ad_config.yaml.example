@@ -1,0 +1,94 @@
+## All parameters for each company entry:
+#
+#   name                      — company name; output file will be {name}-ad.csv
+#   server                    — LDAP/LDAPS URL of the domain controller
+#   bind_dn                   — DN of the service account used to query AD
+#   bind_password             — password for bind_dn
+#   base_dn                   — root DN to search when workstation_ous is not set
+#   workstation_ous           — (optional) list of OUs to search; defaults to base_dn
+#   hostname_patterns         — (optional) keep only hosts matching ≥1 glob; case-insensitive
+#   hostname_exclude_patterns — (optional) drop hosts matching any glob; applied after hostname_patterns
+#   os_filter                 — windows | macos | linux | all  (default: windows)
+#   enabled_only              — skip disabled AD accounts  (default: true)
+#   tls_insecure              — skip TLS certificate validation  (default: false)
+#
+## YAML anchors can be used to share connection settings across companies:
+#
+# _connection: &conn
+#   server: ldaps://dc1.corp.example.com:636
+#   bind_dn: "CN=svc-ldap,OU=Service Accounts,DC=corp,DC=example,DC=com"
+#   bind_password: ""
+#   base_dn: "DC=corp,DC=example,DC=com"
+#   enabled_only: true
+#   tls_insecure: false
+
+companies:
+
+  # ── Scenario A: dedicated OU per company ─────────────────────────────────
+  # The OU already isolates the right hosts — no hostname_patterns needed.
+  - name: my-company-a
+    server: ldaps://dc1.corp.example.com:636
+    bind_dn: "CN=svc-ldap,OU=Service Accounts,DC=corp,DC=example,DC=com"
+    bind_password: ""
+    base_dn: "DC=corp,DC=example,DC=com"
+    workstation_ous:
+      - "OU=Laptops,OU=My Company A,OU=Clients,DC=corp,DC=example,DC=com"
+    os_filter: "windows"
+    enabled_only: true
+    tls_insecure: false
+
+  # ── Scenario B: shared OU, split by hostname prefix ───────────────────────
+  # Multiple companies share the same OU (e.g. OU=Assets).
+  # hostname_patterns picks only this company's machines.
+  # os_filter: "all" covers both Windows and macOS endpoints.
+  - name: my-company-b
+    server: ldaps://dc1.corp.example.com:636
+    bind_dn: "CN=svc-ldap,OU=Service Accounts,DC=corp,DC=example,DC=com"
+    bind_password: ""
+    base_dn: "DC=corp,DC=example,DC=com"
+    workstation_ous:
+      - "OU=Laptops,OU=Assets,DC=corp,DC=example,DC=com"
+      - "OU=MacOS,OU=Laptops,OU=Assets,DC=corp,DC=example,DC=com"
+    hostname_patterns:
+      - "w-comp-b-*"   # Windows endpoints
+      - "m-comp-b-*"   # macOS endpoints
+    os_filter: "all"
+    enabled_only: true
+    tls_insecure: false
+
+  # ── Scenario C: multiple OUs + hostname patterns ──────────────────────────
+  # Company has a dedicated Clients OU AND machines in the shared Assets OU.
+  # hostname_patterns is applied across all listed OUs.
+  - name: my-company-c
+    server: ldaps://dc1.corp.example.com:636
+    bind_dn: "CN=svc-ldap,OU=Service Accounts,DC=corp,DC=example,DC=com"
+    bind_password: ""
+    base_dn: "DC=corp,DC=example,DC=com"
+    workstation_ous:
+      - "OU=Laptops,OU=My Company C,OU=Clients,DC=corp,DC=example,DC=com"
+      - "OU=MacOS,OU=Laptops,OU=Assets,DC=corp,DC=example,DC=com"
+    hostname_patterns:
+      - "w-comp-c-*"
+      - "m-comp-c-*"
+    os_filter: "all"
+    enabled_only: true
+    tls_insecure: false
+
+  # ── Scenario D: broad pattern + exclusions ────────────────────────────────
+  # Company's machines have no shared prefix (e.g. m-<surname> format).
+  # Take all m-* from the OU and exclude prefixes belonging to other companies.
+  - name: my-company-d
+    server: ldaps://dc1.corp.example.com:636
+    bind_dn: "CN=svc-ldap,OU=Service Accounts,DC=corp,DC=example,DC=com"
+    bind_password: ""
+    base_dn: "DC=corp,DC=example,DC=com"
+    workstation_ous:
+      - "OU=MacOS,OU=Laptops,OU=Assets,DC=corp,DC=example,DC=com"
+    hostname_patterns:
+      - "m-*"                 # grab everything m-* from this OU …
+    hostname_exclude_patterns:
+      - "m-comp-b-*"          # … then drop other companies' machines
+      - "m-comp-c-*"
+    os_filter: "macos"
+    enabled_only: true
+    tls_insecure: false

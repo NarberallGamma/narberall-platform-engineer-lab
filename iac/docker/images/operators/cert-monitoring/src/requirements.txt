@@ -1,0 +1,29 @@
+# SSL Certificate Monitoring Dependencies
+
+# Date/time handling
+python-dateutil==2.8.2
+
+# DNS resolution
+dnspython==2.4.2
+
+# Logging and configuration
+python-dotenv==1.0.0
+
+# HTTP requests (for Telegram API)
+requests==2.31.0
+aiohttp==3.9.1
+
+# SSL/TLS certificate handling
+cryptography==41.0.7
+
+# JSON handling (built-in, but explicit for clarity)
+# json - built-in module
+
+# SSL/TLS handling (built-in)
+# ssl - built-in module
+# socket - built-in module
+
+# System utilities (built-in)
+# subprocess - built-in module
+# datetime - built-in module
+# logging - built-in module

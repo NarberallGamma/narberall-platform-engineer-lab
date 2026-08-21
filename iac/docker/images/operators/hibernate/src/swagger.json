@@ -1,0 +1,1273 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Cloud Hibernate Operator API",
+    "description": "REST API for managing CCE cluster hibernation and wake-up operations with ECS worker nodes management, and individual ECS instances management",
+    "version": "3.2.1",
+    "contact": {
+      "name": "API Support"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "description": "Basic health check endpoint",
+        "operationId": "healthCheck",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "healthy"
+                    },
+                    "app_name": {
+                      "type": "string",
+                      "example": "Cloud Hibernate Operator"
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "example": "3.2.1"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "API health check",
+        "description": "Check health of all cloud APIs (IAM, CCE, ECS)",
+        "operationId": "apiHealthCheck",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "All APIs are healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "healthy"
+                    },
+                    "apis": {
+                      "type": "object",
+                      "properties": {
+                        "iam": {
+                          "type": "boolean",
+                          "example": true
+                        },
+                        "cce": {
+                          "type": "boolean",
+                          "example": true
+                        },
+                        "ecs": {
+                          "type": "boolean",
+                          "example": true
+                        }
+                      }
+                    },
+                    "app_name": {
+                      "type": "string"
+                    },
+                    "app_version": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "One or more APIs are unhealthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "degraded"
+                    },
+                    "apis": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clusters": {
+      "get": {
+        "summary": "List all clusters",
+        "description": "Get list of all configured clusters",
+        "operationId": "listClusters",
+        "tags": ["Clusters"],
+        "responses": {
+          "200": {
+            "description": "List of clusters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "clusters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "cluster_id": {
+                            "type": "string",
+                            "example": "00000000-0000-4000-8000-0000000000c1"
+                          },
+                          "name": {
+                            "type": "string",
+                            "example": "demo-cluster"
+                          },
+                          "project_id": {
+                            "type": "string",
+                            "example": "aaaaaaaa000040008000000000000001"
+                          },
+                          "hibernate_schedule": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": "from 22:00 to 8:00 monday"
+                          },
+                          "wake_up_delay_minutes": {
+                            "type": "integer",
+                            "example": 1
+                          }
+                        }
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "example": 2
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clusters/{cluster_id}/status": {
+      "get": {
+        "summary": "Get cluster status",
+        "description": "Get current status of a specific cluster",
+        "operationId": "getClusterStatus",
+        "tags": ["Clusters"],
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "path",
+            "required": true,
+            "description": "Cluster ID",
+            "schema": {
+              "type": "string",
+              "example": "00000000-0000-4000-8000-0000000000c1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cluster status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cluster_id": {
+                      "type": "string"
+                    },
+                    "cluster_name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cluster not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Cluster 00000000-0000-4000-8000-0000000000c1 not found"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to get cluster status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clusters/{cluster_id}/hibernate": {
+      "post": {
+        "summary": "Hibernate cluster",
+        "description": "Hibernate a cluster on-demand (stops worker nodes and hibernates master nodes). Automatically sets schedule override to ignore schedule for configured duration.",
+        "operationId": "hibernateCluster",
+        "tags": ["Clusters"],
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "path",
+            "required": true,
+            "description": "Cluster ID",
+            "schema": {
+              "type": "string",
+              "example": "00000000-0000-4000-8000-0000000000c1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hibernation initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Cluster demo-cluster hibernation initiated successfully"
+                    },
+                    "schedule_override": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean",
+                          "example": true
+                        },
+                        "duration_hours": {
+                          "type": "integer",
+                          "example": 24
+                        },
+                        "reason": {
+                          "type": "string",
+                          "example": "Manual hibernation via API"
+                        }
+                      }
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "cluster_name": {
+                          "type": "string"
+                        },
+                        "cluster_id": {
+                          "type": "string"
+                        },
+                        "operation": {
+                          "type": "string",
+                          "example": "hibernate"
+                        },
+                        "worker_nodes_count": {
+                          "type": "integer"
+                        },
+                        "worker_nodes_processed": {
+                          "type": "integer"
+                        },
+                        "cluster_status": {
+                          "type": "string"
+                        },
+                        "duration_seconds": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cluster not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to hibernate cluster",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clusters/{cluster_id}/awake": {
+      "post": {
+        "summary": "Wake up cluster",
+        "description": "Wake up a hibernated cluster on-demand (wakes up master nodes and starts worker nodes). Automatically sets schedule override to ignore schedule for configured duration.",
+        "operationId": "awakeCluster",
+        "tags": ["Clusters"],
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "path",
+            "required": true,
+            "description": "Cluster ID",
+            "schema": {
+              "type": "string",
+              "example": "00000000-0000-4000-8000-0000000000c1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Wake-up initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Cluster demo-cluster wake-up initiated successfully"
+                    },
+                    "schedule_override": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean",
+                          "example": true
+                        },
+                        "duration_hours": {
+                          "type": "integer",
+                          "example": 24
+                        },
+                        "reason": {
+                          "type": "string",
+                          "example": "Manual wake-up via API"
+                        }
+                      }
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "cluster_name": {
+                          "type": "string"
+                        },
+                        "cluster_id": {
+                          "type": "string"
+                        },
+                        "operation": {
+                          "type": "string",
+                          "example": "awake"
+                        },
+                        "worker_nodes_count": {
+                          "type": "integer"
+                        },
+                        "worker_nodes_processed": {
+                          "type": "integer"
+                        },
+                        "cluster_status": {
+                          "type": "string"
+                        },
+                        "duration_seconds": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cluster not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to wake up cluster",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clusters/{cluster_id}/override": {
+      "get": {
+        "summary": "Get schedule override status",
+        "description": "Get current schedule override status for a cluster (if schedule is being ignored)",
+        "operationId": "getScheduleOverride",
+        "tags": ["Clusters"],
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "path",
+            "required": true,
+            "description": "Cluster ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Override status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cluster_id": {"type": "string"},
+                    "cluster_name": {"type": "string"},
+                    "override": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "until": {"type": "string", "format": "date-time"},
+                        "reason": {"type": "string"},
+                        "set_at": {"type": "string", "format": "date-time"},
+                        "remaining_seconds": {"type": "integer"},
+                        "remaining_hours": {"type": "number"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Set schedule override",
+        "description": "Set schedule override for a cluster (ignore schedule for specified duration)",
+        "operationId": "setScheduleOverride",
+        "tags": ["Clusters"],
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "path",
+            "required": true,
+            "description": "Cluster ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "duration_hours": {
+                    "type": "integer",
+                    "description": "Duration to ignore schedule (hours)",
+                    "default": 24
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Reason for override",
+                    "default": "Manual override via API"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Override set successfully"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Clear schedule override",
+        "description": "Clear schedule override for a cluster (resume following schedule)",
+        "operationId": "clearScheduleOverride",
+        "tags": ["Clusters"],
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "path",
+            "required": true,
+            "description": "Cluster ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Override cleared successfully"
+          },
+          "404": {
+            "description": "No active override found"
+          }
+        }
+      }
+    },
+    "/api/clusters/{cluster_id}/schedule": {
+      "get": {
+        "summary": "Get cluster schedule",
+        "description": "Get current schedule configuration for a cluster",
+        "operationId": "getClusterSchedule",
+        "tags": ["Clusters"],
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "path",
+            "required": true,
+            "description": "Cluster ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cluster schedule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cluster_id": {"type": "string"},
+                    "cluster_name": {"type": "string"},
+                    "hibernate_schedule": {"type": "string", "nullable": true},
+                    "wake_up_delay_minutes": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update cluster schedule",
+        "description": "Update cluster schedule in runtime (changes are not persisted to config file)",
+        "operationId": "updateClusterSchedule",
+        "tags": ["Clusters"],
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "path",
+            "required": true,
+            "description": "Cluster ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["hibernate_schedule"],
+                "properties": {
+                  "hibernate_schedule": {
+                    "type": "string",
+                    "description": "New schedule in format: from <time> [<day/date>] to <time> [<day/date>]",
+                    "example": "from 22:00 monday to 8:00 tuesday"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Schedule updated successfully"
+          },
+          "400": {
+            "description": "Invalid schedule format"
+          }
+        }
+      }
+    },
+    "/api/schedules": {
+      "get": {
+        "summary": "List scheduled jobs",
+        "description": "Get list of all scheduled operations (clusters and ECS instances)",
+        "operationId": "listSchedules",
+        "tags": ["Schedules"],
+        "responses": {
+          "200": {
+            "description": "List of scheduled jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schedules_enabled": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "job_id": {
+                            "type": "string",
+                            "example": "00000000-0000-4000-8000-0000000000c1_hibernate_0"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": ["cluster", "ecs_instance"],
+                            "example": "cluster"
+                          },
+                          "cluster_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": "00000000-0000-4000-8000-0000000000c1"
+                          },
+                          "cluster_name": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": "demo-cluster"
+                          },
+                          "instance_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                          },
+                          "instance_name": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": "standalone-vm-1"
+                          },
+                          "operation": {
+                            "type": "string",
+                            "enum": ["hibernate", "awake", "stop", "start"],
+                            "example": "hibernate"
+                          },
+                          "schedule": {
+                            "type": "string",
+                            "example": "from 22:00 to 8:00 monday"
+                          },
+                          "is_recurring": {
+                            "type": "boolean",
+                            "example": true
+                          }
+                        }
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "example": 4
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config": {
+      "get": {
+        "summary": "Get configuration",
+        "description": "Get application configuration (excluding sensitive data)",
+        "operationId": "getConfig",
+        "tags": ["Configuration"],
+        "responses": {
+          "200": {
+            "description": "Configuration information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "iam_endpoint": {
+                      "type": "string"
+                    },
+                    "cce_endpoint": {
+                      "type": "string"
+                    },
+                    "ecs_endpoint": {
+                      "type": "string"
+                    },
+                    "clusters_count": {
+                      "type": "integer"
+                    },
+                    "clusters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "cluster_id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "project_id": {
+                            "type": "string"
+                          },
+                          "hibernate_schedule": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "wake_up_delay_minutes": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "ecs_instances_count": {
+                      "type": "integer"
+                    },
+                    "ecs_instances": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "instance_id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "project_id": {
+                            "type": "string"
+                          },
+                          "hibernate_schedule": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    },
+                    "telegram_enabled": {
+                      "type": "boolean"
+                    },
+                    "log_level": {
+                      "type": "string"
+                    },
+                    "log_dir": {
+                      "type": "string"
+                    },
+                    "schedule_enabled": {
+                      "type": "boolean"
+                    },
+                    "schedule_override_duration_hours": {
+                      "type": "integer",
+                      "description": "Duration to ignore schedule after manual override (hours)",
+                      "example": 24
+                    },
+                    "iam_token_refresh_interval": {
+                      "type": "integer",
+                      "description": "IAM token refresh interval (seconds, default 82800 = 23 hours)",
+                      "example": 82800
+                    },
+                    "api_enabled": {
+                      "type": "boolean"
+                    },
+                    "api_port": {
+                      "type": "integer"
+                    },
+                    "swagger_endpoint": {
+                      "type": "string"
+                    },
+                    "app_name": {
+                      "type": "string"
+                    },
+                    "app_version": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instances": {
+      "get": {
+        "summary": "List all ECS instances",
+        "description": "Get list of all configured ECS instances (not part of clusters)",
+        "operationId": "listInstances",
+        "tags": ["ECS Instances"],
+        "responses": {
+          "200": {
+            "description": "List of ECS instances",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "instances": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "instance_id": {
+                            "type": "string",
+                            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                          },
+                          "name": {
+                            "type": "string",
+                            "example": "standalone-vm-1"
+                          },
+                          "project_id": {
+                            "type": "string",
+                            "example": "aaaaaaaa000040008000000000000001"
+                          },
+                          "hibernate_schedule": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": "from 22:00 to 8:00 monday"
+                          }
+                        }
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "example": 2
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instances/{instance_id}/status": {
+      "get": {
+        "summary": "Get ECS instance status",
+        "description": "Get current status of a specific ECS instance",
+        "operationId": "getInstanceStatus",
+        "tags": ["ECS Instances"],
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "description": "ECS Instance ID",
+            "schema": {
+              "type": "string",
+              "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ECS instance status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "instance_id": {
+                      "type": "string"
+                    },
+                    "instance_name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ECS instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "ECS instance a1b2c3d4-e5f6-7890-abcd-ef1234567890 not found"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to get ECS instance status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instances/{instance_id}/stop": {
+      "post": {
+        "summary": "Stop ECS instance",
+        "description": "Stop an ECS instance on-demand",
+        "operationId": "stopInstance",
+        "tags": ["ECS Instances"],
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "description": "ECS Instance ID",
+            "schema": {
+              "type": "string",
+              "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stop initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "ECS instance standalone-vm-1 stop initiated successfully"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "instance_name": {
+                          "type": "string"
+                        },
+                        "instance_id": {
+                          "type": "string"
+                        },
+                        "operation": {
+                          "type": "string",
+                          "example": "stop"
+                        },
+                        "duration_seconds": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ECS instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to stop ECS instance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instances/{instance_id}/start": {
+      "post": {
+        "summary": "Start ECS instance",
+        "description": "Start an ECS instance on-demand",
+        "operationId": "startInstance",
+        "tags": ["ECS Instances"],
+        "parameters": [
+          {
+            "name": "instance_id",
+            "in": "path",
+            "required": true,
+            "description": "ECS Instance ID",
+            "schema": {
+              "type": "string",
+              "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Start initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "ECS instance standalone-vm-1 start initiated successfully"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "instance_name": {
+                          "type": "string"
+                        },
+                        "instance_id": {
+                          "type": "string"
+                        },
+                        "operation": {
+                          "type": "string",
+                          "example": "start"
+                        },
+                        "duration_seconds": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ECS instance not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to start ECS instance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API Key для аутентификации. Получите ключ у администратора."
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Health check endpoints"
+    },
+    {
+      "name": "Clusters",
+      "description": "Cluster management operations"
+    },
+    {
+      "name": "Schedules",
+      "description": "Scheduled operations management"
+    },
+    {
+      "name": "Configuration",
+      "description": "Configuration endpoints"
+    },
+    {
+      "name": "ECS Instances",
+      "description": "ECS instance management operations"
+    }
+  ]
+}

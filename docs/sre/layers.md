@@ -2,14 +2,14 @@
 
 Multiple observability planes. **Do not merge** them into one compose or one chart. Host cybersec metrics stay on a VM. The CCE overlay is Grafana + exporters + an OpenObserve collector. PromQL packs, ElastAlert2, ELK, and OTel are other-estate addons.
 
-Hub table (same split): [`../../iac/helm/README.md#observability-split-do-not-duplicate-ansible`](../../iac/helm/README.md#observability-split-do-not-duplicate-ansible). Cases: [10](../../case-studies/10-ansible-estate.md), [11](../../case-studies/11-helm-estate.md).
+Hub table (same split): [`../../iac/helm/README.md#observability-split-do-not-duplicate-ansible`](../../iac/helm/README.md#observability-split-do-not-duplicate-ansible). Cases: [10](../../case-studies/10-ansible-estate.md), [11](../../case-studies/11-helm-estate.md), [12](../../case-studies/12-docker-images.md).
 
 ## Host (Ansible)
 
 | Layer | Path | Job |
 |-------|------|-----|
 | Prom → VictoriaMetrics | [`../../iac/ansible/reference/ansible-app-platform/`](../../iac/ansible/reference/ansible-app-platform/) `monitoring_deploy` | Scrape estate + Kubernetes SD + blackbox + cAdvisor. Compose with remote_write |
-| Host Grafana + vmalert | [`../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/`](../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/) | Roles for VM + Grafana + Alertmanager + PAN-OS / EDR exporters. SOPS contract. Compose `stack/` is not published |
+| Host Grafana + vmalert | [`../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/`](../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/) | Roles for VM + Grafana + Alertmanager + PAN-OS / EDR exporters. SOPS contract. Compose `stack/` **is published**: [`../../iac/docker/compose/sec-stack/`](../../iac/docker/compose/sec-stack/) and the Ansible copy [`../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/stack/`](../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/stack/) |
 | Node scrape | [`../../iac/ansible/reference/ansible-estate/`](../../iac/ansible/reference/ansible-estate/) | `:9100` on the VM; cert-monitoring docker_app next to it |
 | Before Prom | [`../../iac/ansible/reference/monitoring-starter/`](../../iac/ansible/reference/monitoring-starter/) | sysstat / vnstat timers |
 

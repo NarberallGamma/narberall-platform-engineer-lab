@@ -1,0 +1,126 @@
+# Центральный стек мониторинга. Живёт на ВМ в management-сегменте облака A.
+# Версии пиновые (latest stable на 2026-07-15).
+services:
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.147.0
+    command:
+      - --storageDataPath=/storage
+      - --retentionPeriod=6           # месяцев хранения
+      - --httpListenAddr=:8428
+    volumes:
+      - vmdata:/storage
+    ports:
+      # Наружу — это endpoint для remote_write с vmagent'ов других площадок
+      # (облако B, on-prem). Закрыть файрволом до их адресов + позже добавить
+      # TLS/basic auth (vmauth или nginx перед VM).
+      - "8428:8428"
+    restart: unless-stopped
+
+  vmagent:
+    # Локальный сборщик площадки site-a: скрейпит таргеты и пишет в VM.
+    # На остальных площадках будет ровно такой же vmagent + свой prometheus.yml,
+    # с remoteWrite.url на этот хост.
+    image: victoriametrics/vmagent:v1.147.0
+    command:
+      - --promscrape.config=/etc/vmagent/prometheus.yml
+      - --promscrape.configCheckInterval=60s   # подхватывать новый конфиг без рестарта
+      - --remoteWrite.url=http://victoriametrics:8428/api/v1/write
+      - --remoteWrite.tmpDataPath=/vmagentdata
+    volumes:
+      # каталог, не файл: bind-mount файла держит inode, и после замены файла
+      # ansible'ом авто-reload видел бы старый конфиг
+      - ./vmagent:/etc/vmagent:ro
+      - vmagentdata:/vmagentdata
+    restart: unless-stopped
+
+  vmalert:
+    # VictoriaMetrics сама правила не считает — этим занимается vmalert.
+    image: victoriametrics/vmalert:v1.147.0
+    command:
+      - --datasource.url=http://victoriametrics:8428
+      - --remoteWrite.url=http://victoriametrics:8428
+      - --remoteRead.url=http://victoriametrics:8428
+      - --notifier.url=http://alertmanager:9093
+      - --rule=/etc/vmalert/rules/*.yml
+      - --configCheckInterval=60s              # перечитывать правила без рестарта
+      - --external.label=site=site-a
+      # GeneratorURL алерта = ссылка в vmui с запросом правила (📈 в телеграме)
+      - --external.url=http://10.10.1.10:8428
+      - "--external.alert.source=vmui/#/?g0.expr={{.Expr|queryEscape}}&g0.range_input=1h"
+    volumes:
+      - ./vmalert/rules:/etc/vmalert/rules:ro
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.33.1
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      # каталог целиком: конфиг + templates/, и замена файлов ansible'ом не
+      # ломает bind-mount (та же история с inode, что у vmagent)
+      - ./alertmanager:/etc/alertmanager:ro
+      - alertmanagerdata:/alertmanager
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.1.0
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-CHANGE_ME}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  blackbox:
+    image: prom/blackbox-exporter:v0.28.0
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    # ICMP-пробы требуют CAP_NET_RAW
+    cap_add:
+      - NET_RAW
+    restart: unless-stopped
+
+  panos-exporter:
+    # Кастомный экспортер PAN-OS: HA, IPsec, лицензии, сертификаты, сессии.
+    build: ./exporters/panos
+    environment:
+      - PANOS_EXPORTER_CONFIG=/etc/panos-exporter/config.yml
+    # API-ключи файрволов приходят из .env (PANOS_API_KEY_<NAME>)
+    env_file:
+      - .env
+    volumes:
+      - ./exporters/panos/config.yml:/etc/panos-exporter/config.yml:ro
+    restart: unless-stopped
+
+  edr-exporter:
+    # Покрытие инфраструктуры агентами EDR. Образ собирает CI проекта
+    # edr-coverage по тегу; здесь пинится версия. Исходников на ВМ нет.
+    image: example.registry/sec/edr-coverage:v0.7.2
+    environment:
+      - EDR_DATA_DIR=/data
+      - EDR_CONFIG_DIR=/config
+      # Гонять сборщики (AD, облако A, облако B, EDR) перед merge. Источник без
+      # конфига в /config просто пропускается — не ошибка.
+      - EDR_COLLECT_SOURCES=1
+      # Сбор ходит в LDAP и облачные API — раз в 6 часов, а не на каждый scrape;
+      # /metrics отдаёт последний снапшот (см. README экспортера).
+      - EDR_COLLECT_INTERVAL=21600
+    volumes:
+      - ./exporters/edr/data:/data
+      # конфиги сборщиков с кредами — read-only, рендерятся ansible из SOPS
+      - ./exporters/edr/config:/config:ro
+    restart: unless-stopped
+
+volumes:
+  vmdata:
+  vmagentdata:
+  grafanadata:
+  alertmanagerdata:

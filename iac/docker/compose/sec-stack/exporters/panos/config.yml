@@ -1,0 +1,54 @@
+# Конфиг panos-exporter. Имена файрволов здесь = таргеты в vmagent/prometheus.yml
+# и суффиксы переменных с API-ключами (PANOS_API_KEY_NGFW01_SITE_A и т.д.).
+#
+# API-ключ получить так (на каждом ФВ отдельный read-only пользователь sec-stack,
+# роль superuser read-only):
+#   curl -sk "https://<fw>/api/?type=keygen&user=<user>&password=<pass>"
+#
+# IPsec-туннели мониторятся ДИНАМИЧЕСКИ: список берётся из running config
+# устройства (без disabled), вносить руками ничего не нужно.
+#
+# Если туннель штатно лежит — не исключать его из мониторинга, а назначить роль
+# (метка role на panos_ipsec_tunnel_up). Критом алертится только primary:
+#   primary  — рабочий туннель (по умолчанию), падение = алерт;
+#   reserve  — резерв, лежит пока жив основной: на дашборде виден, в чат не идёт;
+#   broken   — заведомо неподнимаемый/недонастроенный, тоже без алертов.
+# Роль задаётся здесь (ipsec_tunnel_roles) либо маркером в поле comment туннеля
+# на самом PAN-OS: [sec-stack:role=reserve] — тогда правит сетевик, без MR сюда.
+# Конфиг перебивает comment. ignore_ipsec_tunnels — жёстче: метрики не будет вовсе.
+
+listen: 0.0.0.0:9654
+
+firewalls:
+  ngfw01-site-a:
+    host: ngfw01-site-a.example.com
+    verify_tls: false # TODO: включить после нормальных сертов на mgmt
+    # ignore_ipsec_tunnels: [tunnel-to-nowhere]
+    ipsec_tunnel_roles:
+      ipsec-to-peer-a-reserve: reserve # резерв для ipsec-to-peer-a, штатно лежит
+      ipsec-peer-b: broken       # не поднимается; снять роль, когда донастроят
+  ngfw02-site-a:
+    host: ngfw02-site-a.example.com
+    verify_tls: false
+  # ngfw-test-site-a сломан — из опроса убран, чтобы не заваливать чат вечным
+  # PanosUnreachable. Вернуть (тут и в vmagent/prometheus.yml), когда починят.
+  # ngfw-test-site-a:
+  #   host: ngfw-test-site-a.example.com
+  #   verify_tls: false
+  ngfw-project-b:
+    host: ngfw-project-b.example.com
+    verify_tls: false
+    ipsec_tunnel_roles:
+      ipsec-to-vps2: broken # подняться не может; снять роль, когда починят
+  ngfw-project-c:
+    host: ngfw-project-c.example.com
+    verify_tls: false
+  ngfw01-project-d:
+    host: ngfw01-project-d.example.com
+    verify_tls: false
+  ngfw02-project-d:
+    host: ngfw02-project-d.example.com
+    verify_tls: false
+  ngfw01-project-e:
+    host: ngfw01-project-e.example.com
+    verify_tls: false

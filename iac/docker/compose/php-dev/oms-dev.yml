@@ -1,0 +1,121 @@
+version: "2.1"
+services:
+  postgres_oms:
+    container_name: postgres_oms
+    image: example.registry/proxy/postgres:13.10
+    restart: always
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    networks:
+      - shop_oms_bridge
+    ports:
+      - 55432:5432
+    volumes:
+    - /path/to/app:/app
+    - ./.database/oms:/var/lib/postgresql
+  postgres_oms_test:
+    container_name: postgres_oms_test
+    image: example.registry/proxy/postgres:13.10
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    networks:
+      - shop_oms_bridge
+    ports:
+      - 55433:5432
+    restart: always
+    volumes:
+    - /path/to/app:/app
+    - ./.database/test:/var/lib/postgresql
+  rabbitmq:
+    container_name: rmq_oms
+    image: example.registry/proxy/rabbitmq:3.9-management-alpine
+    restart: always
+    networks:
+      - shop_oms_bridge
+    environment:
+      RABBITMQ_DEFAULT_USER: CHANGE_ME
+      RABBITMQ_DEFAULT_PASS: CHANGE_ME
+      RABBITMQ_FEATURE_FLAGS: quorum_queue
+  init-db_oms:
+    image: $WERF_BACKEND_DOCKER_IMAGE_NAME
+    command: ["/app/docker/php-oms/scripts/docker-dev-init-entrypoint.sh"]
+    entrypoint: "/bin/bash"
+    networks:
+      - shop_oms_bridge
+    volumes:
+      - /path/to/app:/app
+    env_file:
+      - oms.env.example
+    depends_on:
+        php_oms:
+          condition: service_started
+  init-db_oms_test:
+    image: $WERF_BACKEND_DOCKER_IMAGE_NAME
+    command: ["/app/docker/php-oms/scripts/docker-dev-init-entrypoint-testing.sh"]
+    entrypoint: "/bin/bash"
+    networks:
+      - shop_oms_bridge
+    volumes:
+      - /path/to/app:/app
+    env_file:
+      - oms.env.example
+    depends_on:
+        init-db_oms:
+          condition: service_completed_successfully
+  init-db_conditional:
+    image: $WERF_BACKEND_DOCKER_IMAGE_NAME
+    command: ["/app/docker/php-oms/scripts/docker-dev-init-conditional.sh"]
+    entrypoint: "/bin/bash"
+    networks:
+      - shop_oms_bridge
+    volumes:
+      - /path/to/app:/app
+    depends_on:
+        init-db_oms_test:
+          condition: service_completed_successfully
+        init-db_oms:
+          condition: service_completed_successfully
+  nginxoms:
+    container_name: nginxoms
+    image: $WERF_NGINX_OMS_DOCKER_IMAGE_NAME
+    volumes:
+    - ../../images/apps/php-oms/nginx.conf:/etc/nginx/nginx.conf
+    links:
+      - php_oms
+    ports:
+      - 8000:80
+    networks:
+      - shop_oms_bridge
+    restart: always
+    depends_on:
+      - php_oms
+
+  php_oms:
+    container_name: php_oms
+    image: $WERF_PHP_OMS_DOCKER_IMAGE_NAME
+    restart: always
+    entrypoint: "/bin/bash"
+    command: ["/app/docker/php-oms/scripts/docker-dev-start-oms.sh"]
+    volumes:
+      - /path/to/app:/app
+      - ../../images/apps/php-oms/ini/php.ini:/etc/php.ini
+      - ../../images/apps/php-oms/ini/php-fpm.conf:/etc/php-fpm.conf
+    networks:
+      - shop_oms_bridge
+    environment:
+      - XDEBUG_CONFIG=remote_host=host.docker.internal remote_enable=1
+      - PHP_IDE_CONFIG=serverName=DockerShopOms
+    ports:
+      - 32842:9000
+      - 33843:587
+    sysctls:
+      - net.ipv4.tcp_keepalive_intvl=75
+      - net.ipv4.tcp_keepalive_probes=9
+      - net.ipv4.tcp_keepalive_time=7200
+      - net.core.somaxconn=1024
+    depends_on:
+      - postgres_oms
+      - postgres_oms_test
+networks:
+  shop_oms_bridge:
+    external: true

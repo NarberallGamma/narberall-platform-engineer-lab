@@ -1,0 +1,152 @@
+services:
+  postgres_oms:
+    container_name: postgres_oms
+    image: postgres:13.10
+    restart: always
+    networks:
+      - shop_oms_bridge
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    env_file:
+      - oms.env.example
+    ports:
+      - "55429:5432"
+    volumes:
+    - /path/to/app:/app
+    - oms_database:/var/lib/postgresql
+
+  postgres_oms_test:
+    container_name: postgres_oms_test
+    image: postgres:13.10
+    networks:
+      - shop_oms_bridge
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    env_file:
+      - oms.env.example
+    ports:
+      - "55430:5432"
+    restart: always
+    volumes:
+    - /path/to/app:/app
+    - oms_test_database:/var/lib/postgresql
+
+
+  postgres_oms_test_1:
+    container_name: postgres_oms_test_1
+    image: postgres:13.10
+    networks:
+      - shop_oms_bridge
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    env_file:
+      - oms.env.example
+    ports:
+      - "55431:5432"
+    restart: always
+    volumes:
+    - /path/to/app:/app
+    - oms_test_1_database:/var/lib/postgresql
+
+  postgres_oms_test_2:
+    container_name: postgres_oms_test_2
+    image: postgres:13.10
+    networks:
+      - shop_oms_bridge
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    env_file:
+      - oms.env.example
+    ports:
+      - "55432:5432"
+    restart: always
+    volumes:
+    - /path/to/app:/app
+    - oms_test_2_database:/var/lib/postgresql
+
+  postgres_oms_test_3:
+    container_name: postgres_oms_test_3
+    image: postgres:13.10
+    networks:
+      - shop_oms_bridge
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    env_file:
+      - oms.env.example
+    ports:
+      - "55433:5432"
+    restart: always
+    volumes:
+    - /path/to/app:/app
+    - oms_test_3_database:/var/lib/postgresql
+
+  rabbitmq:
+    container_name: rmq_oms
+    image: rabbitmq:3.9-management-alpine
+    restart: always
+    networks:
+      - shop_oms_bridge
+    environment:
+      RABBITMQ_DEFAULT_USER: CHANGE_ME
+      RABBITMQ_DEFAULT_PASS: CHANGE_ME
+
+  nginxoms:
+    container_name: nginxoms
+    image: nginx:1.25.4-alpine
+    networks:
+      - shop_oms_bridge
+    volumes:
+      - ../../images/apps/php-oms/nginx.conf:/etc/nginx/nginx.conf
+    env_file:
+      - oms.env.example
+    links:
+      - php_oms
+    ports:
+      - "8000:80"
+    restart: always
+    depends_on:
+      - php_oms
+
+  php_oms:
+    container_name: php_oms
+    build: "../../images/apps/php-oms"
+    restart: always
+    entrypoint: "/bin/bash"
+    command: ["/app/docker/php-oms/scripts/docker-dev-start-oms.sh"]
+    networks:
+      - shop_oms_bridge
+    volumes:
+      - /path/to/app:/app
+      - ../../images/apps/php-oms/ini/php-fpm.conf:/etc/php-fpm.conf
+      - ../../images/apps/php-oms/php:/etc/php-fpm.d
+      - ../../images/apps/php-oms/ini/php.ini:/etc/php.ini
+      - ../../images/apps/php-oms/scripts/php-fpm-sudoer:/etc/sudoers.d/php-fpm
+      - /path/to/ssh:/root/.ssh
+      - /path/to/composer/auth.json:/root/.composer/auth.json
+      - /path/to/composer/auth.json:/root/.config/composer/auth.json
+    environment:
+      - XDEBUG_CONFIG=remote_host=host.docker.internal remote_enable=1
+      - PHP_IDE_CONFIG=serverName=DockerShopOms
+    sysctls:
+      - net.ipv4.tcp_keepalive_intvl=75
+      - net.ipv4.tcp_keepalive_probes=9
+      - net.ipv4.tcp_keepalive_time=7200
+      - net.core.somaxconn=1024
+    depends_on:
+      - postgres_oms
+      - postgres_oms_test
+      - postgres_oms_test_1
+      - postgres_oms_test_2
+      - postgres_oms_test_3
+
+networks:
+  shop_oms_bridge:
+    driver: bridge
+    name: "shop_oms_bridge"
+
+volumes:
+  oms_database:
+  oms_test_database:
+  oms_test_1_database:
+  oms_test_2_database:
+  oms_test_3_database:

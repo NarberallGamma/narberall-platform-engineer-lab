@@ -1,0 +1,24 @@
+services:
+  app-postgres:
+    image: library/postgres:14
+    container_name: app-postgres
+    restart: on-failure
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: CHANGE_ME
+      POSTGRES_DB: shop
+      POSTGRES_PORT: 5435
+    #    volumes:
+    #      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: pg_isready -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    ports:
+      - "5435:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 256M

@@ -1,0 +1,49 @@
+services:
+  app-postgres:
+    image: library/postgres:14
+    container_name: app-postgres
+    restart: on-failure
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: CHANGE_ME
+      POSTGRES_DB: outbox
+      POSTGRES_PORT: 5435
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: pg_isready -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    ports:
+      - "5435:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  zookeeper-outbox:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper-outbox
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 22181:2181
+
+  kafka-outbox:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka-outbox
+    depends_on:
+      - zookeeper-outbox
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-outbox:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-outbox:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1

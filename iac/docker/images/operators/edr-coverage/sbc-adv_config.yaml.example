@@ -1,0 +1,49 @@
+# enterprise_project_id (опционально, на компанию) — по какому scope SberCloud
+# проверяет права на чтение ECS:
+#   не указан        — по IAM-проекту (региональному). Права надо выдать учётке
+#                      на IAM-проект (Authorization model: IAM project).
+#   "all_granted_eps" — по всем enterprise-проектам, где у учётки есть роли.
+#                      указать это, если права в IAM раздаются через enterprise
+#                      projects (частый случай при одном проекте).
+#   "0" или "<id>"   — по конкретному enterprise-проекту ("0" — default EP.)
+# Если ECS отдаёт 403 Pdp.0001 при выданных enterprise-ролях — добавить
+# "enterprise_project_id": "all_granted_eps".
+companies: [
+  {
+    "name": "project-e",
+    "ak": "CHANGE_ME",
+    "sk": "CHANGE_ME",
+    "sts": "",
+    "enterprise_project_id": "all_granted_eps",
+    "extra": {
+      "root_project_id": "00000000-0000-4000-8000-000000000002",
+      # https: //console.hc.sbercloud.ru/iam/?agencyId=CHANGE_ME&region=ru-moscow-1&locale=en-us#/mine/apiCredential
+      endpoint_iam: "iam.ru-moscow-1.hc.sbercloud.ru",
+      "endpoint_ecs": "ecs.ru-moscow-1.hc.sbercloud.ru"
+    }
+  },
+  {
+    "name": "project-c",
+    "ak": "CHANGE_ME",
+    "sk": "CHANGE_ME",
+    "sts": "",
+    "extra": {
+      "root_project_id": "00000000-0000-4000-8000-000000000003",
+      # https://console.hc.sbercloud.ru/iam/?agencyId=CHANGE_ME&region=ru-moscow-1&locale=en-us#/mine/apiCredential
+      "endpoint_iam": "iam.ru-moscow-1.hc.sbercloud.ru",
+      "endpoint_ecs": "ecs.ru-moscow-1.hc.sbercloud.ru"
+    }
+  },
+  {
+    "name": "project-b",
+    "ak": "CHANGE_ME",
+    "sk": "CHANGE_ME",
+    "sts": "",
+    "extra": {
+      "root_project_id": "00000000-0000-4000-8000-000000000004",
+      # https://console.hc.sbercloud.ru/iam/?agencyId=CHANGE_ME&region=ru-moscow-1&locale=en-us#/mine/apiCredential
+      "endpoint_iam": "iam.ru-moscow-1.hc.sbercloud.ru",
+      "endpoint_ecs": "ecs.ru-moscow-1.hc.sbercloud.ru"
+    }
+  }
+]

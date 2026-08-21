@@ -1,0 +1,22 @@
+version: "3.7"
+services:
+  cli:
+    build:
+      context: ./
+      dockerfile: docker/Dockerfile
+    image: api-service-cli:local
+    container_name: app-cli
+    volumes:
+      - ./:/app
+  app:
+    build:
+      context: ./
+      dockerfile: docker/Dockerfile
+    image: api-service-cli:local
+    container_name: app-api
+    restart: unless-stopped
+    command: "rr serve -d -c .rr.yml"
+    ports:
+      - 8200:3000
+    volumes:
+      - ./:/app

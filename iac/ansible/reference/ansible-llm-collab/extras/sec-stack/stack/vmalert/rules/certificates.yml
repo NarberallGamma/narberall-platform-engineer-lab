@@ -1,0 +1,25 @@
+groups:
+  - name: tls-endpoints
+    rules:
+      - alert: BlackboxProbeFailed
+        expr: probe_success == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Проба {{ $labels.probe_target }} не проходит"
+          description: "job={{ $labels.job }}: endpoint недоступен 5 минут."
+
+      - alert: TlsCertificateExpiring
+        expr: 0 < (probe_ssl_earliest_cert_expiry - time()) < 86400 * 30
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS-сертификат {{ $labels.probe_target }} истекает менее чем через 30 дней"
+
+      - alert: TlsCertificateExpiringCritical
+        expr: (probe_ssl_earliest_cert_expiry - time()) < 86400 * 7
+        labels:
+          severity: critical
+        annotations:
+          summary: "TLS-сертификат {{ $labels.probe_target }} истекает менее чем через 7 дней"

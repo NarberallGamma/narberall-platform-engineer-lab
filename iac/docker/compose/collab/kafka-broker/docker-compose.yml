@@ -1,0 +1,48 @@
+services:
+
+  kafka:
+    image: apache/kafka:4.0.0
+    container_name: kafka
+    network_mode: host
+    volumes:
+      - ./config/client.properties:/etc/kafka/client.properties
+      - ./config/server.properties:/etc/kafka/server.properties
+      - ./certs:/certs
+      - ./data:/var/lib/kafka/data
+    entrypoint: ""
+      #command: sleep 1d
+    command: /opt/kafka/bin/kafka-server-start.sh /etc/kafka/server.properties
+    restart: always
+    environment:
+      KAFKA_HEAP_OPTS: "-Xmx2G"
+      JMX_PORT: ""
+      KAFKA_JMX_OPTS: "-Dcom.sun.management.jmxremote=false"
+    ulimits:
+      nproc: 512000
+      nofile:
+        soft: 512000
+        hard: 512000
+    logging:
+      options:
+        max-size: '512m'
+        max-file: '2'
+  vault-cert-upload:
+    image: hashicorp/vault:1.18.2
+    restart: always
+    container_name: vault-cert-upload
+    environment:
+      VAULT_ADDR: http://10.10.4.92:8200
+      VAULT_TOKEN: CHANGE_ME
+      SECRET_NAME: kafka-prod-tls
+    volumes:
+    - ./certs:/certs
+    entrypoint: ""
+    command: /certs/download.sh
+  docker:
+    image: docker:29.1.3
+    restart: always
+    volumes:
+    - ./:/docker/kafka:ro
+    - ./crontab:/etc/crontabs/root:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+    command: crond -f -l 8

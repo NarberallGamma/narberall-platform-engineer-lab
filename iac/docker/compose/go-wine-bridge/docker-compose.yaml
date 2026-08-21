@@ -1,0 +1,10 @@
+version: '2'
+
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile.go_build
+    ports:
+      - 50051:50051
+    command: "server"

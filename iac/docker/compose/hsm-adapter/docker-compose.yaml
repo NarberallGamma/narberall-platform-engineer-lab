@@ -1,0 +1,60 @@
+services:
+  # Init container: unpack CSP key material into shared volumes
+  hsm-bootstrap:
+    image: example.registry/estate/base-images/hsm-bootstrap:0.1.0
+    container_name: hsm-bootstrap
+    volumes:
+      - hsm_keys:/var/opt/cprocsp/keys/cprouser
+      - hsm_users:/var/opt/cprocsp/users/cprouser
+      - hsm_dsrf:/var/opt/cprocsp/dsrf
+    command: ["sh", "-c", "cd /archives && tar -xzf keys.tar.gz -C /var/opt/cprocsp/keys/cprouser && tar -xzf users.tar.gz -C /var/opt/cprocsp/users/cprouser && tar -xzf dsrf.tar.gz -C /var/opt/cprocsp/dsrf && chown -R 10001:10001 /var/opt/cprocsp/keys/cprouser /var/opt/cprocsp/users/cprouser /var/opt/cprocsp/dsrf || true"]
+    restart: "no"
+
+  # Main HSM adapter process
+  hsm-adapter:
+    image: example.registry/estate/hsm-adapter-app:2.8.0
+    container_name: hsm-adapter
+    user: "10001:10001"
+    depends_on:
+      - hsm-bootstrap
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      # Spring Boot (app 8080, management 8081 → actuator/prometheus)
+      - SPRING_PROFILES_ACTIVE=production
+      - SERVER_PORT=8080
+      - MANAGEMENT_SERVER_PORT=8081
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
+      # Management endpoints
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,prometheus
+      - MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS=always
+      # Logging
+      - LOGGING_LEVEL_ROOT=INFO
+      - LOGGING_LEVEL_COM_EXAMPLE=DEBUG
+      # CSP license (placeholder; substitute from a secret store when using ESO)
+      - EXTERNAL_CSP_LICENSE=CHANGE_ME
+    volumes:
+      - hsm_keys:/var/opt/cprocsp/keys/cprouser
+      - hsm_users:/var/opt/cprocsp/users/cprouser
+      - hsm_dsrf:/var/opt/cprocsp/dsrf
+      - hsm_tmp:/var/opt/cprocsp/tmp
+    tmpfs:
+      - /tmp:rw,exec,size=100m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/actuator/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  hsm_keys:
+    driver: local
+  hsm_users:
+    driver: local
+  hsm_dsrf:
+    driver: local
+  hsm_tmp:
+    driver: local

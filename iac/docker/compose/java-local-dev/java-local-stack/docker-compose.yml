@@ -1,0 +1,159 @@
+services:
+  #  shop-app:
+  #    image: shop-app:latest
+  #    container_name: shop-app
+  #    environment:
+  #      SPRING_DATASOURCE_URL: jdbc:postgresql://app-postgres:5432/shop
+  #      S3_SERVICE_URL: http://minio:9000
+  #    ports:
+  #      - "8080:8080"
+  #    depends_on:
+  #      - app-postgres
+  #      - minio
+
+  keycloak-postgres:
+    image: library/postgres:14
+    container_name: keycloak-postgres
+    restart: on-failure
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: CHANGE_ME
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: pg_isready -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    ports:
+      - "5434:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:20.0.2
+    hostname: keycloak
+    container_name: keycloak
+    command:
+      - start --db postgres --hostname-strict-https false --hostname-strict false --proxy edge --http-enabled true --import-realm --spi-user-profile-legacy-user-profile-read-only-attributes *_RES_ACCESS_MODE
+    environment:
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/postgres
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: CHANGE_ME
+      KC_DB_SCHEMA: public
+      KC_FEATURES: preview
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: CHANGE_ME
+    volumes:
+      - type: bind
+        source: ./keycloak/import/realm-export.json
+        target: /opt/keycloak/data/import/realm-export.json
+        read_only: true
+    ports:
+      - "8282:8080"
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://0.0.0.0:8080/realms/master" ]
+      start_period: 10s
+      interval: 30s
+      retries: 3
+      timeout: 5s
+
+  app-postgres:
+    image: library/postgres:14
+    container_name: app-postgres
+    restart: on-failure
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: CHANGE_ME
+      POSTGRES_DB: shop
+      POSTGRES_PORT: 5435
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: pg_isready -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    ports:
+      - "5435:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: CHANGE_ME
+      MINIO_ROOT_PASSWORD: CHANGE_ME
+    ports:
+      - "9000:9000"
+      - "9001:9001" # MinIO Console
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://0.0.0.0:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 22181:2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_MAX_TIMEOUT_MS: 900000
+      KAFKA_TRANSACTIONAL_ID_EXPIRATION_MS: 604800000
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - 19092:8080
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=shop-cluster
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+      - KAFKA_CLUSTERS_0_METRICS_PORT=9997
+    restart: unless-stopped
+
+  wiremock:
+    image: wiremock/wiremock:latest
+    container_name: wiremock
+    ports:
+      - "8085:8085"
+    volumes:
+      - ./wiremock:/home/wiremock
+    command: --port 8085
+
+volumes:
+  minio_data:

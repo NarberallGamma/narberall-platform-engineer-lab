@@ -1,0 +1,25 @@
+# Exclude vendor - will be downloaded via go mod
+vendor/
+
+# Exclude git files
+.git/
+.gitignore
+
+# Exclude documentation (except README.md)
+*.md
+!README.md
+
+# Exclude Grafana dashboards (not needed for build)
+grafana_dashboard/
+
+# Exclude test files (but keep logs/ directory for build)
+src/logs/*_test.go
+*.test
+*.log
+
+# Exclude IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

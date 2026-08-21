@@ -1,0 +1,22 @@
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "realm": "shop",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "clients": [
+    {
+      "clientId": "shop-app",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "CHANGE_ME",
+      "redirectUris": [
+        "https://shop.example.com/*"
+      ],
+      "webOrigins": [
+        "https://shop.example.com"
+      ]
+    }
+  ]
+}

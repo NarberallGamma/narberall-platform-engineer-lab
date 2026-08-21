@@ -1,0 +1,135 @@
+version: "3.6"
+services:
+  shop-api-nginx:
+    # THIN one-line nginx (FROM nginx + ADD) not published; build the TLS nginx-php image
+    build: ../../images/apps/nginx-php
+    ports:
+      - "8008:80"
+    container_name: shop-api-nginx
+    networks:
+      - shop_api_net
+    command: nginx -g "daemon off;"
+    volumes:
+      - /path/to/app:/app
+      - /etc/localtime:/etc/localtime:ro
+    links:
+      - shop-api-php1
+      - shop-api-php2
+    restart: always
+
+  shop-api-mysql:
+    image: mysql:8.0
+    container_name: shop-api-mysql
+    networks:
+      - shop_api_net
+    ports:
+      - "8002:3306"
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: CHANGE_ME
+      MYSQL_DATABASE: shop_api
+      MYSQL_USER: shop_api
+      MYSQL_PASSWORD: CHANGE_ME
+    restart: always
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    cap_add:
+      - SYS_NICE
+
+  shop-api-phpmyadmin:
+      image: phpmyadmin/phpmyadmin
+      container_name: shop-api-phpmyadmin
+      networks:
+        - shop_api_net
+      ports:
+        - '8005:80'
+      links:
+        - shop-api-mysql
+      environment:
+        - MYSQL_ROOT_PASSWORD=CHANGE_ME
+        - PMA_HOST=shop-api-mysql
+        - PMA_PORT=3306
+      restart: always
+      volumes:
+        - /etc/localtime:/etc/localtime:ro
+
+  shop-api-migration:
+      build: ../../images/apps/php-fpm-legacy
+      container_name: shop-api-migration
+      networks:
+        - shop_api_net
+      working_dir: /app
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm-legacy/php-ini-overrides.ini:/usr/local/etc/php/conf.d/docker-php-ext-sodium.ini
+        - ../../images/apps/php-fpm-legacy/migrate.sh:/migrate.sh
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-api-mysql
+      command: /bin/bash -c "chmod +x /migrate.sh; /migrate.sh; "
+      env_file:
+        - shop-api.env.example
+
+  shop-api-php1:
+    build: ../../images/apps/php-fpm-legacy
+    working_dir: /app
+    container_name: shop-api-php1
+    networks:
+      - shop_api_net
+    volumes:
+      - /path/to/app:/app
+      - ../../images/apps/php-fpm-legacy/php-ini-overrides.ini:/usr/local/etc/php/conf.d/docker-php-ext-sodium.ini
+    links:
+      - shop-api-redis
+      - shop-api-mysql
+    env_file:
+      - shop-api.env.example
+    restart: always
+    extra_hosts:
+      - "one.shop-app.example.com:host-gateway"
+
+  shop-api-php2:
+    build: ../../images/apps/php-fpm-legacy
+    working_dir: /app
+    container_name: shop-api-php2
+    networks:
+      - shop_api_net
+    volumes:
+      - /path/to/app:/app
+      - ../../images/apps/php-fpm-legacy/php-ini-overrides.ini:/usr/local/etc/php/conf.d/docker-php-ext-sodium.ini
+    links:
+      - shop-api-redis
+      - shop-api-mysql
+    env_file:
+      - shop-api.env.example
+    restart: always
+    extra_hosts:
+      - "one.shop-app.example.com:host-gateway"
+
+  shop-api-redis:
+      container_name: shop-api-redis
+      networks:
+        - shop_api_net
+      image: redis
+      ports:
+        - "6479:6379"
+      volumes:
+        - ./data/redis:/data
+      restart: unless-stopped
+      command: /bin/sh -c "redis-server --requirepass CHANGE_ME"
+
+  shop-api-composer:
+    build: ../../images/apps/php-fpm-legacy/composer
+    container_name: shop-api-composer
+    networks:
+      - shop_api_net
+    working_dir: /app
+    volumes:
+        - /path/to/app:/app
+    environment:
+      - COMPOSER_MEMORY_LIMIT=-1
+
+networks:
+  shop_api_net:
+    driver: bridge
+

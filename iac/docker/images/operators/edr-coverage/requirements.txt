@@ -1,0 +1,30 @@
+# Сгенерировано из uv.lock: uv export --no-hashes --no-dev --no-emit-project --no-annotate
+# Для контейнера экспортера (Dockerfile). Правь pyproject.toml + uv lock, потом пересоздай.
+anyio==4.12.1
+certifi==2026.1.4
+charset-normalizer==3.4.4
+defusedxml==0.7.1
+dnspython==2.8.0
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+huaweicloudsdkcore==3.1.196
+huaweicloudsdkecs==3.1.196
+huaweicloudsdkiam==3.1.186
+idna==3.11
+ldap3==2.9.1
+numpy==2.4.6
+pandas==3.0.3
+pandas-stubs==3.0.0.260204
+prometheus-client==0.25.0
+pyasn1==0.6.2
+pymongo==4.15.1
+python-dateutil==2.9.0.post0
+pyyaml==6.0.3
+requests==2.32.5
+requests-toolbelt==1.0.0
+simplejson==3.20.2
+six==1.17.0
+typing-extensions==4.15.0 ; python_full_version < '3.13'
+tzdata==2026.2 ; sys_platform == 'emscripten' or sys_platform == 'win32'
+urllib3==2.6.3

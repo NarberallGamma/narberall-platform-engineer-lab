@@ -1,0 +1,40 @@
+groups:
+  - name: teleport
+    rules:
+      - alert: TeleportDown
+        expr: up{job="teleport"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Teleport ({{ $labels.instance }}) не отдаёт метрики"
+          description: "Диагностический endpoint недоступен 3 минуты. Проверить контейнер teleport и --diag-addr."
+
+  - name: infra-nodes
+    rules:
+      - alert: NodeExporterDown
+        expr: up{job="node"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ВМ {{ $labels.instance }} ({{ $labels.role }}): node_exporter недоступен"
+          description: "Либо ВМ лежит, либо упал node_exporter."
+
+      - alert: NodeFilesystemAlmostFull
+        expr: >
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"} < 0.10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }}: на {{ $labels.mountpoint }} осталось меньше 10% места"
+
+      - alert: NodeMemoryPressure
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }}: доступно меньше 5% памяти"

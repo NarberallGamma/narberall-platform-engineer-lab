@@ -1,0 +1,24 @@
+# Copy example-config.yaml to config.yaml; set host paths in .env (or keep defaults).
+# Start: docker compose --env-file .env up -d
+# Follow logs: docker compose logs -f
+
+services:
+  cert-orchestrator:
+    image: ${CERT_ORCHESTRATOR_IMAGE:-example.registry/estate/base-images/cert-orchestrator:1.0}
+    container_name: cert-orchestrator
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Moscow}
+      CONFIG_FILE: /etc/cert-orchestrator/config.yaml
+      REG_RU_DNS_USERNAME: ${REG_RU_DNS_USERNAME:-}
+      REG_RU_DNS_PASSWORD: ${REG_RU_DNS_PASSWORD:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_IDS: ${TELEGRAM_CHAT_IDS:-}
+      K8S_TOKEN: ${K8S_TOKEN:-}
+    volumes:
+      # Main YAML (host paths come from .env)
+      - ${HOST_CONFIG_PATH:-./config.yaml}:/etc/cert-orchestrator/config.yaml:ro
+      # certbot live / archive (host path is usually /etc/letsencrypt)
+      - ${HOST_LETSENCRYPT_PATH:-/etc/letsencrypt}:/etc/letsencrypt
+      - ${HOST_K8S_CA_PATH:-./k8s-ca.crt}:/run/cert-orchestrator/k8s-ca.crt:ro
+      - ${HOST_SSH_KEY:-${HOME}/.ssh/id_rsa}:/ssh/id_estate:ro

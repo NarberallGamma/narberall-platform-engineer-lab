@@ -19,7 +19,7 @@ flowchart TB
 
 | Layer | Where it lives | What on-call uses |
 |-------|----------------|-------------------|
-| Host / cybersec | Ansible: [`../iac/ansible/reference/ansible-app-platform/`](../iac/ansible/reference/ansible-app-platform/) `monitoring_deploy`, [`../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/`](../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/), node-exporter on the estate | Prometheus remote_write to VictoriaMetrics, blackbox, cAdvisor, host Grafana / vmalert |
+| Host / cybersec | Ansible: [`../iac/ansible/reference/ansible-app-platform/`](../iac/ansible/reference/ansible-app-platform/) `monitoring_deploy`, [`../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/`](../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/), node-exporter on the estate. Compose **is published**: [`../iac/docker/compose/sec-stack/`](../iac/docker/compose/sec-stack/) and [`../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/stack/`](../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/stack/) | Prometheus remote_write to VictoriaMetrics, blackbox, cAdvisor, host Grafana / vmalert |
 | Host before Prom | [`../iac/ansible/reference/monitoring-starter/`](../iac/ansible/reference/monitoring-starter/) | sysstat / vnstat |
 | In-cluster overlay | [`../iac/helm/reference/helm-estate-cluster/monitoring/`](../iac/helm/reference/helm-estate-cluster/monitoring/) | Grafana **provisioned** alerts and dashboard JSON, two cloud exporters, OpenObserve collector |
 | PromQL pack | [`../iac/helm/reference/helm-addons-extra/custom-prometheus-rules/`](../iac/helm/reference/helm-addons-extra/custom-prometheus-rules/) | Deckhouse CustomPrometheusRules I maintained (CNPG, Redis, Cilium, ES, ingress) |
@@ -35,5 +35,7 @@ Vendor Grafana / Prometheus / OpenObserve **trees** stay out of git. Pins and th
 - Catalog: [`../docs/sre/`](../docs/sre/)
 - [Case 11](../case-studies/11-helm-estate.md): in-cluster overlay (12 alert files, 14 dashboard JSON, CloudEye exporters, OpenObserve collector)
 - [Case 10](../case-studies/10-ansible-estate.md): node-exporter on the Huawei-class hosts; Prom to VictoriaMetrics and host Grafana in sibling Ansible kits
+- [Case 12](../case-studies/12-docker-images.md): Dockerfiles and Compose under [`../iac/docker/`](../iac/docker/); host sec-stack compose is published
 - Helm hub: [`../iac/helm/`](../iac/helm/)
+- Docker hub: [`../iac/docker/`](../iac/docker/)
 - Ansible scrape: [`../iac/ansible/reference/ansible-app-platform/`](../iac/ansible/reference/ansible-app-platform/)

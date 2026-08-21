@@ -1,0 +1,96 @@
+services:
+  chat:
+    image: 'chat-app:latest'
+    container_name: chat-app
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://chat-postgres:5432/chatdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: CHANGE_ME
+      S3_ACCESS_KEY_ID: CHANGE_ME
+      S3_ADDRESS: http://minio:9000
+      S3_BUCKET: dev
+      S3_REGION: default
+      S3_SECRET_ACCESS_KEY: CHANGE_ME
+      KEYCLOAK_HOST: keycloak:8080
+    depends_on:
+      - chat-postgres
+      - minio
+      - keycloak
+    ports:
+      - '8082:8080'
+      - '5005:5005'
+  chat-postgres:
+    image: library/postgres:14
+    container_name: chat-postgres
+    environment:
+      POSTGRES_DB: chatdb
+      POSTGRES_PASSWORD: CHANGE_ME
+      POSTGRES_USER: postgres
+      POSTGRES_PORT: 5436
+    ports:
+      - "5438:5432"
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    environment:
+      MINIO_ACCESS_KEY: CHANGE_ME
+      MINIO_SECRET_KEY: CHANGE_ME
+    volumes:
+      - ./docker/minio:/data
+    ports:
+      - "9010:9000"
+      - "19010:46565"
+    command: server /data --console-address :46565
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:20.0.2
+    hostname: keycloak
+    container_name: keycloak
+    command:
+      - start --db postgres --hostname-strict-https false --hostname-strict false --proxy edge --http-enabled true --import-realm --spi-user-profile-legacy-user-profile-read-only-attributes *_RES_ACCESS_MODE
+    environment:
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/postgres
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: CHANGE_ME
+      KC_DB_SCHEMA: public
+      KC_FEATURES: preview
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: CHANGE_ME
+    volumes:
+      - type: bind
+        source: ./keycloak/import/realm-export.json
+        target: /opt/keycloak/data/import/realm-export.json
+        read_only: true
+    ports:
+      - "8284:8080"
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://0.0.0.0:8080/realms/master" ]
+      start_period: 10s
+      interval: 30s
+      retries: 3
+      timeout: 5s
+
+  keycloak-postgres:
+    image: library/postgres:14
+    container_name: keycloak-postgres
+    restart: on-failure
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: CHANGE_ME
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: pg_isready -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    ports:
+      - "5438:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 256M

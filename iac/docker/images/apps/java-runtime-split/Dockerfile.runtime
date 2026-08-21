@@ -1,0 +1,29 @@
+ARG RUNTIME_IMAGE=bellsoft/liberica-openjre-alpine-musl:21.0.8-12
+
+FROM $RUNTIME_IMAGE
+
+ARG AUTHOR='ops@example.com'
+ARG VERSION
+
+ENV VERSION=$VERSION
+ENV SERVER_PORT=8080
+ENV LANG=ru_RU.UTF-8
+
+LABEL maintainer="$AUTHOR"
+LABEL version="$VERSION"
+
+RUN apk update \
+    && apk --no-cache --upgrade add ca-certificates fontconfig musl ttf-dejavu \
+    && apk cache clean
+
+#COPY build/resources/main/client.jks /opt/app/
+COPY build/target/app-service.jar /opt/app/service.jar
+
+RUN addgroup -S -g 1000 noroot && adduser -S -u 1000 -D -H noroot -G noroot
+
+USER 1000:1000
+WORKDIR /opt/app
+EXPOSE $SERVER_PORT
+
+ENTRYPOINT [ "/bin/sh", "-c", "java $JAVA_OPTS -jar service.jar $JAVA_ARGS" ]
+CMD []

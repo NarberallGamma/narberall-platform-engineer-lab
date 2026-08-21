@@ -1,0 +1,237 @@
+services:
+  shop-app-mysql:
+      # platform: linux/arm64/v8 # NOTE: this line only for arm M1 processors
+      image: mysql:8.0
+      container_name: shop-app-mysql
+      networks:
+        - shop_app_net
+      ports:
+        - "3306:3306"
+      command: mysqld --sql-mode="NO_ENGINE_SUBSTITUTION" --explicit_defaults_for_timestamp=0 --default-time-zone='+02:00'
+      environment:
+        MYSQL_ROOT_PASSWORD: CHANGE_ME
+        MYSQL_DATABASE: shop_app
+        MYSQL_USER: shop_app
+        MYSQL_PASSWORD: CHANGE_ME
+      restart: always
+      volumes:
+        - /etc/localtime:/etc/localtime:ro
+        - ../../images/apps/php-ci/testing:/docker-entrypoint-initdb.d
+      cap_add:
+        - SYS_NICE
+
+  shop-app-phpmyadmin:
+      image: phpmyadmin/phpmyadmin
+      container_name: shop-app-phpmyadmin
+      networks:
+        - shop_app_net
+      ports:
+        - '1005:80'
+      links:
+        - shop-app-mysql
+      environment:
+        - MYSQL_ROOT_PASSWORD=CHANGE_ME
+        - PMA_HOST=shop-app-mysql
+        - PMA_PORT=3306
+      restart: always
+      volumes:
+        - /etc/localtime:/etc/localtime:ro
+
+  shop-app-nginx:
+      build: ../../images/apps/nginx-php
+      ports:
+        - "1001:80"
+        - "1111:443"
+      container_name: shop-app-nginx
+      networks:
+        - shop_app_net
+      command: nginx -g "daemon off;"
+      volumes:
+        - /path/to/app:/app
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-app-php1
+        - shop-app-php2
+        - shop-app-php3
+      restart: always
+
+  shop-app-migration:
+      build: ../../images/apps/php-fpm
+      container_name: shop-app-migration
+      networks:
+        - shop_app_net
+      working_dir: /app
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.1/fpm/conf.d/99-overrides.ini
+        - ../../images/apps/php-fpm/migrate.sh:/migrate.sh
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-app-mysql
+      command: /bin/bash -c "chmod +x /migrate.sh; /migrate.sh; "
+      env_file:
+        - shop-app.env.example
+
+  shop-app-php1:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-app-php1
+      networks:
+        - shop_app_net
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.1/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+        - /etc/ca-certificates.conf:/etc/ca-certificates.conf
+      links:
+        - shop-app-mysql
+        - shop-app-memcached
+        - shop-app-memcached1
+        - shop-app-memcached2
+      env_file:
+        - shop-app.env.example
+      restart: always
+      environment:
+        PHP_IDE_CONFIG: "serverName=Docker"
+        XDEBUG_MODE: 'debug'
+        XDEBUG_CONFIG: 'client_host=host.docker.internal'
+
+  shop-app-php2:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-app-php2
+      networks:
+        - shop_app_net
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.1/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+        - /etc/ca-certificates.conf:/etc/ca-certificates.conf
+      links:
+        - shop-app-mysql
+        - shop-app-memcached
+        - shop-app-memcached1
+        - shop-app-memcached2
+      env_file:
+        - shop-app.env.example
+      restart: always
+      environment:
+        PHP_IDE_CONFIG: "serverName=Docker"
+        XDEBUG_MODE: 'debug'
+        XDEBUG_CONFIG: 'client_host=host.docker.internal'
+
+  shop-app-php3:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-app-php3
+      networks:
+        - shop_app_net
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.1/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+        - /etc/ca-certificates.conf:/etc/ca-certificates.conf
+      links:
+        - shop-app-mysql
+        - shop-app-memcached
+        - shop-app-memcached1
+        - shop-app-memcached2
+      env_file:
+        - shop-app.env.example
+      restart: always
+      environment:
+        PHP_IDE_CONFIG: "serverName=Docker"
+        XDEBUG_MODE: 'debug'
+        XDEBUG_CONFIG: 'client_host=host.docker.internal'
+
+  shop-app-composer:
+      build: ../../images/apps/composer
+      container_name: shop-app-composer
+      networks:
+        - shop_app_net
+      working_dir: /app
+      volumes:
+        - /path/to/app:/app
+      # environment:
+      #   - COMPOSER_MEMORY_LIMIT=-1
+      # deploy:
+      #   resources:
+      #     limits:
+      #       cpus: '0.50'
+      #       memory: 2024M
+
+  shop-app-node:
+      build: ../../images/apps/node-vite
+      container_name: shop-app-node
+      networks:
+        - shop_app_net
+      working_dir: /app
+      volumes:
+        - /path/to/app:/app
+
+  shop-app-memcached:
+      image: memcached
+      container_name: shop-app-memcached
+      networks:
+        - shop_app_net
+      restart: always
+
+  shop-app-memcached1:
+      image: memcached
+      container_name: shop-app-memcached1
+      networks:
+        - shop_app_net
+      restart: always
+
+  shop-app-memcached2:
+      image: memcached
+      container_name: shop-app-memcached2
+      networks:
+        - shop_app_net
+      restart: always
+
+  shop-app-worker:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-app-worker
+      networks:
+        - shop_app_net
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.1/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-app-mysql
+      env_file:
+        - shop-app.env.example
+      restart: always
+      command: /bin/bash -c "php artisan queue:work database --queue=shop-app"
+
+  shop-app-cron:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-app-cron
+      networks:
+        - shop_app_net
+      restart: "always"
+      links:
+        - shop-app-mysql
+        - shop-app-memcached
+        - shop-app-memcached1
+        - shop-app-memcached2
+      env_file:
+        - shop-app.env.example
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/8.1/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+      command: /bin/bash /app/.docker/images/php/cron.sh
+      environment:
+        PHP_IDE_CONFIG: "serverName=Docker"
+        XDEBUG_MODE: 'debug'
+        XDEBUG_CONFIG: 'client_host=host.docker.internal'
+
+
+networks:
+  shop_app_net:
+    driver: bridge

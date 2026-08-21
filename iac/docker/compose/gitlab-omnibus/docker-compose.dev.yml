@@ -1,0 +1,165 @@
+services:
+
+  gitlab:
+    image: 'gitlab/gitlab-ee:19.0.1-ee.0'
+    restart: always
+    container_name: gitlab
+    hostname: 'git-dev.example.com'
+    shm_size: '256m'
+    environment:
+      SKIP: artifacts
+      GITLAB_OMNIBUS_CONFIG: |
+        prometheus['enable'] = true
+        postgresql['min_wal_size'] = "50MB"
+        postgresql['max_wal_size'] = "100MB"
+        prometheus['flags'] = {
+          'storage.tsdb.path' => "/var/opt/gitlab/prometheus/data",
+          'storage.tsdb.retention.time' => "60s",
+          'config.file' => "/var/opt/gitlab/prometheus/prometheus.yml",
+        }
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['real_ip_trusted_addresses'] = [ '10.10.103.0/24' ]
+        nginx['real_ip_header'] = 'X-Forwarded-For'
+        nginx['real_ip_recursive'] = 'on'
+        nginx['client_max_body_size'] = '4096m'
+        external_url 'https://git-dev.example.com'
+        gitlab_rails['gitlab_shell_ssh_port'] = 7999
+
+        registry['enable'] = true
+        gitlab_rails['registry_path'] = "/registry_storage"
+        registry_external_url 'https://registry-dev.example.com'
+        registry_nginx['redirect_http_to_https'] = true
+        registry_nginx['listen_port'] = 5050
+
+        gitlab_rails['smtp_enable'] = true
+        gitlab_rails['smtp_address'] = "smtp.example.com"
+        gitlab_rails['smtp_port'] = 587
+        gitlab_rails['smtp_user_name'] = "robot@example.com"
+        gitlab_rails['smtp_password'] = "CHANGE_ME"
+        gitlab_rails['smtp_domain'] = "smtp.example.com"
+        gitlab_rails['gitlab_email_from'] = 'robot@example.com'
+        gitlab_rails['smtp_authentication'] = "login"
+        gitlab_rails['smtp_openssl_verify_mode'] = 'peer'
+        gitlab_rails['smtp_tls'] = false
+        gitlab_rails['smtp_ssl'] = false
+        gitlab_rails['smtp_enable_starttls_auto'] = true
+
+        gitlab_rails['prevent_ldap_sign_in'] = true
+        gitlab_rails['password_authentication_enabled_for_git'] = false
+        gitlab_rails['password_authentication_enabled_for_web'] = true
+        gitlab_rails['gitlab_default_can_create_group'] = false
+        gitlab_rails['gitlab_username_changing_enabled'] = false
+        gitlab_rails['omniauth_enabled'] = true
+        gitlab_rails['gitlab_signup_enabled'] = false
+        gitlab_rails['omniauth_allow_single_sign_on'] = ['saml']
+        gitlab_rails['omniauth_block_auto_created_users'] = false
+        gitlab_rails['omniauth_auto_link_saml_user'] = true
+        gitlab_rails['omniauth_auto_link_ldap_user'] = true
+        gitlab_rails['omniauth_auto_link_user'] = ["saml"]
+        gitlab_rails['omniauth_providers'] = [
+        {
+          name: "saml",
+          args: {
+            label: "Sign in with IdP",
+            assertion_consumer_service_url: "https://git-dev.example.com/users/auth/saml/callback",
+            idp_cert_fingerprint: "0000000000000000000000000000000000000000",
+            idp_sso_target_url: "https://idp.example.com/sso",
+            issuer: "https://git-dev.example.com/",
+            name_identifier_format: "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
+            uid_attribute: "email",
+            attribute_statements: {
+              email: ["email"],
+              name: ["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"],
+              first_name: ["first_name"],
+              last_name: ["last_name"]
+            }
+          }
+         }
+        ]
+
+        gitlab_rails['ldap_enabled'] = true
+        gitlab_rails['ldap_servers'] = {
+          'main' => {
+            'label' => 'LDAP',
+            'host' => 'dc.example.com',
+            'port' => 636,
+            'uid' => 'sAMAccountName',
+            'bind_dn' => 'CN=svc-gitlab-dev,OU=Accounts,OU=Service,DC=example,DC=com',
+            'password' => 'CHANGE_ME',
+            'encryption' => 'simple_tls',
+            'verify_certificates' => false,
+            'timeout' => 10,
+            'active_directory' => true,
+            'base' => 'DC=example,DC=com',
+            'group_base' => 'OU=GitLab Dev,OU=GitLab,OU=Application,OU=Service,DC=example,DC=com',
+            'admin_group' => 'GitLab Dev admins',
+            'lowercase_usernames' => 'false',
+            'retry_empty_result_with_codes' => [80],
+            'allow_username_or_email_login' => false,
+            'block_auto_created_users' => false
+          }
+        }
+        gitlab_rails['ldap_sync_worker_cron'] = "*/1 * * * *"
+        gitlab_rails['ldap_group_sync_worker_cron'] = "*/1 * * * *"
+
+        gitlab_pages['enable'] = false
+        pages_external_url "http://pages-dev.example.com"
+        pages_nginx['ssl'] = false
+        pages_nginx['listen_https'] = false
+        gitlab_pages['listen_proxy'] = '0.0.0.0:8090'
+        gitlab_pages['internal_gitlab_server'] = 'http://localhost:8080'
+        gitlab_rails['expire_build_artifacts_worker_cron'] = "*/7 * * * *"
+        gitlab_rails['backup_upload_connection'] = {
+          'provider' => 'AWS',
+          'region' => 'region-1',
+          'aws_access_key_id' => 'CHANGE_ME',
+          'aws_secret_access_key' => 'CHANGE_ME',
+          'endpoint'              => 'https://s3.example.com'
+        }
+        gitlab_rails['backup_upload_remote_directory'] = 'gitlab-backup'
+        gitlab_rails['backup_keep_time'] = 604800
+
+    ports:
+      - '7999:22'
+      - '5050:5050'
+    volumes:
+      - './config:/etc/gitlab'
+      - './logs:/var/log/gitlab'
+      - './data:/var/opt/gitlab'
+      - './public.key:/opt/gitlab/embedded/service/gitlab-rails/.license_encryption_key.pub'
+    dns:
+      - 10.10.1.9
+    logging:
+      options:
+        max-size: '50m'
+        max-file: '1'
+
+  nginx:
+    image: nginx:1.31
+    restart: always
+    ports:
+      - '443:443'
+      - '80:80'
+    volumes:
+      - './git-dev.example.com.conf:/etc/nginx/conf.d/git-dev.example.com.conf'
+      - './ssl:/etc/nginx/ssl'
+# backup sidecar commented on host
+#  backup:
+#    build:
+#      context: backuper
+#    command: /usr/sbin/cron -f
+#    restart: always
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#      - ./backuper/rclone.conf:/root/.config/rclone/rclone.conf
+#      - ./backuper/crontab:/etc/crontab
+#      - ./backuper:/backuper
+#    environment:
+#      TZ: "Europe/Moscow"
+#    dns:
+#      - 1.1.1.1
+#    logging:
+#      options:
+#        max-size: '50m'
+#        max-file: '1'

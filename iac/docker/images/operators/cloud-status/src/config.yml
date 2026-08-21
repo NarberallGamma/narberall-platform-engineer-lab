@@ -1,0 +1,6 @@
+# Конфиг Cloud.ru Status Exporter (переопределяется через Helm/ConfigMap)
+# platform — для service_availability (статусы сервисов)
+# emergency_platforms — для событий actual/planned; если пусто, используется platform. Completed не собираем.
+platform: advanced
+api_base_url: "https://api.cloud.ru"
+scrape_interval_seconds: 300

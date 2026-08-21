@@ -1,0 +1,38 @@
+services:
+  vault:
+    image: hashicorp/vault:2.0.2
+    container_name: vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - ./config:/vault/config
+      - ./ssl:/vault/ssl
+      - ./data:/vault/data
+      - /etc/ssl/certs:/etc/ssl/certs:ro
+    command: vault server -config=/vault/config/vault.hcl
+    networks:
+      vault_net:
+        ipv4_address: 10.10.18.2
+
+  nginx:
+    image: nginx:1.31
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - './vault-dev.example.com.conf:/etc/nginx/conf.d/vault-dev.example.com.conf'
+      - './ssl:/etc/nginx/ssl'
+    networks:
+      vault_net:
+        ipv4_address: 10.10.18.3
+    depends_on:
+      - vault
+
+networks:
+  vault_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.18.0/24

@@ -106,6 +106,10 @@ cd extras/sec-stack
 ansible-playbook -i inventory/hosts.yml playbooks/site.yml
 ```
 
+## Compose half (host snapshots)
+
+Ansible here is ACL, n8n JSON, and Kafka `.j2`. The living host compose for Jira, wiki, JSM, Nextcloud fpm, n8n+Postgres, Postfix, edge nginx, Content Capture, and KRaft is [`../../../docker/compose/collab/`](../../../docker/compose/collab/).
+
 ## Inventory contract
 
 - Copy `inventories/hosts.ini.example` to `inventories/hosts.ini` (gitignored)

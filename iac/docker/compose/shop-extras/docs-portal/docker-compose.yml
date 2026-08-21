@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  nginx:
+    container_name: docs-portal
+    image: docs-portal
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: nginx
+    # PlantUML URL can also be set here instead of .env
+    # environment:
+    #   VUE_APP_PLANTUML_SERVER: localhost:8079/svg/
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+
+  plantuml:
+    image: seaf/plantuml-server:jetty
+    container_name: plantuml
+    ports:
+      - "8079:8080"

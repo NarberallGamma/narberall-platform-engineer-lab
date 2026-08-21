@@ -1,0 +1,5 @@
+# Сюда складывать JSON дашбордов — Grafana подхватывает автоматически.
+# Стартовый набор для импорта (ID с grafana.com):
+#   1860  Node Exporter Full
+#   Teleport: официальные дашборды из репозитория gravitational/teleport
+#             (examples/grafana или docs Monitoring)

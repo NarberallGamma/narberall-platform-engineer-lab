@@ -1,0 +1,298 @@
+services:
+  shop-app-mysql:
+      image: mysql
+      container_name: shop-app-local-mysql
+      ports:
+        - "1002:3306"
+      command: >
+              --default-authentication-plugin=mysql_native_password
+              --secure-file-priv=NULL
+      environment:
+        MYSQL_ROOT_PASSWORD: CHANGE_ME
+        MYSQL_DATABASE: shop_app
+        MYSQL_USER: shop_app
+        MYSQL_PASSWORD: CHANGE_ME
+      restart: always
+      volumes:
+        - /etc/localtime:/etc/localtime:ro
+
+  shop-app-phpmyadmin:
+      image: phpmyadmin/phpmyadmin
+      container_name: shop-app-phpmyadmin
+      ports:
+        - '1005:80'
+      links:
+        - shop-app-mysql
+      environment:
+        - MYSQL_ROOT_PASSWORD=CHANGE_ME
+        - PMA_HOST=shop-app-local-mysql
+        - PMA_PORT=3306
+      restart: always
+      volumes:
+        - /etc/localtime:/etc/localtime:ro
+
+  shop-app-nginx:
+    build: ../../images/apps/nginx-php
+    ports:
+      - "1001:80"
+      - "1111:443"
+    container_name: shop-app-nginx
+    command: nginx -g "daemon off;"
+    volumes:
+      - /path/to/app:/app
+      - /etc/localtime:/etc/localtime:ro
+    links:
+      - shop-app-php1
+      - shop-app-php2
+      - shop-app-php3
+    restart: always
+
+
+  shop-app-migration:
+      build: ../../images/apps/php-fpm
+      container_name: shop-app-migration
+      working_dir: /app
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/7.2/fpm/conf.d/99-overrides.ini
+        - ../../images/apps/php-fpm/migrate-test.sh:/migrate.sh
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-app-mysql
+      command: /bin/bash -c "chmod +x /migrate.sh; /migrate.sh; "
+      environment:
+        - DB_HOST=shop-app-local-mysql
+        - DB_PORT=3306
+        - DB_DATABASE=shop-app
+        - DB_USERNAME=shop-app
+        - DB_PASSWORD=CHANGE_ME
+        - APP_KEY=CHANGE_ME
+        - APP_ENV=local
+        - CACHE_DRIVER=memcached
+        - MEMCACHED_HOST=shop-app-memcached
+        - MEMCACHED_HOST1=shop-app-memcached1
+        - MEMCACHED_HOST2=shop-app-memcached2
+        - MEMCACHED_PERSISTENT_ID=shop-app
+
+  shop-app-php1:
+      build: ../../images/apps/php-ci/tests
+      working_dir: /app
+      container_name: shop-app-php1
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/7.2/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-app-mysql
+        - shop-app-memcached
+        - shop-app-memcached1
+        - shop-app-memcached2
+      environment:
+        - DB_HOST=shop-app-mysql
+        - DB_PORT=3306
+        - DB_DATABASE=shop-app
+        - DB_USERNAME=shop-app
+        - DB_PASSWORD=CHANGE_ME
+        - APP_URL=http://shop-app-nginx:80/
+        - APP_DEBUG=true
+        - APP_KEY=CHANGE_ME
+        - APP_ENV=local
+        - SESSION_DRIVER=memcached
+        - CACHE_DRIVER=memcached
+        - MEMCACHE_HOST=shop-app-memcached
+        - MEMCACHE_HOST1=shop-app-memcached1
+        - MEMCACHE_HOST2=shop-app-memcached2
+        - MEMCACHED_PERSISTENT_ID=shop-app
+        - SHOP_APP_URL_PATTERN=http://TENANT.shop-app.example.com:9080
+        - BILLING_API_DEV_AUTH_KEY=CHANGE_ME
+        - BILLING_API_URL=https://billing.example.com
+        - SENTRY_DSN=https://CHANGE_ME@sentry.example.com/1
+        - SHOP_REST_API_KEY=CHANGE_ME
+        - USE_SELENIUM=TRUE
+      restart: always
+      extra_hosts:
+        - "one.shop-app.example.com:172.17.0.1"
+
+  shop-app-php2:
+      build: ../../images/apps/php-ci/tests
+      working_dir: /app
+      container_name: shop-app-php2
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/7.2/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-app-mysql
+        - shop-app-memcached
+        - shop-app-memcached1
+        - shop-app-memcached2
+      environment:
+        - DB_HOST=shop-app-mysql
+        - DB_PORT=3306
+        - DB_DATABASE=shop-app
+        - DB_USERNAME=shop-app
+        - DB_PASSWORD=CHANGE_ME
+        - APP_URL=http://shop-app-nginx:80/
+        - APP_DEBUG=true
+        - APP_KEY=CHANGE_ME
+        - APP_ENV=local
+        - SESSION_DRIVER=memcached
+        - CACHE_DRIVER=memcached
+        - MEMCACHE_HOST=shop-app-memcached
+        - MEMCACHE_HOST1=shop-app-memcached1
+        - MEMCACHE_HOST2=shop-app-memcached2
+        - MEMCACHED_PERSISTENT_ID=shop-app
+        - SHOP_APP_URL_PATTERN=http://TENANT.shop-app.example.com:9080
+        - BILLING_API_DEV_AUTH_KEY=CHANGE_ME
+        - BILLING_API_URL=https://billing.example.com
+        - SENTRY_DSN=https://CHANGE_ME@sentry.example.com/1
+        - SHOP_REST_API_KEY=CHANGE_ME
+      restart: always
+      extra_hosts:
+        - "one.shop-app.example.com:172.17.0.1"
+
+
+  shop-app-php3:
+      build: ../../images/apps/php-ci/tests
+      working_dir: /app
+      container_name: shop-app-php3
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/7.2/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-app-mysql
+        - shop-app-memcached
+        - shop-app-memcached1
+        - shop-app-memcached2
+      environment:
+        - DB_HOST=shop-app-mysql
+        - DB_PORT=3306
+        - DB_DATABASE=shop-app
+        - DB_USERNAME=shop-app
+        - DB_PASSWORD=CHANGE_ME
+        - APP_URL=http://shop-app-nginx:80/
+        - APP_DEBUG=true
+        - APP_KEY=CHANGE_ME
+        - APP_ENV=local
+        - SESSION_DRIVER=memcached
+        - CACHE_DRIVER=memcached
+        - MEMCACHE_HOST=shop-app-memcached
+        - MEMCACHE_HOST1=shop-app-memcached1
+        - MEMCACHE_HOST2=shop-app-memcached2
+        - MEMCACHED_PERSISTENT_ID=shop-app
+        - SHOP_APP_URL_PATTERN=http://TENANT.shop-app.example.com:9080
+        - BILLING_API_DEV_AUTH_KEY=CHANGE_ME
+        - BILLING_API_URL=https://billing.example.com
+        - SENTRY_DSN=https://CHANGE_ME@sentry.example.com/1
+        - SHOP_REST_API_KEY=CHANGE_ME
+      restart: always
+      extra_hosts:
+        - "one.shop-app.example.com:172.17.0.1"
+
+  shop-app-composer:
+      build: ../../images/apps/composer
+      container_name: shop-app-composer
+      volumes:
+        - /path/to/app:/app
+
+  shop-app-memcached:
+      image: memcached
+      container_name: shop-app-memcached
+      restart: always
+
+  shop-app-memcached1:
+      image: memcached
+      container_name: shop-app-memcached1
+      restart: always
+
+  shop-app-memcached2:
+      image: memcached
+      container_name: shop-app-memcached2
+      restart: always
+
+  shop-app-worker:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-app-worker
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/7.2/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+      links:
+        - shop-app-mysql
+      environment:
+        - DB_HOST=shop-app-mysql
+        - DB_PORT=3306
+        - DB_DATABASE=shop-app
+        - DB_USERNAME=shop-app
+        - DB_PASSWORD=CHANGE_ME
+        - APP_URL=http://localhost:1001/
+        - APP_DEBUG=true
+        - APP_KEY=CHANGE_ME
+        - APP_ENV=local
+        - SESSION_DRIVER=memcached
+        - CACHE_DRIVER=memcached
+        - MEMCACHE_HOST=shop-app-memcached
+        - MEMCACHE_HOST1=shop-app-memcached1
+        - MEMCACHE_HOST2=shop-app-memcached2
+        - MEMCACHED_PERSISTENT_ID=shop-app
+        - SHOP_APP_URL_PATTERN=http://TENANT.shop-app.example.com:9080
+        - BILLING_API_DEV_AUTH_KEY=CHANGE_ME
+        - BILLING_API_URL=https://billing.example.com
+        - SENTRY_DSN=https://CHANGE_ME@sentry.example.com/1
+      restart: always
+      command: /bin/bash -c "php artisan queue:work database --queue=shop-app"
+
+  shop-app-cron:
+      build: ../../images/apps/php-fpm
+      working_dir: /app
+      container_name: shop-app-cron
+      restart: "always"
+      links:
+        - shop-app-mysql
+        - shop-app-memcached
+        - shop-app-memcached1
+        - shop-app-memcached2
+      environment:
+        - DB_HOST=shop-app-mysql
+        - DB_PORT=3306
+        - DB_DATABASE=shop-app
+        - DB_USERNAME=shop-app
+        - DB_PASSWORD=CHANGE_ME
+        - APP_URL=http://localhost:1001/
+        - APP_DEBUG=true
+        - APP_KEY=CHANGE_ME
+        - APP_ENV=local
+        - SESSION_DRIVER=memcached
+        - CACHE_DRIVER=memcached
+        - MEMCACHE_HOST=shop-app-memcached
+        - MEMCACHE_HOST1=shop-app-memcached1
+        - MEMCACHE_HOST2=shop-app-memcached2
+        - MEMCACHED_PERSISTENT_ID=shop-app
+        - SHOP_APP_URL_PATTERN=http://TENANT.shop-app.example.com:9080
+        - BILLING_API_DEV_AUTH_KEY=CHANGE_ME
+        - BILLING_API_URL=https://billing.example.com
+        - SENTRY_DSN=https://CHANGE_ME@sentry.example.com/1
+      volumes:
+        - /path/to/app:/app
+        - ../../images/apps/php-fpm/php-ini-overrides.ini:/etc/php/7.2/fpm/conf.d/99-overrides.ini
+        - /etc/localtime:/etc/localtime:ro
+      command: /bin/bash /app/.docker/images/php/cron.sh
+
+  selenium:
+      image: selenium/standalone-chrome:3.11.0-antimony
+      ports:
+        - "5444:4444"
+      depends_on:
+        - shop-app-nginx
+        - shop-app-php1
+        - shop-app-php2
+        - shop-app-php3
+      links:
+        - shop-app-nginx:test
+      volumes:
+        - /dev/shm:/dev/shm
+      environment:
+        - USE_SELENIUM=TRUE
+

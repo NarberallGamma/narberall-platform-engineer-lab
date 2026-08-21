@@ -1,0 +1,31 @@
+services:
+
+  ServiceDesk:
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    container_name: servicedesk
+    restart: unless-stopped
+    image: atlassian/jira-servicemanagement:5.11
+    environment:
+      - TZ=Europe/Moscow
+      - ATL_PROXY_NAME=servicedesk.example.com
+      - ATL_PROXY_PORT=443
+      - ATL_TOMCAT_SCHEME=https
+    ports:
+      - 8083:8080
+    volumes:
+      - ./Volumes/setenv.sh:/opt/atlassian/jira/bin/setenv.sh:ro
+      - ./Volumes/app_data:/var/atlassian/application-data/jira
+      - ./Volumes/agent:/var/agent/
+      - ./Volumes/cacerts:/opt/java/openjdk/lib/security/cacerts:ro
+    networks:
+      - "frontend"
+    dns:
+      - '10.10.1.9'
+networks:
+  frontend:
+    name: frontend
+    external: true

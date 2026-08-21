@@ -1,0 +1,13 @@
+{
+  "chrome": {
+    "default": "latest",
+    "versions": {
+      "latest": {
+        "image": "selenoid/chrome:latest",
+        "port": "5444",
+        "tmpfs": {"/tmp":"size=512m"},
+        "shmSize" : 1073741824
+      }
+    }
+  }
+}

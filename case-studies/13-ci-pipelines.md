@@ -10,7 +10,7 @@ Product pipelines exist as **one richest include per mechanic** under [`iac/ci/p
 
 ## Challenge
 
-A shop with dozens of backends cannot paste the same fifty job files into every repo. An estate needs one include project for Kaniko, Helm, Argo, Vault, and a numbered release cutover. Review stands must expire. Retail wants Trivy and Sonar on the werf train; delivery wants canary and Slack, not a second copy of those gates. Jenkins is still real on earlier estates. Hunters should parse mechanics, not a private monorepo. OSV-Scanner is a gate I stood up; there was no source YAML to publish, so I did not invent a job.
+A shop with dozens of backends cannot paste the same fifty job files into every repo. An estate needs one include project for Kaniko, Helm, Argo, Vault, and a numbered release cutover. Review stands must expire. Retail wants Trivy and Sonar on the werf train; delivery wants canary and Slack, not a second copy of those gates. Jenkins is still real on earlier estates. Hunters should parse mechanics, not a private monorepo. Published gates in this lab are SonarQube and Trivy. OSV-Scanner is the same habit on estates that asked for it.
 
 ## Architecture
 
@@ -29,7 +29,7 @@ See diagram: [`diagrams/case-studies/13-ci-pipelines.md`](../diagrams/case-studi
 10) helmfile-dev + cluster-addons + kb-example-ci + security-gates consumer
 ```
 
-Honest scope: one include per mechanic. `jobs/build/*` stay commented. OSV-Scanner is not a file in this lab. Helmfile **image** CI stays next to the Dockerfile. Seventy on-upgrade stubs stay out; the include lives under `common-ci-estate/releases/`.
+Honest scope: one include per mechanic. `jobs/build/*` stay commented. Helmfile **image** CI stays next to the Dockerfile. Seventy on-upgrade stubs stay out; the include lives under `common-ci-estate/releases/`.
 
 ## What shipped
 

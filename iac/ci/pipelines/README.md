@@ -28,4 +28,4 @@ Catalog YAML is `*.yml.example` / `*.yaml.example` / `Jenkinsfile.example`. Scri
 | [`kb-example-ci/`](kb-example-ci/) | GitLab CI + werf | One teaching `werf converge` (test / production) |
 | [`security-gates/`](security-gates/) | GitLab CI | DefectDojo / Dependency-Track consumer + scripts. Not a Trivy/Sonar mega-folder |
 
-**Not a row:** OSV-Scanner (no source YAML, not invented). `jobs/build/*` (commented on the Java hubs, not written). Helmfile **image** CI (stays next to [`../../docker/images/ci/helmfile/`](../../docker/images/ci/helmfile/)).
+**Not a row:** `jobs/build/*` (commented on the Java hubs). Helmfile **image** CI (stays next to [`../../docker/images/ci/helmfile/`](../../docker/images/ci/helmfile/)).

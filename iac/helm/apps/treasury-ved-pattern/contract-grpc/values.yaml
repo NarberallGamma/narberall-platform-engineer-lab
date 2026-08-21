@@ -104,8 +104,8 @@ application:
       url: "http://report-service-application:8080"
     rates-service:
       url: "http://rates-service-application:8080"
-    safe-deal-adapter:
-      url: "http://safe-deal-adapter-application:8080"
+    signing-adapter:
+      url: "http://signing-adapter-application:8080"
     management:
       # zipkin:
       #   tracing:

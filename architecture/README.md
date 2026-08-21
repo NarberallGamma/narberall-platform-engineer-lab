@@ -13,7 +13,7 @@ Leitmotif: [`../docs/for-business.md`](../docs/for-business.md). Headline is **f
 | [SRE / monitoring](05-sre.md) | How does on-call see a breach, and how fast is a new Grafana view? | [`../docs/sre/`](../docs/sre/), cases 10–11, PromRules, ElastAlert2, Ansible VM |
 | [Product APIs](06-product-apis.md) | How does accompany talk to Grafana, Vault, Argo, JSM without a week of click-ops? | Workstation scripts, [`../docs/security-ai.md`](../docs/security-ai.md) |
 | [FinOps / night park](02-finops-night-park.md) | How does the bill drop without a rewrite? | Huawei-class schedule pattern |
-| [Reusable units](03-reuse-modules.md) | What can be applied again next week? | `iac/terraform/modules`, AWS live, GitLab CI, [`../iac/ansible/`](../iac/ansible/), [`../iac/helm/`](../iac/helm/), [`../iac/helm/apps/`](../iac/helm/apps/) |
+| [Reusable units](03-reuse-modules.md) | What can be applied again next week? | `iac/terraform/modules`, AWS live, [`../iac/ansible/`](../iac/ansible/), [`../iac/helm/`](../iac/helm/), [`../iac/docker/`](../iac/docker/), [`../iac/ci/`](../iac/ci/) |
 | [Cloud move](04-seamless-move.md) | When we must change clouds, can the freeze stay hours? | VK + Huawei-class trees (one skill among many) |
 
 ```mermaid
@@ -24,10 +24,13 @@ flowchart TB
   Days --> TF[Existing iac/terraform]
   Days --> ANS[Existing iac/ansible]
   Days --> HELM[Existing iac/helm]
+  Days --> Dock[Existing iac/docker]
+  Days --> CI[Existing iac/ci]
   Bill --> Park[Night park / right-size]
   AI --> OCR[OCR plus LLM]
   AI --> Desk[Multi-agent MCP desk]
   Biz --> SRE[On-call views same day]
   SRE --> Obs[Helm overlay plus Ansible scrape]
+  SRE --> Ops[Operator images]
   SRE --> APIs[Grafana Vault Argo JSM GitLab]
 ```

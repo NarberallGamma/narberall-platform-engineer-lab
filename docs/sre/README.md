@@ -21,6 +21,12 @@ flowchart TB
     NE[estate node-exporter]
     Sar[monitoring-starter]
   end
+  subgraph images [Operator images Docker]
+    Cert[cert-monitoring]
+    Hib[hibernate]
+    Eye[cloud-metrics status]
+    EDR[edr-coverage]
+  end
   subgraph cluster [In-cluster Helm]
     Ov[estate overlay Grafana]
     CE[CloudEye exporters]
@@ -34,6 +40,10 @@ flowchart TB
   Prom --> VM
   VM --> HG
   NE --> Prom
+  Cert --> HG
+  Hib --> HG
+  Eye --> CE
+  EDR --> HG
   Ov --> Oncall[On-call page]
   CE --> Ov
   OO --> Oncall

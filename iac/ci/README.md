@@ -11,7 +11,7 @@ Terraform creates (or imports) the thing. Ansible makes the guest operable. Helm
 | Reader | What to take | Then open |
 |--------|----------------|-----------|
 | Founder / PM | A branch or tag is the release. Argo or Ansible is the next button, not a Friday copy. | [`../../docs/for-business.md`](../../docs/for-business.md), [case 13](../../case-studies/13-ci-pipelines.md) |
-| Hiring lead | CI is a fifth IaC language next to Terraform, Ansible, Helm, and Docker. Proof is one include per mechanic, not a private monorepo dump. SonarQube and Trivy are in the kits. OSV-Scanner is the same habit; no OSV YAML is published. | [`pipelines/`](pipelines/), [`../../docs/experience.md`](../../docs/experience.md) |
+| Hiring lead | CI is a fifth IaC language next to Terraform, Ansible, Helm, and Docker. Proof is one include per mechanic, not a private monorepo dump. Published job bodies here are SonarQube and Trivy. | [`pipelines/`](pipelines/), [`../../docs/experience.md`](../../docs/experience.md) |
 | Engineer | Kits under `pipelines/`. Each kit README says what shipped vs what is documented only. Catalog copies keep the `.example` suffix. | Kit table below |
 
 The IaC folders are siblings:

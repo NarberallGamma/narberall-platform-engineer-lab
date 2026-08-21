@@ -249,7 +249,7 @@ kafkaConnector:
         slot.name: app_auth_debezium
       autoRestart:
         enabled: true
-  - name: safe-deal-transactional-outbox
+  - name: signing-transactional-outbox
     kafkaConnectName: debezium
     spec:
       class: io.debezium.connector.postgresql.PostgresConnector

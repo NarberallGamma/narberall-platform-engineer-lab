@@ -7,6 +7,7 @@ The long catalog (stacks I ran, layer map, Helm and Ansible pointers): [`../docs
 ```mermaid
 flowchart TB
   Host[Host scrape Ansible] --> VM[VictoriaMetrics]
+  Ops[Operator images Docker] --> Host
   Cluster[In-cluster overlay Helm] --> G[Grafana alerts plus views]
   Cluster --> OO[OpenObserve collector]
   Cloud[CloudEye and status exporters] --> G

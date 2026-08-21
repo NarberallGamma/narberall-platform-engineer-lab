@@ -40,7 +40,7 @@ flowchart LR
   Werf --> Trivy[Trivy Sonar]
 ```
 
-OSV-Scanner is not a box here. No source YAML, no invented job.
+Published scan boxes here are SonarQube and Trivy.
 
 ## Full lifecycle
 

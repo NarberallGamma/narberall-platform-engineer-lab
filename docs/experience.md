@@ -51,7 +51,7 @@ Identity in front of that class of estate is also coded: Access Manager + Identi
 
 ### Blockchain and smart-contract programmes
 
-Accompanied **large blockchain / smart-contract** products: nodes, keys, environments, deploy path, the unglamorous part that keeps a chain-facing app alive. Contract-level write-ups stay NDA-safe and will be expanded in case studies without vendor theatre. The platform job is the same: environments that cannot drift, secrets that cannot leak, releases that cannot “try again on mainnet.”
+Accompanied **large blockchain / smart-contract** products: nodes, keys, environments, deploy path, the unglamorous part that keeps a chain-facing app alive. Contract-level write-ups stay NDA-safe. The platform job is the same: environments that cannot drift, secrets that cannot leak, releases that cannot “try again on mainnet.”
 
 ### Consumer delivery and e-commerce
 
@@ -230,7 +230,7 @@ That is why hardware/OS depth and Cisco-style incident method in this lab are no
 - Data and glue: **Kafka / Debezium / Rabbit / NATS / Artemis / Redis**; **PG/Patroni, MySQL, MSSQL, Oracle, Mongo, ClickHouse**; **Superset, Supabase, Airflow, n8n, NiFi**; **Harbor, MinIO, Ceph**; **Vault, Keycloak, Teleport**
 - Observability / SRE: **Prometheus, Alertmanager, Grafana**, **VictoriaMetrics**, **OpenObserve + OTel Collector**, **Loki**, **ELK / Logstash / Kibana**, **Graylog**, **Jaeger**, CloudEye exporters. I speak those **product APIs** (new views and rules the same day). Catalog: [`sre/`](sre/), [`../architecture/05-sre.md`](../architecture/05-sre.md), [case 11](../case-studies/11-helm-estate.md)
 - **Estate APIs:** Vault, Argo CD, Kubernetes, JSM / Confluence, GitLab, n8n, Harbor, SonarQube, Keycloak, cloud providers. Scripts plus IDE agents, not a console ritual. [`../practice/workstation/`](../practice/workstation/)
-- **CI catalog:** living kits under [`../iac/ci/pipelines/`](../iac/ci/pipelines/): host one-button, estate includes + release cutover, Java/Gradle hubs, werf retail/delivery, Jenkins, GitHub Actions. SonarQube lives on the Java hubs and werf-retail. Trivy lives on werf-retail. OSV-Scanner is the same habit; no OSV YAML is published. [case 13](../case-studies/13-ci-pipelines.md). Detail: [`../iac/ci/`](../iac/ci/)
+- **CI catalog:** living kits under [`../iac/ci/pipelines/`](../iac/ci/pipelines/): host one-button, estate includes + release cutover, Java/Gradle hubs, werf retail/delivery, Jenkins, GitHub Actions. SonarQube lives on the Java hubs and werf-retail. Trivy lives on werf-retail. [case 13](../case-studies/13-ci-pipelines.md). Detail: [`../iac/ci/`](../iac/ci/)
 - **Huawei compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport ECS in a root that catalogs sibling Terragrunt network state. Detail: [`../iac/terraform/cloud-ru-compute/`](../iac/terraform/cloud-ru-compute/)
 - **Payments identity Ansible:** Swarm autodeploy of AM / IG / Redis / Postgres, same roles for Kubernetes. Detail: [`../iac/ansible/reference/ansible-payments-idplat/`](../iac/ansible/reference/ansible-payments-idplat/)
 - **LLM + collab Ansible:** private llama.cpp API, Nextcloud ACL GitOps, n8n, Kafka, CIS, living estate inventory (GitLab, JSM, 1C, OCR). Detail: [`../iac/ansible/reference/ansible-llm-collab/`](../iac/ansible/reference/ansible-llm-collab/), [case 01](../case-studies/01-ai-llm-platform.md)

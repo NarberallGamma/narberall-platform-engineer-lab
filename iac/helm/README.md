@@ -1,6 +1,6 @@
 # Helm
 
-**Business first:** the cluster is a **package and a GitOps entry**, not a Friday YAML copy. Buyer page: [`../../docs/for-business.md`](../../docs/for-business.md). Case: [`../../case-studies/11-helm-estate.md`](../../case-studies/11-helm-estate.md).
+**Business first:** the cluster is a **package and a GitOps entry**, not a Friday YAML copy. Buyer page: [`../../docs/for-business.md`](../../docs/for-business.md). Case: [`../../case-studies/11-helm-estate.md`](../../case-studies/11-helm-estate.md). Operator images those charts consume: [`../docker/images/operators/`](../docker/images/operators/). Pipelines that upgrade them: [`../ci/`](../ci/). Diagram: [`../../diagrams/iac/helm.md`](../../diagrams/iac/helm.md).
 
 I publish Helm the same way as Terraform and Ansible: a hunter hub plus living kits under [`reference/`](reference/) and curated product samples under [`apps/`](apps/). Full client chart farms stay private. What is here is enough to see mesh egress, CDC on an external broker, secrets, GitOps bootstrap, complementary observability layers (host Ansible + in-cluster overlay + addons), and one richest copy per product mechanic.
 

@@ -101,7 +101,7 @@ edge_lb_treasury_policy_gateway_proxy_connect_timeout: 60s
 edge_lb_treasury_policy_gateway_proxy_send_timeout: 60s
 edge_lb_treasury_policy_gateway_proxy_read_timeout: 120s
 
-# cryptopro Safe Deal (cryptopro-01 VM, отдельный vhost, не web WAF)
+# cryptopro signing vhost (separate host, not web WAF)
 edge_lb_cryptopro_domain: cryptopro.example.com
 edge_lb_cryptopro_path_prefix: /api/v0/cryptopro-service/
 edge_lb_cryptopro_backend:

@@ -20,7 +20,7 @@ flowchart TB
     ELK[ELK ECK and OTel]
   end
   subgraph later [Apps]
-    Apps[product umbrellas later]
+    Apps[iac/helm/apps samples]
   end
   subgraph ext [Outside CCE]
     VPS[VPS proxy]

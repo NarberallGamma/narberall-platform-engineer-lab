@@ -4,7 +4,7 @@
 
 I publish Docker the same way as Helm and Ansible: a hunter hub plus living kits. Full client image farms stay private. What is here is enough to see CI pins, two runner mechanics, estate operators, and **one richest Dockerfile per product mechanic**. A hundred-plus identical shop files would not teach more.
 
-Pipelines stay in [`../ci/`](../ci/). The build context lives here under [`images/`](images/). Host and local stacks live under [`compose/`](compose/). Cluster package after the push is [`../helm/`](../helm/).
+Pipelines stay in [`../ci/`](../ci/). The build context lives here under [`images/`](images/). Host and local stacks live under [`compose/`](compose/). Cluster package after the push is [`../helm/`](../helm/). Hub diagram: [`../../diagrams/iac/docker.md`](../../diagrams/iac/docker.md).
 
 ## Who this page is for
 

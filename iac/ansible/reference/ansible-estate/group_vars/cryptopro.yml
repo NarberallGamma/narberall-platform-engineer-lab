@@ -1,5 +1,5 @@
 # cryptopro — docker app (prod VM cryptopro-01).
-# Safe Deal: подпись через CryptoPro CSP; сертификат импортируется через Swagger после deploy (не из playbook).
+# Escrow signing via CryptoPro CSP; certificate imported via Swagger after deploy (not from the playbook).
 # TLS на edge-lb (vhost cryptopro.example.com, не web.example.com WAF).
 # Плейбук: playbooks/docker_app_cryptopro.yml | inventory: [cryptopro_vm]
 #

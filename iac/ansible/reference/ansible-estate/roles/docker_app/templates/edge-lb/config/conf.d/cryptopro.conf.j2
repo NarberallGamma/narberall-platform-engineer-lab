@@ -1,5 +1,5 @@
 # Managed by Ansible (docker_app edge-lb)
-# cryptopro (Safe Deal) — {{ edge_lb_cryptopro_domain }}
+# cryptopro signing vhost — {{ edge_lb_cryptopro_domain }}
 {% set cp_backend_port = edge_lb_cryptopro_backend.port | default(8084) %}
 {% set cp_path = edge_lb_cryptopro_path_prefix | default('/api/v0/cryptopro-service/') %}
 {% set cp_health_port = edge_lb_cryptopro_backend.health_port | default(cp_backend_port) %}

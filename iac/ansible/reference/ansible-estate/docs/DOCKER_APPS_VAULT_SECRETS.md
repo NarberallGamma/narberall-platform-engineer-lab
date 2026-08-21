@@ -44,7 +44,7 @@ docker_app_vault_key_map:
 | Vault key | Обязательно |
 |-----------|-------------|
 | `TELEGRAM_BOT_TOKEN` | да |
-| `TELEGRAM_CHAT_IDS` | да (preprod: `-5091478900`) |
+| `TELEGRAM_CHAT_IDS` | да (пример: `-1000000000001`) |
 | `REG_RU_DNS_USERNAME` | да |
 | `REG_RU_DNS_PASSWORD` | да |
 | `ssh_private_key` | да → `/docker/apps/cert-orchestrator/.ssh/id_estate` (0600), mount в контейнер `/ssh/id_estate:ro` |
@@ -158,7 +158,7 @@ vault kv put secret/cryptopro-service-app \
   spring.flyway.password="..."
 ```
 
-Сертификат подписи Safe Deal: через Swagger **после** deploy (`importCertificate`), не через Vault в этом playbook.
+Сертификат подписи (escrow / CryptoPro): через Swagger **после** deploy (`importCertificate`), не через Vault в этом playbook.
 
 ## Запуск после записи секретов
 

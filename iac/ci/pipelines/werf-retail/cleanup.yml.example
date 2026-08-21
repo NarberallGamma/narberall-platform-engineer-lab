@@ -1,0 +1,16 @@
+Cleanup:
+  extends: .base_werf
+  stage: cleanup
+  variables:
+    KUBERNETES_CPU_REQUEST: "0.2"
+    KUBERNETES_MEMORY_REQUEST: "256Mi"
+  script:
+    - unset WERF_KUBE_CONTEXT
+    - werf cr login -u nobody -p "${WERF_IMAGES_CLEANUP_PASSWORD:?}" "${CI_REGISTRY_IMAGE}"
+    - werf cleanup --keep-stages-built-within-last-n-hours=24
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $CLEANUP_JOB == "TRUE"
+      when: always
+    - when: never
+  tags:
+    - docker

@@ -1,0 +1,34 @@
+# Values below appear under Run pipeline → Inputs and can be changed per run.
+# SSH_PRIVATE_KEY is set in Settings → CI/CD → Variables (only for deploy to another host).
+spec:
+  inputs:
+    DEPLOY_TARGET_HOST:
+      default: ""
+      description: "SSH deploy host (empty = deploy on the runner host without SSH)"
+    PLAYBOOK:
+      default: ""
+      description: "Playbook after repo sync (empty = sync only)"
+    SSH_USER:
+      default: "root"
+      description: "SSH user on the remote host"
+    ANSIBLE_REPO_CHOWN_USER:
+      default: "ansible"
+      description: "Repo directory owner"
+    ANSIBLE_REPO_CHOWN_UID:
+      default: "1001"
+      description: "Owner UID"
+    ANSIBLE_REPO_CHOWN_GID:
+      default: "1001"
+      description: "Owner GID"
+---
+include:
+  - project: 'collab/common-ci'
+    file: 'deploys/ansible-deploy.yaml.example'
+    ref: main
+    inputs:
+      DEPLOY_TARGET_HOST: $[[ inputs.DEPLOY_TARGET_HOST ]]
+      PLAYBOOK: $[[ inputs.PLAYBOOK ]]
+      SSH_USER: $[[ inputs.SSH_USER ]]
+      ANSIBLE_REPO_CHOWN_USER: $[[ inputs.ANSIBLE_REPO_CHOWN_USER ]]
+      ANSIBLE_REPO_CHOWN_UID: $[[ inputs.ANSIBLE_REPO_CHOWN_UID ]]
+      ANSIBLE_REPO_CHOWN_GID: $[[ inputs.ANSIBLE_REPO_CHOWN_GID ]]

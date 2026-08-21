@@ -10,7 +10,7 @@ Product images exist as **one richest copy per mechanic** under [`iac/docker/ima
 
 ## Challenge
 
-A shop with dozens of backends cannot patch fifty Gradle Dockerfiles by hand. CI needs a Kaniko pin, two runner shapes (kubectl/Helm vs docker-login), and honest Node/JRE retags. Estate sidecars (certs, night-park, CloudEye, EDR coverage) are images with a contract, not a wiki. Host GitLab and Vault are Compose, not Helm. Cybersec Grafana already lived on a VM; that stack had to be published so the Ansible role can copy it. Hunters should parse mechanics, not a dump. The public CI YAML catalog is still thin on purpose: pipelines stay in [`iac/ci/`](../iac/ci/), build context moved here.
+A shop with dozens of backends cannot patch fifty Gradle Dockerfiles by hand. CI needs a Kaniko pin, two runner shapes (kubectl/Helm vs docker-login), and honest Node/JRE retags. Estate sidecars (certs, night-park, CloudEye, EDR coverage) are images with a contract, not a wiki. Host GitLab and Vault are Compose, not Helm. Cybersec Grafana already lived on a VM; that stack had to be published so the Ansible role can copy it. Hunters should parse mechanics, not a dump. Pipeline YAML is living kits under [`iac/ci/pipelines/`](../iac/ci/pipelines/) ([case 13](13-ci-pipelines.md)). Build context moved here.
 
 ## Architecture
 
@@ -29,7 +29,7 @@ See diagram: [`diagrams/case-studies/12-docker-images.md`](../diagrams/case-stud
 5) after push: registry → Helm / Argo or compose up
 ```
 
-Honest scope: one mechanic per image, not a hundred-plus shop clones. CloudEye Go `src/` is not in git. App trees, JARs, Postman collections, and DLLs stay out. CI YAML here is a couple of kit files, not a second catalog.
+Honest scope: one mechanic per image, not a hundred-plus shop clones. CloudEye Go `src/` is not in git. App trees, JARs, Postman collections, and DLLs stay out. CI YAML next to a Dockerfile here is a pin (helmfile), not a second catalog. The pipeline kits are [case 13](13-ci-pipelines.md).
 
 ## What shipped (image library)
 
@@ -59,7 +59,7 @@ Honest scope: one mechanic per image, not a hundred-plus shop clones. CloudEye G
 - Host GitLab, Vault, and cybersec metrics are `compose up` with example env files
 - Helm remains the cluster package. Compose remains the VM and laptop path
 - Night-park, CloudEye, and EDR coverage stay complementary to Ansible and the Helm overlay
-- CI catalog stays the YAML map. This case does not claim a full private pipeline dump
+- CI catalog is living kits under [`iac/ci/`](../iac/ci/). This case does not claim those pipeline files
 
 ## Stack
 

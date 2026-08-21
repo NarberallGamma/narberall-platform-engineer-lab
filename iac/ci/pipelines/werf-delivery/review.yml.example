@@ -1,0 +1,124 @@
+include:
+  - local: 'common.yml.example'
+
+.base_review:
+  extends:
+    - .base_converge
+  resource_group: deploy/review
+  variables:
+    CI_ENV: ${CI_COMMIT_REF_SLUG}
+    WERF_ENV: "review"
+    WERF_KUBE_CONTEXT: dev
+  dependencies:
+    - REVIEW-START
+  before_script:
+    - !reference [.app_name]
+
+.base_review_start:
+  stage: review-start
+  extends:
+    - .base_review
+  dependencies:
+    - Build
+  environment:
+    name: review/MR-${CI_MERGE_REQUEST_IID}/${CI_COMMIT_REF_SLUG}
+    on_stop: REVIEW-STOP
+    auto_stop_in: 3 days
+  rules:
+    - !reference [.rule_not_schedule]
+    - !reference [.rule_pipeline_review]
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+      allow_failure: true
+  artifacts:
+    reports:
+      dotenv: review.env
+
+REVIEW-START:
+  extends:
+    - .base_review_start
+  script:
+    - !reference [.base_werf]
+    - echo "Starting review environment ${CI_ENVIRONMENT_SLUG}"
+    - echo "review/MR-${CI_MERGE_REQUEST_IID}/${CI_COMMIT_REF_SLUG}"
+    - echo "CI_ENVIRONMENT_SLUG=${CI_ENVIRONMENT_SLUG}" >> review.env
+    - echo "CI_ENVIRONMENT_NAME=${CI_ENVIRONMENT_NAME}" >> review.env
+    - echo "THREAD=${THREAD}" >> review.env
+
+.base_trigger: &base_trigger
+  stage: deploy
+  inherit:
+    variables: true
+  needs:
+    - Build
+    - job: REVIEW-START
+      optional: true
+    - job: STATIC
+      optional: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "pipeline"'
+      when: never
+
+REVIEW:
+  needs:
+    - Build
+    - job: REVIEW-START
+      optional: true
+  extends:
+    - .base_review
+  before_script:
+    - !reference [.app_name]
+    - !reference [.script_notify_slack_deploy_started]
+  after_script:
+    - !reference [.base_werf]
+    - !reference [.script_notify_slack_deploy_finished]
+  rules:
+    - !reference [.rule_not_schedule]
+    - !reference [.rule_pipeline_review]
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      allow_failure: false
+      when: on_success
+
+REVIEW-STOP:
+  extends:
+    - .base_review
+  environment:
+    name: review/MR-${CI_MERGE_REQUEST_IID}/${CI_COMMIT_REF_SLUG}
+    action: stop
+  variables:
+    GIT_STRATEGY: none
+  artifacts:
+  dependencies:
+  needs:
+  script:
+    - !reference [.base_werf]
+    - werf helm list -n ${WERF_NAMESPACE} -a --filter review --output json | jq -r '.[] | "werf helm delete -n " + .namespace + " " + .name' | bash
+    - werf helm list -n ${WERF_NAMESPACE} -a --output json | jq -e 'select(. | length > 0)' || werf kubectl delete ns ${WERF_NAMESPACE}
+  rules:
+    - !reference [.rule_not_schedule]
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "REVIEW"'
+      allow_failure: true
+      when: manual
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      allow_failure: true
+      when: manual
+
+Cleanup review:
+  extends:
+    - Cleanup
+  variables:
+    WERF_KUBE_CONTEXT: dev
+  script:
+    - !reference [.app_name]
+    - !reference [.base_werf]
+    - export date=$(date +"%s" -d "-4 days")
+    - |
+      for NS in `werf kubectl get ns | grep ${APP_NAME} | grep review | awk '{print $1}'` ; do
+        echo "NS ${NS}"
+        werf helm list -n ${NS} -a --output json --time-format "20060102" | jq -r '.[] | select( .updated | strptime("%Y%m%d") | mktime<'$date') | "werf helm delete -n " + .namespace + " " + .name' | bash
+        werf helm list -n ${NS} -a --output json | jq -e 'select(. | length > 0)' || werf kubectl delete ns ${NS}
+      done

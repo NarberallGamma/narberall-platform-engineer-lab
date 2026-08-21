@@ -36,6 +36,18 @@ Resource types: [`../terraform/RESOURCES.md`](../terraform/RESOURCES.md)
 
 Cluster Helm: [`../helm/`](../helm/).
 
+## Cloud API operators
+
+Terraform creates the account. These images call the same Huawei-class API after apply.
+
+| Path | Job |
+|------|-----|
+| [`../docker/images/operators/hibernate/`](../docker/images/operators/hibernate/) | Night-park stop/start on CCE workers and ECS. Ansible `docker_app` deploys the slug ([case 10](../../case-studies/10-ansible-estate.md)). Review: [`../../architecture/02-finops-night-park.md`](../../architecture/02-finops-night-park.md) |
+| [`../docker/images/operators/cloud-metrics/`](../docker/images/operators/cloud-metrics/) | CloudEye exporter **Dockerfile only**. Go `src/` is not in git. Helm overlay scrapes SYS.RDS / SYS.DCS / SYS.DMS |
+| [`../docker/images/operators/cloud-status/`](../docker/images/operators/cloud-status/) | Cloud.ru status `/metrics`. Owner HTTP client is in git |
+
+Calendar inputs sketch: [`../terraform/examples/night-park/`](../terraform/examples/night-park/).
+
 ## Keywords
 
-Huawei Cloud, cloud.ru, Terraform, Terragrunt, VPC, ECS, CCE, Kubernetes, RDS, Kafka, OBS, IAM, brownfield import, remote state, modules, multi-env
+Huawei Cloud, cloud.ru, Terraform, Terragrunt, VPC, ECS, CCE, Kubernetes, RDS, Kafka, OBS, IAM, brownfield import, remote state, modules, multi-env, night-park, hibernate, CloudEye

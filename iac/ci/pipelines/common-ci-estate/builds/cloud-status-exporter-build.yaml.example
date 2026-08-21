@@ -1,0 +1,41 @@
+# Build the cloud-status-exporter image and push it to the container registry.
+# Exporter polls a cloud provider status API (availability + incidents) and exposes Prometheus metrics.
+# Include directly: project: 'estate/common-ci', file: '/builds/cloud-status-exporter-build.yaml.example'
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - k8s-kaniko
+  timeout: 8h
+  interruptible: true
+
+stages:
+  - build
+
+variables:
+  CLOUD_STATUS_EXPORTER_IMAGE_NAME: "cloud-status-exporter"
+  CLOUD_STATUS_EXPORTER_IMAGE_TAG: "1.4"
+
+build-cloud-status-exporter:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - |
+      if [ -d "$CI_PROJECT_DIR/base-images/cloud-status" ]; then
+        CONTEXT="$CI_PROJECT_DIR/base-images/cloud-status"
+      elif [ -d "$CI_PROJECT_DIR/cloud-status" ]; then
+        CONTEXT="$CI_PROJECT_DIR/cloud-status"
+      else
+        echo "Error: cloud-status directory not found (base-images/cloud-status or cloud-status)"
+        exit 1
+      fi
+    - /kaniko/executor --context "$CONTEXT" --dockerfile "$CONTEXT/Dockerfile" --destination $CI_REGISTRY_IMAGE/$CLOUD_STATUS_EXPORTER_IMAGE_NAME:$CLOUD_STATUS_EXPORTER_IMAGE_TAG --custom-platform=linux/amd64
+    - echo "Cloud status exporter image built and pushed successfully!"
+  rules:
+    - when: manual

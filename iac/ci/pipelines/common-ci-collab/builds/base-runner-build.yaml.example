@@ -1,0 +1,41 @@
+# Build the base-runner image and push it to the Container Registry.
+# Run from the estate/base-images project (base-runner/ with Dockerfile and init.sh).
+
+include:
+  - local: '/defaults.yaml.example'
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - docker
+  timeout: 2h
+  interruptible: true
+
+stages:
+  - build
+
+variables:
+  BASE_RUNNER_IMAGE_NAME: "base-runner"
+
+build-base-runner:
+  stage: build
+  image:
+    name: $KANIKO_IMAGE
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - |
+      if [ -d "$CI_PROJECT_DIR/base-runner" ]; then
+        CONTEXT="$CI_PROJECT_DIR/base-runner"
+      else
+        echo "Error: base-runner directory not found"
+        exit 1
+      fi
+    - /kaniko/executor --context "$CONTEXT" --dockerfile "$CONTEXT/Dockerfile" --destination $CI_REGISTRY_IMAGE/$BASE_RUNNER_IMAGE_NAME:$BASE_RUNNER_IMAGE_TAG --custom-platform=linux/amd64
+    - echo "Base-runner image built and pushed to $CI_REGISTRY_IMAGE/$BASE_RUNNER_IMAGE_NAME:$BASE_RUNNER_IMAGE_TAG"
+  rules:
+    - when: manual

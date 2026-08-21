@@ -1,0 +1,169 @@
+# CI for git.example.com.
+#
+# Persistent CI/CD variables (Settings → CI/CD → Variables, masked/protected):
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   - S3 keys for the terraform state bucket
+#   SOPS_AGE_KEY                               - CI age private key (decrypt secrets.sops.yml)
+#   DEPLOY_SSH_KEY (type: file)                - private key to the target VM
+#
+# The cloud admin password is not stored in CI.
+# terraform plan/apply run only under an ephemeral token: an operator mints
+# it (terraform/mint-cloud-token.py) and passes OS_AUTH_TOKEN for one run
+# (Run pipeline). plan/apply jobs enable ONLY when OS_AUTH_TOKEN is set;
+# the token lives ~1 hour. Detail is in the project README.
+#
+# If runners cannot reach ghcr.io/docker.io, mirror images
+# into this GitLab registry and change image: below.
+
+stages: [lint, plan, apply, deploy]
+
+default:
+  interruptible: true
+  tags:
+    - docker
+
+# ---------- lint (on MR and main) --------------------------------------------
+
+lint:ansible:
+  stage: lint
+  image: python:3.12-slim
+  variables:
+    # runner checkout dir is world-writable, ansible.cfg from cwd is ignored;
+    # set the config path explicitly (the check does not apply to an explicit path)
+    ANSIBLE_CONFIG: $CI_PROJECT_DIR/ansible/ansible.cfg
+  script:
+    - pip install -q ansible-core ansible-lint
+    - ansible-galaxy collection install -r ansible/requirements.yml
+    - cd ansible && ansible-lint
+  rules: &mr-and-main
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+lint:exporter:
+  stage: lint
+  image: python:3.12-slim
+  script:
+    - python -m py_compile stack/exporters/panos/panos_exporter.py
+    - pip install -q PyYAML
+    - python -c "import yaml,glob; [list(yaml.safe_load_all(open(f))) for f in glob.glob('stack/**/*.yml', recursive=True)]"
+  rules: *mr-and-main
+
+# ---------- terraform: only under an ephemeral token (OS_AUTH_TOKEN) ---------
+# lint:terraform (fmt) on every MR/main, no credentials. plan/apply only when
+# the operator started the pipeline with OS_AUTH_TOKEN (see header and README).
+# terraform and providers are installed from a configured mirror
+# (see terraform/terraformrc).
+
+.terragrunt:
+  image: alpine:3.20   # if Docker Hub is unreachable, mirror into the project registry
+  timeout: 20m
+  variables:
+    # pin that is present as linux/amd64 zip on the chosen releases mirror
+    TF_VERSION: "1.15.8"
+    TG_VERSION: "1.1.1"
+    TG_TF_PATH: terraform
+    TF_CLI_CONFIG_FILE: $CI_PROJECT_DIR/terraform/.terraformrc
+    TG_NON_INTERACTIVE: "true"
+  # binaries are cached on the runner: after the first successful download
+  # later jobs do not fetch tools from the internet
+  cache:
+    key: tools-tf${TF_VERSION}-tg${TG_VERSION}
+    paths:
+      - .cache/tools/
+  before_script:
+    - apk add --no-cache curl unzip
+    - mkdir -p .cache/tools
+    - |
+      if [ ! -x .cache/tools/terraform ]; then
+        curl -fsSL --retry 3 -o /tmp/tf.zip \
+          "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
+        unzip -oq /tmp/tf.zip -d .cache/tools
+      fi
+    - |
+      if [ ! -x .cache/tools/terragrunt ]; then
+        # GitHub from this network is unstable; retries with a short connect-timeout.
+        # Durable option: upload the binary to this GitLab generic packages
+        # and replace the URL (see README).
+        curl -fSL --retry 5 --retry-all-errors --connect-timeout 15 --max-time 600 \
+          -o /tmp/terragrunt \
+          "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64"
+        chmod +x /tmp/terragrunt && mv /tmp/terragrunt .cache/tools/terragrunt
+      fi
+    - cp .cache/tools/terraform .cache/tools/terragrunt /usr/local/bin/
+
+lint:terraform:
+  extends: .terragrunt
+  stage: lint
+  script:
+    - terraform fmt -check -recursive -diff terraform/
+  rules: *mr-and-main
+
+# apply uses EXACTLY the plan saved by plan in the same pipeline
+# (--out-dir + artifacts), and does not recompute the world at apply time.
+plan:cloud:
+  extends: .terragrunt
+  stage: plan
+  script:
+    - cd terraform/envs/cloud
+    - terragrunt run --all plan --out-dir "$CI_PROJECT_DIR/tfplans/cloud"
+  artifacts:
+    paths:
+      - tfplans/
+    expire_in: 1 week
+    # binary plans can contain sensitive values. The project is private, but
+    # artifact access equals access to those values
+  rules:
+    # only when the operator started the pipeline with an ephemeral token
+    - if: '$OS_AUTH_TOKEN'
+
+apply:cloud:
+  extends: .terragrunt
+  stage: apply
+  needs:
+    - job: plan:cloud
+      artifacts: true
+  script:
+    - cd terraform/envs/cloud
+    - terragrunt run --all apply --out-dir "$CI_PROJECT_DIR/tfplans/cloud"
+  rules:
+    # manual button, only in a token pipeline on main (token still valid ~1h)
+    - if: '$OS_AUTH_TOKEN && $CI_COMMIT_BRANCH == "main"'
+      when: manual
+  resource_group: cloud-apply
+
+# ---------- deploy the stack with Ansible (manual from main) -----------------
+
+deploy:sec-stack:
+  stage: deploy
+  image: python:3.12-slim
+  variables:
+    ANSIBLE_CONFIG: $CI_PROJECT_DIR/ansible/ansible.cfg
+    SOPS_VERSION: "3.13.2"
+  cache:
+    key: tools-sops${SOPS_VERSION}
+    paths:
+      - .cache/tools/
+  before_script:
+    - pip install -q ansible-core
+    - ansible-galaxy collection install -r ansible/requirements.yml
+    - apt-get update -qq && apt-get install -y -qq openssh-client curl
+    # sops binary: GitHub is unstable -> retries + cache on the runner
+    - mkdir -p .cache/tools
+    - |
+      if [ ! -x .cache/tools/sops ]; then
+        curl -fSL --retry 5 --retry-all-errors --connect-timeout 15 --max-time 600 \
+          -o /tmp/sops \
+          "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
+        chmod +x /tmp/sops && mv /tmp/sops .cache/tools/sops
+      fi
+    - cp .cache/tools/sops /usr/local/bin/sops
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - cp "$DEPLOY_SSH_KEY" ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+  script:
+    # SOPS_AGE_KEY comes from CI variables; sops reads it on its own
+    - cd ansible
+    - ansible-playbook playbooks/site.yml
+        --ssh-common-args '-o StrictHostKeyChecking=accept-new'
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+  resource_group: monitoring-deploy

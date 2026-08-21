@@ -1,0 +1,82 @@
+.multideploy_demo_trigger: &multideploy_demo_trigger
+  stage: demo
+  extends:
+    - .multideploy_demo_only
+    - .multideploy_demo_except
+  needs:
+  - Build
+  - MultiDeploy to DEMO
+  variables:
+    MULTIDEPLOY: "true"
+    WERF_ENV: demo
+    WERF_NAMESPACE: demo
+    KUBE_NAMESPACE: demo
+    CUSTOM_K8S_NAMESPACE: demo
+    CI_ENVIRONMENT_CUSTOM_SLUG: demo
+
+.multideploy_demo_only: &multideploy_demo_only
+  only:
+    - dev
+    - develop
+    - development
+    - demo
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+
+.multideploy_demo_except: &multideploy_demo_except
+  except:
+    - schedules
+    - pipelines
+    - tags
+
+.multideploy_demo_needs: &multideploy_demo_needs
+  needs:
+  - Build
+  - MultiDeploy to DEMO
+  - Deploy clickhouse to DEMO
+
+MultiDeploy to DEMO:
+  stage: demo
+  environment:
+    name: demo
+  extends:
+    - .base_werf
+    - .multideploy_demo_only
+    - .multideploy_demo_except
+  script:
+    - werf kubectl -n demo scale deploy/bi-etl --replicas=0
+  when: manual
+  tags:
+    - docker
+
+Deploy clickhouse to DEMO:
+  extends:
+    - .multideploy_demo_trigger
+  trigger:
+    project: shop-app/bi/clickhouse
+    branch:  ${CI_COMMIT_BRANCH}
+    strategy: depend
+
+Deploy cube to DEMO:
+  extends:
+    - .multideploy_demo_trigger
+    - .multideploy_demo_needs
+    - .multideploy_demo_except
+  trigger:
+    project: shop-app/bi/cube
+    branch:  ${CI_COMMIT_BRANCH}
+    strategy: depend
+
+Deploy etl to DEMO:
+  extends:
+    - .base_deploy
+    - .multideploy_demo_trigger
+    - .multideploy_demo_needs
+    - .multideploy_demo_except
+  # except:
+  # - schedules
+  when: on_success
+  tags:
+    - docker

@@ -1,0 +1,146 @@
+variables:
+  WERF_VERSION: "2 ea"
+  RUNNER_TAG: docker
+
+# Stages
+stages:
+  - build
+  - test
+  - plan
+  - deploy
+  - release
+  - cleanup
+
+# Workflow
+workflow:
+  rules:
+    # Run merge request pipelines on MR events
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Run branch pipelines from "Run pipeline" page
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    # Skip the branch pipeline on push when an MR is already open
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+      when: never
+    # Run branch pipeline on tags
+    - if: $CI_COMMIT_TAG
+    # Run branch pipeline on all branches
+    - if: $CI_COMMIT_BRANCH
+    # Run branch pipeline on default branch
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# Defaults
+default:
+  tags:
+    - $RUNNER_TAG
+
+# Rules
+.rules:
+  not_schedule:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+  manual:
+    - when: manual
+      allow_failure: true
+  production:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+    - if: $CI_COMMIT_TAG
+      when: manual
+      allow_failure: true
+  tags:
+    - if: $CI_COMMIT_TAG
+      when: manual
+      allow_failure: true
+  not_tags:
+    - if: $CI_COMMIT_TAG
+      when: never
+  create_release:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  not_changelog:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - CHANGELOG.md
+      when: never
+
+# Base
+.base_werf:
+  - type trdl && . $(trdl use werf ${WERF_VERSION:-1.2 ea})
+  - type werf && source $(werf ci-env gitlab --as-file)
+  - werf version
+
+  - section_name="envs_$(date +%s)"
+  - echo -e "\e[0Ksection_start:`date +%s`:${section_name}[collapsed=true]\r\e[0KJob environment variables"
+  - |
+    echo "WERF_ENV=${WERF_ENV}"
+    echo "WERF_NAMESPACE=${WERF_NAMESPACE}"
+    echo "WERF_KUBE_CONTEXT=${WERF_KUBE_CONTEXT}"
+    echo "CI_COMMIT_REF_SLUG=${CI_COMMIT_REF_SLUG}"
+    echo "CI_ENVIRONMENT_SLUG=${CI_ENVIRONMENT_SLUG}"
+  - printenv | sort
+  - echo -e "\e[0Ksection_end:`date +%s`:${section_name}\r\e[0K"
+
+.base_build:
+  stage: build
+  variables:
+    WERF_SAVE_BUILD_REPORT: 'yes'
+    WERF_BUILD_REPORT_PATH: build.env
+  script:
+    - !reference [.base_werf]
+    - werf build
+    - sed -i -E 's|(.*_NAME)=(.*):(.*)|\1=\2:\3\n\1_URL=\2\n\1_TAG=\3|g' build.env
+    - cat build.env
+  artifacts:
+    reports:
+      dotenv:
+        - build.env
+  rules:
+    - !reference [.rules, not_schedule]
+    - when: always
+
+.base_tests:
+  stage: test
+  script:
+    - echo "Tests"
+  rules:
+    - !reference [.rules, not_schedule]
+    - when: on_success
+
+.base_plan:
+  stage: plan
+  variables:
+    WERF_REQUIRE_BUILT_IMAGES: true
+    WERF_ENV: ${CI_ENVIRONMENT_SLUG}
+  script:
+    - !reference [.base_werf]
+    - werf plan
+  rules:
+    - !reference [.rules, not_schedule]
+    - !reference [.rules, manual]
+
+.base_deploy:
+  stage: deploy
+  variables:
+    WERF_REQUIRE_BUILT_IMAGES: true
+    WERF_ENV: ${CI_ENVIRONMENT_SLUG}
+  script:
+    - !reference [.base_werf]
+    - werf converge
+  rules:
+    - !reference [.rules, not_schedule]
+    - !reference [.rules, manual]
+  when: manual
+
+# Cleanup
+Cleanup:
+  stage: cleanup
+  script:
+    - !reference [.base_werf]
+    - unset WERF_KUBE_CONTEXT
+    - set -x
+    - werf cr login -u nobody -p ${WERF_IMAGES_CLEANUP_PASSWORD} ${WERF_REPO}
+    - werf cleanup
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"

@@ -25,12 +25,12 @@ See diagram: [`diagrams/case-studies/10-ansible-estate.md`](../diagrams/case-stu
 6) estate_databases: rw/ro users, drop, schema migrate
 ```
 
-Honest scope: network and CCE stay in Terraform. This tree assumes SSH reachability and an inventory. Host Prom to VictoriaMetrics, blackbox, and Kubernetes SD live in [`ansible-app-platform`](../iac/ansible/reference/ansible-app-platform/), not in this docker_app tree. Host Grafana / vmalert / Alertmanager live in [`sec-stack`](../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/). sar / vnstat before a full scrape estate: [`monitoring-starter`](../iac/ansible/reference/monitoring-starter/).
+Honest scope: network and CCE stay in Terraform. This tree assumes SSH reachability and an inventory. `docker_app` consumes published operator images: [`hibernate`](../iac/docker/images/operators/hibernate/), [`cert-orchestrator`](../iac/docker/images/operators/cert-orchestrator/) (compose sits next to that image), and [`cert-monitoring`](../iac/docker/images/operators/cert-monitoring/). The image library case is [12](12-docker-images.md). Host Prom to VictoriaMetrics, blackbox, and Kubernetes SD live in [`ansible-app-platform`](../iac/ansible/reference/ansible-app-platform/), not in this docker_app tree. Host Grafana / vmalert / Alertmanager live in [`sec-stack`](../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/). sar / vnstat before a full scrape estate: [`monitoring-starter`](../iac/ansible/reference/monitoring-starter/).
 
 ## What shipped
 
-- Shared `docker_app` role plus one playbook per product
-- Night-park hibernate operator as Ansible, not a wiki reminder
+- Shared `docker_app` role plus one playbook per product. Images those slugs consume: [`../iac/docker/images/operators/`](../iac/docker/images/operators/)
+- Night-park hibernate operator as Ansible, not a wiki reminder. Image: [`../iac/docker/images/operators/hibernate/`](../iac/docker/images/operators/hibernate/)
 - Vault deploy/init/secrets playbooks
 - DB user lifecycle next to the app estate: Flyway/DDL owner vs app DML, RO (audit/BI), RW (tools), drop without REASSIGN, `REPLICATION` for Debezium
 - Public lab: brands and live certs stripped; role logic kept
@@ -49,6 +49,8 @@ Ansible, Docker, nginx, Vault, CryptoPro, HSM, GitLab, Prometheus, VictoriaMetri
 ## Links
 
 - Sanitized code: [`iac/ansible/reference/ansible-estate/`](../iac/ansible/reference/ansible-estate/)
+- Operator images `docker_app` consumes: [`iac/docker/images/operators/`](../iac/docker/images/operators/)
+- Image library: [case 12](12-docker-images.md)
 - Ansible hub: [`iac/ansible/`](../iac/ansible/)
 - Host Prom / VM / blackbox: [`iac/ansible/reference/ansible-app-platform/`](../iac/ansible/reference/ansible-app-platform/)
 - Host Grafana / vmalert: [`iac/ansible/reference/ansible-llm-collab/extras/sec-stack/`](../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/)

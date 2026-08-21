@@ -1,0 +1,37 @@
+include:
+  - local: '/defaults.yaml.example'
+
+# Build the Ansible image (creator-ee + collections) and push it to the registry.
+# Run from the estate/base-images project (ansible/Dockerfile and ansible/requirements.yml).
+# Uses the Kaniko image from the same registry (run build-kaniko before the first run of this job).
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - docker
+  timeout: 2h
+  interruptible: true
+
+stages:
+  - build
+
+variables:
+  ANSIBLE_IMAGE_NAME: "ansible"
+  ANSIBLE_IMAGE_TAG: "1.0"
+
+build-ansible:
+  stage: build
+  image:
+    name: $KANIKO_IMAGE
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - cd ansible
+    - /kaniko/executor --context $CI_PROJECT_DIR/ansible --dockerfile $CI_PROJECT_DIR/ansible/Dockerfile --destination $CI_REGISTRY_IMAGE/$ANSIBLE_IMAGE_NAME:$ANSIBLE_IMAGE_TAG --custom-platform=linux/amd64
+    - echo "Ansible image built and pushed to $CI_REGISTRY_IMAGE/$ANSIBLE_IMAGE_NAME:$ANSIBLE_IMAGE_TAG"
+  rules:
+    - when: manual

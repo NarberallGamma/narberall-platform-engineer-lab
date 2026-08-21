@@ -1,0 +1,61 @@
+# Catalog flatten: services-template.yml.example sits in this mini-root (not .gitlab/services-template.yml).
+include:
+  - local: services-template.yml.example
+    inputs:
+      service_release_name: "portal-api"
+      service_directory: services/portal_api
+      service_helm_directory: ".werf/portal-api"
+      service_test_image_name: "$WERF_PORTAL_API_DOCKER_IMAGE_NAME"
+      service_test_before_script:
+        - export CURRENT=$(pwd)
+        - cd /root/services/portal_api
+        - poetry config virtualenvs.create false
+        - poetry install --no-interaction --no-ansi -vvv
+      service_cov_variable: "RELOAD_COV_SERVICE_PORTAL_API"
+      service_changes_paths:
+        - "libraries/config_loader/*"
+        - "libraries/config_loader/**/*"
+        - "libraries/db_lib/*"
+        - "libraries/db_lib/**/*"
+        - "libraries/logger/*"
+        - "libraries/logger/**/*"
+        - "libraries/protobuf/*"
+        - "libraries/protobuf/**/*"
+        - "libraries/core/*"
+        - "libraries/core/**/*"
+        - "libraries/http_api_lib/*"
+        - "libraries/http_api_lib/**/*"
+        - "services/portal_api/*"
+        - "services/portal_api/**/*"
+        - ".werf/portal-api/**/*"
+
+.base_test_service/portal-api:
+  services:
+    - !reference [.additional_services, postgres]
+  image:
+    name: "$WERF_PORTAL_API_DOCKER_IMAGE_NAME"
+    docker:
+      user: root
+    entrypoint:
+      - ""
+
+dump portal-api prod db to dev:
+  stage: dev
+  variables:
+    WERF_ENV: dump-portal
+  trigger:
+    project: infra/db-dump-for-dev
+    strategy: depend
+  environment:
+    name: dump-portal
+  except:
+    - schedules
+  when: manual
+
+autotest_api dev check import:
+  trigger:
+    project: shop-app/e2e
+    branch: dev
+  except:
+    - schedules
+  when: manual

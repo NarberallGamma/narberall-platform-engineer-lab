@@ -1,0 +1,16 @@
+include:
+  - local: .gitlab/common.yaml.example
+
+
+Cleanup:
+  stage: cleanup
+  before_script:
+    - source <(multiwerf use ${WERF_VERSION})
+    - source <(werf ci-env gitlab --verbose)
+  script:
+    - docker login -u nobody -p ${WERF_IMAGES_CLEANUP_PASSWORD} ${CI_REGISTRY_IMAGE}
+    - werf cleanup
+  rules:
+    - !reference [ .rules, schedule ]
+  tags:
+    - docker

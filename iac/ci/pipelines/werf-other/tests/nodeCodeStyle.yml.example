@@ -1,0 +1,30 @@
+spec:
+  inputs:
+    image:
+      description: image name in uppercase; replace - with _; format $WERF_<NAME>_DOCKER_IMAGE_NAME
+      default: $WERF_NODE_DOCKER_IMAGE_NAME
+    env:
+      description: environment suffix appended to the job name; leading underscore, for example _dev or _production
+      default: ""
+
+
+---
+.codestyle:
+  image: $[[ inputs.image ]]
+  stage: test
+  before_script:
+    - npm i
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+  tags:
+    - docker
+
+CodeStyle$[[ inputs.env ]]:ESLint:
+  extends: .codestyle
+  script:
+    - npm run lint
+
+CodeStyle$[[ inputs.env ]]:Prettier:
+  extends: .codestyle
+  script:
+    - npm run prettier

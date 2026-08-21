@@ -1,0 +1,35 @@
+# Kaniko build for a static/marketing site image (generic site deploy).
+# Include: project: 'estate/common-ci', file: '/deploys/web-site.yaml.example'
+include:
+  - local: '/defaults.yaml.example'
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - k8s-kaniko
+  timeout: 8h
+  interruptible: true
+
+stages:
+  - build
+
+variables:
+  IMAGE_NAME: "web-site"
+  IMAGE_TAG: "2.0"
+  DOCKERFILE_PATH: "docker/Dockerfile"
+
+build-web-site:
+  stage: build
+  image:
+    name: $KANIKO_IMAGE
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/$DOCKERFILE_PATH --destination $CI_REGISTRY_IMAGE:$IMAGE_TAG --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA --custom-platform=linux/amd64 --cache=true --cache-ttl=168h
+    - echo "Web-site image built and pushed successfully"
+  rules:
+    - when: manual

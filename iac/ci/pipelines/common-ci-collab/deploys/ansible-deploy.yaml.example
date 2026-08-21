@@ -1,0 +1,118 @@
+# Sync the Ansible repo to a host. The job image is base-runner (docker login, rsync).
+# The Ansible EE image is not pulled by CI. Load it on the host separately or via run scripts.
+# SSH_PRIVATE_KEY is custom_host only. Set CI_REGISTRY_* or GITLAB_REGISTRY_* for docker login.
+# For runner_host: set runner config.toml volumes for /ansible and docker.sock (deploy path is /ansible).
+# Vault: when CI variables VAULT_ADDR and VAULT_TOKEN are set, write /ansible/.env.vault (chmod 600, owner ansible).
+# SSH: when ANSIBLE_SSH_PRIVATE_KEY_B64 is set (private key as one-line base64, Masked in GitLab), write /ansible/.ssh/ansible_ssh_key (chmod 600, owner ansible).
+# rsync --delete: git has no artifacts/ (.gitignore). Without --filter P artifacts the host /ansible/artifacts/ would be deleted on every deploy.
+
+spec:
+  inputs:
+    DEPLOY_TARGET_HOST:
+      default: ""
+      description: "SSH deploy host (empty = runner host)"
+    PLAYBOOK:
+      default: ""
+      description: "Playbook to run after sync"
+    SSH_USER:
+      default: "root"
+      description: "SSH user on the remote host"
+    ANSIBLE_REPO_CHOWN_USER:
+      default: "ansible"
+      description: "Repo directory owner (custom_host)"
+    ANSIBLE_REPO_CHOWN_UID:
+      default: "1001"
+      description: "Owner UID"
+    ANSIBLE_REPO_CHOWN_GID:
+      default: "1001"
+      description: "Owner GID"
+    ANSIBLE_IMAGE:
+      default: "example.registry/estate/base-images/ansible:1.0"
+      description: "Ansible EE image (for the playbook)"
+---
+include:
+  - local: '/defaults.yaml.example'
+
+default:
+  tags:
+    - docker
+  timeout: 1h
+  interruptible: true
+
+stages:
+  - deploy
+
+variables:
+  DEPLOY_TARGET_HOST: $[[ inputs.DEPLOY_TARGET_HOST ]]
+  PLAYBOOK: $[[ inputs.PLAYBOOK ]]
+  SSH_USER: $[[ inputs.SSH_USER ]]
+  ANSIBLE_REPO_DEPLOY_PATH: "/ansible"
+  ANSIBLE_REPO_CHOWN_USER: $[[ inputs.ANSIBLE_REPO_CHOWN_USER ]]
+  ANSIBLE_REPO_CHOWN_UID: $[[ inputs.ANSIBLE_REPO_CHOWN_UID ]]
+  ANSIBLE_REPO_CHOWN_GID: $[[ inputs.ANSIBLE_REPO_CHOWN_GID ]]
+  ANSIBLE_IMAGE: $[[ inputs.ANSIBLE_IMAGE ]]
+
+# Deploy onto the same host as the runner (requires volumes in runner config.toml).
+deploy-ansible:runner_host:
+  stage: deploy
+  image: $BASE_IMAGE
+  before_script:
+    - init.sh
+  script:
+    - mkdir -p "${ANSIBLE_REPO_DEPLOY_PATH}"
+    - rsync -a --delete --exclude='.git/objects' --exclude='.git/logs' --filter='P artifacts' "${CI_PROJECT_DIR}/" "${ANSIBLE_REPO_DEPLOY_PATH}/"
+    - find "${ANSIBLE_REPO_DEPLOY_PATH}" -type d -exec chmod 755 {} \;
+    - find "${ANSIBLE_REPO_DEPLOY_PATH}" -type f -exec chmod 644 {} \;
+    - find "${ANSIBLE_REPO_DEPLOY_PATH}" -name "*.sh" -type f -exec chmod 755 {} \;
+    - chown -R "${ANSIBLE_REPO_CHOWN_UID}:${ANSIBLE_REPO_CHOWN_GID}" "${ANSIBLE_REPO_DEPLOY_PATH}" || true
+    - |
+      if [ -n "${VAULT_ADDR:-}" ] && [ -n "${VAULT_TOKEN:-}" ]; then
+        printf 'export VAULT_ADDR="%s"\nexport VAULT_TOKEN="%s"\n' "${VAULT_ADDR}" "${VAULT_TOKEN}" > "${ANSIBLE_REPO_DEPLOY_PATH}/.env.vault"
+        chmod 600 "${ANSIBLE_REPO_DEPLOY_PATH}/.env.vault"
+        chown "${ANSIBLE_REPO_CHOWN_UID}:${ANSIBLE_REPO_CHOWN_GID}" "${ANSIBLE_REPO_DEPLOY_PATH}/.env.vault"
+      fi
+    - mkdir -p "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh"
+    - |
+      if [ -n "${ANSIBLE_SSH_PRIVATE_KEY_B64:-}" ]; then
+        printf '%s' "${ANSIBLE_SSH_PRIVATE_KEY_B64}" | tr -d '\n' | base64 -d > "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh/ansible_ssh_key"
+        printf '\n' >> "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh/ansible_ssh_key"
+        chmod 700 "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh"
+        chmod 600 "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh/ansible_ssh_key"
+        chown -R "${ANSIBLE_REPO_CHOWN_UID}:${ANSIBLE_REPO_CHOWN_GID}" "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh"
+      fi
+    - |
+      if [ -n "${PLAYBOOK}" ]; then
+        docker run --rm -v "${ANSIBLE_REPO_DEPLOY_PATH}:${ANSIBLE_REPO_DEPLOY_PATH}" -w "${ANSIBLE_REPO_DEPLOY_PATH}" "${ANSIBLE_IMAGE}" ansible-playbook -i "localhost," -e "ansible_connection=local" "${PLAYBOOK}" || true
+      fi
+  rules:
+    - if: $DEPLOY_TARGET_HOST == null || $DEPLOY_TARGET_HOST == ""
+
+# Deploy onto another host over SSH.
+deploy-ansible:custom_host:
+  stage: deploy
+  image: $BASE_IMAGE
+  before_script:
+    - init.sh
+    - mkdir -p ~/.ssh
+    - '[[ -n "$SSH_PRIVATE_KEY" ]] && echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa || true'
+    - ssh-keyscan -H "${DEPLOY_TARGET_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
+  script:
+    - |
+      ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_rsa "${SSH_USER}@${DEPLOY_TARGET_HOST}" "mkdir -p ${ANSIBLE_REPO_DEPLOY_PATH}"
+      rsync -a --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new" \
+        --exclude='.git/objects' --exclude='.git/logs' --filter='P artifacts' \
+        "${CI_PROJECT_DIR}/" "${SSH_USER}@${DEPLOY_TARGET_HOST}:${ANSIBLE_REPO_DEPLOY_PATH}/"
+      ssh -i ~/.ssh/id_rsa "${SSH_USER}@${DEPLOY_TARGET_HOST}" "chown -R ${ANSIBLE_REPO_CHOWN_USER}:${ANSIBLE_REPO_CHOWN_USER} ${ANSIBLE_REPO_DEPLOY_PATH}"
+      ssh -i ~/.ssh/id_rsa "${SSH_USER}@${DEPLOY_TARGET_HOST}" "find ${ANSIBLE_REPO_DEPLOY_PATH} -type d -exec chmod 755 {} \\;"
+      ssh -i ~/.ssh/id_rsa "${SSH_USER}@${DEPLOY_TARGET_HOST}" "find ${ANSIBLE_REPO_DEPLOY_PATH} -type f -exec chmod 644 {} \\;"
+      ssh -i ~/.ssh/id_rsa "${SSH_USER}@${DEPLOY_TARGET_HOST}" "find ${ANSIBLE_REPO_DEPLOY_PATH} -name '*.sh' -type f -exec chmod 755 {} \\;"
+    - |
+      if [ -n "${PLAYBOOK}" ]; then
+        docker run --rm -v "${CI_PROJECT_DIR}:${CI_PROJECT_DIR}" -w "${CI_PROJECT_DIR}" -e "ANSIBLE_HOST_KEY_CHECKING=False" "${ANSIBLE_IMAGE}" ansible-playbook -i "${DEPLOY_TARGET_HOST}," -e "ansible_user=${SSH_USER}" "${PLAYBOOK}" || true
+      fi
+  after_script:
+    - rm -f ~/.ssh/id_rsa
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
+      when: never
+    - if: $DEPLOY_TARGET_HOST != null && $DEPLOY_TARGET_HOST != ""

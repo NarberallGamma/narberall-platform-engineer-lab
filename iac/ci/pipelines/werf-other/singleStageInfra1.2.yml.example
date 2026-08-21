@@ -1,0 +1,22 @@
+include:
+  - local: '/common.yml.example'
+
+Build:
+  extends: .base_build
+
+Plan Main:
+  extends: .base_plan
+  environment:
+    name: infra
+
+Deploy to Main:
+  extends: .base_deploy
+  stage: deploy
+  environment:
+    name: infra
+  rules:
+    - !reference [.rules, not_schedule]
+    - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "infra"
+  when: manual

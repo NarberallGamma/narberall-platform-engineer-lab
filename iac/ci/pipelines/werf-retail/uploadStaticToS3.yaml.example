@@ -1,0 +1,103 @@
+include:
+  - local: '/rules/rules.yml.example'
+
+
+.base_upload_static:
+  except:
+  variables:
+    UPLOAD_IMAGE: "s3Uploader"
+    WERF_ADD_LABEL_1: COMMIT-SHA=${CI_COMMIT_SHA}
+  script: |
+    set -eu
+
+    overrides='{"spec":{
+      "serviceAccountName":"web-ui-static-uploader",
+      "terminationGracePeriodSeconds":0
+    }}'
+
+    werf kube-run --overrides="$overrides" --namespace="$STATIC_UPLOADER_NAMESPACE" "$UPLOAD_IMAGE" -- sh -c '
+      export AWS_REGION='"$STATIC_AWS_REGION"';
+      rclone copy --s3-no-check-bucket --s3-env-auth --s3-provider AWS \
+        --s3-region "$AWS_REGION" --s3-endpoint "https://s3.$AWS_REGION.amazonaws.com" \
+        /data/static :s3:'"${STATIC_AWS_S3_BUCKET}"'/'"${S3_DIR}"
+
+  tags:
+    - docker
+
+
+Upload static to S3 for Triggered deploy code DEV:
+  stage: build
+  needs:
+    - job: "Build web-ui"
+      artifacts: true
+      optional: true
+    - job: "Build screen-ui"
+      artifacts: true
+      optional: true
+    - job: "Build"
+      artifacts: true
+      optional: true
+  extends:
+    - .base_build
+    - .base_upload_static
+  variables:
+    STATIC_AWS_REGION: us-east-2
+    STATIC_AWS_S3_BUCKET: shop-app-dev-static
+    WERF_KUBE_CONTEXT: dev
+    STATIC_UPLOADER_NAMESPACE: dev
+  rules:
+    - if: $CI_PROJECT_NAME =~ /^web-ui-(cashier-ci|portal-ci|shop).*$/ && $WERF_ENV !~ /^(production|tenant-a|tenant-b)$/ && $CI_TYPE !~ /^(ready_to_prod|create_release)$/
+
+
+Upload static to S3 Production:
+  stage: build
+  dependencies:
+    - Build
+  extends:
+    - .base_werf
+    - .base_upload_static
+  variables:
+    STATIC_AWS_REGION: us-east-2
+    STATIC_AWS_S3_BUCKET: shop-app-prod-static
+    WERF_KUBE_CONTEXT: production
+    STATIC_UPLOADER_NAMESPACE: production
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+      when: never
+    - if: $WERF_ENV == "production"
+
+
+Upload static to S3 tenant-a:
+  stage: build
+  dependencies:
+    - Build
+  extends:
+    - .base_werf
+    - .base_upload_static
+  variables:
+    STATIC_AWS_REGION: us-east-1
+    STATIC_AWS_S3_BUCKET: shop-app-tenant-a-static
+    WERF_KUBE_CONTEXT: production-reserve-b
+    STATIC_UPLOADER_NAMESPACE: tenant-a
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+      when: never
+    - if: $WERF_ENV == "tenant-a"
+
+
+Upload static to S3 tenant-b:
+  stage: build
+  dependencies:
+    - Build
+  extends:
+    - .base_werf
+    - .base_upload_static
+  variables:
+    STATIC_AWS_REGION: us-east-2
+    STATIC_AWS_S3_BUCKET: shop-app-tenant-b-static
+    WERF_KUBE_CONTEXT: production2
+    STATIC_UPLOADER_NAMESPACE: tenant-b
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+      when: never
+    - if: $WERF_ENV == "tenant-b"

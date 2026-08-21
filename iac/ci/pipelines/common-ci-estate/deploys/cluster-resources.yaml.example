@@ -1,0 +1,785 @@
+include:
+  - local: '/defaults.yaml.example'
+
+stages:
+  - deploy-loadbalancer
+  - deploy-ingress
+  - deploy-istio
+  - deploy-istio-vps-egress
+  - disable-istio-vps-egress
+  - deploy-monitoring-ingress
+  - deploy-exporters
+  - deploy-prometheus
+  - deploy-grafana
+  - deploy-openobserve
+
+variables:
+  HELM_RELEASE_NAME: "ingress-nginx"
+  HELM_NAMESPACE: "ingress-nginx"
+  ISTIO_NAMESPACE: "istio-system"
+  ESTATE_NAMESPACE: "estate"
+  ISTIO_VPS_EGRESS_RELEASE_NAME: "istio-vps-egress"
+  ISTIO_VERSION: "1.27.3"
+  PROMETHEUS_NAMESPACE: "monitoring"
+  PROMETHEUS_RELEASE_NAME: "prometheus"
+  GRAFANA_NAMESPACE: "monitoring"
+  GRAFANA_RELEASE_NAME: "grafana"
+  OPENOBSERVE_NAMESPACE: "monitoring"
+  OPENOBSERVE_RELEASE_NAME: "openobserve"
+  OPENOBSERVE_COLLECTOR_RELEASE_NAME: "openobserve-collector"
+  EXPORTERS_NAMESPACE: "monitoring"
+  BLACKBOX_EXPORTER_RELEASE_NAME: "prometheus-blackbox-exporter"
+  NODE_EXPORTER_RELEASE_NAME: "node-exporter-estate"
+  CLOUD_METRICS_EXPORTER_RELEASE_NAME: "prometheus-cloudeye-exporter"
+  CLOUD_STATUS_EXPORTER_RELEASE_NAME: "prometheus-cloud-ru-status-exporter"
+  HELM_REPO: "https://kubernetes.github.io/ingress-nginx"
+  ISTIO_REPO: "https://istio-release.storage.googleapis.com/charts"
+
+default:
+  tags:
+    - docker
+  timeout: 8h
+  interruptible: true
+
+.k8s_setup: &k8s_setup
+  image: $BASE_IMAGE
+  before_script:
+    - init.sh
+
+deploy-loadbalancer:
+  <<: *k8s_setup
+  stage: deploy-loadbalancer
+  script:
+    - echo "Deploying LoadBalancer Services..."
+    - echo "Creating namespace..."
+    - kubectl create namespace $HELM_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - echo "Checking loadbalancer values file..."
+    - ls -la loadbalancer/values.yaml
+    - cat loadbalancer/values.yaml | head -20
+    - echo "Installing LoadBalancer Services..."
+    - helm upgrade --install ingress-loadbalancer ./loadbalancer
+      --namespace $HELM_NAMESPACE
+      --values loadbalancer/values.yaml
+      --wait
+      --timeout=5m
+    - echo "Waiting 60 seconds before checking status..."
+    - sleep 60
+    - echo "LoadBalancer Services deployment status:"
+    - kubectl get svc -n $HELM_NAMESPACE
+    - kubectl get pods -n $HELM_NAMESPACE || true
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-ingress:
+  <<: *k8s_setup
+  stage: deploy-ingress
+  script:
+    - echo "Deploying Ingress Controller..."
+    - echo "Adding Helm repository..."
+    - helm repo add ingress-nginx $HELM_REPO
+    - helm repo update
+    - echo "Checking ingress values file..."
+    - ls -la ingress/values.yaml
+    - cat ingress/values.yaml | head -20
+    - echo "Installing Ingress Controller..."
+    - helm upgrade --install $HELM_RELEASE_NAME ingress-nginx/ingress-nginx
+      --namespace $HELM_NAMESPACE
+      --values ingress/values.yaml
+      --wait
+      --timeout=10m
+    - echo "Waiting 60 seconds before checking status..."
+    - sleep 60
+    - echo "Ingress Controller deployment status:"
+    - kubectl get pods -n $HELM_NAMESPACE
+    - kubectl get svc -n $HELM_NAMESPACE
+    - kubectl get ingressclass
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-istio:
+  <<: *k8s_setup
+  stage: deploy-istio
+  script:
+    - |
+      echo "=========================================="
+      echo "Deploying Istio core (base, istiod, mTLS policies)"
+      echo "=========================================="
+      
+      echo "Step 1/5: Adding Istio Helm repository..."
+      helm repo add istio $ISTIO_REPO
+      helm repo update
+      
+      echo "Step 2/5: Installing Istio Base (CRDs)..."
+      kubectl create namespace $ISTIO_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+      helm upgrade --install istio-base istio/base \
+        --namespace $ISTIO_NAMESPACE \
+        --version $ISTIO_VERSION \
+        --wait \
+        --timeout=5m
+      echo "Istio Base deployed successfully"
+      kubectl get crd | grep istio | head -5
+      
+      echo "Step 3/5: Installing Istio Control Plane (istiod)..."
+      echo "Configuration: profile=default, enableAutoMtls=true, autoInject=disabled, HA=2 replicas"
+      ls -la istio/values.yaml
+      cat istio/values.yaml | head -25
+      helm upgrade --install istiod istio/istiod \
+        --namespace $ISTIO_NAMESPACE \
+        --values istio/values.yaml \
+        --version $ISTIO_VERSION \
+        --wait \
+        --timeout=10m
+      kubectl wait --for=condition=ready pod -l app=istiod -n $ISTIO_NAMESPACE --timeout=600s || true
+      kubectl get pods -n $ISTIO_NAMESPACE -l app=istiod
+      echo "Istio Control Plane deployed successfully"
+      
+      echo "Step 4/5: Enabling Istio injection for estate namespace..."
+      kubectl label namespace $ESTATE_NAMESPACE istio-injection=enabled --overwrite
+      echo "Verifying namespace labels..."
+      kubectl get namespace $ESTATE_NAMESPACE -o jsonpath='{.metadata.labels}' | grep istio-injection
+      
+      echo "Step 5/5: Deploying PeerAuthentication policies (mTLS)..."
+      helm upgrade --install istio-peer-auth ./istio \
+        --namespace $ESTATE_NAMESPACE \
+        --values istio/values.yaml \
+        --set vpsEgress.enabled=false \
+        --wait \
+        --timeout=5m
+      echo "PeerAuthentication policies deployed successfully"
+      
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Istio core deployment status:"
+      kubectl get pods -n $ISTIO_NAMESPACE -l app=istiod
+      kubectl get peerauthentication -n $ESTATE_NAMESPACE
+      echo "=========================================="
+      echo "Istio core deployment completed!"
+      echo "=========================================="
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-istio-vps-egress:
+  <<: *k8s_setup
+  stage: deploy-istio-vps-egress
+  script:
+    - |
+      echo "=========================================="
+      echo "Deploying Istio VPS egress (gateway + routing policies)"
+      echo "Requires: deploy-istio completed first"
+      echo "=========================================="
+      
+      echo "Step 1/3: Adding Istio Helm repository..."
+      helm repo add istio $ISTIO_REPO
+      helm repo update
+      
+      echo "Step 2/3: Installing Istio Egress Gateway (HA: 2 replicas)..."
+      helm upgrade --install istio-egressgateway istio/gateway \
+        --namespace $ISTIO_NAMESPACE \
+        --values istio/values-egress-gateway.yaml \
+        --version $ISTIO_VERSION \
+        --wait \
+        --timeout=5m
+      kubectl wait --for=condition=ready pod -l istio=egressgateway -n $ISTIO_NAMESPACE --timeout=300s || true
+      kubectl get pods -n $ISTIO_NAMESPACE -l istio=egressgateway
+      
+      echo "Step 3/3: Deploying VPS egress Istio policies..."
+      helm upgrade --install $ISTIO_VPS_EGRESS_RELEASE_NAME ./istio \
+        --namespace $ISTIO_NAMESPACE \
+        --values istio/values.yaml \
+        --set peerAuthentication.enabled=false \
+        --wait \
+        --timeout=5m
+      kubectl get serviceentry,destinationrule,gateway -n $ISTIO_NAMESPACE -l app.kubernetes.io/component=vps-egress || true
+      kubectl get virtualservice -n $ESTATE_NAMESPACE -l app.kubernetes.io/component=vps-egress || true
+      kubectl get virtualservice -n $GRAFANA_NAMESPACE -l app.kubernetes.io/component=vps-egress || true
+      
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Istio VPS egress deployment status:"
+      kubectl get pods -n $ISTIO_NAMESPACE -l istio=egressgateway
+      echo "=========================================="
+      echo "Istio VPS egress deployment completed!"
+      echo "=========================================="
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-blackbox-exporter:
+  <<: *k8s_setup
+  stage: deploy-exporters
+  script:
+    - |
+      echo "=========================================="
+      echo "Deploying Blackbox Exporter"
+      echo "=========================================="
+      
+      echo "Step 1/4: Ensuring namespace exists..."
+      kubectl create namespace $EXPORTERS_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+      
+      echo "Step 2/4: Updating Helm dependencies for blackbox-exporter..."
+      cd monitoring/exporters/prometheus-blackbox-exporter
+      helm dependency update || echo "Dependencies update skipped or failed"
+      cd ../../..
+      
+      echo "Step 3/4: Checking blackbox-exporter values file..."
+      ls -la monitoring/exporters/prometheus-blackbox-exporter/values.yaml
+      cat monitoring/exporters/prometheus-blackbox-exporter/values.yaml | head -30
+      
+      echo "Step 4/4: Installing/Upgrading blackbox-exporter..."
+      helm upgrade --install $BLACKBOX_EXPORTER_RELEASE_NAME ./monitoring/exporters/prometheus-blackbox-exporter \
+        --namespace $EXPORTERS_NAMESPACE \
+        --create-namespace \
+        --values monitoring/exporters/prometheus-blackbox-exporter/values.yaml \
+        --wait \
+        --timeout=10m
+      
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Blackbox Exporter deployment status:"
+      kubectl get pods -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-blackbox-exporter
+      kubectl get svc -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-blackbox-exporter
+      echo "=========================================="
+      echo "Blackbox Exporter deployment completed!"
+      echo "=========================================="
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-node-exporter:
+  <<: *k8s_setup
+  stage: deploy-exporters
+  script:
+    - |
+      echo "=========================================="
+      echo "Deploying Node Exporter"
+      echo "=========================================="
+      
+      echo "Step 1/4: Ensuring namespace exists..."
+      kubectl create namespace $EXPORTERS_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+      
+      echo "Step 2/4: Updating Helm dependencies for node-exporter..."
+      cd monitoring/exporters/prometheus-node-exporter
+      helm dependency update || echo "Dependencies update skipped or failed"
+      cd ../../..
+      
+      echo "Step 3/4: Checking node-exporter values file..."
+      ls -la monitoring/exporters/prometheus-node-exporter/values.yaml
+      cat monitoring/exporters/prometheus-node-exporter/values.yaml | head -50
+      
+      echo "Step 4/4: Installing/Upgrading node-exporter-estate..."
+      helm upgrade --install $NODE_EXPORTER_RELEASE_NAME ./monitoring/exporters/prometheus-node-exporter \
+        --namespace $EXPORTERS_NAMESPACE \
+        --create-namespace \
+        --values monitoring/exporters/prometheus-node-exporter/values.yaml \
+        --wait \
+        --timeout=10m
+      
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Node Exporter deployment status:"
+      kubectl get daemonset -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-node-exporter
+      kubectl get pods -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-node-exporter
+      kubectl get svc -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-node-exporter
+      echo "=========================================="
+      echo "Node Exporter deployment completed!"
+      echo "=========================================="
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-cloud-metrics-exporter:
+  <<: *k8s_setup
+  stage: deploy-exporters
+  script:
+    - |
+      echo "=========================================="
+      echo "Deploying cloud metrics exporter"
+      echo "=========================================="
+      
+      echo "Step 1/4: Ensuring namespace exists..."
+      kubectl create namespace $EXPORTERS_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+      
+      echo "Step 2/4: Updating Helm dependencies for the cloud metrics exporter..."
+      cd monitoring/exporters/prometheus-cloudeye-exporter
+      helm dependency update || echo "Dependencies update skipped or failed"
+      cd ../../..
+      
+      echo "Step 3/4: Checking cloud metrics exporter values file..."
+      ls -la monitoring/exporters/prometheus-cloudeye-exporter/values.yaml
+      cat monitoring/exporters/prometheus-cloudeye-exporter/values.yaml | head -50
+      
+      echo "Step 4/4: Installing/upgrading the cloud metrics exporter..."
+      helm upgrade --install $CLOUD_METRICS_EXPORTER_RELEASE_NAME ./monitoring/exporters/prometheus-cloudeye-exporter \
+        --namespace $EXPORTERS_NAMESPACE \
+        --create-namespace \
+        --values monitoring/exporters/prometheus-cloudeye-exporter/values.yaml \
+        --wait \
+        --timeout=10m
+      
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Cloud metrics exporter deployment status:"
+      kubectl get pods -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-cloudeye-exporter
+      kubectl get svc -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-cloudeye-exporter
+      kubectl get externalsecret -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-cloudeye-exporter || echo "ExternalSecret check skipped"
+      echo "=========================================="
+      echo "Cloud metrics exporter deployment completed!"
+      echo "=========================================="
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-cloud-status-exporter:
+  <<: *k8s_setup
+  stage: deploy-exporters
+  script:
+    - |
+      echo "=========================================="
+      echo "Deploying Cloud status exporter"
+      echo "=========================================="
+      
+      echo "Step 1/4: Ensuring namespace exists..."
+      kubectl create namespace $EXPORTERS_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+      
+      echo "Step 2/4: Updating Helm dependencies for the cloud status exporter..."
+      cd monitoring/exporters/prometheus-cloud-ru-status-exporter
+      helm dependency update || echo "Dependencies update skipped or failed"
+      cd ../../..
+      
+      echo "Step 3/4: Checking cloud status exporter values file..."
+      ls -la monitoring/exporters/prometheus-cloud-ru-status-exporter/values.yaml
+      cat monitoring/exporters/prometheus-cloud-ru-status-exporter/values.yaml | head -50
+      
+      echo "Step 4/4: Installing/upgrading the cloud status exporter..."
+      helm upgrade --install $CLOUD_STATUS_EXPORTER_RELEASE_NAME ./monitoring/exporters/prometheus-cloud-ru-status-exporter \
+        --namespace $EXPORTERS_NAMESPACE \
+        --create-namespace \
+        --values monitoring/exporters/prometheus-cloud-ru-status-exporter/values.yaml \
+        --wait \
+        --timeout=10m
+      
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Cloud status exporter deployment status:"
+      kubectl get pods -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-cloud-ru-status-exporter
+      kubectl get svc -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-cloud-ru-status-exporter
+      echo "=========================================="
+      echo "Cloud status exporter deployment completed!"
+      echo "=========================================="
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-openobserve-collector:
+  <<: *k8s_setup
+  stage: deploy-exporters
+  script:
+    - |
+      echo "=========================================="
+      echo "Deploying OpenObserve Collector (logs only)"
+      echo "=========================================="
+
+      echo "Step 1/3: Ensuring namespace exists..."
+      kubectl create namespace $OPENOBSERVE_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+      echo "Step 2/3: Checking values..."
+      ls -la monitoring/openobserve-collector/values.yaml
+      head -40 monitoring/openobserve-collector/values.yaml
+
+      echo "Step 3/3: Installing/Upgrading OpenObserve Collector..."
+      helm upgrade --install $OPENOBSERVE_COLLECTOR_RELEASE_NAME ./monitoring/openobserve-collector \
+        --namespace $OPENOBSERVE_NAMESPACE \
+        --create-namespace \
+        --values monitoring/openobserve-collector/values.yaml \
+        --wait \
+        --timeout=10m
+
+      echo "Waiting 30 seconds before checking status..."
+      sleep 30
+      echo "OpenObserve Collector status:"
+      kubectl get daemonset -n $OPENOBSERVE_NAMESPACE $OPENOBSERVE_COLLECTOR_RELEASE_NAME
+      kubectl get pods -n $OPENOBSERVE_NAMESPACE -l app.kubernetes.io/name=openobserve-collector -o wide
+      kubectl get externalsecret -n $OPENOBSERVE_NAMESPACE openobserve-collector-vault || true
+      echo "=========================================="
+      echo "OpenObserve Collector deployment completed!"
+      echo "=========================================="
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-prometheus:
+  <<: *k8s_setup
+  stage: deploy-prometheus
+  script:
+    - |
+      echo "=========================================="
+      echo "Deploying Prometheus Stack"
+      echo "=========================================="
+      
+      echo "Step 1/4: Ensuring namespace exists..."
+      kubectl create namespace $PROMETHEUS_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+      
+      echo "Step 2/4: Updating Helm dependencies..."
+      cd monitoring/prometheus
+      helm dependency update || echo "Dependencies update skipped or failed"
+      cd ../..
+      
+      echo "Step 3/4: Checking Prometheus values file..."
+      ls -la monitoring/prometheus/values.yaml
+      cat monitoring/prometheus/values.yaml | head -30
+      
+      echo "Step 4/4: Installing/Upgrading Prometheus..."
+      helm upgrade --install $PROMETHEUS_RELEASE_NAME ./monitoring/prometheus \
+        --namespace $PROMETHEUS_NAMESPACE \
+        --create-namespace \
+        --values monitoring/prometheus/values.yaml \
+        --wait \
+        --timeout=15m
+      
+      echo "Waiting 30 seconds before checking status..."
+      sleep 30
+      echo "Prometheus deployment status:"
+      kubectl get pods -n $PROMETHEUS_NAMESPACE
+      kubectl get svc -n $PROMETHEUS_NAMESPACE
+      kubectl get ingress -n $PROMETHEUS_NAMESPACE
+      echo "=========================================="
+      echo "Prometheus deployment completed!"
+      echo "=========================================="
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-grafana:
+  <<: *k8s_setup
+  stage: deploy-grafana
+  script:
+    - |
+      echo "=========================================="
+      echo "Deploying Grafana Stack"
+      echo "=========================================="
+      
+      echo "Step 1/4: Ensuring namespace exists..."
+      kubectl create namespace $GRAFANA_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+      
+      echo "Step 2/4: Updating Helm dependencies..."
+      cd monitoring/grafana
+      helm dependency update || echo "Dependencies update skipped or failed"
+      cd ../..
+      
+      echo "Step 3/4: Checking Grafana values file..."
+      ls -la monitoring/grafana/values.yaml
+      cat monitoring/grafana/values.yaml | head -30
+      
+      echo "Step 4/4: Installing/Upgrading Grafana..."
+      helm upgrade --install $GRAFANA_RELEASE_NAME ./monitoring/grafana \
+        --namespace $GRAFANA_NAMESPACE \
+        --create-namespace \
+        --values monitoring/grafana/values.yaml \
+        --wait \
+        --timeout=15m
+      
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Grafana deployment status:"
+      kubectl get pods -n $GRAFANA_NAMESPACE
+      kubectl get svc -n $GRAFANA_NAMESPACE
+      kubectl get ingress -n $GRAFANA_NAMESPACE
+      echo "=========================================="
+      echo "Grafana deployment completed!"
+      echo "=========================================="
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-openobserve:
+  <<: *k8s_setup
+  stage: deploy-openobserve
+  script:
+    - |
+      echo "=========================================="
+      echo "Deploying OpenObserve"
+      echo "=========================================="
+
+      echo "Step 1/4: Ensuring namespace exists..."
+      kubectl create namespace $OPENOBSERVE_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+      echo "Step 2/4: Installing Helm chart dependencies (NATS)..."
+      cd monitoring/openobserve
+      helm dependency update
+      cd ../..
+
+      echo "Step 3/4: Checking values..."
+      ls -la monitoring/openobserve/values.yaml
+      head -35 monitoring/openobserve/values.yaml
+
+      echo "Step 4/4: Installing/Upgrading OpenObserve..."
+      helm upgrade --install $OPENOBSERVE_RELEASE_NAME ./monitoring/openobserve \
+        --namespace $OPENOBSERVE_NAMESPACE \
+        --create-namespace \
+        --values monitoring/openobserve/values.yaml \
+        --wait \
+        --timeout=30m
+
+      echo "Waiting 30 seconds before checking status..."
+      sleep 30
+      echo "OpenObserve deployment status:"
+      kubectl get pods -n $OPENOBSERVE_NAMESPACE -l app.kubernetes.io/name=openobserve || kubectl get pods -n $OPENOBSERVE_NAMESPACE
+      kubectl get svc -n $OPENOBSERVE_NAMESPACE -l app.kubernetes.io/name=openobserve || kubectl get svc -n $OPENOBSERVE_NAMESPACE
+      kubectl get ingress -n $OPENOBSERVE_NAMESPACE || true
+      echo "=========================================="
+      echo "OpenObserve deployment completed!"
+      echo "=========================================="
+  when: manual
+  only:
+    - main
+    - develop
+
+# ============================================================================
+# ROLLBACK JOBS
+# ============================================================================
+# Rollback jobs sit below the deploy jobs for navigation.
+# They share stages with the matching deploy jobs so GitLab UI shows them in parallel.
+
+rollback-ingress:
+  <<: *k8s_setup
+  stage: deploy-ingress
+  script:
+    - echo "Rolling back Ingress Controller deployment..."
+    - helm rollback $HELM_RELEASE_NAME -n $HELM_NAMESPACE
+    - echo "Waiting 60 seconds before checking status..."
+    - sleep 60
+    - echo "Ingress Controller rollback status:"
+    - kubectl get pods -n $HELM_NAMESPACE
+    - kubectl get svc -n $HELM_NAMESPACE
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-istio:
+  <<: *k8s_setup
+  stage: deploy-istio
+  script:
+    - echo "Rolling back Istio core deployment..."
+    - helm rollback istio-peer-auth -n $ESTATE_NAMESPACE || echo "No peer-auth rollback needed"
+    - helm rollback istiod -n $ISTIO_NAMESPACE || echo "No istiod rollback needed"
+    - echo "Removing namespace labels..."
+    - kubectl label namespace $ESTATE_NAMESPACE istio-injection- || echo "Label removal optional"
+    - echo "Waiting 60 seconds before checking status..."
+    - sleep 60
+    - echo "Istio core rollback status:"
+    - kubectl get pods -n $ISTIO_NAMESPACE -l app=istiod
+    - kubectl get peerauthentication -n $ESTATE_NAMESPACE || true
+  when: manual
+  only:
+    - main
+    - develop
+
+disable-istio-vps-egress:
+  <<: *k8s_setup
+  stage: disable-istio-vps-egress
+  script:
+    - |
+      echo "=========================================="
+      echo "Disabling Istio VPS egress routing"
+      echo "Traffic returns to cluster NAT (ALLOW_ANY). Egress gateway pods stay up."
+      echo "Use when both VPS are down or VPS path must be bypassed immediately."
+      echo "=========================================="
+      
+      helm upgrade --install $ISTIO_VPS_EGRESS_RELEASE_NAME ./istio \
+        --namespace $ISTIO_NAMESPACE \
+        --values istio/values.yaml \
+        --set vpsEgress.enabled=false \
+        --set peerAuthentication.enabled=false \
+        --wait \
+        --timeout=5m
+      
+      echo "Verifying VPS egress Istio resources removed..."
+      kubectl get serviceentry,destinationrule,gateway -n $ISTIO_NAMESPACE -l app.kubernetes.io/component=vps-egress 2>/dev/null || echo "No VPS egress resources in istio-system (expected)"
+      for NS in $ESTATE_NAMESPACE $GRAFANA_NAMESPACE; do
+        VS_COUNT=$(kubectl get virtualservice -n $NS -l app.kubernetes.io/component=vps-egress --no-headers 2>/dev/null | wc -l)
+        if [ "$VS_COUNT" -gt 0 ]; then
+          echo "WARNING: VPS VirtualServices still present in $NS"
+          kubectl get virtualservice -n $NS -l app.kubernetes.io/component=vps-egress
+        else
+          echo "No VPS VirtualServices in $NS (expected)"
+        fi
+      done
+      
+      echo "Waiting 30 seconds before final status..."
+      sleep 30
+      echo "=========================================="
+      echo "VPS egress routing disabled."
+      echo "Re-enable: manual job deploy-istio-vps-egress (vpsEgress.enabled must be true in values.yaml)"
+      echo "=========================================="
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-istio-vps-egress:
+  <<: *k8s_setup
+  stage: deploy-istio-vps-egress
+  script:
+    - echo "Rolling back Istio VPS egress deployment..."
+    - helm rollback $ISTIO_VPS_EGRESS_RELEASE_NAME -n $ISTIO_NAMESPACE || echo "No VPS egress policies rollback needed"
+    - helm rollback istio-egressgateway -n $ISTIO_NAMESPACE || echo "No egress gateway rollback needed"
+    - echo "Waiting 60 seconds before checking status..."
+    - sleep 60
+    - echo "Istio VPS egress rollback status:"
+    - kubectl get pods -n $ISTIO_NAMESPACE -l istio=egressgateway || true
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-blackbox-exporter:
+  <<: *k8s_setup
+  stage: deploy-exporters
+  script:
+    - |
+      echo "Rolling back Blackbox Exporter deployment..."
+      helm rollback $BLACKBOX_EXPORTER_RELEASE_NAME -n $EXPORTERS_NAMESPACE || echo "No rollback needed"
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Blackbox Exporter rollback status:"
+      kubectl get pods -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-blackbox-exporter
+      kubectl get svc -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-blackbox-exporter
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-node-exporter:
+  <<: *k8s_setup
+  stage: deploy-exporters
+  script:
+    - |
+      echo "Rolling back Node Exporter deployment..."
+      helm rollback $NODE_EXPORTER_RELEASE_NAME -n $EXPORTERS_NAMESPACE || echo "No rollback needed"
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Node Exporter rollback status:"
+      kubectl get daemonset -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-node-exporter
+      kubectl get pods -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-node-exporter
+      kubectl get svc -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-node-exporter
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-cloud-metrics-exporter:
+  <<: *k8s_setup
+  stage: deploy-exporters
+  script:
+    - |
+      echo "Rolling back cloud metrics exporter deployment..."
+      helm rollback $CLOUD_METRICS_EXPORTER_RELEASE_NAME -n $EXPORTERS_NAMESPACE || echo "No rollback needed"
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Cloud metrics exporter rollback status:"
+      kubectl get pods -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-cloudeye-exporter
+      kubectl get svc -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-cloudeye-exporter
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-cloud-status-exporter:
+  <<: *k8s_setup
+  stage: deploy-exporters
+  script:
+    - |
+      echo "Rolling back Cloud status exporter deployment..."
+      helm rollback $CLOUD_STATUS_EXPORTER_RELEASE_NAME -n $EXPORTERS_NAMESPACE || echo "No rollback needed"
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Cloud status exporter rollback status:"
+      kubectl get pods -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-cloud-ru-status-exporter
+      kubectl get svc -n $EXPORTERS_NAMESPACE -l app.kubernetes.io/name=prometheus-cloud-ru-status-exporter
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-openobserve-collector:
+  <<: *k8s_setup
+  stage: deploy-exporters
+  script:
+    - |
+      echo "Rolling back OpenObserve Collector..."
+      helm rollback $OPENOBSERVE_COLLECTOR_RELEASE_NAME -n $OPENOBSERVE_NAMESPACE || echo "No rollback needed"
+      echo "Waiting 30 seconds before checking status..."
+      sleep 30
+      echo "OpenObserve Collector rollback status:"
+      kubectl get daemonset -n $OPENOBSERVE_NAMESPACE $OPENOBSERVE_COLLECTOR_RELEASE_NAME || true
+      kubectl get pods -n $OPENOBSERVE_NAMESPACE -l app.kubernetes.io/name=openobserve-collector || true
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-prometheus:
+  <<: *k8s_setup
+  stage: deploy-prometheus
+  script:
+    - |
+      echo "Rolling back Prometheus deployment..."
+      helm rollback $PROMETHEUS_RELEASE_NAME -n $PROMETHEUS_NAMESPACE || echo "No rollback needed"
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Prometheus rollback status:"
+      kubectl get pods -n $PROMETHEUS_NAMESPACE
+      kubectl get svc -n $PROMETHEUS_NAMESPACE
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-grafana:
+  <<: *k8s_setup
+  stage: deploy-grafana
+  script:
+    - |
+      echo "Rolling back Grafana deployment..."
+      helm rollback $GRAFANA_RELEASE_NAME -n $GRAFANA_NAMESPACE || echo "No rollback needed"
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "Grafana rollback status:"
+      kubectl get pods -n $GRAFANA_NAMESPACE
+      kubectl get svc -n $GRAFANA_NAMESPACE
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-openobserve:
+  <<: *k8s_setup
+  stage: deploy-openobserve
+  script:
+    - |
+      echo "Rolling back OpenObserve deployment..."
+      helm rollback $OPENOBSERVE_RELEASE_NAME -n $OPENOBSERVE_NAMESPACE || echo "No rollback needed"
+      echo "Waiting 60 seconds before checking status..."
+      sleep 60
+      echo "OpenObserve rollback status:"
+      kubectl get pods -n $OPENOBSERVE_NAMESPACE
+      kubectl get svc -n $OPENOBSERVE_NAMESPACE
+  when: manual
+  only:
+    - main
+    - develop

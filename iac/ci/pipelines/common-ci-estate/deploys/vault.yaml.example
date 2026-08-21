@@ -1,0 +1,76 @@
+include:
+  - local: '/defaults.yaml.example'
+
+stages:
+  - deploy-vault-cluster-secret-store
+  - verify-vault-cluster-secret-store
+  - rollback-vault-cluster-secret-store
+
+variables:
+  HELM_RELEASE_NAME: "vault-cluster-secret-store"
+  HELM_NAMESPACE: "external-secret-manager"
+
+default:
+  tags:
+    - docker
+  timeout: 8h
+  interruptible: true
+
+.k8s_setup: &k8s_setup
+  image: $BASE_IMAGE
+  before_script:
+    - init.sh
+
+deploy-vault-cluster-secret-store:
+  <<: *k8s_setup
+  stage: deploy-vault-cluster-secret-store
+  script:
+    - echo "Deploying Vault ClusterSecretStore for external Vault..."
+    - kubectl create namespace $HELM_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - echo "Installing/Upgrading ClusterSecretStore configuration..."
+    - echo "Current directory contents:"
+    - ls -la
+    - echo "Values.yaml contents:"
+    - cat values.yaml
+    - helm upgrade --install $HELM_RELEASE_NAME .
+      --namespace $HELM_NAMESPACE 
+      --create-namespace
+      --values values.yaml
+      --wait
+      --timeout=5m
+    - echo "Deployment completed successfully"
+    - kubectl get clusterSecretStore -n $HELM_NAMESPACE
+    - kubectl get serviceaccount -n $HELM_NAMESPACE
+    - kubectl get clusterrolebinding | grep vault
+  when: manual
+  only:
+    - main
+    - develop
+
+verify-vault-cluster-secret-store:
+  <<: *k8s_setup
+  stage: verify-vault-cluster-secret-store
+  script:
+    - echo "Verifying Vault ClusterSecretStore..."
+    - kubectl get clusterSecretStore vault-cluster-secret-store
+    - kubectl get serviceaccount external-secrets-vault -n $HELM_NAMESPACE || kubectl get serviceaccount -n $HELM_NAMESPACE
+    - kubectl get clusterrolebinding external-secrets-vault-auth
+    - echo "ClusterSecretStore configuration:"
+    - kubectl get clusterSecretStore vault-cluster-secret-store -o yaml
+    - echo "Verification completed successfully"
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-vault-cluster-secret-store:
+  <<: *k8s_setup
+  stage: rollback-vault-cluster-secret-store
+  script:
+    - echo "Rolling back Vault ClusterSecretStore deployment..."
+    - helm rollback $HELM_RELEASE_NAME -n $HELM_NAMESPACE
+    - echo "Rollback completed"
+  when: manual
+  only:
+    - main
+    - develop

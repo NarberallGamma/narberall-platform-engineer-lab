@@ -1,0 +1,87 @@
+include:
+  - local: '/defaults.yaml.example'
+
+stages:
+  - deploy-crds
+  - deploy-operator
+  - verify-operator
+  - rollback-operator
+
+variables:
+  HELM_RELEASE_NAME: "kafka-operator"
+  HELM_NAMESPACE: "kafka"
+
+default:
+  tags:
+    - docker
+  timeout: 8h
+  interruptible: true
+
+.k8s_setup: &k8s_setup
+  image: $BASE_IMAGE
+  before_script:
+    - init.sh
+
+deploy-crds:
+  <<: *k8s_setup
+  stage: deploy-crds
+  script:
+    - echo "Deploying Kafka Operator CRDs..."
+    - kubectl apply -f crds/ || true
+    - echo "Waiting for CRDs to be registered..."
+    - sleep 5
+    - echo "Checking installed CRDs..."
+    - kubectl get crd | grep kafka
+    - echo "CRDs deployment completed"
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-operator:
+  <<: *k8s_setup
+  stage: deploy-operator
+  script:
+    - echo "Deploying Kafka Operator (Strimzi) with Helm..."
+    - kubectl create namespace $HELM_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - echo "Installing Kafka Operator with production values..."
+    - helm upgrade --install $HELM_RELEASE_NAME . 
+      --namespace $HELM_NAMESPACE 
+      --create-namespace
+      --values values.yaml
+      --wait
+      --timeout=10m
+    - echo "Kafka Operator deployed successfully"
+  when: manual
+  only:
+    - main
+    - develop
+
+verify-operator:
+  <<: *k8s_setup
+  stage: verify-operator
+  script:
+    - echo "Verifying Kafka Operator deployment..."
+    - echo "=== Pods Status ==="
+    - kubectl get pods -n $HELM_NAMESPACE -l name=strimzi-cluster-operator
+    - echo "=== CRDs ==="
+    - kubectl get crd | grep kafka
+    - echo "=== Pod Disruption Budget ==="
+    - kubectl get pdb strimzi-cluster-operator -n $HELM_NAMESPACE
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-operator:
+  <<: *k8s_setup
+  stage: rollback-operator
+  script:
+    - echo "Rolling back Kafka Operator..."
+    - helm rollback $HELM_RELEASE_NAME -n $HELM_NAMESPACE
+    - kubectl wait --for=condition=ready pod -l name=strimzi-cluster-operator -n $HELM_NAMESPACE --timeout=300s
+    - echo "Kafka Operator rollback completed"
+  when: manual
+  only:
+    - main
+    - develop

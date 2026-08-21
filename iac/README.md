@@ -15,7 +15,7 @@ iac/
   ansible/      # Linux / edge + reference/ kits (same habit as terraform/)
   helm/         # Cluster GitOps: reference/ kits (mesh, ESO, Argo, obs) + apps/ product samples
   docker/       # Images + Compose: one mechanic per Dockerfile, host/local stacks
-  ci/           # CI catalog: turnkey map + sanitized pipelines/
+  ci/           # CI catalog: turnkey map + living kits under pipelines/
 ```
 
 | Start here | Audience |
@@ -25,7 +25,7 @@ iac/
 | [`ansible/`](ansible/) | Engineers: host bootstrap, Xray/panel, LLM/collab, estate docker_app, app platform, KB, Borg, AWS hosts |
 | [`helm/`](helm/) | Engineers: cluster GitOps, mesh, ESO, Argo bootstrap, in-cluster observability, and product samples under [`helm/apps/`](helm/apps/). SRE catalog: [`../docs/sre/`](../docs/sre/). Product APIs: [`../architecture/06-product-apis.md`](../architecture/06-product-apis.md) |
 | [`docker/`](docker/) | Engineers: image build context and host/local Compose. One richest Dockerfile per mechanic. Case: [`../case-studies/12-docker-images.md`](../case-studies/12-docker-images.md) |
-| [`ci/`](ci/) | CI catalog: turnkey map (infra, Java builds, gates, MR, revoke) + `pipelines/` |
+| [`ci/`](ci/) | CI catalog: living kits (estate includes, Java hubs, werf, Jenkins). Case: [`../case-studies/13-ci-pipelines.md`](../case-studies/13-ci-pipelines.md) |
 
 ```mermaid
 flowchart TB

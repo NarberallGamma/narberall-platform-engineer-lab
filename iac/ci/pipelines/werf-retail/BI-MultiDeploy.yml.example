@@ -1,0 +1,4 @@
+# Sibling env clones (not staged). Same job graph; only env / namespace / stage differ:
+#   dev, test-e, testdb, sales, stage, production, production-reserve-b, tenant-b
+include:
+  - local: '/BI-MultiDeploy/multideploy-env.yml.example'

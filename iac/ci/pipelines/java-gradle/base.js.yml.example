@@ -1,0 +1,13 @@
+# Node / frontend service hub. jobs/build/* includes were not present
+# in the source tree (honest gap). Leave those lines commented. Do not invent build YAML.
+include:
+  - /jobs/common/registry_login.gitlab-ci.yml.example
+  # - /jobs/build/build.js.yml
+  # - /jobs/build/build.helm.yml
+  - /jobs/e2e/run-e2e.yaml.example
+  - /jobs/deploy/deploy-dev.yaml.example
+
+stages:
+  - app-test
+  - build
+  - deploy-dev

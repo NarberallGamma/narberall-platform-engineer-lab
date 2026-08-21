@@ -1,0 +1,164 @@
+include:
+  - local: 'backend/common.yml.example'
+
+## Base review
+.review:
+  extends: .base_converge
+  stage: review
+  needs:
+    - Build
+    - REVIEW-START
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "REVIEW"'
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - if: !reference [.rules, if, mr]
+
+.review_manual:
+  extends: .review
+  needs:
+    - Build
+    - REVIEW-START
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "REVIEW"'
+      when: manual
+      allow_failure: true
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - if: !reference [.rules, if, mr]
+      when: manual
+      allow_failure: true
+
+.review_trigger:
+  stage: review
+  needs:
+    - Build
+    - REVIEW-START
+  variables:
+    TRIGGER: REVIEW
+    THREAD: $THREAD
+    UPSTREAM_CI_COMMIT_REF_SLUG: $CI_COMMIT_REF_SLUG
+    UPSTREAM_CI_ENVIRONMENT_SLUG: $CI_ENVIRONMENT_SLUG
+    UPSTREAM_CI_PROJECT_PATH: $CI_PROJECT_PATH
+    WERF_ENV: $WERF_ENV
+    WERF_NAMESPACE: $WERF_NAMESPACE
+    WERF_KUBE_CONTEXT: $WERF_KUBE_CONTEXT
+  trigger:
+    strategy: depend
+  rules:
+    # Manual to avoid circular triggering
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "REVIEW"'
+      when: manual
+      allow_failure: true
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - if: !reference [.rules, if, mr]
+
+.review_trigger_manual:
+  extends: .review_trigger
+  needs:
+    - Build
+    - REVIEW-START
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "REVIEW"'
+      when: manual
+      allow_failure: true
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - if: !reference [.rules, if, mr]
+      when: manual
+      allow_failure: true
+
+# Set review variables and start review environment
+REVIEW-START:
+  extends: .review
+  stage: review-start
+  needs:
+    - Build
+  environment:
+    name: review/MR-${CI_MERGE_REQUEST_IID}/${CI_COMMIT_REF_SLUG}
+    on_stop: REVIEW-STOP
+    auto_stop_in: 3 days
+  variables:
+    WERF_ENV: "review"
+    WERF_KUBE_CONTEXT: dev
+  script:
+    - !reference [.scripts, setup_werf]
+    - echo "Starting review environment ${CI_ENVIRONMENT_SLUG}"
+    - echo "review/MR-${CI_MERGE_REQUEST_IID}/${CI_COMMIT_REF_SLUG}"
+    - echo "CI_ENVIRONMENT_SLUG=${CI_ENVIRONMENT_SLUG}" | tee -a review.env
+    - echo "THREAD=${THREAD}" | tee -a review.env
+    - echo "WERF_ENV=${WERF_ENV}" | tee -a review.env
+    - echo "WERF_NAMESPACE=${WERF_NAMESPACE}" | tee -a review.env
+    - echo "WERF_KUBE_CONTEXT=${WERF_KUBE_CONTEXT}" | tee -a review.env
+  artifacts:
+    reports:
+      dotenv: review.env
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "REVIEW"'
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - if: !reference [.rules, if, mr]
+      when: manual
+      allow_failure: true
+
+# Stop review environment
+REVIEW-STOP:
+  extends: .review_manual
+  stage: review-start
+  needs:
+    - Build
+    - REVIEW-START
+  environment:
+    name: review/MR-${CI_MERGE_REQUEST_IID}/${CI_COMMIT_REF_SLUG}
+    action: stop
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf helm list -n ${WERF_NAMESPACE} -a --filter "review|dbdump" --output json | jq -r '.[] | "werf helm delete -n " + .namespace + " " + .name' | bash
+    - werf helm list -n ${WERF_NAMESPACE} -a --output json | jq -e 'select(. | length > 0)' || werf kubectl delete ns ${WERF_NAMESPACE}
+
+# Deploy to review
+REVIEW:
+  extends: .review
+  needs:
+    - Build
+    - REVIEW-START
+
+## Example: review job with extra needs
+# REVIEW-INFRA:
+#   extends: .review
+#   variables:
+#     WERF_SET_STRING_REDIS: "redisfailover.enabled=true"
+# REVIEW-TRIGGER:
+#   extends: .review_trigger
+#   trigger:
+#     project: shop-app/review-trigger-example
+#     branch: main
+#     strategy: depend
+# REVIEW:
+#   extends: .review
+#   needs:
+#     - Build
+#     - REVIEW-START
+#     - REVIEW-INFRA
+#     - REVIEW-TRIGGER
+
+## Cleanup
+Cleanup review:
+  stage: cleanup
+  variables:
+    WERF_KUBE_CONTEXT: dev
+  script:
+    - !reference [.scripts, setup_werf]
+    - export APP_NAME=`cat werf.yaml | grep project | awk '{print $2}'`
+    - export date=$(date +"%s" -d "-4 days")
+    - |
+      for NS in `werf kubectl get ns | grep ${APP_NAME} | grep review | awk '{print $1}'` ; do
+        echo "NS ${NS}"
+        werf helm list -n ${NS} -a --output json --time-format "20060102" | jq -r '.[] | select( .updated | strptime("%Y%m%d") | mktime<'$date') | "werf helm delete -n " + .namespace + " " + .name' | bash
+        werf helm list -n ${NS} -a --output json | jq -e 'select(. | length > 0)' || werf kubectl delete ns ${NS}
+      done
+  rules:
+    - !reference [.rules, schedule]

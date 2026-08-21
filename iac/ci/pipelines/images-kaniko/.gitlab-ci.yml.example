@@ -1,0 +1,178 @@
+# Pin public images into the project registry via Kaniko.
+# Manual jobs. If the version folder has no Dockerfile, write a one-line FROM retag.
+
+stages:
+  - build
+
+variables:
+  APP_VERSION: "1.0.0"
+
+.default_kaniko_template: &kaniko_template
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:v1.24.0-debug
+    entrypoint: [""]
+  before_script:
+    - mkdir -p /kaniko/.docker
+    - |
+      cat > /kaniko/.docker/config.json <<EOF
+      {
+        "auths": {
+          "$CI_REGISTRY": {
+            "username": "$CI_REGISTRY_USER",
+            "password": "$CI_REGISTRY_PASSWORD"
+          }
+        }
+      }
+      EOF
+
+  script:
+    - |
+      if [ ! -f "$CI_PROJECT_DIR/$NAME/$VER/Dockerfile" ]; then
+        echo "Folder $NAME or Dockerfile missing. Creating a one-line Dockerfile."
+        mkdir -p "$CI_PROJECT_DIR/$NAME/$VER"
+        echo "FROM $NAME:$VER" > "$CI_PROJECT_DIR/$NAME/$VER/Dockerfile"
+      fi
+
+    - echo "Building $NAME with version $VER"
+    - |
+      echo /kaniko/executor \
+        --context "$CI_PROJECT_DIR/$NAME/$VER" \
+        --dockerfile "$CI_PROJECT_DIR/$NAME/$VER/Dockerfile" \
+        --destination "$CI_REGISTRY_IMAGE/$NAME:$VER-$CI_COMMIT_SHORT_SHA" \
+        --destination "$CI_REGISTRY_IMAGE/$NAME:$VER" \
+        --build-arg VER=$VER \
+        --cache=false
+    - PUSH_NAME=$(echo "$NAME" | sed 's/[\.\/]/-/g')
+    - |
+      /kaniko/executor \
+        --context "$CI_PROJECT_DIR/$NAME/$VER" \
+        --dockerfile "$CI_PROJECT_DIR/$NAME/$VER/Dockerfile" \
+        --destination "$CI_REGISTRY_IMAGE/$PUSH_NAME:$VER-$CI_COMMIT_SHORT_SHA" \
+        --destination "$CI_REGISTRY_IMAGE/$PUSH_NAME:$VER" \
+        --build-arg VER=$VER \
+        --cache=false
+
+  when: manual
+  tags:
+    - k8s-kaniko
+
+vault:
+  <<: *kaniko_template
+  variables:
+    NAME: "hashicorp/vault"
+    VER: "1.18.2"
+
+kafka:
+  <<: *kaniko_template
+  variables:
+    NAME: "apache/kafka"
+    VER: "4.0.0"
+
+gradle:8.8.0-jdk17:
+  <<: *kaniko_template
+  variables:
+    NAME: "gradle"
+    VER: "8.8.0-jdk17"
+
+gradle:8.8.0-jdk21:
+  <<: *kaniko_template
+  variables:
+    NAME: "gradle"
+    VER: "8.8.0-jdk21"
+
+gradle:9.2.0-jdk25:
+  <<: *kaniko_template
+  variables:
+    NAME: "gradle"
+    VER: "9.2.0-jdk25"
+
+eclipse-temurin:17-jdk:
+  <<: *kaniko_template
+  variables:
+    NAME: "eclipse-temurin"
+    VER: "17-jdk"
+
+eclipse-temurin:21-jdk:
+  <<: *kaniko_template
+  variables:
+    NAME: "eclipse-temurin"
+    VER: "21-jdk"
+
+eclipse-temurin:25-jdk:
+  <<: *kaniko_template
+  variables:
+    NAME: "eclipse-temurin"
+    VER: "25-jdk"
+
+gcr.io/kaniko-project/executor:v1.24.0-debug:
+  <<: *kaniko_template
+  variables:
+    NAME: "gcr.io/kaniko-project/executor"
+    VER: "v1.24.0-debug"
+
+alpine/helm:3.19.0:
+  <<: *kaniko_template
+  variables:
+    NAME: "alpine/helm"
+    VER: "3.19.0"
+
+eclipse-temurin:21-jdk-alpine:
+  <<: *kaniko_template
+  variables:
+    NAME: "eclipse-temurin"
+    VER: "21-jdk-alpine"
+
+bellsoft/liberica-openjre-alpine-musl:21.0.9:
+  <<: *kaniko_template
+  variables:
+    NAME: "bellsoft/liberica-openjre-alpine-musl"
+    VER: "21.0.9"
+
+gradle:8.8.0-jdk11:
+  <<: *kaniko_template
+  variables:
+    NAME: "gradle"
+    VER: "8.8.0-jdk11"
+
+gradle:9.2.0-jdk21:
+  <<: *kaniko_template
+  variables:
+    NAME: "gradle"
+    VER: "9.2.0-jdk21"
+
+keycloak/keycloak:20.0.2:
+  <<: *kaniko_template
+  variables:
+    NAME: "keycloak/keycloak"
+    VER: "20.0.2"
+
+keycloak/keycloak:21.0.0:
+  <<: *kaniko_template
+  variables:
+    NAME: "keycloak/keycloak"
+    VER: "21.0.0"
+
+node:22-alpine:
+  <<: *kaniko_template
+  variables:
+    NAME: "node"
+    VER: "22-alpine"
+
+node:e2e-ci-22-alpine:
+  <<: *kaniko_template
+  variables:
+    NAME: "node"
+    VER: "e2e-ci-22-alpine"
+
+node:20-alpine:
+  <<: *kaniko_template
+  variables:
+    NAME: "node"
+    VER: "20-alpine"
+
+nginx:1.21.0-alpine:
+  <<: *kaniko_template
+  variables:
+    NAME: "nginx"
+    VER: "1.21.0-alpine"

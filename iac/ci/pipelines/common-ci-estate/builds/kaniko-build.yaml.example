@@ -1,0 +1,40 @@
+# Build the Kaniko image and push it to the container registry.
+# Include directly: project: 'estate/common-ci', file: '/builds/kaniko-build.yaml.example'
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - k8s-kaniko
+  timeout: 8h
+  interruptible: true
+
+stages:
+  - build
+
+variables:
+  KANIKO_IMAGE_NAME: "kaniko"
+  KANIKO_IMAGE_TAG: "1.0"
+
+build-kaniko:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - |
+      if [ -d "$CI_PROJECT_DIR/base-images/kaniko" ]; then
+        CONTEXT="$CI_PROJECT_DIR/base-images/kaniko"
+      elif [ -d "$CI_PROJECT_DIR/kaniko" ]; then
+        CONTEXT="$CI_PROJECT_DIR/kaniko"
+      else
+        echo "Error: kaniko directory not found (base-images/kaniko or kaniko)"
+        exit 1
+      fi
+    - /kaniko/executor --context "$CONTEXT" --dockerfile "$CONTEXT/Dockerfile" --destination $CI_REGISTRY_IMAGE/$KANIKO_IMAGE_NAME:$KANIKO_IMAGE_TAG --custom-platform=linux/amd64
+    - echo "Kaniko image built and pushed to $CI_REGISTRY_IMAGE/$KANIKO_IMAGE_NAME:$KANIKO_IMAGE_TAG"
+  rules:
+    - when: manual

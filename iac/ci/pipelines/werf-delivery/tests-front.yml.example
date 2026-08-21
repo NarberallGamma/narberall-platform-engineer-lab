@@ -1,0 +1,224 @@
+include:
+  - local: "common.yml.example"
+
+variables:
+  # Enable feature flag
+  FF_USE_FASTZIP: "true"
+  # These can be specified per job or per pipeline
+  ARTIFACT_COMPRESSION_LEVEL: "fast"
+  CACHE_COMPRESSION_LEVEL: "fast"
+
+.base_test: &base_test
+  stage: test
+  image: $WERF_BUILD_DOCKER_IMAGE_NAME
+  needs:
+    - job: Build
+      artifacts: true
+  tags: [docker]
+
+test_stories:
+  extends:
+    - .base_test
+  script:
+    - |
+      cd /app
+      npm run storybook &
+      sleep 30
+      npm run test:stories
+  rules:
+    - !reference [.rule_not_schedule]
+    - if: $RUN_TEST_STORIES
+      when: on_success
+
+#test_loki:
+#  extends:
+#    - .base_test
+#  script:
+#    - git_repo_path=$(pwd)
+#    - echo ${git_repo_path}
+#    - rm -rf /app/.loki
+#    - ln -s ${git_repo_path}/.loki /app/.loki
+#    - |
+#      cd /app
+#      npm run storybook &
+#      sleep 30
+#      npm run test:loki
+#  artifacts:
+#    when: on_failure
+#    paths:
+#      - .loki
+#    expire_in: 2 min
+#  rules:
+#    - !reference [.rule_not_schedule]
+#    - if: $RUN_TEST_LOKI
+#      when: on_success
+
+#loki_allow_approve:
+#  needs:
+#    - job: test_loki
+#      artifacts: true
+#  variables:
+#    GIT_STRATEGY: none
+#  script:
+#    - pwd
+#    - ls -la .loki
+#  artifacts:
+#    when: always
+#    paths:
+#      - .loki
+#    expire_in: 1 week
+#  rules:
+#    - !reference [.rule_not_schedule]
+#    - if: $RUN_TEST_LOKI
+#      when: on_failure
+#  tags: [docker]
+
+#loki_approve:
+#  extends:
+#    - .base_test
+#  stage: tests-approve
+#  script:
+#    - git_repo_path=$(pwd)
+#    - echo ${git_repo_path}
+#    - git config user.email "ci-bot@example.com"
+#    - git config user.name "ci-bot"
+#    - |
+#      git remote remove gitlab_origin || true
+#      git remote add gitlab_origin https://oauth2:$CI_BOT_TOKEN@$CI_SERVER_HOST/$CI_PROJECT_PATH.git || true
+#    - rm -rf /app/.loki
+#    - ln -s ${git_repo_path}/.loki /app/.loki
+#    - cd /app
+#    - npm run test:loki:approve
+#    - cd ${git_repo_path}
+#    - git add .loki
+#    - |
+#      [[ -z $(git status -uno --porcelain) ]] && echo "no need to push..." && exit 250
+#    - git commit -m "[CI Bot] $CI_JOB_NAME approve loki"
+#    - git push gitlab_origin HEAD:$CI_COMMIT_REF_NAME -o ci.skip
+#  needs:
+#    - job: Build
+#      artifacts: true
+#      optional: true
+#    - job: loki_allow_approve
+#      artifacts: true
+#      optional: true
+#  dependencies:
+#    - Build
+#    - loki_allow_approve
+#  rules:
+#    - !reference [.rule_not_schedule]
+#    - if: $RUN_TEST_LOKI
+#      when: manual
+
+test_snapshots:
+  extends:
+    - .base_test
+  script:
+    - |
+      cd /app
+      npm run test:snapshots
+  rules:
+    - !reference [.rule_not_schedule]
+    - if: $RUN_TEST_SNAPSHOTS
+      when: on_success
+
+snapshots_allow_approve:
+  needs:
+    - test_snapshots
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - pwd
+  rules:
+    - !reference [.rule_not_schedule]
+    - if: $RUN_TEST_SNAPSHOTS
+      when: on_failure
+  tags: [docker]
+
+snapshots_approve:
+  stage: tests-approve
+  extends:
+    - .base_test
+  script:
+    - git_repo_path=$(pwd)
+    - echo ${git_repo_path}
+    - git config user.email "ci-bot@example.com"
+    - git config user.name "ci-bot"
+    - |
+      git remote remove gitlab_origin || true
+      git remote add gitlab_origin https://oauth2:$CI_BOT_TOKEN@$CI_SERVER_HOST/$CI_PROJECT_PATH.git || true
+    - |
+      cd /app
+      npm run test:snapshots ||true
+      npm run test:snapshots:update
+    - cp -f /app/.storybook/__snapshots__/storyshots.test.ts.snap ${git_repo_path}/.storybook/__snapshots__/storyshots.test.ts.snap
+    - cd ${git_repo_path}
+    - git add .storybook/__snapshots__/storyshots.test.ts.snap
+    - |
+      [[ -z $(git status -uno --porcelain) ]] && echo "no need to push..." && exit 250
+    - git commit -m "[CI Bot] $CI_JOB_NAME approve snapshots"
+    - git push gitlab_origin HEAD:$CI_COMMIT_REF_NAME -o ci.skip
+  needs:
+    - job: Build
+      artifacts: true
+      optional: true
+    - job: snapshots_allow_approve
+      optional: true
+  rules:
+    - !reference [.rule_not_schedule]
+    - if: $RUN_TEST_SNAPSHOTS
+      when: manual
+
+test_lint_validate:
+  extends:
+    - .base_test
+  image:
+  script:
+    - !reference [.base_werf]
+    - werf helm dependency build .helm/
+    - werf helm lint .helm/
+      --ignore-secret-key
+    - werf render
+      --validate
+      --ignore-secret-key > render.yaml
+  artifacts:
+    when: always
+    paths:
+      - render.yaml
+    expire_in: 1 week
+  needs:
+    - Build
+  environment:
+    name: dev
+    url: ${DEV_URL}
+  variables:
+    WERF_KUBE_CONTEXT: dev
+  rules:
+    - !reference [.rule_not_schedule]
+    - if: $RUN_TEST_LINT_VALIDATE
+      when: on_success
+  tags: [docker]
+
+lint:
+  extends:
+    - .base_test
+  script:
+    - |
+      cd /app
+      npm run lint
+  rules:
+    - !reference [.rule_not_schedule]
+    - if: $RUN_LINT
+      when: on_success
+
+test:
+  extends:
+    - .base_test
+  script:
+    - |
+      cd /app
+      npm run test
+  rules:
+    - !reference [.rule_not_schedule]
+    - if: $RUN_TEST
+      when: on_success

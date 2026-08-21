@@ -1,0 +1,2 @@
+WARNING: Borg backup repos require the project user.
+Command: sudo -u projectname -i

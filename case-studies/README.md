@@ -2,11 +2,11 @@
 
 **Business first:** LLMOps (01, 03) is process speed. Cloud cases are days-to-weeks, audit, and a planned move. Manager hub: [`../architecture/`](../architecture/). Buyer page: [`../docs/for-business.md`](../docs/for-business.md). Existing case bodies stay; more cases can be added later.
 
-NDA-safe narratives. Each links to diagrams and related code under `iac/` (Terraform, Ansible, Helm kits, and Docker / Compose) and `practice/` (home-lab kits and workstation MCP).
+NDA-safe narratives. Each links to diagrams and related code under `iac/` (Terraform, Ansible, Helm kits, Docker / Compose, and CI pipelines) and `practice/` (home-lab kits and workstation MCP).
 
 The same engineer owns **greenfield** platforms and **legacy** estates (import, runbooks, monitoring, incidents). About **six years**, senior in platform niches: bank/SBP-class, blockchain, delivery e-commerce, Atlassian/Nextcloud, 50+ microservices and JVM monoliths, **Jenkins** and **GitLab CI + Argo CD** — [`docs/experience.md`](../docs/experience.md). Delivery in a large team with a lead, as a de facto lead (train/delegate), and as the single owner on concurrent projects (reachable). Loaded production: high RPS, **~99.9% SLA**, seamless migrations, multi-zone HA. Kubernetes across OpenShift / Deckhouse / vanilla / cloud PaaS. DBMS under load (long SQL, locks, replication, sharding). Crisis work: off-hours restore, connectivity when a path is blocked, Cisco-style 7-step. Security from day one: hardening, EDR, Vault / ESO, SonarQube/Trivy/OSV; repos and pipelines laid out for developers, on-call, and audit.
 
-Home-lab edge (Xray / VPS) is **not** a client case study; it lives in [`practice/home-lab/edge-platform.md`](../practice/home-lab/edge-platform.md). Payments identity autodeploy is case **08**. Huawei-class estate Ansible is case **10**. Huawei-class estate Helm is case **11**. Docker images and Compose stacks are case **12**. Observability catalog: [`../docs/sre/`](../docs/sre/). Product APIs: [`../architecture/06-product-apis.md`](../architecture/06-product-apis.md).
+Home-lab edge (Xray / VPS) is **not** a client case study; it lives in [`practice/home-lab/edge-platform.md`](../practice/home-lab/edge-platform.md). Payments identity autodeploy is case **08**. Huawei-class estate Ansible is case **10**. Huawei-class estate Helm is case **11**. Docker images and Compose stacks are case **12**. CI pipelines (GitLab, Jenkins, werf) are case **13**. Observability catalog: [`../docs/sre/`](../docs/sre/). Product APIs: [`../architecture/06-product-apis.md`](../architecture/06-product-apis.md).
 
 | ID | Topic | Diagram |
 |----|-------|---------|
@@ -22,5 +22,6 @@ Home-lab edge (Xray / VPS) is **not** a client case study; it lives in [`practic
 | [`10-ansible-estate.md`](10-ansible-estate.md) | **Huawei-class estate Ansible:** docker_app, Vault, hibernate, DB users | [`diagrams/case-studies/10-ansible-estate.md`](../diagrams/case-studies/10-ansible-estate.md) |
 | [`11-helm-estate.md`](11-helm-estate.md) | **Huawei-class estate Helm:** Istio egress, Kafka Connect, Vault/ESO, Argo door, Grafana overlay (same-day views) | [`diagrams/case-studies/11-helm-estate.md`](../diagrams/case-studies/11-helm-estate.md) |
 | [`12-docker-images.md`](12-docker-images.md) | **Docker / Compose:** one mechanic per image, host GitLab/Vault/sec-stack, local Java stands | [`diagrams/case-studies/12-docker-images.md`](../diagrams/case-studies/12-docker-images.md) |
+| [`13-ci-pipelines.md`](13-ci-pipelines.md) | **CI pipelines:** living kits (estate includes, Java hubs, werf, Jenkins, GitHub Actions) | [`diagrams/case-studies/13-ci-pipelines.md`](../diagrams/case-studies/13-ci-pipelines.md) |
 
 Use [`_template.md`](_template.md) for new entries.

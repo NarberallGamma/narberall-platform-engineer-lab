@@ -1,0 +1,43 @@
+include:
+  - local: '/defaults.yaml.example'
+
+# Build the eclipse-temurin image and push it to the container registry.
+# Include directly: project: 'estate/common-ci', file: '/builds/eclipse-temurin-build.yaml.example'
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - k8s-kaniko
+  timeout: 8h
+  interruptible: true
+
+stages:
+  - build
+
+variables:
+  ECLIPSE_TEMURIN_IMAGE_NAME: "eclipse-temurin"
+  ECLIPSE_TEMURIN_IMAGE_TAG: "11-jre"
+
+build-eclipse-temurin:
+  stage: build
+  image:
+    name: $KANIKO_IMAGE
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - |
+      if [ -d "$CI_PROJECT_DIR/base-images/eclipse-temurin" ]; then
+        CONTEXT="$CI_PROJECT_DIR/base-images/eclipse-temurin"
+      elif [ -d "$CI_PROJECT_DIR/eclipse-temurin" ]; then
+        CONTEXT="$CI_PROJECT_DIR/eclipse-temurin"
+      else
+        echo "Error: eclipse-temurin directory not found (base-images/eclipse-temurin or eclipse-temurin)"
+        exit 1
+      fi
+    - /kaniko/executor --context "$CONTEXT" --dockerfile "$CONTEXT/Dockerfile" --destination $CI_REGISTRY_IMAGE/$ECLIPSE_TEMURIN_IMAGE_NAME:$ECLIPSE_TEMURIN_IMAGE_TAG --custom-platform=linux/amd64
+    - echo "Eclipse Temurin image built and pushed successfully!"
+  rules:
+    - when: manual

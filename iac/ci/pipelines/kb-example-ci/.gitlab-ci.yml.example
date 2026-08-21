@@ -1,0 +1,43 @@
+variables:
+  CI_NAMESPACE: ${CI_PROJECT_NAME}-${CI_ENVIRONMENT_SLUG}
+
+stages:
+  - converge
+
+.base_werf: &base_werf
+  - type multiwerf && source $(multiwerf use ${WERF_VERSION} --as-file)
+  - werf version
+  - type werf && source $(werf ci-env gitlab --as-file)
+  - set -x
+
+.base_converge:
+  stage: converge
+  script:
+    - *base_werf
+    - kubectl get ns ${CI_NAMESPACE} || ( kubectl create namespace ${CI_NAMESPACE} && kubectl get secret registrysecret -n kube-system -o json |
+                      jq ".metadata.namespace = \"${CI_NAMESPACE}\"|
+                      del(.metadata.annotations,.metadata.creationTimestamp,.metadata.resourceVersion,.metadata.selfLink,.metadata.uid)" |
+                      kubectl apply -f - )
+    - werf converge
+        --namespace ${CI_NAMESPACE}
+        --timeout ${CI_TIMEOUT:-1200}
+  tags:
+    - werf
+  except:
+    - schedules
+
+Deploy to Test:
+  extends: .base_converge
+  environment:
+    name: test
+  only:
+    - branches
+  when: manual
+
+Deploy to Production:
+  extends: .base_converge
+  environment:
+    name: production
+  only:
+    - master
+  when: manual

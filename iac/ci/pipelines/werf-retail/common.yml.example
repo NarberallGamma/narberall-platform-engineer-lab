@@ -1,0 +1,175 @@
+include:
+  - local: '/snippets.yml.example'
+
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+
+default:
+  # https://docs.gitlab.com/ci/yaml/#retry
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - api_failure
+      - data_integrity_failure
+    exit_codes:
+      - 1
+      - 137
+
+variables:
+  WERF_VERSION: "1.2 stable"
+  K8S_NAMESPACE_PREFIX: ""
+# kube-context names for the production / reserve cluster swap
+  CONTEXT_PRODUCTION_MAIN: "production"
+  CONTEXT_PRODUCTION_RESERVE: "production-reserve-b"
+  CONTEXT_PRODUCTION_RESERVE_NEW: "production-reserve"
+  #CONTEXT_PRODUCTION_MAIN: "production-reserve-b"
+  #CONTEXT_PRODUCTION_RESERVE: "production"
+
+  CONTEXT_TENANT_B_MAIN: "production2"
+  CONTEXT_TENANT_B_RESERVE: "production-reserve"
+
+  CONTEXT_TENANT_A_MAIN: "production-reserve-b"
+  CONTEXT_TENANT_A_RESERVE: "production"
+  CONTEXT_TENANT_A_RESERVE_NEW: "production-reserve"
+
+# optional: deploy to the standby cluster with production-equivalent variables
+# optional standby-cluster manual deploy; set MANUAL_RESERVE_CLUSTER=manual on the pipeline
+  MANUAL_RESERVE_CLUSTER: "false"
+
+# skip reserve-cluster deploy when the repo is unchanged
+  DEPLOY_TO_RESERVE_CLUSTER: "false"
+
+# runner tag for the Build job
+  RUNNER_TAG: docker
+
+  FF_SCRIPT_SECTIONS: "true"
+
+.base_werf:
+  before_script:
+    - type trdl && source $(trdl use werf ${WERF_CUSTOM_VERSION:-${WERF_VERSION}}) || true
+    - export WERF_HOME="$HOME/.werf-by-pipeline/$CI_PIPELINE_ID"
+    - find "$HOME/.werf-by-pipeline" -mindepth 1 -maxdepth 1 -type d -mmin +1440 -exec rm -rf '{}' '+' || true
+    - werf version
+    - helm version
+    - type werf && source <(werf ci-env gitlab)
+    - export HELM_EXPERIMENTAL_OCI=1
+    - printenv HELM_CHARTS_PASSWORD | werf helm registry login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin || true
+    - printenv CHARTS_PASSWORD | werf helm repo add --username "$CHARTS_USER" --password-stdin shop-charts "$CI_API_V4_URL/projects/1/packages/helm/stable" || true
+
+    - echo "BASH_VERSION=${BASH_VERSION:-}"
+    - !reference [.snippets, dump_env]
+    - !reference [.werf_pre_converge_script]
+    - if [ -f werf_pre_converge_script.sh ]; then
+        . werf_pre_converge_script.sh;
+      fi
+  after_script:
+    - |
+      if [ "$WERF_NAMESPACE" = "tenant-a" ] || [ "$KUBE_NAMESPACE" = "tenant-a" ]; then
+        TAG_NAME="tenant-a-$(date +"%Y_%m_%d-%H_%M")"
+        git config user.email "ci@example.com"
+        git config user.name "GitLab CI"
+        git tag -a "$TAG_NAME" -m "Deployment to tenant-a"
+        git remote set-url origin "https://gitlab-ci:${RELEASE_BOT_TOKEN}@$CI_SERVER_HOST/$CI_PROJECT_PATH.git"
+        git push origin "$TAG_NAME"
+      fi
+      if [ "$WERF_NAMESPACE" = "tenant-b" ] || [ "$KUBE_NAMESPACE" = "tenant-b" ]; then
+        TAG_NAME="tenant-b-$(date +"%Y_%m_%d-%H_%M")"
+        git config user.email "ci@example.com"
+        git config user.name "GitLab CI"
+        git tag -a "$TAG_NAME" -m "Deployment to tenant-b"
+        git remote set-url origin "https://gitlab-ci:${RELEASE_BOT_TOKEN}@$CI_SERVER_HOST/$CI_PROJECT_PATH.git"
+        git push origin "$TAG_NAME"
+      fi
+  tags:
+    - docker
+
+.werf_pre_converge_script: |
+  # optional hook: run immediately before werf converge when a repo needs it
+
+.base_deploy_without_except:
+  variables:
+    KUBERNETES_CPU_REQUEST: "0.2"
+    KUBERNETES_MEMORY_REQUEST: "256Mi"
+    DELIVERY_WERF_CMD: converge
+  extends: .base_werf
+  script:
+    - !reference [.werf_pre_converge_script]
+    - if [ -f werf_pre_converge_script.sh ]; then
+        . werf_pre_converge_script.sh;
+      fi
+    # - werf helm dependency build .helm
+    - werf "${DELIVERY_WERF_CMD}"
+      --require-built-images
+      --namespace "${K8S_NAMESPACE_PREFIX}${CUSTOM_K8S_NAMESPACE:-${KUBE_NAMESPACE}}"
+      --env "${CI_ENVIRONMENT_CUSTOM_SLUG:-${CI_ENVIRONMENT_SLUG}}"
+      --set "global.index_name=${CI_ENVIRONMENT_CUSTOM_SLUG:-${CI_ENVIRONMENT_SLUG}}"
+      --set "global.namespace=${UPSTREAM_BRANCH}"
+    - echo "KUBE_NAMESPACE=$KUBE_NAMESPACE" > stage.env
+  when: manual
+  artifacts:
+    reports:
+      dotenv: stage.env
+  interruptible: true
+
+.base_deploy:
+  extends: .base_deploy_without_except
+  except:
+    - schedules
+    - pipelines
+    - tags
+
+stages:
+  - prepare
+  - check
+  - build
+  - postbuild-imagescan
+  - security-scan
+  - lint
+  - testing
+  - history_copy
+  - reports
+  - publish_nuget
+  - plan
+  - deploy
+  - deploy_clustersecretstore
+  - start_review
+  - review
+  - retry_review
+  - multideploy
+  - reimport
+  - retry-review
+  - destroy
+  - tests
+  - dev
+  - test
+  - stage
+  - demo
+  - pilot
+  - hotfix
+  - sales
+  - tenant-a
+  - tenant-a-reserve
+  - production
+  - production-reserve
+  - tenant-b
+  - tenant-b-reserve
+  - alerts
+  - cleanup
+  - sentry
+
+.base_build:
+  extends: .base_werf
+  script:
+    - werf build --save-build-report=true --build-report-path='build.env'
+    - cat build.env
+  after_script: []
+  artifacts:
+    reports:
+      dotenv: build.env
+  except:
+    - schedules
+  tags:
+    - $RUNNER_TAG

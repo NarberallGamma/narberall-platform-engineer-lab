@@ -1,0 +1,84 @@
+default:
+  tags:
+    - docker
+
+include:
+    - project: 'security/security-gates'
+      ref: 'main'
+      file: 'templates/defectdojo.yml.example'
+
+stages:
+    - Scan codebase
+
+# .pre  -  create an Engagement in DefectDojo
+defectdojo_create_engagement:
+    extends: .defectdojo_create_engagement
+
+# Secret scanning  -  Gitleaks
+gitleaks:
+    extends: .import_results_base
+    stage: Scan codebase
+    image:
+        name: zricethezav/gitleaks:latest
+        entrypoint: [""]
+    needs: [defectdojo_create_engagement]
+    tags: [docker]
+    variables:
+        DEFECTDOJO_SCAN_FILE: "gitleaks-report.json"
+        DEFECTDOJO_SCAN_TYPE: "Gitleaks Scan"
+    allow_failure: true
+    script:
+        - gitleaks detect
+            --source .
+            --report-format json
+            --report-path "$DEFECTDOJO_SCAN_FILE"
+            --no-git
+            --exit-code 0
+    after_script:
+        - sed -i 's/\r$//' "${_SCRIPTS_DIR}/scripts/defectdojo_import_scan.sh"
+        - bash "${_SCRIPTS_DIR}/scripts/defectdojo_import_scan.sh"
+    artifacts:
+        paths: ["$DEFECTDOJO_SCAN_FILE"]
+        when: always
+
+# SAST  -  Semgrep
+semgrep:
+    extends: .import_results_base
+    stage: Scan codebase
+    image: semgrep/semgrep:1.78.0
+    needs: [defectdojo_create_engagement]
+    tags: [docker]
+    variables:
+        DEFECTDOJO_SCAN_FILE: "semgrep-report.json"
+        DEFECTDOJO_SCAN_TYPE: "Semgrep JSON Report"
+    allow_failure:
+        exit_codes: [1]
+    after_script:
+        - sed -i 's/\r$//' "${_SCRIPTS_DIR}/scripts/defectdojo_import_scan.sh"
+        - bash "${_SCRIPTS_DIR}/scripts/defectdojo_import_scan.sh"
+    script:
+        - semgrep scan --json -o "$DEFECTDOJO_SCAN_FILE" .
+    artifacts:
+        paths: ["$DEFECTDOJO_SCAN_FILE"]
+
+# SCA  -  generate an SBOM (CycloneDX)
+CycloneDX:
+    stage: Scan codebase
+    tags: [docker]
+    image:
+        name: ghcr.io/cyclonedx/cdxgen:v9.8.10
+        entrypoint: [""]
+    script:
+        - node /opt/cdxgen/bin/cdxgen.js --required-only -t "$CDXGEN_LANG" -r -o bom.json --spec-version 1.4
+    artifacts:
+        paths: [bom.json]
+
+# SCA  -  Dependency-Track → DefectDojo
+dependency-track:
+    extends: .dependency_track
+    stage: Scan codebase
+    tags: [docker]
+    needs: [defectdojo_create_engagement, CycloneDX]
+    script:
+        - sed -i 's/\r$//' "${_SCRIPTS_DIR}/scripts/dependency_track_upload.sh"
+        - bash "${_SCRIPTS_DIR}/scripts/dependency_track_upload.sh"

@@ -1,0 +1,78 @@
+
+---
+
+.rules_exclude_feature_reviews:
+  - if: >
+      ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ )
+    when: never
+
+.sonarqube-check:
+  image:
+    name: example.registry/shop-app/base-images/sonar-scanner-cli:latest
+    entrypoint: [""]
+  cache:
+    policy: pull
+    key: "${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - sonar-scanner/
+  script:
+    - sonar-scanner
+  allow_failure: true
+  retry: 0
+  tags:
+    - docker
+
+.sonarqube-check.net:
+  image: example.registry/shop-app/base-images/sonar-scanner-msbuild:latest
+  variables:
+    GIT_DEPTH: 0
+  before_script:
+    - echo -e "\e[0Ksection_start:`date +%s`:env_section[collapsed=true]\r\e[0KEnv variables"
+    - env -0 | sort -z | tr '\0' '\n'
+    - echo -e "\e[0Ksection_end:`date +%s`:env_section\r\e[0K"
+  script:
+      - "dotnet tool install --global dotnet-sonarscanner"
+      - "export PATH=\"$PATH:$HOME/.dotnet/tools\""
+      - "dotnet sonarscanner begin /k:\"$PROJECT_KEY\" /d:sonar.token=\"$SONAR_TOKEN\" /d:\"sonar.host.url=$SONAR_HOST_URL\" -d:\"sonar.sources=src\" /d:\"sonar.scanner.scanAll=false\" /d:\"sonar.qualitygate.wait=true\""
+      - "dotnet build $BUILD_FILE > build.log 2>&1 || true; tail -n 15 build.log"
+      - "dotnet sonarscanner end /d:sonar.token=\"$SONAR_TOKEN\""
+  allow_failure: true
+  retry: 0
+  tags:
+    - docker
+
+sonarqube-check-mr:
+  stage: check
+  extends: .sonarqube-check
+  rules:
+    - !reference [.rules_exclude_feature_reviews]
+    - if: $CI_OPEN_MERGE_REQUESTS && $SONARQUBE_ENABLE == "true"
+    - when: never
+
+sonarqube-check.net-mr:
+  stage: check
+  extends: .sonarqube-check.net
+  rules:
+    - !reference [.rules_exclude_feature_reviews]
+    - if: $CI_OPEN_MERGE_REQUESTS && $SONARQUBE_ENABLE_NET == 'true'
+    - when: never
+
+sonarqube-check-branch:
+  stage: check
+  extends: .sonarqube-check
+  rules:
+    - !reference [.rules_exclude_feature_reviews]
+    - if: $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH && $SONARQUBE_ENABLE == "true"
+    - when: never
+
+sonarqube-check.net-branch:
+  stage: check
+  extends: .sonarqube-check.net
+  rules:
+    - !reference [.rules_exclude_feature_reviews]
+    - if: $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH && $SONARQUBE_ENABLE_NET == 'true'
+    - when: never

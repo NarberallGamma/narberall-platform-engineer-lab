@@ -1,0 +1,42 @@
+include:
+  - local: .gitlab/common.yaml.example
+
+Build production:
+  extends:
+    - .build
+  variables:
+    WERF_ENV: production
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, master_branch]
+
+Build development from master:
+  extends:
+    - .build
+  variables:
+    WERF_ENV: dev
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, master_branch]
+
+Build development:
+  extends:
+    - .build
+  variables:
+    WERF_ENV: dev
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, develop_branch]
+
+Build stage:
+  extends:
+    - .build
+  variables:
+    WERF_ENV: stage
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, stage_branch]

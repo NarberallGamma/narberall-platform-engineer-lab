@@ -1,0 +1,26 @@
+# Auto-create MR on first push of a new upgrade/* release branch (pattern in defaults-release.yaml.example).
+# Include from the root .gitlab-ci.yml of each helm repo.
+
+include:
+  - project: 'estate/common-ci'
+    ref: main
+    file: '/defaults.yaml.example'
+  - project: 'estate/common-ci'
+    ref: main
+    file: '/releases/defaults-release.yaml.example'
+
+stages:
+  - releases
+
+release-mr-create:
+  stage: releases
+  extends:
+    - .release_runner
+    - .release_tools
+  rules:
+    - if: >
+        $CI_PIPELINE_SOURCE == "push" &&
+        $CI_COMMIT_BEFORE_SHA == "0000000000000000000000000000000000000000" &&
+        $CI_COMMIT_BRANCH =~ /^upgrade\/shop-app-[0-9.]+\-estate-[0-9.]+\-(preprod|prod)$/
+  script:
+    - bash "${RELEASE_SCRIPTS_DIR}/mr_create_on_push.sh"

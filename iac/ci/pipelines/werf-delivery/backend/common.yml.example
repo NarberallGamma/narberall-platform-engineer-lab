@@ -1,0 +1,302 @@
+include:
+  - local: "notify-scripts.yml.example"
+
+variables:
+  WERF_VERSION: "1.2 alpha"
+  WERF_EXPERIMENTAL_DEPLOY_ENGINE: "1"
+  WERF_REQUIRE_BUILT_IMAGES: "1"
+
+stages:
+  - build
+  - test
+  - tests
+  - loaddump
+  - review-start
+  - review
+  - plan
+  - deploy
+  - dev
+  - preprod
+  - production
+  - cleanup
+
+# Branch pipelines only workflow
+# workflow:
+#   rules:
+#     - if: $CI_COMMIT_TAG
+#     - if: $CI_COMMIT_BRANCH
+
+# MRs and branch pipelines workflow
+workflow:
+  rules:
+    # Run merge request pipelines on MR events
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Run branch pipelines from "Run pipeline" page
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    # Do not run a branch pipeline on push when an MR is open
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+      when: never
+    # Run branch pipeline on tags
+    - if: $CI_COMMIT_TAG
+    # Run branch pipeline on all branches
+    - if: $CI_COMMIT_BRANCH
+    # Run branch pipeline on default branch
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    # Optional: run only on platform contractor branches
+    # - if: $CI_COMMIT_BRANCH =~ /^platform.*$/
+
+default:
+  tags:
+    - docker
+
+.scripts:
+  setup_werf:
+    - type trdl && source "$(trdl use werf ${WERF_VERSION:?})"
+    - werf version
+    - type werf && source "$(werf ci-env gitlab --as-file)"
+
+    - section_name="envs_$(date +%s)"
+    - echo -e "\e[0Ksection_start:`date +%s`:${section_name}[collapsed=true]\r\e[0KJob environment variables"
+    - |
+      echo "WERF_ENV=${WERF_ENV}"
+      echo "WERF_NAMESPACE=${WERF_NAMESPACE}"
+      echo "WERF_KUBE_CONTEXT=${WERF_KUBE_CONTEXT}"
+      echo "CI_COMMIT_REF_SLUG=${CI_COMMIT_REF_SLUG}"
+      echo "CI_ENVIRONMENT_SLUG=${CI_ENVIRONMENT_SLUG}"
+    - printenv | sort
+    - echo -e "\e[0Ksection_end:`date +%s`:${section_name}\r\e[0K"
+  set_upstream_werf_env:
+    - |
+      if [ ! -z "${UPSTREAM_WERF_ENV}" ]; then
+          echo "[INFO] Set WERF_ENV=${UPSTREAM_WERF_ENV}"
+          export WERF_ENV="${UPSTREAM_WERF_ENV}"
+      fi
+  app_name:
+    - export APP_NAME=`cat werf.yaml | grep project | awk '{print $2}'`
+    - |
+      if [ ! -z "${APP_NAME_SUFFIX}" ]; then
+          echo "[INFO] Set APP_NAME=${APP_NAME}-${APP_NAME_SUFFIX}"
+          export APP_NAME="${APP_NAME}-${APP_NAME_SUFFIX}"
+          echo "[INFO] Set WERF_RELEASE=${APP_NAME}-${WERF_ENV}"
+          export WERF_RELEASE="${APP_NAME}-${WERF_ENV}"
+      fi
+
+# CI_COMMIT_REF_NAME    -- The branch or tag name for which project is built. Available in merge request pipelines or tag pipelines.
+# CI_COMMIT_REF_SLUG    -- CI_COMMIT_REF_NAME in lowercase, shortened to 63 bytes, and with everything except 0-9 and a-z replaced with -. No leading / trailing -. Use in URLs, host names and domain names.
+# CI_COMMIT_BRANCH      -- The commit branch name. Available in branch pipelines, including pipelines for the default branch. Not available in merge request pipelines or tag pipelines.
+.rules:
+  if:
+    main:                $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    main_schedule:       $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "schedule"
+    branch:              $CI_COMMIT_BRANCH
+    tag:                 $CI_COMMIT_TAG
+    mr:                  $CI_PIPELINE_SOURCE == "merge_request_event"
+    schedule:            $CI_PIPELINE_SOURCE == "schedule"
+    schedule_null:       $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE == null
+    schedule_cleanup:    $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE == "cleanup"
+    schedule_tests:      $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE == "tests"
+    pipeline:            $CI_PIPELINE_SOURCE == "pipeline"
+    pipeline_trigger:    $CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER
+    pipeline_review:     $CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "review"
+    pipeline_static:     $CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "static"
+    pipeline_codecept:   $CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "codecept"
+    platform:               $CI_COMMIT_REF_SLUG =~ /^platform.*$/
+    partner_a:                $CI_COMMIT_BRANCH =~ /^partner-a.*$/
+    partner_b:            $CI_COMMIT_BRANCH =~ /^partner-b.*$/
+  schedule:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  no_schedule:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+  pipeline:
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+  no_pipeline:
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+      when: never
+  manual:
+    - when: manual
+      allow_failure: true
+  platform:
+    - if: $CI_COMMIT_REF_SLUG =~ /^platform.*$/
+      when: manual
+      allow_failure: true
+  static:
+    - if: '$CI_COMMIT_BRANCH == "stage"'
+    - if: '$CI_COMMIT_BRANCH == "postgres-demo"'
+    - if: '$CI_COMMIT_BRANCH == "demo"'
+    - if: '$CI_COMMIT_BRANCH == "loyalty"'
+    - if: '$CI_COMMIT_BRANCH =~ /^team\/.*$/'
+    - if: '$CI_COMMIT_BRANCH == "partner-a-stage"'
+      variables:
+        WERF_ENV: "partner-a"
+        WERF_KUBE_CONTEXT: dev
+    - if: '$CI_COMMIT_BRANCH == "partner-b-stage"'
+      variables:
+        WERF_ENV: "partner-b"
+        WERF_KUBE_CONTEXT: dev
+  static_partner_a:
+    - if: '$CI_COMMIT_BRANCH == "partner-a-stage"'
+      variables:
+        WERF_ENV: "partner-a"
+        WERF_KUBE_CONTEXT: dev
+  static_partner_b:
+    - if: '$CI_COMMIT_BRANCH == "partner-b-stage"'
+      variables:
+        WERF_ENV: "partner-b"
+        WERF_KUBE_CONTEXT: dev
+  static_manual:
+    - if: '$CI_COMMIT_BRANCH == "platform-static-test"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "stage"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "postgres-demo"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "demo"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "loyalty"'
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH =~ /^team\/.*$/'
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "partner-a-stage"'
+      when: manual
+      allow_failure: true
+      variables:
+        WERF_ENV: "partner-a"
+        WERF_KUBE_CONTEXT: dev
+    - if: '$CI_COMMIT_BRANCH == "partner-b-stage"'
+      when: manual
+      allow_failure: true
+      variables:
+        WERF_ENV: "partner-b"
+        WERF_KUBE_CONTEXT: dev
+  static_partner_a_manual:
+    - if: '$CI_COMMIT_BRANCH == "partner-a-stage"'
+      when: manual
+      allow_failure: true
+      variables:
+        WERF_ENV: "partner-a"
+        WERF_KUBE_CONTEXT: dev
+  static_partner_b_manual:
+    - if: '$CI_COMMIT_BRANCH == "partner-b-stage"'
+      when: manual
+      allow_failure: true
+      variables:
+        WERF_ENV: "partner-b"
+        WERF_KUBE_CONTEXT: dev
+  production:
+    - if: $CI_COMMIT_TAG
+      when: manual
+      allow_failure: true
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  partner_a_production:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE =~ /^backend\/partner-a.*$/
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "partner-a-master"'
+      when: manual
+      allow_failure: true
+  partner_b_production:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE =~ /^backend\/partner-b.*$/
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "partner-b-master"'
+      when: manual
+      allow_failure: true
+  migration_switch:
+    - if: $EXTRA_BUTTONS != "ON"
+      when: never
+
+## Base
+.base_plan:
+  stage: plan
+  variables:
+    WERF_EXPERIMENTAL_DEPLOY_ENGINE: "1"
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf plan
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - when: on_success
+
+.base_converge:
+  stage: deploy
+  needs:
+    - Build
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf helm dependency build .helm/
+    - werf helm lint .helm/
+      --ignore-secret-key
+    - werf render
+      --validate
+      --ignore-secret-key > render.yaml
+    - werf converge
+  before_script:
+    - !reference [.scripts, set_upstream_werf_env]
+    - !reference [.scripts, app_name]
+    - !reference [.script_notify_slack_deploy_started]
+  after_script:
+    - !reference [.scripts, setup_werf]
+    - !reference [.script_notify_slack_deploy_finished]
+  artifacts:
+    when: always
+    paths:
+      - render.yaml
+    expire_in: 1 week
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, manual]
+
+## Build
+Build:
+  stage: build
+  variables:
+    WERF_SAVE_BUILD_REPORT: "true"
+    WERF_BUILD_REPORT_PATH: "build.env"
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf build
+    - cat build.env
+  before_script:
+    - !reference [.script_notify_slack_build_started]
+  after_script:
+    - !reference [.script_notify_slack_build_finished]
+  artifacts:
+    reports:
+      dotenv:
+        - thread.env
+        - build.env
+  rules:
+    - if: !reference [.rules, if, schedule_tests]
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, static]
+    - if: !reference [.rules, if, pipeline_trigger]
+    - if: !reference [.rules, if, mr]
+    - if: !reference [.rules, if, main]
+    - if: !reference [.rules, if, tag]
+    - if: !reference [.rules, if, platform]
+    - if: !reference [.rules, if, partner-a]
+    - if: !reference [.rules, if, partner-b]
+    # - when: always
+
+## Cleanup
+Cleanup:
+  stage: cleanup
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf cr login -u nobody -p "${WERF_IMAGES_CLEANUP_PASSWORD:?}" "${WERF_REPO:?}"
+    - werf cleanup
+  resource_group: cleanup
+  rules:
+    - if: !reference [.rules, if, schedule_null]
+    - if: !reference [.rules, if, schedule_cleanup]

@@ -1,0 +1,94 @@
+include:
+  - local: .gitlab/common.yaml.example
+
+.base_review_rules:
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "master"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "stage"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "develop"
+      when: never
+    - !reference [.rules, mr_to_protected_branches]
+
+Build review:
+  extends:
+    - .build
+    - .base_review_rules
+  variables:
+    WERF_ENV: review-${CI_COMMIT_REF_SLUG}
+  allow_failure: true
+  needs:
+    - Run Linter
+    - Run Tests
+
+Set up review environment:
+  stage: review
+  extends:
+    - .base_review_rules
+  environment:
+    name: review/${CI_COMMIT_REF_SLUG}
+    url: $DYNAMIC_ENVIRONMENT_URL
+  variables:
+    K8S_NAMESPACE: ${CI_ENVIRONMENT_SLUG}
+    WERF_KUBE_CONTEXT: cluster-a
+  script:
+    - DYNAMIC_ENVIRONMENT_URL="https://$(werf render --ignore-secret-key |
+      yq -N 'select(.kind == "Ingress") |
+      .spec.rules.[].host' | sort | uniq)"
+    - echo $DYNAMIC_ENVIRONMENT_URL
+  artifacts:
+    reports:
+      dotenv: deploy.env
+  tags:
+    - docker
+  needs:
+    - Build review
+
+Deploy to review:
+  stage: review
+  extends:
+    - .base_review_rules
+  environment:
+    name: review/${CI_COMMIT_REF_SLUG}
+    on_stop: Destroy review
+    auto_stop_in: 4 days
+  variables:
+    WERF_ENV: review-${CI_COMMIT_REF_SLUG}
+    K8S_NAMESPACE: review-${CI_COMMIT_REF_SLUG}
+    WERF_KUBE_CONTEXT: cluster-a
+  before_script:
+    - type multiwerf && source <(multiwerf use ${WERF_VERSION})
+    - werf version
+    - type werf && source <(werf ci-env gitlab)
+  script:
+    - werf converge
+      --skip-build
+      --namespace ${CUSTOM_K8S_NAMESPACE:-${K8S_NAMESPACE}}
+      --env ${CI_ENVIRONMENT_CUSTOM_SLUG:-${CI_ENVIRONMENT_SLUG}}
+  tags:
+    - docker
+  needs:
+    - Set up review environment
+
+Destroy review:
+  stage: review
+  extends:
+    - .base_review_rules
+  variables:
+    GIT_STRATEGY: none
+    K8S_NAMESPACE: review-${CI_COMMIT_REF_SLUG}
+    WERF_KUBE_CONTEXT: cluster-a
+  script:
+    - werf dismiss --env ${CI_ENVIRONMENT_CUSTOM_SLUG:-${CI_ENVIRONMENT_SLUG}} --namespace ${K8S_NAMESPACE}
+    - kubectl delete ns ${K8S_NAMESPACE}
+  environment:
+    name: review/${CI_COMMIT_REF_SLUG}
+    action: stop
+  tags:
+    - docker
+  when: manual
+  needs:
+    - Set up review environment

@@ -1,0 +1,409 @@
+include:
+  - local: '/multiStageMainCommon.yml.example'
+
+# manual deploy to production
+Deploy to Production:
+  extends: .deploy
+  stage: production
+  environment:
+    name: production
+  variables:
+    KUBE_NAMESPACE: production
+    WERF_KUBE_CONTEXT: ${CONTEXT_PRODUCTION_MAIN}
+    WERF_SET_CLUSTER_INFO: global.cluster_type=production
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${CONTEXT_PRODUCTION_MAIN}
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+  only:
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+  except:
+    - schedules
+    - triggers
+    - pipelines
+  when: manual
+
+.deploy-production-reserve:
+  extends: .deploy
+  stage: production-reserve
+  environment:
+    name: production
+  variables:
+    KUBE_NAMESPACE: production
+    WERF_KUBE_CONTEXT: ${CONTEXT_PRODUCTION_RESERVE}
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${CONTEXT_PRODUCTION_RESERVE}
+  only:
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+  except:
+    - schedules
+    - triggers
+    - pipelines
+  when: manual
+
+# auto deploy to production-reserve
+Deploy to Production-reserve:
+  extends:
+    - .deploy-production-reserve
+    - .include_replicas
+  dependencies:
+    - Deploy to Production
+  needs:
+    - Deploy to Production
+  variables:
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+  only:
+    variables:
+      - $DEPLOY_TO_RESERVE_CLUSTER == "true"
+    refs:
+      - master
+      - production
+      - /^sales.*$/
+      - /^release.*$/
+  when: on_success
+
+# auto deploy to demo
+Deploy to Demo (auto):
+  extends: .deploy
+  stage: production-reserve
+  dependencies:
+    - Deploy to Production
+  needs:
+    - job: Deploy to Production
+      artifacts: false
+  environment:
+    name: demo
+  variables:
+    KUBE_NAMESPACE: demo
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  only:
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+  except:
+    - schedules
+    - triggers
+    - pipelines
+  when: on_success
+
+# auto deploy to sales
+Deploy to Sales (auto):
+  extends: .deploy
+  stage: production-reserve
+  dependencies:
+    - Deploy to Production
+  needs:
+    - job: Deploy to Production
+      artifacts: false
+  environment:
+    name: sales
+  variables:
+    KUBE_NAMESPACE: sales
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  only:
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+  except:
+    - schedules
+    - triggers
+    - pipelines
+  when: on_success
+
+# auto deploy ingresses
+# candidate for removal in favor of Auto Deploy to Production-reserve
+Deploy Ingresses to Production-reserve:
+  extends:
+    - .deploy-production-reserve
+  dependencies:
+    - Deploy to Production
+  needs:
+    - Deploy to Production
+  variables:
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+  only:
+    variables:
+      - $CI_PROJECT_NAME == "ingresses"
+    refs:
+      - master
+      - production
+      - /^sales.*$/
+      - /^release.*$/
+  when: on_success
+
+# manual deploy to production-reserve
+Deploy to Production-reserve-manual:
+  extends:
+    - .deploy-production-reserve
+  variables:
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve-manual
+  only:
+    variables:
+      - $MANUAL_RESERVE_CLUSTER == "manual"
+    refs:
+      - master
+      - production
+      - /^sales.*$/
+      - /^release.*$/
+      - /^infra-ops.*$/
+  when: manual
+
+Deploy to Production-reserve-manual-with-reserve-replicas:
+  extends:
+    - .deploy-production-reserve
+    - .include_replicas
+  variables:
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve-manual
+  only:
+    variables:
+      - $MANUAL_RESERVE_CLUSTER == "manual"
+    refs:
+      - master
+      - production
+      - /^sales.*$/
+      - /^release.*$/
+      - /^infra-ops.*$/
+  when: manual
+
+Deploy to tenant-a:
+  extends: .deploy
+  stage: tenant-a
+  variables:
+    KUBE_NAMESPACE: tenant-a
+    WERF_KUBE_CONTEXT: ${CONTEXT_TENANT_A_MAIN}
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  environment:
+    name: tenant-a
+  #allow_failure: false
+  only:
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+  except:
+    - schedules
+    - triggers
+    - pipelines
+  when: manual
+
+Deploy to tenant-a Reserve:
+  extends:
+    - .deploy
+    - .include_tenant_a_replicas
+  stage: tenant-a-reserve
+  variables:
+    KUBE_NAMESPACE: tenant-a
+    WERF_KUBE_CONTEXT: ${CONTEXT_TENANT_A_RESERVE}
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  environment:
+    name: tenant-a
+  #allow_failure: false
+  dependencies:
+    - Deploy to tenant-a
+  needs:
+    - Deploy to tenant-a
+  only:
+    variables:
+      - $DEPLOY_TO_RESERVE_CLUSTER == "true"
+    refs:
+      - master
+      - production
+      - /^sales.*$/
+      - /^release.*$/
+  except:
+    - schedules
+    - triggers
+    - pipelines
+  when: on_success
+
+Deploy to tenant-a Reserve manual:
+  stage: tenant-a-reserve
+  variables:
+    KUBE_NAMESPACE: tenant-a
+    WERF_KUBE_CONTEXT: ${CONTEXT_TENANT_A_RESERVE}
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+  environment:
+    name: tenant-a
+  extends:
+    - .deploy
+  only:
+    variables:
+      - $MANUAL_RESERVE_CLUSTER == "manual"
+    refs:
+      - master
+      - production
+      - /^sales.*$/
+      - /^release.*$/
+  except:
+    - schedules
+    - triggers
+    - pipelines
+  when: manual
+
+Deploy to tenant-a Reserve manual with replicas:
+  extends:
+    - .deploy
+    - .include_tenant_a_replicas
+  stage: tenant-a-reserve
+  variables:
+    KUBE_NAMESPACE: tenant-a
+    WERF_KUBE_CONTEXT: ${CONTEXT_TENANT_A_RESERVE}
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+  environment:
+    name: tenant-a
+  #allow_failure: false
+  only:
+    variables:
+      - $MANUAL_RESERVE_CLUSTER == "manual"
+    refs:
+      - master
+      - production
+      - /^sales.*$/
+      - /^release.*$/
+  except:
+    - schedules
+    - triggers
+    - pipelines
+  when: manual
+
+# deploy to tenant-b
+Deploy to tenant-b:
+  extends: .deploy
+  stage: tenant-b
+  environment:
+    name: tenant-b
+  variables:
+    KUBE_NAMESPACE: tenant-b
+    WERF_KUBE_CONTEXT: ${CONTEXT_TENANT_B_MAIN}
+    WERF_SET_CLUSTER_INFO: global.cluster_type=production2
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${CONTEXT_TENANT_B_MAIN}
+  only:
+    variables:
+      - $DEPLOY_TO_PRODUCTION2_CLUSTER == "true"
+    refs:
+      - master
+      - production
+      - /^sales.*$/
+      - /^release.*$/
+  except:
+    - schedules
+    - triggers
+    - pipelines
+  when: manual
+
+# manual deploy to new production reserve
+Deploy to NEW Production Reserve:
+  extends: .deploy
+  stage: production-reserve
+  environment:
+    name: production-reserve
+  variables:
+    KUBE_NAMESPACE: production
+    CI_ENVIRONMENT_CUSTOM_SLUG: production
+    WERF_ENV: production
+    WERF_KUBE_CONTEXT: $CONTEXT_PRODUCTION_RESERVE_NEW
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+  only:
+    variables:
+      - $DEPLOY_TO_PROD_RESERVE_CLUSTER == "true"
+    refs:
+      - master
+      - production
+      - /^sales.*$/
+      - /^release.*$/
+      - /^infra-ops.*$/
+  except:
+    refs:
+      - schedules
+      - pipelines
+  when: manual
+
+Deploy to NEW Production Reserve (with replicas):
+  extends:
+    - Deploy to NEW Production Reserve
+    - .include_replicas
+
+# manual deploy to new tenant-a reserve
+Deploy to NEW tenant-a Reserve:
+  extends: .deploy
+  stage: tenant-a-reserve
+  environment:
+    name: tenant-a-reserve
+  variables:
+    KUBE_NAMESPACE: tenant-a
+    CI_ENVIRONMENT_CUSTOM_SLUG: tenant-a
+    WERF_KUBE_CONTEXT: $CONTEXT_TENANT_A_RESERVE_NEW
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+  after_script: []
+  only:
+    variables:
+      - $DEPLOY_TO_PROD_RESERVE_CLUSTER == "true"
+    refs:
+      - master
+      - production
+      - /^sales.*$/
+      - /^release.*$/
+      - /^infra-ops.*$/
+  except:
+    refs:
+      - schedules
+      - pipelines
+  when: manual
+
+Deploy to NEW tenant-a Reserve (with replicas):
+  extends:
+    - Deploy to NEW tenant-a Reserve
+    - .include_tenant_a_replicas
+
+# manual deploy to tenant-b reserve
+Deploy to tenant-b Reserve:
+  extends: .deploy
+  stage: tenant-b-reserve
+  environment:
+    name: tenant-b-reserve
+  variables:
+    KUBE_NAMESPACE: tenant-b
+    CI_ENVIRONMENT_CUSTOM_SLUG: tenant-b
+    WERF_KUBE_CONTEXT: $CONTEXT_TENANT_B_RESERVE
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+  after_script: []
+  only:
+    variables:
+      - $DEPLOY_TO_PROD_RESERVE_CLUSTER == "true"
+    refs:
+      - master
+      - production
+      - /^sales.*$/
+      - /^release.*$/
+      - /^infra-ops.*$/
+  except:
+    refs:
+      - schedules
+      - pipelines
+  when: manual
+
+Deploy to tenant-b Reserve (with replicas):
+  extends:
+    - Deploy to tenant-b Reserve
+    - .include_tenant_b_replicas

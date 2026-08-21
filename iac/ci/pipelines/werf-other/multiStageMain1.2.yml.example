@@ -1,0 +1,40 @@
+include:
+  - local: '/common.yml.example'
+
+Build:
+  extends: .base_build
+
+# Plan
+Plan Dev:
+  extends: .base_plan
+  environment:
+    name: dev
+    action: prepare
+  variables:
+    WERF_NAMESPACE: dev
+
+Plan Production:
+  extends: .base_plan
+  environment:
+    name: production
+    action: prepare
+  variables:
+    WERF_NAMESPACE: production
+
+# Deploy
+Deploy to Dev:
+  extends: .base_deploy
+  environment:
+    name: dev
+  variables:
+    WERF_NAMESPACE: dev
+
+Deploy to Production:
+  extends: .base_deploy
+  environment:
+    name: production
+  variables:
+    WERF_NAMESPACE: production
+  rules:
+    - !reference [.rules, not_schedule]
+    - !reference [.rules, production]

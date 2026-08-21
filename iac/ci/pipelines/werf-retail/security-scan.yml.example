@@ -1,0 +1,155 @@
+---
+variables:
+  TRIVY_REPO_SCAN_DISABLED: "false"
+  SCAN_KUBERNETES_MANIFESTS: 'true'
+
+include:
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - template: Jobs/SAST.gitlab-ci.yml
+
+semgrep-sast:
+  allow_failure: true
+  rules:
+  - if: $SONARQUBE_ENABLE == 'true' || $SONARQUBE_ENABLE_NET == 'true'
+    when: never
+  - if: $CI_PIPELINE_SOURCE == 'pipeline'
+    when: never
+  - if: "$CI_COMMIT_BRANCH"
+
+kubesec-sast:
+  allow_failure: true
+  rules:
+  - if: $SONARQUBE_ENABLE == 'true' || $SONARQUBE_ENABLE_NET == 'true'
+    when: never
+  - if: $CI_PIPELINE_SOURCE == 'pipeline'
+    when: never
+  - if: "$CI_COMMIT_BRANCH"
+
+secret_detection:
+  stage: security-scan
+  allow_failure: true
+  variables:
+    SECRET_DETECTION_HISTORIC_SCAN: "true"
+    KUBERNETES_CPU_REQUEST: "0.2"
+    KUBERNETES_MEMORY_REQUEST: "256Mi"
+  rules:
+  - if: $SONARQUBE_ENABLE == 'true' || $SONARQUBE_ENABLE_NET == 'true'
+    when: never
+  - if: $CI_PIPELINE_SOURCE == 'pipeline'
+    when: never
+  - if: "$CI_COMMIT_BRANCH"
+
+sast:
+  stage: security-scan
+  allow_failure: true
+  variables:
+    KUBERNETES_CPU_REQUEST: "0.2"
+    KUBERNETES_MEMORY_REQUEST: "256Mi"
+  rules:
+    - when: never
+  tags:
+    - docker
+
+trivy_repo_scanning:
+  stage: security-scan
+  image:
+    name: example.registry/shop-app/base-images/trivy:latest
+    entrypoint: [""]
+  variables:
+    # clone is required so the scanner can read the tree.  See
+    # https://docs.gitlab.com/ee/ci/runners/README.html#git-strategy
+    GIT_STRATEGY: clone
+    KUBERNETES_CPU_REQUEST: "0.2"
+    KUBERNETES_MEMORY_REQUEST: "256Mi"
+  script:
+    - trivy --version
+    # clear the local Trivy cache between scans; the vulnerability DB is kept
+    - rm -rf .trivycache/
+    - time trivy fs . --clear-cache --cache-dir .trivycache/||true
+    # download the vulnerability database
+    - time trivy fs . --download-db-only --no-progress --cache-dir .trivycache/
+    # write the GitLab container-scanning report into $CI_PROJECT_DIR for artifacts
+    - time trivy fs . --exit-code 0 --cache-dir .trivycache/ --no-progress --format template --template "@/contrib/gitlab.tpl" --output "$CI_PROJECT_DIR/gl-container-scanning-report.json"
+    # print the full report
+    - time trivy fs . --exit-code 0 --cache-dir .trivycache/ --no-progress
+    # fail the job when CRITICAL findings exist
+    - time trivy fs . --exit-code 1 --cache-dir .trivycache/ --severity CRITICAL --no-progress
+  allow_failure: true
+  cache:
+    paths:
+      - .trivycache/
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    when: never
+  - if: "$TRIVY_REPO_SCAN_DISABLED == 'true' || $TRIVY_REPO_SCAN_DISABLED == '1'"
+    when: never
+  - if: $SAST_DISABLED == 'true' || $SAST_DISABLED == '1'
+    when: never
+  - if: $SONARQUBE_ENABLE == 'true' || $SONARQUBE_ENABLE_NET == 'true'
+    when: never
+  - if: "$CI_COMMIT_BRANCH"
+  # GitLab container-scanning artifact (EE/Ultimate)
+  artifacts:
+    when:                          always
+    reports:
+      container_scanning:          gl-container-scanning-report.json
+  tags:
+    - docker
+
+
+grype_image_scanning:
+  stage: security-scan
+  image:
+    name: example.registry/shop-app/base-images/grype:latest
+    entrypoint: [""]
+  variables:
+    GIT_STRATEGY: clone
+    KUBERNETES_CPU_REQUEST: "0.2"
+    KUBERNETES_MEMORY_REQUEST: "256Mi"
+    GRYPE_DB_CACHE_DIR: $CI_PROJECT_DIR/grype_db_cache
+    IMAGE_SCAN_ENABLED: "false"
+  script:
+    - docker login -u ${REGISTRY_USER} -p ${REGISTRY_PASSWORD} example.registry
+    - |
+      vulnerabilities_found=false
+
+      for image_name in $IMAGE_NAMES; do
+        echo "Scanning $image_name"
+        grype -v $image_name --file "report_${image_name//\//-}.json"
+
+        high_critical_vulnerabilities=$(grep -E '(High|Critical)' "report_${image_name//\//-}.json")
+
+        if [ -n "$high_critical_vulnerabilities" ]; then
+          vulnerabilities_found=true
+          echo "High or Critical vulnerabilities found in $image_name:"
+          echo "$high_critical_vulnerabilities"
+        fi
+      done
+      # fail the job when High or Critical findings exist
+      if [ "$vulnerabilities_found" = true ]; then
+        exit 1
+      fi
+  allow_failure: true
+  when: manual
+  needs:
+    - Build
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    when: never
+  - if: '$CI_PIPELINE_SOURCE == "trigger"'
+    when: never
+  - if: "$IMAGE_SCAN_ENABLED == 'false' || $IMAGE_SCAN_ENABLED == '0'"
+    when: never
+  - if: $SONARQUBE_ENABLE == 'true' || $SONARQUBE_ENABLE_NET == 'true'
+    when: never
+  - if: "$CI_COMMIT_BRANCH"
+  cache:
+    key: GRYPE_DB_CACHE
+    paths:
+      - grype_db_cache/
+  artifacts:
+    when: always
+    paths:
+      - report_*.json
+  tags:
+    - docker

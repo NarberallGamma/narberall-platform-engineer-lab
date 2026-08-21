@@ -1,0 +1,166 @@
+include:
+  - component: $CI_SERVER_FQDN/components/opentofu/job-templates@0.45.0
+    inputs:
+      # Version must be specified explicitly as an input so the matching images are resolved.
+      # Can be removed once https://gitlab.com/gitlab-org/gitlab/-/issues/438275 is solved.
+      version: 0.45.0
+      opentofu_version: 1.8.6
+      root_dir: cluster-a/
+      state_name: cluster-a-tfstate
+  - template: Jobs/SAST-IaC.gitlab-ci.yml
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      variables:
+        SAST_DISABLED: "true"
+    - when: always
+
+stages:
+  - validate
+  - test
+  - build
+  - alert
+  - deploy
+  - cleanup
+
+# tests tag override
+kics-iac-sast:
+  tags:
+    - docker
+
+.base-opentofu:
+  tags:
+    - docker
+
+
+.rule_not_schedule: &rule_not_schedule
+  - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    when: never
+
+.opentofu:fmt:
+  rules:
+    - !reference [.rule_not_schedule]
+    - when: always
+
+.opentofu:validate:
+  rules:
+    - !reference [.rule_not_schedule]
+    - when: always
+
+.opentofu:plan:
+  rules:
+    - !reference [.rule_not_schedule]
+    - when: always
+
+.opentofu:apply:
+  rules:
+    - !reference [.rule_not_schedule]
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $TF_AUTO_DEPLOY == "true"
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+      when: manual
+
+.custom-opentofu-build:
+  after_script:
+    - type jq && jq --version
+    - cat ${GITLAB_TOFU_ROOT_DIR}/plan.json | jq
+
+.custom-opentofu-init:
+  before_script:
+    - echo "use a local provider cache"
+    - mkdir ~/.terraform.d/plugin-cache
+    - cp -R .terraform/providers/registry.terraform.io ~/.terraform.d/plugin-cache/
+    - cd $GITLAB_TOFU_ROOT_DIR
+    - tofu init > /dev/null 2>&1 || true
+    - cd $OLDPWD
+
+.check builds:
+  artifacts:
+    paths:
+      - ${GITLAB_TOFU_ROOT_DIR}/plan.json
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
+.check alerts:
+  stage: alert
+  script:
+    - export TF_VAR_pve_api_token_id=${TF_VAR_PVE_API_TOKEN_ID}
+    - |
+      export VM_IN_STATE=$(curl -s --header "Private-Token: ${TF_HTTP_PASSWORD}" "https://gitlab.example.com/api/v4/projects/CHANGE_ME/terraform/state/${GITLAB_TOFU_STATE_NAME}" |jq -r '.resources|length')
+    - |
+      export NODES=$(curl -s -k https://$PVE_SERVER:8006/api2/json/nodes -H  "Authorization: PVEAPIToken=$TF_VAR_pve_api_token_id=$TF_VAR_PVE_API_TOKEN_SECRET"|jq -r .data[].node)
+    - |
+      VM_PVE_SUM=0
+      for NODE in $(echo $NODES); do
+          VM_PVE_SUM=$(($VM_PVE_SUM+$(curl -s -k https://$PVE_SERVER:8006/api2/json/nodes/$NODE/qemu -H  "Authorization: PVEAPIToken=$TF_VAR_pve_api_token_id=$TF_VAR_PVE_API_TOKEN_SECRET" |jq -r .data[].name |grep -v template |wc -l)))
+      done
+      echo VM in hypervisor $VM_PVE_SUM
+      echo VM in  $GITLAB_TOFU_STATE_NAME $VM_IN_STATE
+      if [[ $(cat ${GITLAB_TOFU_ROOT_DIR}/plan.json |grep -v -E " 0|{|}") ]]; then
+          echo  ${GITLAB_TOFU_STATE_NAME} not valid;
+          TF_STATE_VALID=false;
+      fi
+      if [ $VM_PVE_SUM -ne $VM_IN_STATE ] || [[ $TF_STATE_VALID = "false" ]]; then
+          notify-alert -s 4 -l server=$(hostname) -l status="terraform_state_not_valid" -t "terraform state \"${GITLAB_TOFU_STATE_NAME}\" not valid" -m "check terraform state in repo $CI_JOB_URL"  "check terraform state in repo $CI_JOB_URL and/or check quantity VM in terraform and hypervisor. VM_in_hypervisor_$PVE_SERVER=$VM_PVE_SUM, VM_in_$GITLAB_TOFU_STATE_NAME=$VM_IN_STATE"
+          exit 1
+      else
+          echo $GITLAB_TOFU_STATE_NAME valid;
+      fi
+
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - when: never
+  tags:
+    - docker
+
+
+.base-cluster-a:
+  extends: .base-opentofu
+  variables:
+    TF_VAR_PVE_API_TOKEN_SECRET: ${PVE_API_TOKEN_SECRET}
+    TF_HTTP_PASSWORD: ${TF_HTTP_PASSWORD}
+    TF_IMPLICIT_INIT: "false"
+    PVE_SERVER: ${PVE_SERVER}
+    DEBUG_OUTPUT: "false"
+
+cluster-a format:
+  extends:
+    - .base-cluster-a
+    - .opentofu:fmt
+cluster-a validate:
+  extends:
+    - .base-cluster-a
+    - .opentofu:validate
+cluster-a plan:
+  extends:
+    - .base-cluster-a
+    - .custom-opentofu-init
+    - .opentofu:plan
+    - .custom-opentofu-build
+
+cluster-a apply:
+  extends:
+    - .base-cluster-a
+    - .custom-opentofu-init
+    - .opentofu:apply
+  dependencies:
+    - cluster-a plan
+
+
+cluster-a check plan:
+  extends:
+    - cluster-a plan
+    - .check builds
+  variables:
+    GITLAB_TOFU_STATE_NAME: cluster-a-tfstate
+    GITLAB_TOFU_ROOT_DIR: cluster-a
+
+cluster-a check alert:
+  extends:
+    - .base-cluster-a
+    - .check alerts
+  dependencies:
+    - cluster-a check plan
+  variables:
+    GITLAB_TOFU_STATE_NAME: cluster-a-tfstate
+    GITLAB_TOFU_ROOT_DIR: cluster-a

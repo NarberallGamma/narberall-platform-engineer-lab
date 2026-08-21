@@ -1,0 +1,132 @@
+include:
+  - local: '/snippets.yml.example'
+  - local: 'rules/rules.yml.example'
+
+.base_tests:
+  variables:
+    TEST_IMAGE: "build"
+    TEST_WORKDIR: "/src"
+    TEST_DEFAULT_FILTER: "FullyQualifiedName!~IntegrationTests"
+    TEST_COVERAGE_ARGS: ""
+    SD_ARTIFACTS_DIR: .artifacts
+    SD_TESTS_LOG: $SD_ARTIFACTS_DIR/stdout
+    SD_JOB_TMPDIR: /tmp/job.$CI_JOB_ID
+  cache:
+    key: coverage__${CI_COMMIT_SHA}__${CI_JOB_NAME_SLUG}
+    unprotect: true
+    paths:
+      - $SD_ARTIFACTS_DIR
+  stage: tests
+  image: ${WERF_BUILD_DOCKER_IMAGE_NAME}
+  rules:
+    - !reference [.rules_not_schedule]
+    - !reference [.rules_pipeline_and_default_branch]
+    - !reference [.rules_not_tag]
+    - when: on_success
+  before_script:
+    - !reference [.snippets, dump_env]
+    - mkdir -p $SD_JOB_TMPDIR
+  after_script: |
+    set -ux
+    if [ -f $SD_TESTS_LOG ]; then
+      exit 0
+    fi
+    if [ $CI_JOB_STATUS != 'success' ]; then
+        rm -f $SD_TESTS_LOG
+        echo -e "\e[31m !!!!!!!!!! ERRROR !!!!!!!!!! \e[0m"
+        echo -e "\e[31m $(cat $SD_JOB_TMPDIR/error.txt) \e[0m"
+    fi
+    mkdir -p $SD_ARTIFACTS_DIR
+    echo "*" > $SD_ARTIFACTS_DIR/.gitignore
+    cp -R $SD_JOB_TMPDIR/* $SD_ARTIFACTS_DIR
+
+  dependencies:
+    - Build
+  tags:
+    - docker
+  retry:
+    max: 1
+
+.base_tests_with_cobertura:
+  extends:
+    - .base_tests
+  script: |
+    set -ux
+    if [ -f $SD_TESTS_LOG ]; then
+      echo "⚠️ Using cached results of tests" >&2
+      cat $SD_TESTS_LOG
+      exit 0
+    fi
+
+    export TEST_DEFAULT_LOGGER="junit;LogFilePath=$SD_JOB_TMPDIR/junit/{assembly}-test-result.xml;MethodFormat=Class;FailureBodyFormat=Verbose"
+
+    cd ${TEST_WORKDIR}
+    dotnet test ${TEST_SLN} --filter ${TEST_FILTER:-${TEST_DEFAULT_FILTER}} -c Release --nologo --no-build --no-restore \
+      --logger:${TEST_LOGGER:-${TEST_DEFAULT_LOGGER}} /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura \
+      /p:CoverletOutput=$SD_JOB_TMPDIR/coverage ${TEST_COVERAGE_ARGS} 2>$SD_JOB_TMPDIR/error.txt |tee $SD_JOB_TMPDIR/stdout
+
+  artifacts:
+    paths:
+      - $SD_ARTIFACTS_DIR/junit/*-test-result.xml
+    reports:
+      junit:
+        - $SD_ARTIFACTS_DIR/junit/*-test-result.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: $SD_ARTIFACTS_DIR/coverage.cobertura.xml
+  coverage: '/Total\s*\|\s*(\d+(?:\.\d+)?)/'
+
+.base_tests_with_cobertura_trx:
+  extends:
+    - .base_tests
+  script: |
+    set -ux
+    if [ -f $SD_TESTS_LOG ]; then
+      echo "Using cached results of tests" >&2
+      cat $SD_TESTS_LOG
+      exit 0
+    fi
+
+    export PATH="$PATH:/root/.dotnet/tools"
+    dotnet tool install --global trx2junit
+    dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.3.11
+    cd ${TEST_WORKDIR}
+    dotnet test ${TEST_SLN} -c Release --nologo --no-build --no-restore --results-directory $SD_JOB_TMPDIR/trx \
+      --filter ${TEST_FILTER:-${TEST_DEFAULT_FILTER}} --collect "XPlat Code Coverage" --logger trx ${TEST_COVERAGE_ARGS} 2>$SD_JOB_TMPDIR/error.txt
+
+    reportgenerator -reports:"$SD_JOB_TMPDIR/trx/*/coverage.cobertura.xml" -targetdir:"$SD_JOB_TMPDIR" -reporttypes:"cobertura"
+
+    # werf's mount.from=tmp_dir breaks /tmp permissions
+    chmod a+rwx /tmp
+
+    apt-get update && apt-get install -y xmlstarlet
+
+    # remove "/src" from the class.filename attribute (werf artifact)
+    # <class name="[Class]" filename="/src/src/SD.*.cs /> => <class name="[Class]" filename="/src/SD.*.cs />
+    xmlstarlet ed -L -u '//class/@filename' -x 'substring-after(., "/src")' $SD_JOB_TMPDIR/Cobertura.xml
+
+    # remove "/" from the class.filename attribute
+    # <class name="[Class]" filename="/src/SD.*.cs /> => <class name="[Class]" filename="src/SD.*.cs />
+    xmlstarlet ed -L -u '//class/@filename' -x 'substring-after(., "/")' $SD_JOB_TMPDIR/Cobertura.xml
+
+    # Deletes <sources /> tag and its content (if exists)
+    # https://gitlab.com/gitlab-org/gitlab/-/issues/213444#note_478850910
+    xmlstarlet ed -L -d "//sources" $SD_JOB_TMPDIR/Cobertura.xml
+
+    trx2junit $SD_JOB_TMPDIR/trx/*.trx --output $SD_JOB_TMPDIR/junit
+    rm -rf $SD_JOB_TMPDIR/trx
+
+    # selects coverage.line-rate attribute and print
+    xmlstarlet sel -t -v "concat('TOTAL_COVERAGE=', format-number(/coverage/@line-rate, '"#.##%"'))" $SD_JOB_TMPDIR/Cobertura.xml |tee $SD_JOB_TMPDIR/stdout
+
+  artifacts:
+    paths:
+      - $SD_ARTIFACTS_DIR/junit/*.xml
+      - $SD_ARTIFACTS_DIR/Cobertura.xml
+    reports:
+      junit:
+        - $SD_ARTIFACTS_DIR/junit/*.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: $SD_ARTIFACTS_DIR/Cobertura.xml
+  coverage: '/TOTAL_COVERAGE=(\d+(?:\.\d+)?)/'

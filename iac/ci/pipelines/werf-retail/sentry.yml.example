@@ -1,0 +1,157 @@
+include:
+  - local: '/rules/rules.yml.example'
+
+.need_build:
+    - job: Build
+      artifacts: true
+      optional: true
+    - job: Build web-ui
+      artifacts: true
+      optional: true
+
+.script_send_sentry:
+  script:
+    - find . -name .sentry.helper.sh -exec sh {} \; | grep \/ || echo "File \".sentry.helper.sh\" not found in project"
+
+.sentry:
+  image: $WERF_STORE_BUILD_DOCKER_IMAGE_NAME
+  extends: .script_send_sentry
+  stage: sentry
+  allow_failure: true
+  interruptible: true
+  tags:
+    - docker
+
+Sending to Sentry Dev:
+  extends: .sentry
+  rules:
+    - !reference [.rules_dev_sentry_release]
+    - !reference [.rules_sentry]
+    - when: never
+  needs:
+    - job: Deploy to Dev
+      artifacts: true
+    - !reference [.need_build]
+  before_script:
+    - if [ "$KUBE_NAMESPACE" == "dev" ]; then SENTRY_DOMAIN="${SENTRY_DOMAIN_DEV}" && SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN_DEV}"; fi
+
+Sending to Sentry Test-E:
+  extends: .sentry
+  rules:
+    - !reference [.rules_dev_sentry]
+    - !reference [.rules_sentry]
+    - when: never
+  needs:
+    - job: Deploy to Test-E
+      artifacts: true
+      optional: true
+    - !reference [.need_build]
+  before_script:
+    - if [ "$KUBE_NAMESPACE" == "test-e" ]; then SENTRY_DOMAIN="${SENTRY_DOMAIN_DEV}" && SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN_DEV}"; fi
+
+Sending to Sentry TestDB:
+  extends: .sentry
+  rules:
+    - !reference [.rules_dev_sentry]
+    - !reference [.rules_sentry]
+    - when: never
+  needs:
+    - job: Deploy to TestDB
+      artifacts: true
+      optional: true
+    - !reference [.need_build]
+  before_script:
+    - if [ "$KUBE_NAMESPACE" == "testdb" ]; then SENTRY_DOMAIN="${SENTRY_DOMAIN_DEV}" && SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN_DEV}"; fi
+
+Sending to Sentry Sales:
+  extends: .sentry
+  rules:
+    - !reference [.rules_not_schedule]
+    - !reference [.rules_not_pipeline]
+    - !reference [.rules_not_trigger]
+    - !reference [.rules_not_feature_sales_release]
+    - !reference [.rules_not_release_prod]
+    - if: $CI_COMMIT_BRANCH =~ /stage$|master$|production$/ && $CI_PROJECT_NAME =~ /^web-ui-.*$/
+    - when: never
+  needs:
+    - job: Deploy to Sales
+      artifacts: true
+    - !reference [.need_build]
+  before_script:
+    - if [ "$KUBE_NAMESPACE" == "sales" ]; then SENTRY_DOMAIN="${SENTRY_DOMAIN_DEV}" && SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN_DEV}"; fi
+
+Sending to Sentry Stage:
+  extends: .sentry
+  rules:
+    - !reference [.rules_not_schedule]
+    - !reference [.rules_not_pipeline]
+    - !reference [.rules_not_trigger]
+    - !reference [.rules_not_feature_sales_release]
+    - !reference [.rules_not_release_prod]
+    - if: $CI_COMMIT_BRANCH =~ /stage$|master$|production$|dev$|develop$|development$/ && $CI_PROJECT_NAME =~ /^web-ui-.*$/
+    - when: never
+  needs:
+    - job: Deploy to Stage
+      artifacts: true
+    - !reference [.need_build]
+  before_script:
+    - if [ "$KUBE_NAMESPACE" == "stage" ]; then SENTRY_DOMAIN="${SENTRY_DOMAIN_DEV}" && SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN_DEV}"; fi
+
+Sending to Sentry Demo:
+  extends: .sentry
+  rules:
+    - !reference [.rules_not_schedule]
+    - !reference [.rules_not_pipeline]
+    - !reference [.rules_not_trigger]
+    - !reference [.rules_not_release_prod]
+    - if: $CI_COMMIT_BRANCH =~ /master$|production$|dev$|develop$|development$|demo$|^sales.*$|^release.*$/ && $CI_PROJECT_NAME =~ /^web-ui-.*$/
+    - when: never
+  needs:
+    - job: Deploy to Demo
+      artifacts: true
+    - !reference [.need_build]
+  before_script:
+    - if [ "$KUBE_NAMESPACE" == "demo" ]; then SENTRY_DOMAIN="${SENTRY_DOMAIN}" && SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN}"; fi
+
+Sending to Sentry Pilot:
+  extends: .sentry
+  rules:
+    - !reference [.rules_not_schedule]
+    - !reference [.rules_not_pipeline]
+    - !reference [.rules_not_trigger]
+    - !reference [.rules_not_release_prod]
+    - if: $CI_COMMIT_BRANCH =~ /master$|production$|dev$|develop$|development$|demo$|pilot$|^sales.*$|^release.*$/ && $CI_PROJECT_NAME =~ /^web-ui-.*$/
+    - when: never
+  needs:
+    - job: Deploy to Pilot
+      artifacts: true
+    - !reference [.need_build]
+  before_script:
+    - if [ "$KUBE_NAMESPACE" == "pilot" ]; then SENTRY_DOMAIN="${SENTRY_DOMAIN}" && SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN}"; fi
+
+Sending to Sentry tenant-b:
+  extends: .sentry
+  rules:
+    - !reference [.rules_not_schedule]
+    - !reference [.rules_not_pipeline]
+    - !reference [.rules_not_trigger]
+    - !reference [.rules_not_release_prod]
+    - if: $CI_COMMIT_BRANCH =~ /master$|production$|^sales.*$|^release.*$/ && $WERF_ENV == "tenant-b" && $CI_PROJECT_NAME =~ /^web-ui-.*$/
+    - when: never
+  needs:
+    - !reference [.need_build]
+  before_script:
+    - if [ "$KUBE_NAMESPACE" == "tenant-b" ]; then SENTRY_DOMAIN="${SENTRY_DOMAIN}" && SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN}"; fi
+
+Sending to Sentry tenant-a:
+  extends: .sentry
+  rules:
+    - !reference [.rules_not_trigger]
+    - !reference [.rules_not_pipeline]
+    - !reference [.rules_not_schedule]
+    - if: $CI_COMMIT_BRANCH =~ /master$|production$|^sales.*$|^release.*$/ && $WERF_ENV == "tenant-a" && $CI_PROJECT_NAME =~ /^web-ui-.*$/
+    - when: never
+  needs:
+    - !reference [.need_build]
+  before_script:
+    - if [ "$KUBE_NAMESPACE" == "tenant-a" ]; then SENTRY_DOMAIN="${SENTRY_DOMAIN}" && SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN}"; fi

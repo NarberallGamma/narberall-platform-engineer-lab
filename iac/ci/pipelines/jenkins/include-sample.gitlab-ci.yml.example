@@ -1,0 +1,12 @@
+---
+# Sanitized include-only GitLab CI. The shared jobs live in infra/common-ci
+# (deployInfra.yml / deploy.yml / deployInfra1.2.yml). Those include targets
+# are not in this tree.
+include:
+  - project: infra/common-ci
+    file: /deployInfra.yml
+    ref: v2
+  # - project: infra/common-ci
+  #   file: /deployDWH.yml
+  # - project: infra/common-ci
+  #   file: /deployInfraBundles.yml

@@ -1,0 +1,209 @@
+# Monolithic AppSec hub: DefectDojo engagement, Semgrep, ZAP, CycloneDX, SCA track.
+# Modular one-file-per-tool variants live under pipelines/.
+stages:
+    - Scan codebase
+
+variables:
+    DEFECTDOJO_ENGAGEMENT_PERIOD: 0
+    DEFECTDOJO_ENGAGEMENT_STATUS: "Not Started"
+    DEFECTDOJO_ENGAGEMENT_BUILD_SERVER: "null"
+    DEFECTDOJO_ENGAGEMENT_SOURCE_CODE_MANAGEMENT_SERVER: "null"
+    DEFECTDOJO_ENGAGEMENT_ORCHESTRATION_ENGINE: "null"
+    DEFECTDOJO_ENGAGEMENT_DEDUPLICATION_ON_ENGAGEMENT: "false"
+    DEFECTDOJO_ENGAGEMENT_THREAT_MODEL: "false"
+    DEFECTDOJO_ENGAGEMENT_API_TEST: "true"
+    DEFECTDOJO_ENGAGEMENT_PEN_TEST: "false"
+    DEFECTDOJO_ENGAGEMENT_CHECK_LIST: "true"
+    DEFECTDOJO_NOT_ON_MASTER: "false"
+
+
+defectdojo_create_engagement:
+    stage: .pre
+    image: alpine
+    variables:
+    before_script:
+    - apk add curl jq coreutils
+    - TODAY=`date +%Y-%m-%d`
+    - ENDDAY=$(date -d "+${DEFECTDOJO_ENGAGEMENT_PERIOD} days" +%Y-%m-%d)
+    script:
+    - |
+        ESCAPED_DESCRIPTION=$(echo "${CI_COMMIT_DESCRIPTION}" | sed 's/!/\\!/g')
+        ENGAGEMENTID=`curl -v --fail --location --request POST "${DEFECTDOJO_URL}/engagements/" \
+                --header "Authorization: Token ${DEFECTDOJO_TOKEN}" \
+                --header 'Content-Type: application/json' \
+                --data-raw "{
+                    \"tags\": [\"GITLAB-CI\"],
+                    \"name\": \"${CI_PIPELINE_ID}\",
+                    \"description\": \"${ESCAPED_DESCRIPTION}\",
+                    \"version\": \"${CI_COMMIT_REF_NAME}\",
+                    \"first_contacted\": \"${TODAY}\",
+                    \"target_start\": \"${TODAY}\",
+                    \"target_end\": \"${ENDDAY}\",
+                    \"reason\": \"string\",
+                    \"tracker\": \"${CI_PROJECT_URL}/-/issues\",
+                    \"threat_model\": \"${DEFECTDOJO_ENGAGEMENT_THREAT_MODEL}\",
+                    \"api_test\": \"${DEFECTDOJO_ENGAGEMENT_API_TEST}\",
+                    \"pen_test\": \"${DEFECTDOJO_ENGAGEMENT_PEN_TEST}\",
+                    \"check_list\": \"${DEFECTDOJO_ENGAGEMENT_CHECK_LIST}\",
+                    \"status\": \"${DEFECTDOJO_ENGAGEMENT_STATUS}\",
+                    \"engagement_type\": \"CI/CD\",
+                    \"build_id\": \"${CI_PIPELINE_ID}\",
+                    \"commit_hash\": \"${CI_COMMIT_SHORT_SHA}\",
+                    \"branch_tag\": \"${CI_COMMIT_REF_NAME}\",
+                    \"deduplication_on_engagement\": \"${DEFECTDOJO_ENGAGEMENT_DEDUPLICATION_ON_ENGAGEMENT}\",
+                    \"product\": \"${DEFECTDOJO_PRODUCTID}\",
+                    \"source_code_management_uri\": \"${CI_PROJECT_URL}/-/tree/${CI_COMMIT_SHA}\",
+                    \"build_server\": ${DEFECTDOJO_ENGAGEMENT_BUILD_SERVER},
+                    \"source_code_management_server\": ${DEFECTDOJO_ENGAGEMENT_SOURCE_CODE_MANAGEMENT_SERVER},
+                    \"orchestration_engine\": ${DEFECTDOJO_ENGAGEMENT_ORCHESTRATION_ENGINE}
+                }" | jq -r '.id'`
+    - echo "DEFECTDOJO_ENGAGEMENTID=${ENGAGEMENTID}" >> defectdojo.env
+    artifacts:
+        reports:
+            dotenv: defectdojo.env
+
+
+.import_results:
+    variables:
+        DEFECTDOJO_SCAN_MINIMUM_SEVERITY: "Low"
+        DEFECTDOJO_SCAN_ACTIVE: "true"
+        DEFECTDOJO_SCAN_VERIFIED: "false"
+        DEFECTDOJO_SCAN_CLOSE_OLD_FINDINGS: "true"
+        DEFECTDOJO_SCAN_CLOSE_OLD_FINDINGS_PRODUCT_SCOPE: "true"
+        DEFECTDOJO_SCAN_PUSH_TO_JIRA: "false"
+        DEFECTDOJO_SCAN_ENVIRONMENT: "Default"
+        DEFECTDOJO_ANCHORE_DISABLE: "false"
+    after_script:
+        - TODAY=`date +%Y-%m-%d`
+        - |
+            curl --fail --location --request POST "${DEFECTDOJO_URL}/import-scan/" \
+            --header "Authorization: Token ${DEFECTDOJO_TOKEN}" \
+            --form "scan_date=\"${TODAY}\"" \
+            --form "minimum_severity=\"${DEFECTDOJO_SCAN_MINIMUM_SEVERITY}\"" \
+            --form "active=\"${DEFECTDOJO_SCAN_ACTIVE}\"" \
+            --form "verified=\"${DEFECTDOJO_SCAN_VERIFIED}\"" \
+            --form "scan_type=\"${DEFECTDOJO_SCAN_TYPE}\"" \
+            --form "engagement=\"${DEFECTDOJO_ENGAGEMENTID}\"" \
+            --form "file=@${DEFECTDOJO_SCAN_FILE}" \
+            --form "close_old_findings=\"${DEFECTDOJO_SCAN_CLOSE_OLD_FINDINGS}\"" \
+            --form "close_old_findings_product_scope=\"${DEFECTDOJO_SCAN_CLOSE_OLD_FINDINGS_PRODUCT_SCOPE}\"" \
+            --form "push_to_jira=\"${DEFECTDOJO_SCAN_PUSH_TO_JIRA}\"" \
+            --form "environment=\"${DEFECTDOJO_SCAN_ENVIRONMENT}\""
+
+semgrep:
+    variables:
+        DEFECTDOJO_SCAN_FILE: "semgrep-report.json"
+        DEFECTDOJO_SCAN_TYPE: "Semgrep JSON Report"
+
+    extends: .import_results
+    stage: Scan codebase
+    needs: ["defectdojo_create_engagement"]
+    tags:
+        - docker
+    allow_failure:
+        exit_codes:
+            - 1 # Scan finished; findings failed the quality gate
+    script:
+        - >
+            semgrep scan
+            --json
+            -o $DEFECTDOJO_SCAN_FILE
+            #--baseline-commit=$(git rev-parse HEAD~1) # Limit findings to the current commit
+        - check_qg.py $DEFECTDOJO_SCAN_FILE
+    artifacts:
+        paths:
+            - $DEFECTDOJO_SCAN_FILE
+
+ZAP:
+    variables:
+        DEFECTDOJO_SCAN_FILE: "zap-report.xml"
+        DEFECTDOJO_SCAN_TYPE: "ZAP Scan"
+        SCAN_PLAN_FILE: "full-scan-plan.yml.example"
+        ZAPROXY_PATH: "/opt/zaproxy"
+    extends: .import_results
+    stage: Scan codebase
+    allow_failure:
+        exit_codes:
+            - 1 # Scan finished; findings failed the quality gate
+    rules:
+        - if: $APP_URL
+        - exists:
+            - $SCAN_PLAN_FILE
+    tags:
+        - docker
+    script:
+        - ${ZAPROXY_PATH}/zap.sh -cmd -autorun ${CI_PROJECT_DIR}/${SCAN_PLAN_FILE} || true
+        - check_qg.py $DEFECTDOJO_SCAN_FILE
+    artifacts:
+        paths:
+            - $DEFECTDOJO_SCAN_FILE
+
+CycloneDX:
+    stage: Scan codebase
+    tags:
+        - docker
+    image:
+        name: ghcr.io/cyclonedx/cdxgen:v9.8.10
+        entrypoint: [""]
+    script:
+        - node /opt/cdxgen/bin/cdxgen.js --required-only -t ${CDXGEN_LANG} -r -o bom.json --spec-version 1.4
+    artifacts:
+        paths:
+            - bom.json
+
+ScaTrack:
+    variables:
+        DEFECTDOJO_SCAN_FILE: "track-report.json"
+        DEFECTDOJO_SCAN_TYPE: "CycloneDX Scan"
+        COMMIT_URL: $CI_PROJECT_URL/-/commit/$CI_COMMIT_SHA
+        SCA_TRACK_URL: http://10.10.8.10/
+        APP_ENV: shop-app-test
+    extends: .import_results
+    stage: Scan codebase
+    tags:
+        - docker
+    allow_failure:
+        exit_codes:
+            - 1 # Scan finished; findings failed the quality gate
+    needs: ["CycloneDX", "defectdojo_create_engagement"]
+    dependencies:
+        - CycloneDX
+        - defectdojo_create_engagement
+    script:
+        - >
+            printf "
+            curl %s/api/login
+            -c cookie.txt
+            -H 'Content-Type: application/json'
+            --data-raw '{\"email\":\"%s\",\"password\":\"%s\",\"ldapId\":null}'"
+            $SCA_TRACK_URL $TRACK_LOGIN $TRACK_PASSWORD | bash
+        - >
+            output=$(/opt/tools/appsec-track-cli-1.7.0.96
+            -s $SCA_TRACK_URL
+            -f ./bom.json
+            -a $CI_PROJECT_NAME
+            -t $CI_PROJECT_NAMESPACE
+            -v $CI_COMMIT_REF_NAME
+            -e $APP_ENV
+            -c $CI_COMMIT_SHA
+            -u $COMMIT_URL 2>&1
+            | tee >(cat 1>&2))
+            echo "$output"
+        - |
+            if echo $output | grep -q 'INFO: STATUS IS "OK"'; then
+                echo -e "Quality gate passed"
+                echo "$output"                                              \
+                | grep -Po "https?://.*/sca/scan/.*"                        \
+                | cut -d/ -f6                                               \
+                | xargs -I {} echo ${SCA_TRACK_URL}/api/report/json/{}   \
+                | xargs curl -b cookie.txt -o ${DEFECTDOJO_SCAN_FILE}
+            elif echo $output | grep -q 'INFO: STATUS IS "FAILED"'; then
+                echo -e "Quality gate failed: blocking component policy detected"
+                exit 1
+            else
+                echo "Tool error; quality gate is not applicable"
+                exit 2
+            fi
+    artifacts:
+        paths:
+            - $DEFECTDOJO_SCAN_FILE

@@ -1,0 +1,75 @@
+image: docker:20.10
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+  REGISTRY_URL: "example.registry"
+
+stages:
+  - build
+  - deploy
+
+# --- Build jobs ---
+build:feed-api:
+  stage: build
+  only:
+    - main
+  when: manual
+  tags:
+    - docker
+  before_script:
+    - echo "=== waiting for the Docker daemon ==="
+    - timeout 30 sh -c 'while ! docker info >/dev/null 2>&1; do sleep 1; done' || echo "Docker daemon did not become ready"
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $REGISTRY_URL
+    - BUILD_DNS=$(grep nameserver /etc/resolv.conf | head -1 | awk '{print $2}')
+    - echo "Using DNS: $BUILD_DNS"
+  script:
+    - docker build --dns $BUILD_DNS -t ${REGISTRY_URL}/apps/feed-api:latest ./feed-api/
+    - docker push ${REGISTRY_URL}/apps/feed-api:latest
+
+build:feed-bridge:
+  stage: build
+  only:
+    - main
+  when: manual
+  tags:
+    - docker
+  before_script:
+    - echo "=== waiting for the Docker daemon ==="
+    - timeout 30 sh -c 'while ! docker info >/dev/null 2>&1; do sleep 1; done' || echo "Docker daemon did not become ready"
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $REGISTRY_URL
+    - BUILD_DNS=$(grep nameserver /etc/resolv.conf | head -1 | awk '{print $2}')
+    - echo "Using DNS: $BUILD_DNS"
+  script:
+    - docker build --dns $BUILD_DNS -t ${REGISTRY_URL}/apps/feed-bridge:latest ./feed-bridge/
+    - docker push ${REGISTRY_URL}/apps/feed-bridge:latest
+
+build:feed-rss:
+  stage: build
+  only:
+    - main
+  when: manual
+  tags:
+    - docker
+  before_script:
+    - echo "=== waiting for the Docker daemon ==="
+    - timeout 30 sh -c 'while ! docker info >/dev/null 2>&1; do sleep 1; done' || echo "Docker daemon did not become ready"
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $REGISTRY_URL
+    - BUILD_DNS=$(grep nameserver /etc/resolv.conf | head -1 | awk '{print $2}')
+    - echo "Using DNS: $BUILD_DNS"
+  script:
+    - docker build --dns $BUILD_DNS -t ${REGISTRY_URL}/apps/feed-rss:latest ./feed-rss/
+    - docker push ${REGISTRY_URL}/apps/feed-rss:latest
+
+# --- Deploy ---
+
+deploy:
+  stage: deploy
+  image: ${REGISTRY_URL}/ci/helmfile:latest
+  only:
+    - main
+  when: manual
+  tags:
+    - docker
+  script:
+    - helmfile apply -f stands/dev-stand-feed/helmfile.yaml

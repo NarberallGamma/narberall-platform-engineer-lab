@@ -1,0 +1,39 @@
+## Autotest
+.autotest_trigger_manual:
+  stage: test
+  environment:
+    name: autotest/default
+    auto_stop_in: 1 day
+  variables:
+    TRIGGER: AUTOTEST
+    ALLURE_PROJECT_ID: "${CI_PROJECT_PATH_SLUG}-default"
+    SITE_ADDRESS: "https://shop-app.example.com"
+    THREAD: "${THREAD}"
+  trigger:
+    project: autotests/shop-app-e2e
+    strategy: depend
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, platform]
+    - if: !reference [.rules, if, main]
+      when: manual
+      allow_failure: true
+
+Autotest on Production:
+  extends: .autotest_trigger_manual
+  environment:
+    name: autotest/production
+    auto_stop_in: 1 day
+  variables:
+    TRIGGER: AUTOTEST_PRODUCTION
+    ALLURE_PROJECT_ID: "${CI_PROJECT_PATH_SLUG}-production"
+
+Autotest on Preprod:
+  extends: .autotest_trigger_manual
+  environment:
+    name: autotest/preprod
+    auto_stop_in: 1 day
+  variables:
+    TRIGGER: AUTOTEST_PREPROD
+    ALLURE_PROJECT_ID: "${CI_PROJECT_PATH_SLUG}-preprod"

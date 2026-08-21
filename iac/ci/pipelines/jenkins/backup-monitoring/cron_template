@@ -1,0 +1,11 @@
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=""
+
+33 8,20 * * * root ( cd "${BORG_JOBS_MON_DIR}" && "./borg_jobs_monitoring.sh" --one-project shop-app --one-project-user borg --backup-dir "${BACKUP_DIR}" --config "${BORG_JOBS_MON_CONF_DIR}/${BORG_JOBS_MON_CONF_NAME}" --attempts-max-time 21600 --parallelize-all-operations ) || "${BORG_JOBS_MON_DIR}/send_to_alerts.sh" "shop-app" "catastrophic" "likely" "borg_jobs_mon" "Errors when checking Borg backups" "Didn\'t run Borg jobs monitoring"
+
+0 20 * * * root ( cd "${BORG_JOBS_MON_DIR}" && "./borg_jobs_monitoring.sh" --one-project shop-app --one-project-user borg --backup-dir "${BACKUP_DIR}" --config "${BORG_JOBS_MON_CONF_DIR}/${BORG_JOBS_MON_CONF_NAME}" --check-access-rights ) || "${BORG_JOBS_MON_DIR}/send_to_alerts.sh" "shop-app" "catastrophic" "likely" "borg_jobs_mon" "Errors when checking Borg backups" "Didn\'t run Borg jobs monitoring"
+
+0 8 1 * * root ( cd "${BORG_JOBS_MON_DIR}" && "./borg_jobs_monitoring.sh" --one-project shop-app --one-project-user borg --backup-dir "${BACKUP_DIR}" --config "${BORG_JOBS_MON_CONF_DIR}/${BORG_JOBS_MON_CONF_NAME}" --check-disabled-backups-storage-limit ) || "${BORG_JOBS_MON_DIR}/send_to_alerts.sh" "shop-app" "catastrophic" "likely" "borg_jobs_mon" "Errors when checking Borg backups" "Didn\'t run Borg jobs monitoring"
+
+33 15 * * 2,4,6 root ( cd "${BORG_JOBS_MON_DIR}" && "./borg_jobs_monitoring.sh" --one-project shop-app --one-project-user borg --backup-dir "${BACKUP_DIR}" --config "${BORG_JOBS_MON_CONF_DIR}/${BORG_JOBS_MON_CONF_NAME}" --check-archive-size 72 --attempts-max-time 21600 --parallelize-all-operations ) || "${BORG_JOBS_MON_DIR}/send_to_alerts.sh" "shop-app" "catastrophic" "likely" "borg_jobs_mon" "Errors when checking Borg backups" "Didn\'t run Borg jobs monitoring"

@@ -1,0 +1,163 @@
+include:
+  - local: autotests/notifications.yml.example
+
+variables:
+  WERF_VERSION: "2 ea"
+  WERF_NELM: "1"
+  WERF_REQUIRE_BUILT_IMAGES: "1"
+
+stages:
+  - build
+  - test_compile
+  - test
+  - cleanup
+
+## MRs and branch pipelines workflow
+workflow:
+  rules:
+    ## Run merge request pipelines on MR events
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    ## Run on parent-child pipelines
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
+    ## Run on multi-project pipelines
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+    ## Run branch pipelines from "Run pipeline" page
+    - if: $CI_PIPELINE_SOURCE == "web"
+    ## Do not run a branch pipeline on push when an MR is open
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+      when: never
+    ## Run branch pipeline on tags
+    - if: $CI_COMMIT_TAG
+    ## Run branch pipeline on all branches
+    - if: $CI_COMMIT_BRANCH
+    ## Run branch pipeline on default branch
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    ## Optional: run only on platform contractor branches
+    # - if: $CI_COMMIT_BRANCH =~ /^platform.*$/
+
+default:
+  tags:
+    - docker
+
+.scripts:
+  setup_werf:
+    - type trdl && source "$(trdl use werf ${WERF_VERSION:?})"
+    - werf version
+    - type werf && source "$(werf ci-env gitlab --as-file)"
+
+    - section_name="envs_$(date +%s)"
+    - echo -e "\e[0Ksection_start:`date +%s`:${section_name}[collapsed=true]\r\e[0KJob environment variables"
+    - |
+      echo "WERF_ENV=${WERF_ENV}"
+      echo "WERF_NAMESPACE=${WERF_NAMESPACE}"
+      echo "WERF_KUBE_CONTEXT=${WERF_KUBE_CONTEXT}"
+      echo "CI_COMMIT_REF_SLUG=${CI_COMMIT_REF_SLUG}"
+      echo "CI_ENVIRONMENT_SLUG=${CI_ENVIRONMENT_SLUG}"
+    - printenv | sort
+    - echo -e "\e[0Ksection_end:`date +%s`:${section_name}\r\e[0K"
+
+.rules:
+  if:
+    main:          $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    main_schedule: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "schedule"
+    branch:        $CI_COMMIT_BRANCH
+    tag:           $CI_COMMIT_TAG
+    mr:            $CI_PIPELINE_SOURCE == "merge_request_event"
+    schedule:      $CI_PIPELINE_SOURCE == "schedule"
+    pipeline:      $CI_PIPELINE_SOURCE == "pipeline"
+    platform:         $CI_COMMIT_REF_SLUG =~ /^platform.*$/
+    feature:       $CI_COMMIT_REF_SLUG =~ /^feature.*$/
+  schedule:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  no_schedule:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+  pipeline:
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
+  no_pipeline:
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
+      when: never
+  manual:
+    - when: manual
+      allow_failure: true
+  platform:
+    - if: $CI_COMMIT_REF_SLUG =~ /^platform.*$/
+      when: manual
+      allow_failure: true
+  production:
+    - if: $CI_COMMIT_TAG
+      when: manual
+      allow_failure: true
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+
+## Base
+.base_plan:
+  stage: plan
+  variables:
+    WERF_NELM: "1"
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf plan
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - when: on_success
+
+.base_converge:
+  stage: deploy
+  needs:
+    - Build
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf converge
+  before_script:
+    - !reference [.scripts, setup_werf]
+    - !reference [.script_notify_slack_deploy_started]
+  after_script:
+    - !reference [.scripts, setup_werf]
+    - !reference [.script_notify_slack_deploy_finished]
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, manual]
+
+## Build
+Build:
+  stage: build
+  variables:
+    WERF_SAVE_BUILD_REPORT: "1"
+    WERF_BUILD_REPORT_PATH: build.env
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf build
+    - cat build.env
+  before_script:
+    - !reference [.scripts, setup_werf]
+    - !reference [.script_notify_slack_build_started]
+  after_script:
+    - !reference [.scripts, setup_werf]
+    - !reference [.script_notify_slack_build_finished]
+  artifacts:
+    reports:
+      dotenv:
+        - thread.env
+        - build.env
+  rules:
+    - !reference [.rules, no_schedule]
+    - when: always
+
+## Cleanup
+Cleanup:
+  stage: cleanup
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf cr login -u nobody -p "${WERF_IMAGES_CLEANUP_PASSWORD:?}" "${WERF_REPO:?}"
+    - werf cleanup
+  resource_group: cleanup
+  rules:
+    - !reference [.rules, schedule]

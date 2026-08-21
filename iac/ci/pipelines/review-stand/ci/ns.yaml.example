@@ -1,0 +1,265 @@
+# Create a time-boxed review namespace, seed shared objects, and deploy stand deps.
+
+start-delete-ns:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/bitnamilegacy/kubectl:1.33.4
+    entrypoint: [""]
+  script:
+    - |
+      if echo "default kube-system kube-public kube-node-lease ingress-nginx monitoring logging" | grep -w "$CI_COMMIT_REF_SLUG"; then
+        echo "Refusing to delete protected namespace $CI_COMMIT_REF_SLUG"
+        exit 1
+      fi
+      K_ARGS="--server=$DEV_HELM_KUBEAPISERVER --token=$DEV_HELM_KUBETOKEN --insecure-skip-tls-verify=true"
+      kubectl delete namespace $CI_COMMIT_REF_SLUG $K_ARGS --grace-period=0 --force || true
+  tags:
+    - docker
+
+create-ns:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/bitnamilegacy/kubectl:1.33.4
+    entrypoint: [""]
+  script:
+    - K_ARGS="--server=$DEV_HELM_KUBEAPISERVER --token=$DEV_HELM_KUBETOKEN --insecure-skip-tls-verify=true"
+    - kubectl create ns $CI_COMMIT_REF_SLUG $K_ARGS
+    - EXPIRES_AT=$(date -u -d '+5 hours' +%s)
+    - EXPIRES_AT_DATE=$(date -u -d '+5 hours' '+%Y-%m-%d %H:%M:%S')
+    - kubectl label ns $CI_COMMIT_REF_SLUG temp-stand=true $K_ARGS --overwrite
+    - kubectl annotate ns $CI_COMMIT_REF_SLUG temp-stand/expires-at="$EXPIRES_AT" $K_ARGS --overwrite
+    - kubectl annotate ns $CI_COMMIT_REF_SLUG temp-stand/expires-at-date="$EXPIRES_AT_DATE" $K_ARGS --overwrite
+    - kubectl annotate ns $CI_COMMIT_REF_SLUG temp-stand/created-by="$GITLAB_USER_LOGIN" $K_ARGS --overwrite
+    - kubectl create secret docker-registry regcred --docker-server=example.registry --docker-username="$CI_REGISTRY_USER" --docker-password=$CI_REGISTRY_PASSWORD -n $CI_COMMIT_REF_SLUG $K_ARGS
+    - kubectl patch serviceaccount default -n $CI_COMMIT_REF_SLUG -p '{"imagePullSecrets":[{"name":"regcred"}]}' $K_ARGS
+    - kubectl get secret tls -n shared-certs -o yaml $K_ARGS | grep -v namespace > tls.yml
+    - kubectl apply -f tls.yml -n $CI_COMMIT_REF_SLUG $K_ARGS
+    - kubectl get cm truststore -n shared-trust -o yaml $K_ARGS | grep -v namespace > truststore.yml
+    - kubectl apply -f truststore.yml -n $CI_COMMIT_REF_SLUG $K_ARGS
+  tags:
+    - docker
+  needs: ["start-delete-ns"]
+
+deploy-postgres:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/alpine/helm:3.15.3
+    entrypoint: [""]
+  variables:
+    HELM_MAX_HISTORY: 2
+    HELM_KUBEAPISERVER: $DEV_HELM_KUBEAPISERVER
+    HELM_KUBETOKEN: $DEV_HELM_KUBETOKEN
+    HELM_KUBEINSECURE_SKIP_TLS_VERIFY: true
+    HELM_NAMESPACE: $CI_COMMIT_REF_SLUG
+  tags:
+    - docker
+  needs: ["create-ns"]
+  script:
+    - touch values/$CI_COMMIT_REF_SLUG.yaml
+    - helm upgrade -i postgres helm/postgres -f values/$CI_COMMIT_REF_SLUG.yaml --wait --timeout 15m0s
+
+clone-postgres:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/bitnamilegacy/kubectl:1.33.4
+    entrypoint: [""]
+  script:
+    - K_ARGS="--server=$DEV_HELM_KUBEAPISERVER --token=$DEV_HELM_KUBETOKEN --insecure-skip-tls-verify=true"
+    - kubectl apply -f helm/postgres-clone.yml -n $CI_COMMIT_REF_SLUG $K_ARGS
+    - kubectl wait --for=condition=complete job/clone-postgres-job --timeout=1200s -n $CI_COMMIT_REF_SLUG $K_ARGS
+  tags:
+    - docker
+  needs: ["deploy-postgres"]
+
+deploy-kafka:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/alpine/helm:3.15.3
+    entrypoint: [""]
+  variables:
+    HELM_MAX_HISTORY: 2
+    HELM_KUBEAPISERVER: $DEV_HELM_KUBEAPISERVER
+    HELM_KUBETOKEN: $DEV_HELM_KUBETOKEN
+    HELM_KUBEINSECURE_SKIP_TLS_VERIFY: true
+    HELM_NAMESPACE: $CI_COMMIT_REF_SLUG
+  tags:
+    - docker
+  needs: ["create-ns"]
+  script:
+    - touch values/$CI_COMMIT_REF_SLUG.yaml
+    - helm upgrade -i kafka helm/kafka -f values/$CI_COMMIT_REF_SLUG.yaml --timeout 15m0s
+
+deploy-minio:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/alpine/helm:3.15.3
+    entrypoint: [""]
+  variables:
+    HELM_MAX_HISTORY: 2
+    HELM_KUBEAPISERVER: $DEV_HELM_KUBEAPISERVER
+    HELM_KUBETOKEN: $DEV_HELM_KUBETOKEN
+    HELM_KUBEINSECURE_SKIP_TLS_VERIFY: true
+    HELM_NAMESPACE: $CI_COMMIT_REF_SLUG
+  tags:
+    - docker
+  needs: ["create-ns"]
+  script:
+    - touch values/$CI_COMMIT_REF_SLUG.yaml
+    - helm upgrade -i minio helm/minio -f values/$CI_COMMIT_REF_SLUG.yaml --timeout 15m0s
+
+deploy-roles:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/alpine/helm:3.15.3
+    entrypoint: [""]
+  variables:
+    HELM_MAX_HISTORY: 2
+    HELM_KUBEAPISERVER: $DEV_HELM_KUBEAPISERVER
+    HELM_KUBETOKEN: $DEV_HELM_KUBETOKEN
+    HELM_KUBEINSECURE_SKIP_TLS_VERIFY: true
+    HELM_NAMESPACE: $CI_COMMIT_REF_SLUG
+  tags:
+    - docker
+  needs: ["create-ns"]
+  script:
+    - helm upgrade -i roles helm/roles --set namespace=$CI_COMMIT_REF_SLUG --timeout 15m0s
+
+clone-minio:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/bitnamilegacy/kubectl:1.33.4
+    entrypoint: [""]
+  tags:
+    - docker
+  needs: ["deploy-minio"]
+  script:
+    - |
+      REQUIRED_VARS="S3ID1 S3KEY1 S3ID2 S3KEY2 MINIO_ACCESS_KEY MINIO_SECRET_KEY MINIO_ENDPOINT"
+      export MINIO_ACCESS_KEY=CHANGE_ME
+      export MINIO_SECRET_KEY=CHANGE_ME
+      export MINIO_ENDPOINT=http://minio:9000
+
+      for var in $REQUIRED_VARS; do
+        if [ -z "${!var:-}" ]; then
+          echo "ERROR: variable $var is not set"
+          exit 1
+        fi
+      done
+
+      envsubst '$S3ID1 $S3KEY1 $S3ID2 $S3KEY2 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY $MINIO_ENDPOINT' < helm/s3-clone.tmpl.yml > helm/s3-clone.yml
+    - K_ARGS="--server=$DEV_HELM_KUBEAPISERVER --token=$DEV_HELM_KUBETOKEN --insecure-skip-tls-verify=true"
+    - kubectl apply -f helm/s3-clone.yml -n $CI_COMMIT_REF_SLUG $K_ARGS
+    - kubectl wait --for=condition=complete job/minio-data-clone --timeout=1200s -n $CI_COMMIT_REF_SLUG $K_ARGS
+
+info:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/bitnamilegacy/kubectl:1.33.4
+    entrypoint: [""]
+  script:
+    - |
+      K_ARGS="--server=$DEV_HELM_KUBEAPISERVER --token=$DEV_HELM_KUBETOKEN --insecure-skip-tls-verify=true"
+      kubectl get pods -n $CI_COMMIT_REF_SLUG $K_ARGS
+      kubectl get ing -n $CI_COMMIT_REF_SLUG $K_ARGS
+      kubectl get svc -n $CI_COMMIT_REF_SLUG $K_ARGS
+      kubectl get node -n $CI_COMMIT_REF_SLUG $K_ARGS
+      echo Summary.
+      echo Site: https://$(kubectl get ingress publication -n $CI_COMMIT_REF_SLUG $K_ARGS -o jsonpath='{.spec.rules[0].host}')
+      echo Keycloak: http://$(kubectl get nodes $K_ARGS|head -n2|tail -n1|cut -f1 -d' '):$(kubectl get svc -n $CI_COMMIT_REF_SLUG $K_ARGS|grep keycloaknodeport|cut -f2 -d':'|cut -f1 -d '/')
+      echo PostgreSQL DB: host $(kubectl get nodes $K_ARGS|head -n2|tail -n1|cut -f1 -d' ') port $(kubectl get svc -n $CI_COMMIT_REF_SLUG $K_ARGS|grep postgresnodeport|cut -f2 -d':'|cut -f1 -d '/')
+      echo S3 Minio UI: http://$(kubectl get nodes $K_ARGS|head -n2|tail -n1|cut -f1 -d' '):$(kubectl get svc -n $CI_COMMIT_REF_SLUG $K_ARGS|grep minio-ui-nodeport|cut -f2 -d':'|cut -f1 -d '/')
+      echo S3 Minio API: http://$(kubectl get nodes $K_ARGS|head -n2|tail -n1|cut -f1 -d' '):$(kubectl get svc -n $CI_COMMIT_REF_SLUG $K_ARGS|grep minio-api-nodeport|cut -f2 -d':'|cut -f1 -d '/')
+      echo Kafka UI: http://$(kubectl get nodes $K_ARGS|head -n2|tail -n1|cut -f1 -d' '):$(kubectl get svc -n $CI_COMMIT_REF_SLUG $K_ARGS|grep kafka-ui-nodeport|cut -f2 -d':'|cut -f1 -d '/')
+  tags:
+    - docker
+  needs: ["deploy-shop-app"]
+
+delete-ns:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/bitnamilegacy/kubectl:1.33.4
+    entrypoint: [""]
+  script:
+    - K_ARGS="--server=$DEV_HELM_KUBEAPISERVER --token=$DEV_HELM_KUBETOKEN --insecure-skip-tls-verify=true"
+    - kubectl delete namespace $CI_COMMIT_REF_SLUG $K_ARGS --grace-period=0 --force
+  tags:
+    - docker
+  when: manual
+
+00-extend-stand-on-3h:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/bitnamilegacy/kubectl:1.33.4
+    entrypoint: [""]
+  variables:
+    EXTEND_HOURS: "3"
+  script:
+    - |
+      K_ARGS="--server=$DEV_HELM_KUBEAPISERVER --token=$DEV_HELM_KUBETOKEN --insecure-skip-tls-verify=true"
+
+      if [ "$EXTEND_HOURS" -lt 1 ] || [ "$EXTEND_HOURS" -gt 3 ]; then
+        echo "EXTEND_HOURS must be between 1 and 3"
+        exit 1
+      fi
+
+      NOW=$(date -u +%s)
+
+      CURRENT_EXPIRES_AT=$(kubectl get ns "$CI_COMMIT_REF_SLUG" $K_ARGS \
+        -o go-template='{{index .metadata.annotations "temp-stand/expires-at"}}')
+
+      if [ -z "$CURRENT_EXPIRES_AT" ] || [ "$CURRENT_EXPIRES_AT" -lt "$NOW" ]; then
+        BASE_TIME=$NOW
+      else
+        BASE_TIME=$CURRENT_EXPIRES_AT
+      fi
+
+      NEW_EXPIRES_AT=$((BASE_TIME + EXTEND_HOURS * 3600))
+
+      kubectl annotate ns "$CI_COMMIT_REF_SLUG" \
+        temp-stand/expires-at="$NEW_EXPIRES_AT" \
+        $K_ARGS --overwrite
+
+      echo "Stand $CI_COMMIT_REF_SLUG extended by $EXTEND_HOURS h."
+      echo "New expiry: $(date -u -d "@$NEW_EXPIRES_AT") UTC"
+  tags:
+    - docker
+  when: manual
+
+extend-stand-on-24h:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/bitnamilegacy/kubectl:1.33.4
+    entrypoint: [""]
+  variables:
+    EXTEND_HOURS: "24"
+  script:
+    - |
+      K_ARGS="--server=$DEV_HELM_KUBEAPISERVER --token=$DEV_HELM_KUBETOKEN --insecure-skip-tls-verify=true"
+
+      if [ "$EXTEND_HOURS" -lt 1 ] || [ "$EXTEND_HOURS" -gt 24 ]; then
+        echo "EXTEND_HOURS must be between 1 and 24"
+        exit 1
+      fi
+
+      NOW=$(date -u +%s)
+
+      CURRENT_EXPIRES_AT=$(kubectl get ns "$CI_COMMIT_REF_SLUG" $K_ARGS \
+        -o go-template='{{index .metadata.annotations "temp-stand/expires-at"}}')
+
+      if [ -z "$CURRENT_EXPIRES_AT" ] || [ "$CURRENT_EXPIRES_AT" -lt "$NOW" ]; then
+        BASE_TIME=$NOW
+      else
+        BASE_TIME=$CURRENT_EXPIRES_AT
+      fi
+
+      NEW_EXPIRES_AT=$((BASE_TIME + EXTEND_HOURS * 3600))
+
+      kubectl annotate ns "$CI_COMMIT_REF_SLUG" \
+        temp-stand/expires-at="$NEW_EXPIRES_AT" \
+        $K_ARGS --overwrite
+
+      echo "Stand $CI_COMMIT_REF_SLUG extended by $EXTEND_HOURS h."
+      echo "New expiry: $(date -u -d "@$NEW_EXPIRES_AT") UTC"
+  tags:
+    - docker
+  when: manual

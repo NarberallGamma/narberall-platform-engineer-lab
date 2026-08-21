@@ -1,0 +1,37 @@
+# Delete expired review namespaces labeled temp-stand=true.
+
+cleanup:
+  stage: deploy
+  image:
+    name: mirror.gcr.io/bitnamilegacy/kubectl:1.33.4
+    entrypoint: [""]
+  script:
+    - |
+      K_ARGS="--server=$DEV_HELM_KUBEAPISERVER --token=$DEV_HELM_KUBETOKEN --insecure-skip-tls-verify=true"
+
+      PROTECTED_NS="default kube-system kube-public kube-node-lease ingress-nginx monitoring logging"
+
+      NOW=$(date -u +%s)
+
+      kubectl get ns -l temp-stand=true $K_ARGS \
+        -o go-template='{{range .items}}{{.metadata.name}}{{"\t"}}{{index .metadata.annotations "temp-stand/expires-at"}}{{"\n"}}{{end}}' \
+      | while read NS EXPIRES_AT; do
+          if echo "$PROTECTED_NS" | grep -qw "$NS"; then
+            echo "Skip protected namespace: $NS"
+            continue
+          fi
+
+          if [ -z "$EXPIRES_AT" ]; then
+            echo "Skip $NS: no expires-at annotation"
+            continue
+          fi
+
+          if [ "$EXPIRES_AT" -le "$NOW" ]; then
+            echo "Delete expired namespace: $NS"
+            kubectl delete namespace "$NS" $K_ARGS --grace-period=0 --force || true
+          else
+            echo "Keep namespace: $NS"
+          fi
+        done
+  tags:
+    - docker

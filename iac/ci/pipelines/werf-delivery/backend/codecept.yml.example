@@ -1,0 +1,117 @@
+include:
+  - local: 'backend/common.yml.example'
+
+.script_notify_slack_codecept_finished: |
+  export $(cat thread.env | xargs)
+  curl --request POST \
+    --header "Content-Type: application/json" \
+    --header "Authorization: Bearer $SLACK_NOTIFICATIONS" \
+    "https://slack.com/api/chat.postMessage" \
+    --data '{
+      "channel": "'$SLACK_CHANNEL'",
+      "thread_ts": "'$THREAD'",
+      "text": "`'"$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME"'` `'"$CI_JOB_NAME"'` Kube codecept `'"$CI_JOB_STATUS"'`: <'"$CI_JOB_URL"'|Logs>"
+    }'
+
+## Base codecept
+.codecept:
+  extends: .base_converge
+  stage: test
+  needs:
+    - Build
+    - CODECEPT-START
+  variables:
+    UPSTREAM_WERF_ENV: "review"
+    WERF_ENV: "review"
+    WERF_KUBE_CONTEXT: dev
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "CODECEPT"'
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, static]
+    - if: !reference [.rules, if, mr]
+    - if: !reference [.rules, if, main]
+    - if: !reference [.rules, if, tag]
+
+.codecept_trigger:
+  stage: test
+  needs:
+    - Build
+    - CODECEPT-START
+  variables:
+    TRIGGER: CODECEPT
+    THREAD: $THREAD
+    UPSTREAM_CI_COMMIT_REF_SLUG: $CI_COMMIT_REF_SLUG
+    UPSTREAM_CI_ENVIRONMENT_SLUG: $CI_ENVIRONMENT_SLUG
+    UPSTREAM_CI_PROJECT_PATH: $CI_PROJECT_PATH
+    UPSTREAM_WERF_ENV: $UPSTREAM_WERF_ENV
+    WERF_ENV: $WERF_ENV
+    # CI_ENVIRONMENT_SLUG: $CI_ENVIRONMENT_SLUG
+    # WERF_NAMESPACE: $WERF_NAMESPACE
+    WERF_KUBE_CONTEXT: $WERF_KUBE_CONTEXT
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, static]
+    - if: !reference [.rules, if, mr]
+    - if: !reference [.rules, if, main]
+    - if: !reference [.rules, if, tag]
+
+# Set codecept variables and start codecept environment
+CODECEPT-START:
+  extends: .codecept
+  stage: test
+  needs:
+    - Build
+  script:
+    - !reference [.scripts, setup_werf]
+    - echo "Starting codecept environment"
+    - echo "codecept/${CI_PIPELINE_ID}"
+    - echo "codecept/${CI_PIPELINE_ID}"
+    - echo "CI_ENVIRONMENT_SLUG=codecept-${CI_PIPELINE_ID}" >> codecept.env
+    - echo "CI_ENVIRONMENT_NAME=codecept-${CI_PIPELINE_ID}" >> codecept.env
+    - echo "THREAD=${THREAD}" | tee -a codecept.env
+    - echo "WERF_ENV=${WERF_ENV}" | tee -a codecept.env
+    - echo "UPSTREAM_WERF_ENV=${UPSTREAM_WERF_ENV}" | tee -a codecept.env
+    # - echo "WERF_NAMESPACE=${WERF_NAMESPACE}" | tee -a codecept.env
+    - echo "WERF_KUBE_CONTEXT=${WERF_KUBE_CONTEXT}" | tee -a codecept.env
+  artifacts:
+    reports:
+      dotenv: codecept.env
+
+# Deploy to review
+CODECEPT:
+  extends: .codecept
+  before_script:
+    - export APP_NAME=`cat werf.yaml | grep project | awk '{print $2}'`
+  after_script:
+    - !reference [.scripts, setup_werf]
+    - werf kubectl -n ${WERF_NAMESPACE} logs -l test=codecept --tail=-1 > codecept.txt
+    - werf kubectl -n ${WERF_NAMESPACE} logs -l test=codecept --tail=-1
+    - werf helm list -n ${WERF_NAMESPACE} -a --output json --time-format "20060102" | jq -r '.[] | "werf helm delete -n " + .namespace + " " + .name' | bash
+    - werf kubectl delete ns ${WERF_NAMESPACE} --wait=false
+    - !reference [.script_notify_slack_codecept_finished]
+  artifacts:
+    when: always
+    name: logs
+    paths:
+      - codecept.txt
+    expire_in: 1 week
+
+## Cleanup
+Cleanup codecept:
+  stage: cleanup
+  variables:
+    WERF_KUBE_CONTEXT: dev
+  script:
+    - !reference [.scripts, setup_werf]
+    - export APP_NAME=`cat werf.yaml | grep project | awk '{print $2}'`
+    - export date=$(date +"%s" -d "-1 days")
+    - |
+      for NS in `werf kubectl get ns | grep ${WERF_NAMESPACE} | grep codecept | awk '{print $1}'` ; do
+        echo "NS ${NS}"
+        werf helm list -n ${NS} -a --output json --time-format "20060102" | jq -r '.[] | select( .updated | strptime("%Y%m%d") | mktime<'$date') | "werf helm delete -n " + .namespace + " " + .name' | bash
+        werf helm list -n ${NS} -a --output json | jq -e 'select(. | length > 0)' || werf kubectl delete ns ${NS} --wait=false
+      done
+  rules:
+    - !reference [.rules, schedule]

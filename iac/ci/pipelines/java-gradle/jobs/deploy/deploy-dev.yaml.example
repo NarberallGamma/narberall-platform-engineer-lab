@@ -1,0 +1,22 @@
+deploy-dev:
+  stage: deploy-dev
+  image:
+    name: example.registry/ci/alpine-helm:3.19.0
+    entrypoint: [""]
+  variables:
+    HELM_MAX_HISTORY: 2
+    HELM_KUBEAPISERVER: $DEV_HELM_KUBEAPISERVER
+    HELM_KUBETOKEN: $DEV_HELM_KUBETOKEN
+    HELM_KUBEINSECURE_SKIP_TLS_VERIFY: true
+    HELM_NAMESPACE: default
+  script:
+    - helm upgrade -i $CI_PROJECT_NAME .helm -f .helm/values-dev.yaml --set="image.repository=$CI_REGISTRY_IMAGE" --set="image.tag=$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA" --wait --set hpa.enabled=false --timeout 15m0s
+  tags:
+    - docker
+  when: manual
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$GITLAB_USER_LOGIN =~ /^(ci-operator|release-bot)$/'
+      when: manual
+    - when: never

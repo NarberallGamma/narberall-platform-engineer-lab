@@ -1,0 +1,64 @@
+include:
+  - local: '/defaults.yaml.example'
+
+stages:
+  - deploy-kafka
+  - verify-kafka
+  - rollback-kafka
+
+variables:
+  HELM_RELEASE_NAME: "kafka"
+  HELM_NAMESPACE: "kafka"
+
+default:
+  tags:
+    - docker
+  timeout: 8h
+  interruptible: true
+
+.k8s_setup: &k8s_setup
+  image: $BASE_IMAGE
+  before_script:
+    - init.sh
+
+deploy-kafka:
+  <<: *k8s_setup
+  stage: deploy-kafka
+  script:
+    - echo "Deploying Kafka infrastructure (Kafka Connect + Connectors + AKHQ)..."
+    - helm upgrade --install $HELM_RELEASE_NAME .
+      --namespace $HELM_NAMESPACE
+      --values values.yaml
+      --wait
+      --timeout=15m
+  when: manual
+  only:
+    - main
+    - develop
+
+verify-kafka:
+  <<: *k8s_setup
+  stage: verify-kafka
+  script:
+    - echo "Verifying Kafka deployment..."
+    - kubectl get pods -n $HELM_NAMESPACE
+    - echo "Checking External Secrets..."
+    - kubectl get externalsecret -n $HELM_NAMESPACE
+    - kubectl get secret kafka-vault-credentials -n $HELM_NAMESPACE
+    - echo "Kafka verification completed"
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-kafka:
+  <<: *k8s_setup
+  stage: rollback-kafka
+  script:
+    - echo "Rolling back Kafka deployment..."
+    - helm rollback $HELM_RELEASE_NAME -n $HELM_NAMESPACE
+    - echo "Kafka rollback completed"
+  when: manual
+  only:
+    - main
+    - develop

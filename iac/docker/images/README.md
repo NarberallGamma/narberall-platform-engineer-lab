@@ -2,7 +2,7 @@
 
 **Business first:** CI builds **one richest image per mechanic**, then the registry is the hand-off. Buyer page: [`../../../docs/for-business.md`](../../../docs/for-business.md). Case: [`../../../case-studies/12-docker-images.md`](../../../case-studies/12-docker-images.md). Hub: [`../`](../).
 
-I publish pins, runners, estate operators, and product packaging here. Pipelines that call `docker build` stay in [`../../ci/`](../../ci/). Helm after the push stays in [`../../helm/`](../../helm/). Compose that consumes an image stays in [`../compose/`](../compose/).
+I publish pins, runners, estate operators, and product packaging here. Pipelines that call `docker build` stay in [`../../ci/`](../../ci/) (living kits, [case 13](../../../case-studies/13-ci-pipelines.md)). Helm after the push stays in [`../../helm/`](../../helm/). Compose that consumes an image stays in [`../compose/`](../compose/).
 
 Honest scope: one mechanic per folder. This is not a dump of a hundred shop Dockerfiles. App source, Postman collections, JARs, and the CloudEye Go tree stay out. The listed folders are on disk.
 
@@ -156,6 +156,6 @@ Folders that already have a `Dockerfile*` when this page was written:
 
 - Not a dump of every client Dockerfile. One richest file per mechanic. A hundred-plus identical shop clones stay private
 - Not application source, collections, JARs, or vendor binaries. Kit READMEs say when `docker build` needs that tree
-- Not the CI YAML catalog. Pipelines stay under [`../../ci/`](../../ci/)
+- Not the CI YAML catalog. Living pipeline kits stay under [`../../ci/pipelines/`](../../ci/pipelines/) ([case 13](../../../case-studies/13-ci-pipelines.md))
 
 **Keywords:** Docker, Dockerfile, Kaniko, ansible-ee, Helm, Maven, Liberica, Next.js, Playwright, Newman, PHP, Poetry, Keycloak, NiFi, CloudEye, EDR, night-park

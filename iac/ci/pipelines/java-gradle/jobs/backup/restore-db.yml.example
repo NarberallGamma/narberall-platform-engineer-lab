@@ -1,0 +1,44 @@
+restore-db:
+  image: alpine:latest
+  stage: backup
+  before_script:
+    - apk add --no-cache postgresql-client s3cmd
+    - |
+      cat <<EOL > /root/.s3cfg
+      [default]
+      access_key = $ACCESS_KEY
+      secret_key = $SECRET_KEY
+      host_base = obs.example.com
+      host_bucket = %(bucket)s.obs.example.com
+      use_https = True
+      signature_v2 = No
+      EOL
+  script:
+    - s3cmd get s3://backup-test.example/$BACKUP_FILE_TEST selected_backup.sql
+    - export PGPASSWORD=$PGPASSWORD
+    - |
+      cat <<EOL > clean.sql
+      DO \$\$
+      DECLARE
+          r RECORD;
+      BEGIN
+          FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = current_schema()) LOOP
+              EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+          END LOOP;
+      END \$\$;
+      EOL
+    - psql -h 10.10.0.20 -p 5432 -U app -d shop_app_test -f clean.sql
+    - psql -h 10.10.0.20 -p 5432 -U app -d shop_app_test -f selected_backup.sql
+  tags:
+    - docker
+  when: manual
+  variables:
+    BACKUP_FILE_TEST: ""
+  needs:
+    - job: setenv
+      artifacts: true
+      optional: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - when: manual

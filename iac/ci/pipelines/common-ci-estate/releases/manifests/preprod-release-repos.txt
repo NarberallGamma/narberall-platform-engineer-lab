@@ -1,0 +1,2 @@
+# Generic PREPROD release repo list (helm only; no ansible VM cutover).
+shop-app

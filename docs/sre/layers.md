@@ -9,11 +9,11 @@ Hub table (same split): [`../../iac/helm/README.md#observability-split-do-not-du
 | Layer | Path | Job |
 |-------|------|-----|
 | Prom → VictoriaMetrics | [`../../iac/ansible/reference/ansible-app-platform/`](../../iac/ansible/reference/ansible-app-platform/) `monitoring_deploy` | Scrape estate + Kubernetes SD + blackbox + cAdvisor. Compose with remote_write |
-| Host Grafana + vmalert | [`../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/`](../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/) | Roles for VM + Grafana + Alertmanager + PAN-OS / EDR exporters. SOPS contract. Compose `stack/` **is published**: [`../../iac/docker/compose/sec-stack/`](../../iac/docker/compose/sec-stack/) and the Ansible copy [`../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/stack/`](../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/stack/) |
-| Node scrape | [`../../iac/ansible/reference/ansible-estate/`](../../iac/ansible/reference/ansible-estate/) | `:9100` on the VM; cert-monitoring docker_app next to it |
+| Host Grafana + vmalert | [`../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/`](../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/) | Roles for VM + Grafana + Alertmanager + PAN-OS / EDR exporters. SOPS contract. Compose `stack/` **is published**: [`../../iac/docker/compose/sec-stack/`](../../iac/docker/compose/sec-stack/) and the Ansible copy [`../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/stack/`](../../iac/ansible/reference/ansible-llm-collab/extras/sec-stack/stack/). Host compose pins [`../../iac/docker/images/operators/edr-coverage/`](../../iac/docker/images/operators/edr-coverage/) |
+| Node scrape | [`../../iac/ansible/reference/ansible-estate/`](../../iac/ansible/reference/ansible-estate/) | `:9100` on the VM; cert-monitoring docker_app next to it. Images: [`../../iac/docker/images/operators/cert-monitoring/`](../../iac/docker/images/operators/cert-monitoring/), [`../../iac/docker/images/operators/cert-orchestrator/`](../../iac/docker/images/operators/cert-orchestrator/) (compose sits next to that image), [`../../iac/docker/images/operators/hibernate/`](../../iac/docker/images/operators/hibernate/) night-park |
 | Before Prom | [`../../iac/ansible/reference/monitoring-starter/`](../../iac/ansible/reference/monitoring-starter/) | sysstat / vnstat timers |
 
-Ansible scrapes. The Helm overlay **alerts on** those host metrics (`node-exporter-host.yaml`). It does not replace host Prom.
+Ansible scrapes. The Helm overlay **alerts on** those host metrics (`node-exporter-host.yaml`). It does not replace host Prom. Operator images are the build context `docker_app` and the exporter charts consume. They are not a fourth observability plane.
 
 ## In-cluster overlay (Helm, CCE envelope)
 
@@ -23,7 +23,7 @@ Living tree: [`../../iac/helm/reference/helm-estate-cluster/monitoring/`](../../
 |-------|--------|-----|
 | `grafana/alerts/*.yaml` | copy | **12** provisioned groups, contact points, policies, templates |
 | `grafana/dashboards/*.json` | copy | **14** artefacts. Sidecar is **off** |
-| CloudEye + cloud-status exporters | copy | Managed Kafka / RDS / emergency work in the same Grafana |
+| CloudEye + cloud-status exporters | copy | Managed Kafka / RDS / emergency work in the same Grafana. Images: [`../../iac/docker/images/operators/cloud-metrics/`](../../iac/docker/images/operators/cloud-metrics/) (Dockerfile only; `src/` not in git) and [`../../iac/docker/images/operators/cloud-status/`](../../iac/docker/images/operators/cloud-status/) (HTTP client in git). Charts stay in this overlay |
 | OpenObserve collector | copy | Custom DaemonSet. CCE hostPath `container_logs` |
 | Grafana / Prom / OO vendor charts | document | Pins in the overlay README. Trees stay out |
 

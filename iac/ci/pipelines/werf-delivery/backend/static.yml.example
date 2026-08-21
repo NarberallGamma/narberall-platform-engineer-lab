@@ -1,0 +1,74 @@
+include:
+  - local: 'backend/common.yml.example'
+
+## Base STATIC
+.static:
+  extends: .base_converge
+  stage: deploy
+  needs:
+    - Build
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+  variables:
+    WERF_ENV: static
+    WERF_KUBE_CONTEXT: dev
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "STATIC"'
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, static]
+
+.static_manual:
+  extends: .static
+  needs:
+    - Build
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "STATIC"'
+      when: manual
+      allow_failure: true
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, static_manual]
+
+.static_trigger:
+  stage: deploy
+  needs:
+    - Build
+  inherit:
+    variables: false
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+  variables:
+    TRIGGER: STATIC
+    THREAD: $THREAD
+    UPSTREAM_CI_COMMIT_REF_SLUG: $CI_COMMIT_REF_SLUG
+    UPSTREAM_CI_ENVIRONMENT_SLUG: $CI_ENVIRONMENT_SLUG
+    UPSTREAM_CI_PROJECT_PATH: $CI_PROJECT_PATH
+    WERF_ENV: static
+    WERF_KUBE_CONTEXT: dev
+  trigger:
+    strategy: depend
+  rules:
+    # Manual to avoid circular triggering
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "STATIC"'
+      when: manual
+      allow_failure: true
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, static]
+
+.static_trigger_manual:
+  extends: .static_trigger
+  needs:
+    - Build
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "STATIC"'
+      when: manual
+      allow_failure: true
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, static_manual]
+
+## STATIC
+STATIC:
+  extends: .static

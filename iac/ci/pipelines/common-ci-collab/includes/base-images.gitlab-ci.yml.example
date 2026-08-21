@@ -1,0 +1,11 @@
+# Image-build pipeline: job bodies live in common-ci; this repo only includes them.
+include:
+  - project: 'collab/common-ci'
+    file: 'builds/kaniko-build.yaml.example'
+    ref: main
+  - project: 'collab/common-ci'
+    file: 'builds/ansible-build.yaml.example'
+    ref: main
+  - project: 'collab/common-ci'
+    file: 'builds/base-runner-build.yaml.example'
+    ref: main

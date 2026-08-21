@@ -1,0 +1,13 @@
+# Load object-store and database credentials from Vault into a dotenv artifact.
+setenv:
+  stage: setenv
+  image: hashicorp/vault:1.18.2
+  script:
+    - export VAULT_TOKEN=$(vault write -field=token auth/approle/login role_id="$BACKUP_ROLE_ID" secret_id="$BACKUP_SECRET_ID")
+    - echo ACCESS_KEY=$(vault kv get -mount=secret -field=ACCESS_KEY ci/object-store) >>dotenv.env
+    - echo SECRET_KEY=$(vault kv get -mount=secret -field=SECRET_KEY ci/object-store) >>dotenv.env
+    - echo PGPASSWORD=$(vault kv get -mount=secret -field=PGPASSWORD ci/database) >>dotenv.env
+  artifacts:
+    expire_in: 30d
+    reports:
+      dotenv: dotenv.env

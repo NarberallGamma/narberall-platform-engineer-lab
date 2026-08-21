@@ -1,0 +1,24 @@
+include:
+  - local: '/rules/rules.yml.example'
+
+Purge CF SSR Cache:
+  needs:
+    - Build web-ui
+  extends:
+    - .base_build
+  image: curlimages/curl
+  script:
+    - sh scripts/purge_ssr_cache.sh
+  when: on_success
+  allow_failure: true
+  only:
+    variables:
+      - >
+        $CI_PIPELINE_SOURCE == "pipeline"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $MULTIDEPLOY == "true" )
+        && $CI_PROJECT_NAME =~ /^web-ui-shop.*$/
+        && $WERF_ENV && $CI_PIPELINE_SOURCE != "push"
+  except:
+    variables:
+      - $CI_PROJECT_PATH == "shop-app/review"
+      - $CI_PIPELINE_SOURCE == "pipeline" && $MULTIDEPLOY == "true" && $CONTEXT_WERF == "production-reserve"

@@ -1,0 +1,45 @@
+include:
+  - local: 'common.yml.example'
+
+.app_name_infra: &app_name_infra
+  - !reference [.app_name]
+  - export APP_NAME="`cat werf.yaml | grep project | awk '{print $2}'`-infra"
+  - export WERF_RELEASE="${APP_NAME}-${WERF_ENV}"
+
+.base_trigger: &base_trigger
+  needs:
+    - Build
+    - job: REVIEW-START
+      optional: true
+    - job: REVIEW-INFRA
+      optional: true
+    - job: STATIC
+      optional: true
+
+REVIEW-INFRA:
+  needs:
+    - Build
+    - job: REVIEW-START
+      optional: true
+  extends:
+    - .base_review
+  rules:
+    - !reference [.rule_not_schedule]
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      allow_failure: false
+      when: on_success
+    - !reference [.rule_pipeline_review]
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "CODECEPT"'
+  before_script:
+    - !reference [.app_name_infra]
+    - !reference [.script_notify_slack_deploy_started]
+  after_script:
+    - !reference [.base_werf]
+    - !reference [.script_notify_slack_deploy_finished]
+
+REVIEW:
+  needs:
+    - Build
+    - job: REVIEW-START
+      optional: true
+    - REVIEW-INFRA

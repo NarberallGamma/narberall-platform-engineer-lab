@@ -1,0 +1,33 @@
+.base_purge_cache:
+  stage: clean-cf-cache
+  image: curlimages/curl
+  interruptible: true
+  script:
+    - sh scripts/purge_ssr_cache.sh
+  rules:
+    - if: $CI_PROJECT_NAME =~ /^web-ui-shop.*$/
+      when: on_success
+    - when: never
+
+Purge CF SSR Cache for Demo web-ui-shop:
+  extends: .base_purge_cache
+  variables:
+    WERF_ENV: demo
+  needs:
+    - Deploy to Demo
+
+Purge CF SSR Cache on Production web-ui-shop:
+  extends: .base_purge_cache
+  variables:
+    WERF_ENV: production
+  needs:
+    - job: Deploy to Production
+
+Purge CF SSR Cache if delete release web-ui-shop:
+  extends: .base_purge_cache
+  variables:
+    WERF_ENV: production
+  rules:
+    - if: $CI_PROJECT_NAME =~ /^web-ui-shop.*$/
+      when: manual
+    - when: never

@@ -1,0 +1,79 @@
+defectdojo_import_scan:
+    stage: security
+    image: alpine:3.20
+    before_script:
+        - apk add --no-cache curl jq coreutils
+    retry: 2
+    needs:
+        - job: defectdojo_create_engagement
+          artifacts: true
+        - job: deepsecrets-check
+          artifacts: true
+        - job: semgrep
+          artifacts: true
+        - job: pii-scan
+          artifacts: true
+        - job: dependency-track-upload
+          artifacts: true
+    variables:
+        DEFECTDOJO_SCAN_MINIMUM_SEVERITY: "Low"
+        DEFECTDOJO_SCAN_ACTIVE: "true"
+        DEFECTDOJO_SCAN_VERIFIED: "false"
+        DEFECTDOJO_SCAN_CLOSE_OLD_FINDINGS: "true"
+        DEFECTDOJO_SCAN_CLOSE_OLD_FINDINGS_PRODUCT_SCOPE: "true"
+        DEFECTDOJO_SCAN_PUSH_TO_JIRA: "false"
+        DEFECTDOJO_SCAN_ENVIRONMENT: "Default"
+    script:
+        - |
+            set -e
+
+            for _var in DEFECTDOJO_URL DEFECTDOJO_TOKEN DEFECTDOJO_ENGAGEMENTID; do
+                eval "_val=\$$_var"
+                if [ -z "$_val" ]; then
+                    echo "ERROR: Required variable '$_var' is not set." >&2
+                    exit 1
+                fi
+            done
+
+            _failed=0
+
+            import_scan() {
+                _file="$1"
+                _type="$2"
+
+                if [ ! -f "${_file}" ]; then
+                    echo "ERROR: Scan file '${_file}' not found." >&2
+                    return 1
+                fi
+
+                echo "==> Importing '${_file}' (${_type}) into DefectDojo engagement ${DEFECTDOJO_ENGAGEMENTID}..."
+
+                curl --fail --silent --show-error \
+                    --retry 3 --retry-delay 5 \
+                    --location \
+                    --request POST "${DEFECTDOJO_URL}/import-scan/" \
+                    --header "Authorization: Token ${DEFECTDOJO_TOKEN}" \
+                    --form "scan_date=$(date +%Y-%m-%d)" \
+                    --form "minimum_severity=${DEFECTDOJO_SCAN_MINIMUM_SEVERITY}" \
+                    --form "active=${DEFECTDOJO_SCAN_ACTIVE}" \
+                    --form "verified=${DEFECTDOJO_SCAN_VERIFIED}" \
+                    --form "scan_type=${_type}" \
+                    --form "engagement=${DEFECTDOJO_ENGAGEMENTID}" \
+                    --form "file=@${_file}" \
+                    --form "close_old_findings=${DEFECTDOJO_SCAN_CLOSE_OLD_FINDINGS}" \
+                    --form "close_old_findings_product_scope=${DEFECTDOJO_SCAN_CLOSE_OLD_FINDINGS_PRODUCT_SCOPE}" \
+                    --form "push_to_jira=${DEFECTDOJO_SCAN_PUSH_TO_JIRA}" \
+                    --form "environment=${DEFECTDOJO_SCAN_ENVIRONMENT}"
+
+                echo "==> '${_file}' imported successfully."
+            }
+
+            import_scan deepsecrets-report.json "SARIF"                                                 || _failed=$((_failed + 1))
+            import_scan semgrep-report.json "Semgrep JSON Report"                                       || _failed=$((_failed + 1))
+            import_scan pii-report.json "Nuclei Scan"                                                   || _failed=$((_failed + 1))
+            import_scan dependency-report.json "Dependency Track Finding Packaging Format (FPF) Export" || _failed=$((_failed + 1))
+
+            if [ "$_failed" -gt 0 ]; then
+                echo "ERROR: ${_failed} import(s) failed." >&2
+                exit 1
+            fi

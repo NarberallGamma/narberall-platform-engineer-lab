@@ -1,0 +1,136 @@
+include:
+  - local: '/snippets.yml.example'
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE
+
+variables:
+  GIT_STRATEGY: clone
+  GIT_DEPTH: 100
+
+stages:
+  - checks
+
+.base_job:
+  before_script:
+    - !reference [.snippets, dump_env]
+    - !reference [.snippets, set_werf_values_by_env]
+  tags:
+    - docker
+  variables:
+    KUBERNETES_CPU_REQUEST: '0.2'
+    KUBERNETES_MEMORY_REQUEST: 256Mi
+  script:
+    - echo "TEST"
+
+Ready to Prod Deploy:
+  extends:
+    - .base_job
+  stage: checks
+  needs:
+    - job: "Check jira ticket status"
+  before_script:
+    #Preparing the push key
+    - export GIT_AUTHOR_NAME="docker"
+    - export GIT_AUTHOR_EMAIL="ci@example.com"
+    - export GIT_COMMITTER_NAME="docker"
+    - export GIT_COMMITTER_EMAIL="ci@example.com"
+    - !reference [.snippets, dump_env]
+  script:
+    #Checking if the branch is up to date
+    - git fetch
+    - git checkout ${CI_DEFAULT_BRANCH} && git pull origin ${CI_DEFAULT_BRANCH} --allow-unrelated-histories
+    - git checkout ${CI_COMMIT_REF_NAME} && git pull origin ${CI_COMMIT_REF_NAME} --allow-unrelated-histories
+    - git merge-base --is-ancestor ${CI_DEFAULT_BRANCH} HEAD && { echo -e "\e[32mBranch is ok\e[0m"; NEED_REBASE=false; } || { echo -e "\e[31mNeed to rebase\e[0m"; NEED_REBASE=true; }
+    #Performing rebase
+    - |
+      if [ "$NEED_REBASE" = true ] ; then
+        echo "Rebase branch"
+        git merge ${CI_DEFAULT_BRANCH} -m "${CI_COMMIT_MESSAGE}"
+        git push https://nobody:${RELEASE_BOT_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
+        exit 1
+      fi
+    #Checking for the presence of approvals and overall mergeability
+    - |
+      REQUEST_URL=$(printf '%s/projects/%s/merge_requests/%s' ${CI_API_V4_URL} ${CI_PROJECT_ID} ${CI_MERGE_REQUEST_IID})
+      MERGE_DATA=$(curl -s --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${REQUEST_URL})
+      MERGE_STATUS=$(echo ${MERGE_DATA} | jq -r '.detailed_merge_status')
+      if [[ "$MERGE_STATUS" == "mergeable" ]]; then
+        echo -e "\e[32mEvrything OK. Continue...\e[0m"
+      else
+        MERGE_URL=$(echo $MERGE_DATA|jq -r '.web_url')
+        echo -e "\e[31mMerge request coudn't be merged. The reason is ${MERGE_STATUS}\e[0m"
+        echo -e "\e[31mUnresolved merge-request problems\e[0m ${MERGE_URL}"
+        exit 1
+      fi
+    #Checking for the existence of the lock file
+    - echo -e "\e[32mChecking for another releases\e[0m"
+    - REQUEST_URL=$(printf '%s/projects/%s/packages/generic/release_lock/0.0.1/.lock' ${CI_API_V4_URL} ${CI_PROJECT_ID})
+    - |
+      RESULT=$(curl -s -o/dev/null -w "%{http_code}" --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${REQUEST_URL})
+    - |
+      if [ "$RESULT" -eq 200 ]; then
+        RESULT=$(curl -s --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${REQUEST_URL})
+        echo -e "\e[31mA Release already exists. TAG: $(echo $RESULT | jq -r '.tag_name')\e[0m"
+        echo -e "\e[31mA Job: $(echo $RESULT | jq -r '.CI_JOB_URL')\e[0m"
+        exit 1
+      else
+        echo -e "\e[32mCreating Lock\e[0m"
+
+        REQUEST_OUT=$(mktemp)
+        REQUEST_CODE=$(printf '{"tag_name": "%s", "CI_JOB_URL": "%s", "CI_MERGE_REQUEST_IID": "%s"}' ${CI_COMMIT_REF_SLUG} ${CI_JOB_URL} ${CI_MERGE_REQUEST_IID} | curl -X PUT -s -o "$REQUEST_OUT" -w "%{http_code}" --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" --data @- ${REQUEST_URL})
+        [ "$REQUEST_CODE" -eq 200 -o "$REQUEST_CODE" -eq 201 ] || {
+            echo -e "\e[31m[ERROR] http request failed with response code: ${REQUEST_CODE}\e[0m";
+            cat "$REQUEST_OUT"; rm "$REQUEST_OUT";
+            exit 1; }
+        cat "$REQUEST_OUT"; rm "$REQUEST_OUT";
+      fi
+    # Creating a release
+    - echo -e "\e[32mCreating a release\e[0m"
+    - RELASE_NAME=$(echo ${CI_COMMIT_REF_SLUG} | sed -e 's/^release-//')
+    - |
+      REQUEST_DATA=$(printf '{ "name": "Release %s", "tag_name": "%s", "tag_message": "%s", "description": "My release", "ref": "%s" }' ${RELASE_NAME} ${CI_COMMIT_REF_SLUG} ${CI_COMMIT_REF_NAME} ${CI_COMMIT_SHA})
+      REQUEST_URL=$(printf '%s/projects/%s/releases' ${CI_API_V4_URL} ${CI_PROJECT_ID})
+
+      REQUEST_OUT=$(mktemp)
+      REQUEST_CODE=$(curl -X POST -s -o "$REQUEST_OUT" -w "%{http_code}" --header 'Content-Type: application/json' --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" --data "${REQUEST_DATA}" ${REQUEST_URL})
+      [ "$REQUEST_CODE" -eq 200 -o "$REQUEST_CODE" -eq 201 -o "$REQUEST_CODE" -eq 409 ] || {
+          echo -e "\e[31m[ERROR] http request failed with response code: ${REQUEST_CODE}\e[0m";
+          cat "$REQUEST_OUT"; rm "$REQUEST_OUT";
+          exit 1; }
+      cat "$REQUEST_OUT" | jq; rm "$REQUEST_OUT";
+
+Check jira ticket status:
+  stage: checks
+  id_tokens:
+    VAULT_ID_TOKEN:
+      aud: https://vault.example.com
+  secrets:
+    JIRA_API_KEY:
+      vault: secret/example/jira_api_key
+      file: false
+  variables:
+    JIRA_API_URL: "https://jira.example.com/rest/api/2"
+  script:
+    - RELEASE_TICKET=$(echo ${CI_COMMIT_REF_SLUG} | sed -e 's/^release-//' | tr '[:lower:]' '[:upper:]')
+    - |
+      if [[ "$RELEASE_TICKET" == RELEASE-* ]]; then
+        echo "Verifying status of ticket $RELEASE_TICKET..."
+        TICKET_STATUS=$(curl -s -H "Authorization: Basic $JIRA_API_KEY" -H "Content-Type: application/json" "$JIRA_API_URL/issue/$RELEASE_TICKET" | jq .fields.status.name )
+        TICKET_STATUS_TRIMMED=$(echo "$TICKET_STATUS" | tr '[:lower:]' '[:upper:]' | xargs)
+        case "$TICKET_STATUS_TRIMMED" in
+          "READY TO DEPLOY"|"IN DEPLOY")
+            echo "✅ $RELEASE_TICKET is in status: $TICKET_STATUS. Verification passed!"
+            ;;
+          *)
+            echo "❌ $RELEASE_TICKET is in status: $TICKET_STATUS. Cannot deploy to Production. Allowed statuses are 'READY TO DEPLOY' or 'IN DEPLOY'."
+            exit 1
+            ;;
+        esac
+      else
+        echo "🔍 No RELEASE project ticket referenced."
+        exit 1
+      fi
+  tags:
+    - docker

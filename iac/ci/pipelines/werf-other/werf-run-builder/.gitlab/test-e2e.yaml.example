@@ -1,0 +1,150 @@
+include:
+  - local: .gitlab/common.yaml.example
+
+variables:
+  WERF_NAMESPACE: e2e-${CI_COMMIT_REF_SLUG}
+  WERF_KUBE_CONTEXT: cluster-a
+  WERF_ENV: e2e
+  E2E_ENV: e2e/${CI_COMMIT_REF_SLUG}
+  FRONTEND_HOST: http://dashboard-interface-e2e.${WERF_NAMESPACE}.svc.cluster.local:80
+  BACKEND_HOST: http://dashboard-api-backend.${WERF_NAMESPACE}.svc.cluster.local:8000/api
+
+.e2e:
+  stage: e2e-tests
+  rules:
+    - !reference [ .rules, no_schedule ]
+    - !reference [ .rules, no_pipeline ]
+    - !reference [ .rules, mr_to_master ]
+  tags:
+    - docker
+
+.e2e-stop:
+  extends: .e2e
+  environment:
+    name: ${E2E_ENV}
+    action: stop
+  script:
+    - werf dismiss --with-namespace
+  tags:
+    - docker
+
+Prepare E2E:
+  extends: .e2e
+  script:
+    - |
+      echo FRONTEND_HOST=${FRONTEND_HOST} > hosts.env
+      echo BACKEND_HOST=${BACKEND_HOST} >> hosts.env
+    - |
+      echo "[INFO] Check branch in E2E repo"
+      echo "E2E_TRIGGER_BRANCH=${E2E_TRIGGER_BRANCH}" > e2e_branch.env
+
+      if git ls-remote --exit-code --heads https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.example.com/shop-app/e2e.git "${CI_COMMIT_REF_NAME}" >/dev/null 2>&1; then
+        echo "[INFO] Branch ${CI_COMMIT_REF_NAME} exists in E2E repo"
+        echo "E2E_TRIGGER_BRANCH=${CI_COMMIT_REF_NAME}" > e2e_branch.env
+      else
+        echo "[INFO] Branch ${CI_COMMIT_REF_NAME} does not exist in E2E repo, using default branch ${E2E_TRIGGER_BRANCH}"
+      fi
+    - |
+      echo "[INFO] Check branch in Backend repo"
+      echo "BACKEND_TRIGGER_BRANCH=${BACKEND_TRIGGER_BRANCH}" > backend_branch.env
+
+      if git ls-remote --exit-code --heads https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.example.com/shop-app/dashboard-api.git "${CI_COMMIT_REF_NAME}" >/dev/null 2>&1; then
+        echo "[INFO] Branch ${CI_COMMIT_REF_NAME} exists in Backend repo"
+        echo "BACKEND_TRIGGER_BRANCH=${CI_COMMIT_REF_NAME}" > backend_branch.env
+      else
+        echo "[INFO] Branch ${CI_COMMIT_REF_NAME} does not exist in Backend repo, using default branch ${BACKEND_TRIGGER_BRANCH}"
+      fi
+    - cat  hosts.env e2e_branch.env backend_branch.env > e2e.env
+  artifacts:
+    reports:
+      dotenv: e2e.env
+
+Build bundle E2E:
+  stage: e2e-tests
+  needs:
+    - Prepare E2E
+  variables:
+    WERF_ENV: ${WERF_ENV}
+    WERF_DEV: "true"
+    GIT_COMMIT_HASH: ${CI_COMMIT_SHORT_SHA}
+  script:
+    - echo "[INFO] Update Backend host for E2E bundle"
+    - echo "[INFO] BACKEND_HOST=${BACKEND_HOST}"
+    - sed -i "s|^VITE_API_URL=.*|VITE_API_URL=${BACKEND_HOST}|" apps/web/.env.development
+    - werf build
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [ .rules, mr_to_master ]
+  tags:
+    - docker
+
+Trigger E2E Backend:
+  stage: e2e-tests
+  needs:
+    - Prepare E2E
+  variables:
+    WERF_ENV: ${WERF_ENV}
+    TRIGGER: E2E
+    BACKEND_HOST: ${BACKEND_HOST}
+    SOURCE_BRANCH: ${CI_COMMIT_REF_NAME}
+    SOURCE_MR_AUTHOR: ${CI_COMMIT_AUTHOR}
+    SOURCE_MR_IID: ${CI_MERGE_REQUEST_IID}
+    SOURCE_PROJECT_NAME: ${CI_PROJECT_NAME}
+  trigger:
+    project: shop-app/dashboard-api
+    branch: ${BACKEND_TRIGGER_BRANCH}
+    strategy: depend
+  rules:
+    - !reference [ .rules, no_schedule ]
+    - !reference [ .rules, no_pipeline ]
+    - !reference [ .rules, mr_to_master ]
+
+Deploy E2E Front:
+  stage: e2e-tests
+  extends: .base_deploy
+  needs:
+    - Build bundle E2E
+  environment:
+    name: ${E2E_ENV}
+    action: start
+    on_stop: Stop E2E stand
+    auto_stop_in: 1 hour
+  resource_group: ${E2E_ENV}
+  variables:
+    WERF_ENV: ${WERF_ENV}
+    CI_ENVIRONMENT_CUSTOM_SLUG: ${WERF_ENV}
+    K8S_NAMESPACE: ${WERF_NAMESPACE}
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [ .rules, mr_to_master ]
+
+Trigger E2E Tests:
+  stage: e2e-tests
+  needs:
+    - Prepare E2E
+    - Deploy E2E Front
+    - Trigger E2E Backend
+  variables:
+    TRIGGER: E2E-UI
+    FRONTEND_HOST: ${FRONTEND_HOST}
+    BACKEND_HOST: ${BACKEND_HOST}
+    SOURCE_BRANCH: ${CI_COMMIT_REF_NAME}
+    SOURCE_MR_AUTHOR: ${CI_COMMIT_AUTHOR}
+    SOURCE_MR_IID: ${CI_MERGE_REQUEST_IID}
+    SOURCE_PROJECT_NAME: ${CI_PROJECT_NAME}
+  trigger:
+    project: shop-app/e2e
+    branch: ${E2E_TRIGGER_BRANCH}
+    strategy: depend
+  rules:
+    - !reference [ .rules, no_schedule ]
+    - !reference [ .rules, no_pipeline ]
+    - !reference [ .rules, mr_to_master ]
+
+Stop E2E stand:
+  extends: .e2e-stop
+  needs:
+    - Deploy E2E Front
+  when: manual

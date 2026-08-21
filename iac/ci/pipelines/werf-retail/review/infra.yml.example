@@ -1,0 +1,71 @@
+workflow:
+  name: $PIPELINE_NAME
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "pipeline" && $WERF_NAMESPACE
+      variables:
+        PIPELINE_NAME: triggered by $UPSTREAM_PROJECT_PATH project for $WERF_NAMESPACE namespace
+    - when: always
+
+Triggered deploy:
+  extends:
+    - .base_werf
+  stage: review
+  variables:
+    WERF_KUBE_CONTEXT: dev
+  script:
+    - echo "triggered by $UPSTREAM_PROJECT_PATH project for $WERF_NAMESPACE namespace"
+    # - werf helm dependency build .helm
+    - werf converge
+  when: on_success
+  only:
+    variables:
+      - >
+        $CI_PIPELINE_SOURCE == "pipeline"
+        && $WERF_NAMESPACE =~ /^feature-.*/
+        && $WERF_ENV
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - api_failure
+      - data_integrity_failure
+    exit_codes:
+      - 1
+      - 137
+
+Import dev dump to clickhouse:
+  stage: reimport
+  extends:
+    - .base_werf
+  variables:
+    IMPORT_FILE: /tmp/import-clickhouse-database-$CI_PIPELINE_ID.yaml
+  script:
+    - |
+      werf render | yq 'select(.metadata.name == "*import-clickhouse-dump")' | tee ${IMPORT_FILE}
+
+    - |
+      yq -N '(.kind, .metadata.name)' ${IMPORT_FILE} \
+      | xargs -rn2 werf kubectl delete -n ${WERF_NAMESPACE} || true
+
+    - |
+      werf kubectl apply --namespace=${WERF_NAMESPACE} -f ${IMPORT_FILE}
+
+    - |
+      werf kubectl wait --namespace=${WERF_NAMESPACE} --for=condition=complete --timeout=600s \
+      job $(yq -N 'select(.kind == "Job") | .metadata.name' ${IMPORT_FILE})
+
+    - rm ${IMPORT_FILE}
+  when: manual
+  needs:
+    - job: "Prepare review vars"
+      artifacts: true
+      optional: true
+    - job: "Start deploy"
+      optional: true
+    - job: Deploy clickhouse
+      optional: true
+  rules:
+    - if: $CI_PROJECT_PATH == "shop-app/clickhouse" && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      when: manual
+    - when: never

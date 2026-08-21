@@ -1,0 +1,19 @@
+integration-test:
+  stage: app-test
+  image: $GRADLE_IMAGE
+  variables:
+    DOCKER_HOST: "tcp://172.17.0.1:2375"
+    GRADLE_OPTS: "-Xss5m"
+  script:
+    - echo "Running tests and generating a local report..."
+    - gradle --no-daemon clean compileJava --stacktrace --info --no-build-cache
+    - gradle --no-daemon test --stacktrace --info --no-build-cache
+    - find . |grep -v \.git
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+    - changes:
+        - "src/*"
+        - "gradle/*"
+  allow_failure: false
+  tags:
+    - docker

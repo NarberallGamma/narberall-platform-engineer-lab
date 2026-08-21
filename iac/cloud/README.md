@@ -16,7 +16,7 @@ Platforms I have stood up and operated: public cloud, private cloud, and on-prem
 
 | Platform | What I owned | Published Terraform |
 |----------|----------------|---------------------|
-| [cloud.ru / Huawei Cloud](cloud-ru-huawei.md) | Greenfield + brownfield: IAM, VPC, ECS, CCE, RDS, Kafka, OBS. **Second estate:** compute catalog with split state | [`../terraform/cloud-ru-huawei/`](../terraform/cloud-ru-huawei/), [`../terraform/cloud-ru-compute/`](../terraform/cloud-ru-compute/) |
+| [cloud.ru / Huawei Cloud](cloud-ru-huawei.md) | Greenfield + brownfield: IAM, VPC, ECS, CCE, RDS, Kafka, OBS. **Second estate:** compute catalog with split state. Night-park and CloudEye / status are operator images that call this API | [`../terraform/cloud-ru-huawei/`](../terraform/cloud-ru-huawei/), [`../terraform/cloud-ru-compute/`](../terraform/cloud-ru-compute/) |
 | [AWS](aws.md) | Multi-account / multi-region: VPC, EC2, EKS, RDS, ElastiCache, IAM, S3, CloudFront | [`../terraform/aws/`](../terraform/aws/) |
 | [Google Cloud](google-cloud.md) | Project/network bootstrap, compute, GKE-class / VM delivery | Narrative (private trees) |
 | [Hetzner](hetzner.md) | Cloud VMs, networking, Linux baseline for app and CI | Narrative (private trees) |
@@ -86,5 +86,7 @@ Greenfield: empty project or empty rack → apply.
 Brownfield: inventory → code → `terraform import` → clean `plan`. Same pattern for accelerating delivery, cutting idle spend, and making ops visible.
 
 See case studies: [turnkey from zero](../../case-studies/02-cloud-platform-turnkey.md), [brownfield import](../../case-studies/04-terraform-brownfield-import.md), [legacy estate as Terraform](../../case-studies/05-legacy-estate-as-code.md), [VMware VCD + one-button CI](../../case-studies/06-vmware-vcd-greenfield.md), [Huawei compute catalog](../../case-studies/07-huawei-compute-catalog.md), [Selectel VPC + dedicated](../../case-studies/09-selectel-vpc-and-dedicated.md).
+
+Huawei-class API jobs are operator images, not only Terraform apply. Night-park stop/start on CCE workers and ECS: [`../docker/images/operators/hibernate/`](../docker/images/operators/hibernate/). CloudEye exporter (**Dockerfile only**; Go `src/` stays out): [`../docker/images/operators/cloud-metrics/`](../docker/images/operators/cloud-metrics/). Cloud.ru status `/metrics` (HTTP client in git): [`../docker/images/operators/cloud-status/`](../docker/images/operators/cloud-status/). I deploy hibernate with estate Ansible ([case 10](../../case-studies/10-ansible-estate.md)). FinOps review: [`../../architecture/02-finops-night-park.md`](../../architecture/02-finops-night-park.md). Hub table: [`../docker/images/README.md#operators`](../docker/images/README.md#operators).
 
 Hosts (Ansible): [`../ansible/`](../ansible/). Cluster Helm: [`../helm/`](../helm/). One-button CI: [`../ci/`](../ci/). Positioning: [`../../docs/positioning.md`](../../docs/positioning.md).

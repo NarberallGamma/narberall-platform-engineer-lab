@@ -1,0 +1,52 @@
+.base_upload_static:
+  variables:
+    WERF_NAMESPACE: default
+    UPLOAD_IMAGE: "s3Uploader"
+    WERF_ADD_LABEL_1: COMMIT-SHA=${CI_COMMIT_SHA}
+    RCLONE_S3_DIR: $S3_DIR
+  except: null
+  script:
+    - |
+      export CI_VARIABLES=$(env | grep -E 'STATIC_AWS|RCLONE' | awk -F= '{print "{\"name\": \"" $1 "\", \"value\": \"" $2 "\"}"}' | paste -sd "," -)
+    - |
+      werf kube-run --overrides "{\"spec\":{\"containers\":[{\"name\":\"%container_name%\",\"env\":[${CI_VARIABLES}]}]}}" --namespace='default' ${UPLOAD_IMAGE} -- sh -c "
+        AWS_ACCESS_KEY_ID=${STATIC_AWS_ACCESS_KEY_ID} \
+        AWS_SECRET_ACCESS_KEY=${STATIC_AWS_SECRET_ACCESS_KEY} \
+        rclone copy --s3-no-check-bucket --s3-env-auth --s3-provider AWS \
+        --s3-region ${STATIC_AWS_REGION} \
+        --s3-endpoint https://s3.${STATIC_AWS_REGION}.amazonaws.com \
+        /data/static :s3:${STATIC_AWS_S3_BUCKET}/${RCLONE_S3_DIR}
+      "
+  after_script:
+    - werf kubectl -n default delete pod -l COMMIT-SHA=${CI_COMMIT_SHA}
+  rules:
+    - if: ( $CI_PROJECT_NAME =~ /^web-ui-cashier-ci.*$/ || $CI_PROJECT_NAME =~ /^web-ui-portal-ci.*$/ ||$CI_PROJECT_NAME =~ /^web-ui-shop.*$/ ) && $CI_COMMIT_TAG != null
+    - when: never
+  tags:
+    - docker
+
+Upload static to S3 Production:
+  stage: upload-static-production
+  extends:
+    - .base_werf
+    - .base_upload_static
+  variables:
+    STATIC_AWS_ACCESS_KEY_ID: $PROD_STATIC_AWS_ACCESS_KEY_ID
+    STATIC_AWS_SECRET_ACCESS_KEY: $PROD_STATIC_AWS_SECRET_ACCESS_KEY
+    STATIC_AWS_REGION: us-east-2
+    STATIC_AWS_S3_BUCKET: shop-app-prod-static
+    WERF_KUBE_CONTEXT: ${CONTEXT_PRODUCTION_MAIN}
+
+Upload static to S3 to Demo web-ui:
+  stage: demo
+  needs:
+    - Close Release
+  extends:
+    - .base_werf
+    - .base_upload_static
+  variables:
+    STATIC_AWS_ACCESS_KEY_ID: $DEV_STATIC_AWS_ACCESS_KEY_ID
+    STATIC_AWS_SECRET_ACCESS_KEY: $DEV_STATIC_AWS_SECRET_ACCESS_KEY
+    STATIC_AWS_REGION: us-east-2
+    STATIC_AWS_S3_BUCKET: shop-app-dev-static
+    WERF_KUBE_CONTEXT: dev

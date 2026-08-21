@@ -1,0 +1,544 @@
+include:
+  - local: '/common.yml.example'
+  - local: '/rules/rules.yml.example'
+  - local: '/ReleaseCI/release_web_ui.yml.example'
+  - local: '/ReleaseCI/CF_SSR_clean_cache.yml.example'
+  - local: '/ReleaseCI/upload_static_to_s3.yml.example'
+  - local: '/snippets.yml.example'
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE
+
+variables:
+  GIT_STRATEGY: clone
+  GIT_DEPTH: 100
+
+stages:
+  - upload-static-production
+  - production
+  - release
+  - restart_release
+  - delete_release
+  - demo
+  - production-reserve
+  - tenant-b
+  - sentry
+  - clean-cf-cache
+  - hotfix
+  - sales
+
+.include_replicas:
+  variables:
+    WERF_SET_RESERVE_CLUSTER_REPLICA1: ${RESERVE_CLUSTER_REPLICA1}
+    WERF_SET_RESERVE_CLUSTER_REPLICA2: ${RESERVE_CLUSTER_REPLICA2}
+    WERF_SET_RESERVE_CLUSTER_REPLICA3: ${RESERVE_CLUSTER_REPLICA3}
+    WERF_SET_RESERVE_CLUSTER_REPLICA4: ${RESERVE_CLUSTER_REPLICA4}
+    WERF_SET_RESERVE_CLUSTER_REPLICA5: ${RESERVE_CLUSTER_REPLICA5}
+    WERF_SET_RESERVE_CLUSTER_REPLICA6: ${RESERVE_CLUSTER_REPLICA6}
+    WERF_SET_RESERVE_CLUSTER_REPLICA7: ${RESERVE_CLUSTER_REPLICA7}
+    WERF_SET_RESERVE_CLUSTER_REPLICA8: ${RESERVE_CLUSTER_REPLICA8}
+    WERF_SET_RESERVE_CLUSTER_REPLICA9: ${RESERVE_CLUSTER_REPLICA9}
+    WERF_SET_RESERVE_CLUSTER_REPLICA10: ${RESERVE_CLUSTER_REPLICA10}
+
+.include_tenant_a_replicas:
+  variables:
+    WERF_SET_RESERVE_TENANT_A_REPLICA1: ${RESERVE_TENANT_A_REPLICA1}
+    WERF_SET_RESERVE_TENANT_A_REPLICA2: ${RESERVE_TENANT_A_REPLICA2}
+    WERF_SET_RESERVE_TENANT_A_REPLICA3: ${RESERVE_TENANT_A_REPLICA3}
+    WERF_SET_RESERVE_TENANT_A_REPLICA4: ${RESERVE_TENANT_A_REPLICA4}
+    WERF_SET_RESERVE_TENANT_A_REPLICA5: ${RESERVE_TENANT_A_REPLICA5}
+    WERF_SET_RESERVE_TENANT_A_REPLICA6: ${RESERVE_TENANT_A_REPLICA6}
+    WERF_SET_RESERVE_TENANT_A_REPLICA7: ${RESERVE_TENANT_A_REPLICA7}
+    WERF_SET_RESERVE_TENANT_A_REPLICA8: ${RESERVE_TENANT_A_REPLICA8}
+    WERF_SET_RESERVE_TENANT_A_REPLICA9: ${RESERVE_TENANT_A_REPLICA9}
+    WERF_SET_RESERVE_TENANT_A_REPLICA10: ${RESERVE_TENANT_A_REPLICA10}
+
+.include_tenant_b_replicas:
+  variables:
+    WERF_SET_RESERVE_TENANT_B_REPLICA1: ${RESERVE_TENANT_B_REPLICA1}
+    WERF_SET_RESERVE_TENANT_B_REPLICA2: ${RESERVE_TENANT_B_REPLICA2}
+    WERF_SET_RESERVE_TENANT_B_REPLICA3: ${RESERVE_TENANT_B_REPLICA3}
+    WERF_SET_RESERVE_TENANT_B_REPLICA4: ${RESERVE_TENANT_B_REPLICA4}
+    WERF_SET_RESERVE_TENANT_B_REPLICA5: ${RESERVE_TENANT_B_REPLICA5}
+    WERF_SET_RESERVE_TENANT_B_REPLICA6: ${RESERVE_TENANT_B_REPLICA6}
+    WERF_SET_RESERVE_TENANT_B_REPLICA7: ${RESERVE_TENANT_B_REPLICA7}
+    WERF_SET_RESERVE_TENANT_B_REPLICA8: ${RESERVE_TENANT_B_REPLICA8}
+    WERF_SET_RESERVE_TENANT_B_REPLICA9: ${RESERVE_TENANT_B_REPLICA9}
+    WERF_SET_RESERVE_TENANT_B_REPLICA10: ${RESERVE_TENANT_B_REPLICA10}
+
+.base_job:
+  before_script:
+    - !reference [.snippets, dump_env]
+  tags:
+    - docker
+  variables:
+    KUBERNETES_CPU_REQUEST: '0.2'
+    KUBERNETES_MEMORY_REQUEST: 256Mi
+  script:
+    - echo "TEST"
+
+.deploy:
+  variables:
+    KUBERNETES_CPU_REQUEST: "0.2"
+    KUBERNETES_MEMORY_REQUEST: "256Mi"
+  extends: .base_deploy
+
+.base_deploy:
+  except: []
+
+.script_get_tag_name:
+  - |
+    REQUEST_URL=$(printf '%s/projects/%s/packages/generic/release_lock/0.0.1/.lock' ${CI_API_V4_URL} ${CI_PROJECT_ID})
+    LOCK_DATA=$(curl -s --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${REQUEST_URL})
+    TAG_NAME=$(echo ${LOCK_DATA} | jq -r '.tag_name')
+
+.script_check_lock:
+  - |
+    if [[ "${TAG_NAME}" == "${CI_COMMIT_TAG}" ]]; then
+      echo -e "\e[32mChecking for correct lock\e[0m"
+    else
+      echo -e "\e[31mUnable to proceed because lock was set on release ${TAG_NAME}\e[0m"
+      exit 1
+    fi
+
+.script_add_pipeline_url:
+  - |
+    REQUEST_URL=$(printf '%s/projects/%s/releases/%s/assets/links/' ${CI_API_V4_URL} ${CI_PROJECT_ID} ${CI_COMMIT_REF_SLUG})
+
+    REQUEST_OUT=$(mktemp)
+    REQUEST_CODE=$(curl -X POST -s -o "$REQUEST_OUT" -w "%{http_code}" --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" --data name="PIPELINE_URL" --data url=${CI_PIPELINE_URL} --data link_type=other ${REQUEST_URL})
+    [ "$REQUEST_CODE" -eq 200 -o "$REQUEST_CODE" -eq 201 ] || {
+        echo -e "\e[31m[ERROR] http request failed with response code: ${REQUEST_CODE}\e[0m";
+        cat "$REQUEST_OUT"; rm "$REQUEST_OUT";
+        exit 1; }
+    cat "$REQUEST_OUT"; rm "$REQUEST_OUT";
+
+.script_remove_lock:
+  - |
+    if [[ "${TAG_NAME}" != "${CI_COMMIT_TAG}" ]]; then
+      echo -e "\e[31mUnable to remove lock because it was set on release ${TAG_NAME}\e[0m"
+      exit 1
+    fi
+  - |
+      REQUEST_URL=$(printf '%s/projects/%s/packages?package_name=release_lock' ${CI_API_V4_URL} ${CI_PROJECT_ID})
+      DELETE_PACKAGE_URL=$(curl -s --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${REQUEST_URL} | jq -r '.[0]._links.delete_api_path')
+  - |
+      REQUEST_CODE=$(curl -X DELETE -s -o /dev/null -w "%{http_code}" --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${DELETE_PACKAGE_URL} || { echo ""; } )
+      [ "$REQUEST_CODE" -eq 200 -o "$REQUEST_CODE" -eq 204 -o "$REQUEST_CODE" -eq 404 ] || {
+          echo -e "\e[31m[ERROR] http request failed with response code: ${REQUEST_CODE}\e[0m";
+          exit 1; }
+  - echo -e "\e[32mLock removed\e[0m"
+
+.script_check_mergeability_and_merge:
+  - |
+    MERGE_ID=$(echo ${LOCK_DATA} | jq -r '.CI_MERGE_REQUEST_IID')
+    REQUEST_URL=$(printf '%s/projects/%s/merge_requests/%s' ${CI_API_V4_URL} ${CI_PROJECT_ID} ${MERGE_ID})
+    MERGE_DATA=$(curl -s --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${REQUEST_URL})
+    MERGE_STATUS=$(echo ${MERGE_DATA} | jq -r '.detailed_merge_status')
+    if [[ "$MERGE_STATUS" == "mergeable" ]]; then
+      echo -e "\e[32mStarting merge\e[0m"
+      REQUEST_URL=$(printf '%s/projects/%s/merge_requests/%s/merge?squash=false' ${CI_API_V4_URL} ${CI_PROJECT_ID} ${MERGE_ID})
+
+      REQUEST_OUT=$(mktemp)
+      REQUEST_CODE=$(curl -X PUT -s -o "$REQUEST_OUT" -w "%{http_code}" --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${REQUEST_URL})
+      [ "$REQUEST_CODE" -eq 200 -o "$REQUEST_CODE" -eq 201 ] || {
+          echo -e "\e[31m[ERROR] http request failed with response code: ${REQUEST_CODE}\e[0m";
+          cat "$REQUEST_OUT"; rm "$REQUEST_OUT";
+          exit 1; }
+      cat "$REQUEST_OUT"; rm "$REQUEST_OUT";
+    else
+      MERGE_URL=$(echo $MERGE_DATA|jq -r '.web_url')
+      echo -e "\e[31mMerge request couldn't be merged. The reason is ${MERGE_STATUS}\e[0m"
+      echo -e "\e[31mUnresolved merge-request problems\e[0m ${MERGE_URL}"
+      exit 1
+    fi
+
+.script_write_last_applied_release:
+  - |
+    echo "Add info about the last applied release"
+    REQUEST_URL=$(printf '%s/projects/%s/packages/generic/last_applied_release/0.0.1/.release' ${CI_API_V4_URL} ${CI_PROJECT_ID})
+    RESULT=$(curl -s -o/dev/null -w "%{http_code}" --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${REQUEST_URL})
+    if [ "$RESULT" -eq 200 ]; then
+      DELETE_REQUEST_URL=$(printf '%s/projects/%s/packages?package_name=last_applied_release' ${CI_API_V4_URL} ${CI_PROJECT_ID})
+      DELETE_PACKAGE_URL=$(curl -s --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${DELETE_REQUEST_URL} | jq -r '.[0]._links.delete_api_path')
+
+      REQUEST_CODE=$(curl -X DELETE -s -o /dev/null -w "%{http_code}" --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${DELETE_PACKAGE_URL})
+      [ "$REQUEST_CODE" -eq 200 -o "$REQUEST_CODE" -eq 204 -o "$REQUEST_CODE" -eq 404 ] || {
+          echo -e "\e[31m[ERROR] http request failed with response code: ${REQUEST_CODE}\e[0m";
+          exit 1; }
+    fi
+
+    REQUEST_OUT=$(mktemp)
+    REQUEST_CODE=$(printf '{"tag_name": "%s", "CI_JOB_URL": "%s", "CI_PIPELINE_URL": "%s"}' ${CI_COMMIT_REF_SLUG} ${CI_JOB_URL} ${CI_PIPELINE_URL} | curl -X PUT -s -o "$REQUEST_OUT" -w "%{http_code}" --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" --data @- ${REQUEST_URL})
+    [ "$REQUEST_CODE" -eq 200 -o "$REQUEST_CODE" -eq 201 ] || {
+        echo -e "\e[31m[ERROR] http request failed with response code: ${REQUEST_CODE}\e[0m";
+        cat "$REQUEST_OUT"; rm "$REQUEST_OUT";
+        exit 1; }
+    cat "$REQUEST_OUT"; rm "$REQUEST_OUT";
+
+.script_rollback_release:
+  - |
+    echo "rollback"
+    REQUEST_URL=$(printf '%s/projects/%s/packages/generic/release_lock/0.0.1/.cluster_release_name' ${CI_API_V4_URL} ${CI_PROJECT_ID})
+    CHECK_FILE=$(curl -s -o/dev/null -w "%{http_code}" --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${REQUEST_URL})
+    if [ "$CHECK_FILE" -eq 200 ]; then
+      RESULT=$(curl -s --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${REQUEST_URL})
+      RELEASE_NAME=$(echo $RESULT |jq -r '.release')
+      RELEASE_NAMESPACE=$(echo $RESULT |jq -r '.namespace')
+      RELEASE_REVISION=$(echo $RESULT |jq -r '.revision')
+      werf helm -n ${RELEASE_NAMESPACE} get metadata ${RELEASE_NAME}
+      if [ '$RELEASE_REVISION' -le 1 ]; then
+        echo -e "\e[31mThis is the first release: $(echo $RELEASE_NAME)\e[0m"
+        exit 1
+      fi
+      ((RELEASE_REVISION--))
+      werf helm rollback --wait --timeout=10m0s --verbose --namespace=${RELEASE_NAMESPACE} ${RELEASE_NAME} ${RELEASE_REVISION}
+    else
+      echo -e "\e[31mThe release is not deployed, rollback is not needed\e[0m"
+    fi
+
+.script_get_release_name:
+  - |
+    echo "Add info about release name in cluster"
+    DEPLOY_REPORT=$(cat .werf-deploy-report.json)
+    REQUEST_URL=$(printf '%s/projects/%s/packages/generic/release_lock/0.0.1/.cluster_release_name' ${CI_API_V4_URL} ${CI_PROJECT_ID})
+
+    REQUEST_OUT=$(mktemp)
+    REQUEST_CODE=$(printf '%s' ${DEPLOY_REPORT} | curl -X PUT -s -o "$REQUEST_OUT" -w "%{http_code}" --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" --data @- ${REQUEST_URL})
+    [ "$REQUEST_CODE" -eq 200 -o "$REQUEST_CODE" -eq 201 ] || {
+        echo -e "\e[31m[ERROR] http request failed with response code: ${REQUEST_CODE}\e[0m";
+        cat "$REQUEST_OUT"; rm "$REQUEST_OUT";
+        exit 1; }
+    cat "$REQUEST_OUT"; rm "$REQUEST_OUT";
+
+.script_delete_tag:
+  - |
+    REQUEST_URL=$(printf '%s/projects/%s/repository/tags/%s' ${CI_API_V4_URL} ${CI_PROJECT_ID} ${CI_COMMIT_TAG})
+
+    REQUEST_CODE=$(curl -X DELETE -s -o /dev/null -w "%{http_code}" --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" ${REQUEST_URL})
+    [ "$REQUEST_CODE" -eq 200 -o "$REQUEST_CODE" -eq 204 -o "$REQUEST_CODE" -eq 404 ] || {
+        echo -e "\e[31m[ERROR] http request failed with response code: ${REQUEST_CODE}\e[0m";
+        exit 1; }
+
+.script_run_jobs_after_close_release:
+  - |
+    # Filling JOBS_AFTER_CLOSE_RELEASE if it is set
+    IFS=',' read -r -a JOBS_AFTER_CLOSE_RELEASE <<< "$JOBS_AFTER_CLOSE_RELEASE"
+    # Getting a list of jobs for the pipeline
+    jobs_json=$(curl --silent --header "PRIVATE-TOKEN: $PRIVATE_TOKEN" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/jobs")
+    # Checking for a list of jobs
+    if [ -z "$jobs_json" ]; then
+      echo "Unable to retrieve job data."
+      exit 1
+    fi
+    # Looping through JOBS_AFTER_CLOSE_RELEASE
+    for job_name in "${JOBS_AFTER_CLOSE_RELEASE[@]}"; do
+      # getting ID
+      job_id=$(echo "$jobs_json" | jq --arg JOB_NAME "$job_name" -r '.[] | select(.name == $JOB_NAME) | .id')
+      # Check if ID is found
+      if [ -n "$job_id" ]; then
+        echo "Job ID for '$job_name' found: $job_id"
+        # launch the job with this ID
+        response=$(curl --silent --request POST --header "PRIVATE-TOKEN: $PRIVATE_TOKEN" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/$job_id/play")
+        # checking
+        play_job_id=$(echo "$response" | jq -r '.id')
+        if [ -n "$play_job_id" ] && [ "$play_job_id" != "null" ]; then
+          echo "Job '$job_name' successfully started with new ID: $play_job_id - ${CI_PROJECT_URL}/-/jobs/$play_job_id"
+        else
+          echo "Failed to start job '$job_name'. Error '$response'"
+        fi
+      else
+        echo "Job with name '$job_name' not found"
+      fi
+    done
+
+.script_clean_cache_on_delete_release:
+  - |
+    if [[ $CI_PROJECT_NAME =~ ^web-ui-shop ]]; then
+      JOB_ID=$(curl -s -XGET -H "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/jobs" | jq --arg name "Purge CF SSR Cache if delete release web-ui-shop" '.[] | select(.name == $name) | .id')
+      # Trigger the job
+      curl -s --request POST --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/${JOB_ID}/play"
+      # Poll for job completion
+      echo "Waiting for job ${JOB_ID} to complete..."
+      while true; do
+        STATUS=$(curl -s -H "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/${JOB_ID}" | jq -r '.status')
+        if [[ "$STATUS" == "success" ]]; then
+          echo "Job completed successfully"
+          break
+        elif [[ "$STATUS" == "failed" || "$STATUS" == "canceled" ]]; then
+          echo "Job ${JOB_ID} failed or was canceled"
+          exit 1
+        fi
+        echo "Job status: ${STATUS}"
+        sleep 10
+      done
+    fi
+
+.script_check_commits_before_close_release:
+  - |
+    TAG_BRANCH=$(curl -s --header "PRIVATE-TOKEN: ${RELEASE_BOT_TOKEN}" \
+      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags/${CI_COMMIT_TAG}" | \
+      jq -r '.message')
+  - echo "Running additional validation steps for tag ${CI_COMMIT_TAG} and branch ${TAG_BRANCH}"
+  - git fetch
+  - git pull origin ${TAG_BRANCH} --allow-unrelated-histories
+  - |
+    TAG_COMMIT=$(git rev-list -n 1 ${CI_COMMIT_TAG})
+    echo -e "\e[32m Last commit SHA in tag ${CI_COMMIT_TAG} is ${TAG_COMMIT} \e[0m"
+    git checkout ${TAG_BRANCH}
+    LATEST_COMMIT=$(git rev-list -n 1 ${TAG_BRANCH})
+    echo -e "\e[32m Last commit SHA in branch ${TAG_BRANCH} is ${LATEST_COMMIT} \e[0m"
+    if [ "$TAG_COMMIT" != "$LATEST_COMMIT" ]; then
+      echo -e "\e[33mThere are new commits in the branch after the tag was created and not deployed to production.\e[0m"
+      echo -e "\e[33mRestart the release with the Restart Release job and deploy the new changes to production.\e[0m"
+      exit
+    else
+      echo -e "\e[32mNo new commits in the branch after the tag was created. Proceeding.\e[0m"
+    fi
+
+Close Release:
+  extends:
+    - .base_job
+  stage: release
+  dependencies:
+    - Deploy to Production
+  needs:
+    - Deploy to Production
+  script:
+    # Get tag name
+    - !reference [.script_get_tag_name]
+    # Checking for the correct lock
+    - !reference [.script_check_lock]
+    # Checking the last commits for tag and branch
+#    - !reference [.script_check_commits_before_close_release]
+    # Checking mergeability and merge
+    - !reference [.script_check_mergeability_and_merge]
+    # Write pipeline of the last applied release
+    - !reference [.script_write_last_applied_release]
+    # Remove lock
+    - !reference [.script_remove_lock]
+  when: manual
+
+Restart Release (remove tag & lock file):
+  extends:
+    - .base_job
+  stage: restart_release
+  script:
+    # Get tag name
+    - !reference [.script_get_tag_name]
+    # Checking for the correct lock
+    - !reference [.script_check_lock]
+    # Delete tag
+    - !reference [.script_delete_tag]
+    # Remove lock
+    - !reference [.script_remove_lock]
+  when: manual
+
+Rollback Release (remove tag & lock file & rollback release in production):
+  extends:
+    - .base_job
+  stage: delete_release
+  variables:
+    WERF_KUBE_CONTEXT: ${CONTEXT_PRODUCTION_MAIN}
+  script:
+    # Get tag name
+    - !reference [.script_get_tag_name]
+    # Checking for the correct lock
+    - !reference [.script_check_lock]
+    # Rollback to last applied release
+    - !reference [.script_rollback_release]
+    # Clean CF cache for web-ui-shop
+    - !reference [.script_clean_cache_on_delete_release]
+    # Delete tag
+    - !reference [.script_delete_tag]
+    # Remove lock
+    - !reference [.script_remove_lock]
+  when: manual
+
+Update release description:
+  extends: .base_job
+  stage: production
+  script:
+    # Add pipeline URL to release
+    - !reference [.script_add_pipeline_url]
+  when: always
+  allow_failure: true
+
+# manual deploy to production
+Deploy to Production:
+  extends: .deploy
+  stage: production
+  environment:
+    name: production
+  variables:
+    WERF_SAVE_DEPLOY_REPORT: true
+    KUBE_NAMESPACE: production
+    WERF_KUBE_CONTEXT: ${CONTEXT_PRODUCTION_MAIN}
+    WERF_SET_CLUSTER_INFO: global.cluster_type=production
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${CONTEXT_PRODUCTION_MAIN}
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+  after_script:
+    # Get release name for rollback
+    - !reference [.script_get_release_name]
+  when: manual
+  needs:
+    - pipeline: $PARENT_PIPELINE_ID
+      job: Build
+      artifacts: true
+    - job: "Upload static to S3 Production"
+      optional: true
+
+# Trigger Auto Deploy after Close Release
+Deploy after Close Release:
+  extends:
+    - .base_job
+  stage: release
+  dependencies:
+    - Close Release
+  needs:
+    - Close Release
+  variables:
+    JOBS_AFTER_CLOSE_RELEASE: "Deploy to Production-reserve,Deploy to NEW Production Reserve (with replicas),Deploy to Demo,Deploy to Sales"
+  script:
+    - !reference [.script_run_jobs_after_close_release]
+  when: on_success
+
+.deploy-production-reserve:
+  extends: .deploy
+  stage: production-reserve
+  environment:
+    name: production
+  variables:
+    KUBE_NAMESPACE: production
+    WERF_KUBE_CONTEXT: ${CONTEXT_PRODUCTION_RESERVE}
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${CONTEXT_PRODUCTION_RESERVE}
+  when: manual
+
+# Auto Deploy to Production-reserve with replicas after Close Release
+Deploy to Production-reserve:
+  extends:
+    - .deploy-production-reserve
+    - .include_replicas
+  dependencies:
+    - Close Release
+  needs:
+    - job: Close Release
+    - pipeline: $PARENT_PIPELINE_ID
+      job: Build
+      artifacts: true
+  variables:
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+  only:
+    variables:
+      - $DEPLOY_TO_RESERVE_CLUSTER == "true"
+  when: manual
+
+# Auto Deploy to Demo after Close Release
+Deploy to Demo:
+  extends: .deploy
+  stage: demo
+  dependencies:
+    - Close Release
+  needs:
+    - job: Close Release
+    - pipeline: $PARENT_PIPELINE_ID
+      job: Build
+      artifacts: true
+  environment:
+    name: demo
+  variables:
+    KUBE_NAMESPACE: demo
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=dev
+  when: manual
+
+# Auto Deploy to Sales after Close Release
+Deploy to Sales:
+  extends: .deploy
+  stage: sales
+  dependencies:
+    - Close Release
+  needs:
+    - job: Close Release
+    - pipeline: $PARENT_PIPELINE_ID
+      job: Build
+      artifacts: true
+  environment:
+    name: sales
+  variables:
+    KUBE_NAMESPACE: sales
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=dev
+  when: manual
+
+# Auto Deploy Ingresses to Production-reserve after Close Release
+Deploy Ingresses to Production-reserve:
+  extends:
+    - .deploy-production-reserve
+  dependencies:
+    - Deploy to Production
+  needs:
+    - Deploy to Production
+  variables:
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+  only:
+    variables:
+      - $CI_PROJECT_NAME == "ingresses"
+  when: on_success
+
+# manual deploy to production-reserve
+Deploy to Production-reserve-manual:
+  extends:
+    - .deploy-production-reserve
+  variables:
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve-manual
+  only:
+    variables:
+      - $MANUAL_RESERVE_CLUSTER == "manual"
+  when: manual
+
+# Manual Deploy to Production-reserve with replicas
+Deploy to Production-reserve-manual-with-reserve-replicas:
+  extends:
+    - .deploy-production-reserve
+    - .include_replicas
+  variables:
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve-manual
+  only:
+    variables:
+      - $MANUAL_RESERVE_CLUSTER == "manual"
+  when: manual
+
+## Deploy to NEW Production Reserve
+#Deploy to NEW Production Reserve:
+#  extends: .deploy
+#  stage: production-reserve
+#  environment:
+#    name: production-reserve
+#  variables:
+#    KUBE_NAMESPACE: production
+#    CI_ENVIRONMENT_CUSTOM_SLUG: production
+#    WERF_ENV: production
+#    WERF_KUBE_CONTEXT: ${CONTEXT_PRODUCTION_RESERVE_NEW}
+#    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${CONTEXT_PRODUCTION_RESERVE_NEW}
+#    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve-manual
+#  only:
+#    variables:
+#      - $DEPLOY_TO_PROD_RESERVE_CLUSTER == "true"
+#  when: manual
+#
+## Auto Deploy to NEW Production Reserve after Close Release
+#Deploy to NEW Production Reserve (with replicas):
+#  extends:
+#    - Deploy to NEW Production Reserve
+#    - .include_replicas
+#  needs:
+#    - job: Close Release
+#  dependencies:
+#    - Close Release
+#  variables:
+#    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve

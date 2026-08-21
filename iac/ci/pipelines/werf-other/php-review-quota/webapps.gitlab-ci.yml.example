@@ -1,0 +1,198 @@
+variables:
+  WERF_VERSION: "1.2 ea"
+  WERF_NELM: "1"
+  WERF_REQUIRE_BUILT_IMAGES: "1"
+
+stages:
+  - build_docker_for_ci
+  - codecheck
+  - build
+  - plan
+  - deploy
+  - deploy_test
+  - deploy_stage
+  - deploy_prod
+  - cleanup
+
+default:
+  tags:
+    - docker
+
+## Scripts
+.scripts:
+  setup_werf:
+    - type trdl && source "$(~/bin/trdl use werf ${WERF_VERSION})"
+    - werf version
+    - type werf && source "$(werf ci-env gitlab --as-file)"
+
+    - section_name="envs_$(date +%s)"
+    - echo -e "\e[0Ksection_start:`date +%s`:${section_name}[collapsed=true]\r\e[0KJob environment variables"
+    - |
+      echo "WERF_ENV=${WERF_ENV}"
+      echo "WERF_NAMESPACE=${WERF_NAMESPACE}"
+      echo "WERF_KUBE_CONTEXT=${WERF_KUBE_CONTEXT}"
+      echo "CI_COMMIT_REF_SLUG=${CI_COMMIT_REF_SLUG}"
+      echo "CI_ENVIRONMENT_SLUG=${CI_ENVIRONMENT_SLUG}"
+    - printenv | sort
+    - echo -e "\e[0Ksection_end:`date +%s`:${section_name}\r\e[0K"
+
+## Base
+.base_converge:
+  stage: deploy
+  needs:
+    - Build
+  variables:
+    WERF_NAMESPACE: ${CI_ENVIRONMENT_SLUG}
+    WERF_KUBE_CONTEXT: cluster-a
+    WERF_SET_CLUSTER: "global.cluster=${WERF_KUBE_CONTEXT}"
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf converge
+  before_script:
+    - MAX_REVIEW=${MAX_REVIEW:-3}
+    - DEPLOYED_REVIEW=$(helm list -q --all | grep -F "$CI_PROJECT_NAME-review" | sort | uniq | grep -cv "$CI_PROJECT_NAME-$CI_ENVIRONMENT_SLUG") || true
+    - if (("$DEPLOYED_REVIEW" >= "$MAX_REVIEW")); then ( echo "Review environment quota reached ($MAX_REVIEW); stop unused review environments" && exit 1; ); fi
+  when: manual
+  except:
+    - schedules
+
+.base_plan:
+  stage: plan
+  environment:
+    action: prepare
+  variables:
+    WERF_NELM: "1"
+    WERF_NAMESPACE: ${CI_ENVIRONMENT_SLUG}
+    WERF_KUBE_CONTEXT: cluster-a
+    WERF_SET_CLUSTER: "global.cluster=${WERF_KUBE_CONTEXT}"
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf plan
+  when: manual
+  only:
+    - /^infra.*$/
+  except:
+    - schedules
+
+## Tests
+build_docker_for_ci:
+  stage: build_docker_for_ci
+  script:
+    - docker build --rm -t php-tools-ci -f .docker/images/php-for-ci/Dockerfile .
+  except:
+    - schedules
+  tags:
+    - docker
+
+codecheck:
+  stage: codecheck
+  image: composer
+  script:
+    - COMMIT_BRANCH="${CI_COMMIT_BRANCH:-$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}";
+    - CHANGED_FILES=$(
+      if [[ $COMMIT_BRANCH == $CI_DEFAULT_BRANCH ]]; then
+      git log -m -1 --name-only --diff-filter=ACM --pretty="format:" "$CI_COMMIT_SHA";
+      else
+      git branch -a | grep -q "remotes/origin/$CI_DEFAULT_BRANCH" || git fetch origin $CI_DEFAULT_BRANCH:refs/remotes/origin/$CI_DEFAULT_BRANCH;
+      git diff --name-status --diff-filter=ACM --pretty="" origin/$CI_DEFAULT_BRANCH...HEAD | awk '{print $2}';
+      fi |
+      awk 'NF' |
+      { grep -E '^app/|^tests/' || true; } |
+      xargs
+      )
+    - docker run --rm --entrypoint /bin/bash php-tools-ci -c "cd /app && composer self-update --2 && composer install && composer validate && ( echo '${CHANGED_FILES}' | xargs -rl ./vendor/bin/phpcs --standard=PSR12 )"
+  except:
+    - schedules
+  allow_failure: true
+  tags:
+    - docker
+
+## Build
+Build:
+  stage: build
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf build
+  except:
+    - schedules
+
+## Plan
+Plan to Production cluster-b:
+  extends: .base_plan
+  stage: plan
+  environment:
+    name: production-cluster-b
+    url: http://app.example.com
+    action: prepare
+  variables:
+    WERF_ENV: production
+    WERF_NAMESPACE: production
+    WERF_KUBE_CONTEXT: cluster-b
+  only:
+    - /^infra.*$/
+  except:
+    - schedules
+
+## Deploy
+Deploy to Test:
+  extends: .base_converge
+  stage: deploy_test
+  environment:
+    name: test
+    url: http://webapps-${CI_ENVIRONMENT_SLUG}.review.example.com
+  variables:
+    WERF_KUBE_CONTEXT: cluster-a
+
+Deploy to Stage:
+  extends: .base_converge
+  stage: deploy_stage
+  environment:
+    name: stage
+    url: http://webapps-${CI_ENVIRONMENT_SLUG}.review.example.com
+  variables:
+    WERF_KUBE_CONTEXT: cluster-a
+  only:
+    - master
+    - /^k8s-.*$/
+
+## Production
+Deploy to Production cluster-a:
+  extends: .base_converge
+  stage: deploy_prod
+  environment:
+    name: production
+    url: http://widgets.example.com
+  variables:
+    WERF_KUBE_CONTEXT: cluster-a
+  only:
+    - /^k8s-.*$/
+  except:
+    - schedules
+    - /^k8s-beta-.*$/
+
+Deploy to Production cluster-b:
+  extends: .base_converge
+  stage: deploy_prod
+  environment:
+    name: production-cluster-b
+    url: http://app.example.com
+  variables:
+    WERF_ENV: production
+    WERF_NAMESPACE: production
+    WERF_KUBE_CONTEXT: cluster-b
+  only:
+    - /^k8s-.*$/
+    - /^infra.*$/
+  except:
+    - schedules
+    - /^k8s-beta-.*$/
+
+## Cleanup
+Cleanup:
+  stage: cleanup
+  script:
+    - !reference [.scripts, setup_werf]
+    - werf cr login -u nobody -p ${WERF_IMAGES_CLEANUP_PASSWORD} ${CI_REGISTRY_IMAGE}
+    - werf cleanup
+  only:
+    - schedules

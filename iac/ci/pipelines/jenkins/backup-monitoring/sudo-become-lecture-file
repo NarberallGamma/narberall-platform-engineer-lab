@@ -1,0 +1,2 @@
+Defaults lecture_file = /etc/become-message
+Defaults lecture = always

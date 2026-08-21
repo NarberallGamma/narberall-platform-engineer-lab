@@ -8,12 +8,16 @@
 | [`iac/terraform/aws/live/`](../iac/terraform/aws/live/) | Account/region/env Terragrunt; EKS + Karpenter-class placeholder | Hours to a day for a HA EKS-class cluster + monitoring starter, not a quarter |
 | [`iac/terraform/examples/greenfield-platform/`](../iac/terraform/examples/greenfield-platform/) | Compose the modules | Same day as the first apply |
 | [`iac/ci/pipelines/host-lifecycle.gitlab-ci.yml.example`](../iac/ci/pipelines/host-lifecycle.gitlab-ci.yml.example) | Plan → apply → Ansible → Vault → metrics → docs | One pipeline, one host, minutes after runners exist |
+| [`iac/ci/pipelines/common-ci-estate/`](../iac/ci/pipelines/common-ci-estate/) | Shared Kaniko / Helm / Argo includes + nested release cutover | Hours once the include project and runners exist. Consumer repo is one `include:` |
+| [`iac/ci/pipelines/java-gradle/`](../iac/ci/pipelines/java-gradle/) | Service hubs (test, Sonar, deploy, AppSec). `jobs/build/*` commented | Hours to attach a hub. Build job files are an honest gap, not invented |
+| [`iac/ci/pipelines/werf-retail/`](../iac/ci/pipelines/werf-retail/) | Multi-stage werf + Trivy + Sonar + cleanup | Hours once werf and a registry exist. No OSV YAML |
 | [`practice/home-lab/reference/ai/llm-compose-kit/`](../practice/home-lab/reference/ai/llm-compose-kit/) | Ollama-class GPU serve | Minutes on a box that already has NVIDIA + Compose |
 | [`practice/workstation/reference/mcp-replicate/`](../practice/workstation/reference/mcp-replicate/) | Replicate MCP wrapper + `replicate-img` (async poll) | Minutes on Linux, macOS, or WSL once a token file exists |
 | [`practice/workstation/reference/scripts/`](../practice/workstation/reference/scripts/) | SSH / kube / Ansible / JSM helpers any agent host calls (Cursor, Claude Code, Codex, local) | Hours on a new laptop; same kit, any of those OS |
 | [`iac/ansible/reference/monitoring-starter/`](../iac/ansible/reference/monitoring-starter/) | Host metrics | Minutes via Ansible |
 | [`iac/ansible/reference/ansible-llm-collab/`](../iac/ansible/reference/ansible-llm-collab/) | GPU/LLM + Nextcloud + Kafka + CIS | Hours once inventory and GPU host exist |
-| [`iac/ansible/reference/ansible-estate/`](../iac/ansible/reference/ansible-estate/) | docker_app family + Vault + hibernate + RDS Flyway/RO/RW users | Hours for one app after SSH and images exist |
+| [`iac/ansible/reference/ansible-estate/`](../iac/ansible/reference/ansible-estate/) | docker_app family + Vault + hibernate + RDS Flyway/RO/RW users. Operator images those playbooks consume live under [`iac/docker/images/operators/`](../iac/docker/images/operators/) | Hours for one app after SSH and images exist |
+| [`iac/docker/images/operators/`](../iac/docker/images/operators/) | Estate sidecars docker_app and the Huawei-class overlay consume (hibernate, certs, CloudEye / status) | Hours once a registry tag exists |
 | [`iac/ansible/reference/ansible-app-platform/`](../iac/ansible/reference/ansible-app-platform/) | Kafka mTLS, EDR, Prometheus, Postgres users | Hours after hosts are inventory |
 | [`iac/ansible/reference/ansible-kb-linux/`](../iac/ansible/reference/ansible-kb-linux/) | PostgreSQL / Percona / NTP / host audit | Hours for a Linux DB or NTP estate |
 | [`iac/ansible/reference/ansible-backup-borg/`](../iac/ansible/reference/ansible-backup-borg/) | Borg user + dump scripts | Hours once the backup host and keys exist |

@@ -1,0 +1,170 @@
+.rules_master_main:
+  - if: $CI_COMMIT_BRANCH == 'master'
+  - if: $CI_COMMIT_BRANCH == 'main'
+
+.rules_merge:
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
+.rules_not_merge:
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    when: never
+
+.rules_not_schedule:
+  - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    when: never
+
+.rules_schedule:
+  - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
+.rules_cleanup:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $CLEANUP_JOB == "TRUE"
+    when: always
+  - when: never
+
+.rules_ready_to_prod:
+  - if: $CI_TYPE == "ready_to_prod"
+  - when: never
+
+.rules_create_release:
+  - if: $CI_TYPE == "create_release"
+  - when: never
+
+.rules_not_release_prod:
+  - if: $CI_TYPE == "create_release" || $CI_TYPE == "ready_to_prod"
+    when: never
+
+.rules_develop:
+  - if: $CI_COMMIT_BRANCH == 'develop'
+
+.rules_development:
+  - if: $CI_COMMIT_BRANCH == 'development'
+    when: manual
+
+.rules_test_portal:
+  - if: $CI_COMMIT_BRANCH == 'test_portal'
+    when: manual
+
+.rules_test_delivery:
+  - if: $CI_COMMIT_BRANCH == 'test_delivery'
+    when: manual
+
+.rules_test_ecommerce:
+  - if: $CI_COMMIT_BRANCH == 'test_ecommerce'
+    when: manual
+
+.rules_test_integration:
+  - if: $CI_COMMIT_BRANCH == 'test_integration'
+    when: manual
+
+.rules_sales:
+  - if: $CI_COMMIT_BRANCH == 'Sales'
+    when: manual
+
+.rules_not_pipeline:
+  - if: $CI_PIPELINE_SOURCE == "pipeline"
+    when: never
+
+.rules_pipeline:
+  - if: $CI_PIPELINE_SOURCE == "pipeline"
+
+.rules_pipeline_and_default_branch:
+  - if: $CI_PIPELINE_SOURCE == "pipeline" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.rules_not_parent_pipeline:
+  - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
+    when: never
+
+.rules_not_trigger:
+  - if: "$CI_PIPELINE_SOURCE == 'trigger'"
+    when: never
+
+.rules_trigger:
+  - if: "$CI_PIPELINE_SOURCE == 'trigger'"
+
+.rules_not_tag:
+  - if: $CI_COMMIT_TAG
+    when: never
+
+.rules_tag:
+  - if: $CI_COMMIT_TAG
+
+.rules_not_feature_sales_release:
+  - if: $CI_COMMIT_BRANCH =~ /^feature.*$|^sales.*$|^release.*$/
+    when: never
+
+.rules_branch_sales:
+  - if: $CI_COMMIT_BRANCH =~ /stage|master|production/
+
+.rules_branch_sales_migration:
+  - if: $CI_COMMIT_BRANCH =~ /stage|master|production|^sales.*$|^release.*$/
+
+.rules_branch_stage:
+  - if: $CI_COMMIT_BRANCH =~ /stage|master|production|dev|develop|development/
+
+.rules_branch_stage_migration:
+  - if: $CI_COMMIT_BRANCH =~ /master|production|dev|develop|development|stage|^sales.*$|^release.*$/
+
+.rules_deploy_to_existed_reviews:
+  - if: $CI_COMMIT_BRANCH =~ /stage|master|production|^sales.*$|^release.*$|^infra-ops.*$|^feature.*$/
+
+.rules_branch_dev:
+  - if: $CI_COMMIT_BRANCH =~ /dev|develop|development|^release.*$/
+
+.rules_branch_demo:
+  - if: $CI_COMMIT_BRANCH =~ /master|production|dev|develop|development|demo|^sales.*$|^release.*$/
+
+.rules_branch_pilot:
+  - if: $CI_COMMIT_BRANCH =~ /master|production|dev|develop|development|demo|pilot|^sales.*$|^release.*$/
+
+.rules_production:
+  - if: $CI_COMMIT_BRANCH =~ /master|main|production|^sales.*$|^release.*$/
+
+.rules_ingress_reserve:
+  - if: $CI_PROJECT_NAME == "ingresses" && $CI_COMMIT_BRANCH =~ /master|production|^sales.*$|^release.*$/
+
+.rules_deploy_reserve:
+  - if: $DEPLOY_TO_RESERVE_CLUSTER == "true" && $CI_COMMIT_BRANCH =~ /master|production|^sales.*$|^release.*$/
+
+.rules_manual_reserve:
+  - if: $MANUAL_RESERVE_CLUSTER == "manual" && $CI_COMMIT_BRANCH =~ /master|production|^sales.*$|^release.*$|^infra-ops.*$/
+
+.rules_commit_ref_slug:
+  - if: $CI_COMMIT_REF_SLUG =~ /^feature.*$/
+
+.rules_infra_ops:
+  - if: $CI_COMMIT_BRANCH =~ /^infra-ops.*$/
+    when: manual
+    allow_failure: true
+
+.rules_review_step:
+  - if: $CI_COMMIT_BRANCH =~ /^feature.*$/
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+    when: never
+  - if: $CI_COMMIT_BRANCH =~ /master|main|estate-k8s|infra-ops|dev|develop/
+    when: never
+  - if: $CI_COMMIT_TAG != null
+    when: never
+
+.rules_review_vars:
+  - if: $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NAMESPACE =~ /^feature-.*/ ||  $CI_COMMIT_REF_SLUG =~ /^feature-.*/
+  - if: $WERF_NEW_NAMESPACE =~ /^feature-.*/
+  - if: $WERF_EXISTED_NAMESPACE =~ /^feature-.*/
+  - if: $WERF_NAMESPACE =~ /^feature-.*/
+  - if: $CI_COMMIT_REF_SLUG =~ /^feature-.*/
+
+.rules_sentry:
+  - if: $CI_PROJECT_NAME =~ /^web-ui-.*$/
+
+.rules_dev_sentry_release:
+  - !reference [.rules_not_schedule]
+  - !reference [.rules_not_trigger]
+  - !reference [.rules_not_pipeline]
+  - !reference [.rules_not_release_prod]
+
+.rules_dev_sentry:
+  - if: $CI_COMMIT_REF_SLUG =~ /^feature.*$|^release.*$/
+    when: never
+  - !reference [.rules_not_schedule]
+  - !reference [.rules_not_trigger]
+  - !reference [.rules_not_pipeline]
+  - !reference [.rules_not_release_prod]

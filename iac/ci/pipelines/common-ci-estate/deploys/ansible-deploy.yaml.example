@@ -1,0 +1,100 @@
+# Sync the Ansible repo onto the Git runner host. Any update of main rsyncs into /ansible.
+# When CI variables ANSIBLE_SSH_PRIVATE_KEY_B64 and/or GITLAB_RUNNER_SSH_PRIVATE_KEY_B64 are set
+# (private keys as one-line base64, Masked in GitLab), write them under /ansible/.ssh/ (chmod 600, owner ansible).
+# When VAULT_ADDR and VAULT_TOKEN are set, write /ansible/.env.vault (chmod 600, owner ansible).
+# rsync --delete: git has no artifacts/; --filter P artifacts keeps /ansible/artifacts/ on the host.
+
+spec:
+  inputs:
+    PLAYBOOK:
+      default: ""
+      description: "Playbook after sync (empty = sync only)"
+    ANSIBLE_REPO_CHOWN_USER:
+      default: "ansible"
+      description: "Owner of the repo directory"
+    ANSIBLE_REPO_CHOWN_UID:
+      default: "1001"
+      description: "Owner UID"
+    ANSIBLE_REPO_CHOWN_GID:
+      default: "1001"
+      description: "Owner GID"
+    ANSIBLE_IMAGE:
+      default: "example.registry/estate/base-images/ansible:1.0"
+      description: "Ansible image (for the playbook)"
+---
+include:
+  - local: '/defaults.yaml.example'
+
+default:
+  tags:
+    - docker
+  timeout: 1h
+  interruptible: true
+
+stages:
+  - deploy
+
+variables:
+  PLAYBOOK: $[[ inputs.PLAYBOOK ]]
+  ANSIBLE_REPO_DEPLOY_PATH: "/ansible"
+  ANSIBLE_REPO_CHOWN_USER: $[[ inputs.ANSIBLE_REPO_CHOWN_USER ]]
+  ANSIBLE_REPO_CHOWN_UID: $[[ inputs.ANSIBLE_REPO_CHOWN_UID ]]
+  ANSIBLE_REPO_CHOWN_GID: $[[ inputs.ANSIBLE_REPO_CHOWN_GID ]]
+  ANSIBLE_IMAGE: $[[ inputs.ANSIBLE_IMAGE ]]
+
+# Deploy onto the runner host (config.toml volume: /ansible). Runs on every push to main.
+deploy-ansible:runner_host:
+  stage: deploy
+  image: $BASE_IMAGE
+  before_script:
+    - init.sh
+  script:
+    - mkdir -p "${ANSIBLE_REPO_DEPLOY_PATH}"
+    - rsync -a --delete --exclude='.git/objects' --exclude='.git/logs' --filter='P artifacts' "${CI_PROJECT_DIR}/" "${ANSIBLE_REPO_DEPLOY_PATH}/"
+    - find "${ANSIBLE_REPO_DEPLOY_PATH}" -type d -exec chmod 755 {} \;
+    - find "${ANSIBLE_REPO_DEPLOY_PATH}" -type f -exec chmod 644 {} \;
+    - find "${ANSIBLE_REPO_DEPLOY_PATH}" -name "*.sh" -type f -exec chmod 755 {} \;
+    - chown -R "${ANSIBLE_REPO_CHOWN_UID}:${ANSIBLE_REPO_CHOWN_GID}" "${ANSIBLE_REPO_DEPLOY_PATH}" || true
+    - |
+      find "${ANSIBLE_REPO_DEPLOY_PATH}" -type f \( -name "*.sh" -o -name "*.yml" -o -name "*.yaml" -o -name "*.ini" -o -name "*.cfg" -o -name "*.md" \) ! -path "${ANSIBLE_REPO_DEPLOY_PATH}/.git/*" -exec sed -i 's/\r$//' {} \;
+    - |
+      if [ -n "${VAULT_ADDR:-}" ] && [ -n "${VAULT_TOKEN:-}" ]; then
+        printf 'export VAULT_ADDR="%s"\nexport VAULT_TOKEN="%s"\n' "${VAULT_ADDR}" "${VAULT_TOKEN}" > "${ANSIBLE_REPO_DEPLOY_PATH}/.env.vault"
+        chmod 600 "${ANSIBLE_REPO_DEPLOY_PATH}/.env.vault"
+        chown "${ANSIBLE_REPO_CHOWN_UID}:${ANSIBLE_REPO_CHOWN_GID}" "${ANSIBLE_REPO_DEPLOY_PATH}/.env.vault"
+      fi
+    - mkdir -p "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh"
+    - |
+      b64_decode_ci_var() {
+        local raw="$1" pad n
+        raw=$(printf '%s' "$raw" | tr -d '\n=')
+        n=${#raw}
+        pad=$(( (4 - n % 4) % 4 ))
+        case $pad in
+          1) raw="${raw}=" ;;
+          2) raw="${raw}==" ;;
+          3) raw="${raw}===" ;;
+        esac
+        printf '%s' "$raw" | base64 -d
+      }
+      if [ -n "${ANSIBLE_SSH_PRIVATE_KEY_B64:-}" ]; then
+        b64_decode_ci_var "${ANSIBLE_SSH_PRIVATE_KEY_B64}" > "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh/ansible_ssh_key"
+        printf '\n' >> "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh/ansible_ssh_key"
+        chmod 700 "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh"
+        chmod 600 "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh/ansible_ssh_key"
+        chown -R "${ANSIBLE_REPO_CHOWN_UID}:${ANSIBLE_REPO_CHOWN_GID}" "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh"
+      fi
+    - |
+      if [ -n "${GITLAB_RUNNER_SSH_PRIVATE_KEY_B64:-}" ]; then
+        b64_decode_ci_var "${GITLAB_RUNNER_SSH_PRIVATE_KEY_B64}" > "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh/gitlab_runner_ssh_key"
+        printf '\n' >> "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh/gitlab_runner_ssh_key"
+        chmod 700 "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh"
+        chmod 600 "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh/gitlab_runner_ssh_key"
+        chown -R "${ANSIBLE_REPO_CHOWN_UID}:${ANSIBLE_REPO_CHOWN_GID}" "${ANSIBLE_REPO_DEPLOY_PATH}/.ssh"
+      fi
+    - |
+      if [ -n "${PLAYBOOK}" ]; then
+        docker run --rm -v "${ANSIBLE_REPO_DEPLOY_PATH}:${ANSIBLE_REPO_DEPLOY_PATH}" -w "${ANSIBLE_REPO_DEPLOY_PATH}" "${ANSIBLE_IMAGE}" ansible-playbook -i "localhost," -e "ansible_connection=local" "${PLAYBOOK}" || true
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

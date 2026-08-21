@@ -1,0 +1,40 @@
+# Build the cert-orchestrator image and push it to the container registry.
+# Include directly: project: 'estate/common-ci', file: '/builds/cert-orchestrator-build.yaml.example'
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - k8s-kaniko
+  timeout: 8h
+  interruptible: true
+
+stages:
+  - build
+
+variables:
+  CERT_ORCHESTRATOR_IMAGE_NAME: "cert-orchestrator"
+  CERT_ORCHESTRATOR_IMAGE_TAG: "1.0"
+
+build-cert-orchestrator:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - |
+      if [ -d "$CI_PROJECT_DIR/base-images/cert-orchestrator" ]; then
+        CONTEXT="$CI_PROJECT_DIR/base-images/cert-orchestrator"
+      elif [ -d "$CI_PROJECT_DIR/cert-orchestrator" ]; then
+        CONTEXT="$CI_PROJECT_DIR/cert-orchestrator"
+      else
+        echo "Error: cert-orchestrator directory not found"
+        exit 1
+      fi
+    - /kaniko/executor --context "$CONTEXT" --dockerfile "$CONTEXT/Dockerfile" --destination $CI_REGISTRY_IMAGE/$CERT_ORCHESTRATOR_IMAGE_NAME:$CERT_ORCHESTRATOR_IMAGE_TAG --custom-platform=linux/amd64
+    - echo "Cert orchestrator image built and pushed successfully!"
+  rules:
+    - when: manual

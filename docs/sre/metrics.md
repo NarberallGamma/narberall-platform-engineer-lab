@@ -29,6 +29,15 @@ Groups I provisioned (names only; YAML in git):
 
 Dashboard artefacts include estate ledger/databases, Cloud.ru global, Kafka / Connect, RDS PostgreSQL, Spring Boot 2.1, Node Exporter Full, and Kubernetes views (API server, CoreDNS, global, namespaces, nodes, pods).
 
+## CloudEye / status: image vs chart
+
+I keep the Helm charts and the Dockerfiles as siblings. The chart is the in-cluster package. The image is what CI builds.
+
+| Need | Helm chart | Image |
+|------|------------|-------|
+| CloudEye (RDS / DCS / DMS) | [`../../iac/helm/reference/helm-estate-cluster/monitoring/exporters/prometheus-cloudeye-exporter/`](../../iac/helm/reference/helm-estate-cluster/monitoring/exporters/prometheus-cloudeye-exporter/) | [`../../iac/docker/images/operators/cloud-metrics/`](../../iac/docker/images/operators/cloud-metrics/) Dockerfile only. `src/` is the upstream Go tree and stays out |
+| Cloud.ru emergency / planned work | [`../../iac/helm/reference/helm-estate-cluster/monitoring/exporters/prometheus-cloud-ru-status-exporter/`](../../iac/helm/reference/helm-estate-cluster/monitoring/exporters/prometheus-cloud-ru-status-exporter/) | [`../../iac/docker/images/operators/cloud-status/`](../../iac/docker/images/operators/cloud-status/) HTTP client in git |
+
 ## Prometheus / VictoriaMetrics (host)
 
 | Piece | Path |

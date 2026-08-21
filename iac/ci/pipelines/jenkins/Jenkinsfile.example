@@ -1,0 +1,76 @@
+// Sanitized Jenkinsfile: image build, registry push, AWX deploy trigger.
+// Credential IDs, registry, image tag, and branch are set on the local copy.
+// AWX URL and login stay in Jenkins credentials, not in git.
+
+def repoName = "example.registry/shop-app"
+def repoTag = ":latest"
+def buildBranch = "development/master"
+def builtImage
+
+pipeline {
+
+  agent {
+    // target label for Jenkins worker pods, independent from nodeSelector
+    label 'docker'
+  }
+
+  environment {
+    SSH_KEY = credentials('CHANGE_ME')
+    IMAGE_REGISTRY_CREDENTIALS = 'CHANGE_ME'
+    AWX_API_USER = credentials('CHANGE_ME')
+    AWX_API_PASSWORD = credentials('CHANGE_ME')
+    AWX_API_URL = credentials('CHANGE_ME')
+  }
+
+  stages {
+
+    stage('Build Development image') {
+      when {
+        branch buildBranch
+      }
+
+      steps {
+        script {
+          MY_KEY = sh(
+              script: 'cat $SSH_KEY',
+              returnStdout: true
+            ).trim()
+          def arguments = "--build-arg GIT_SSH_PRIVATE_KEY=\"${MY_KEY}\" .".toString()
+          builtImage = docker.build(repoName + repoTag , "${arguments}" )
+        }
+      }
+    }
+
+    stage('Push to Development registry') {
+      when {
+        branch buildBranch
+      }
+
+      steps {
+        script {
+          docker.withRegistry('', IMAGE_REGISTRY_CREDENTIALS) {
+            builtImage.push()
+          }
+        }
+      }
+    }
+
+    stage('Deploy to Dev environment using AWX') {
+      when {
+        branch buildBranch
+      }
+
+      steps {
+        script {
+          def json = '''\
+            {"extra_vars": {"microservice_identifier": "shop-app"}}
+          '''
+          sh "curl -XPOST -H 'Content-Type: application/json'  \
+          -d '${json}' \
+          --user $AWX_API_USER:$AWX_API_PASSWORD $AWX_API_URL"
+        }
+      }
+    }
+
+  }
+}

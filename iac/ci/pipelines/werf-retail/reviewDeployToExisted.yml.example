@@ -1,0 +1,82 @@
+Generate "Deploy to existed reviews":
+  stage: build
+  variables:
+    GIT_STRATEGY: none
+    WERF_KUBE_CONTEXT: dev
+    KUBERNETES_CPU_REQUEST: "0.2"
+    KUBERNETES_MEMORY_REQUEST: "256Mi"
+  artifacts:
+    paths:
+      - generated-config.yml
+  before_script:
+    - AVAILABLE_NAMESPACES=$(werf kubectl get ns | grep feature- | cut -f1 -d' ')
+    - echo $AVAILABLE_NAMESPACES
+    - ">generated-config.yml"
+  script:
+    - |+
+      for NS in $AVAILABLE_NAMESPACES; do
+      cat <<EOF | tee -a generated-config.yml
+
+      Deploy code to $NS review:
+        stage: review
+        extends:
+          - .base_werf
+        environment:
+          name: $NS
+        variables:
+          WERF_NAMESPACE: $NS
+      EOF
+      cat <<'EOF' | tee -a generated-config.yml
+          WERF_SKIP_BUILD: "true"
+          WERF_KUBE_CONTEXT: dev
+        script:
+          - export WERF_ENV=$(echo ${WERF_NAMESPACE} | sed -E 's|(^feature-[a-zA-Z-]+-[0-9]+).*|\1|g')
+          - if [[ $(echo ${WERF_ENV} | wc -c) -gt 40 ]]; then export WERF_ENV=${CI_ENVIRONMENT_SLUG}; fi
+          # - werf helm dependency build .helm
+          - werf converge
+          - echo "Project urls:";
+            werf helm get manifest $(werf helm get-release)
+            --namespace $WERF_NAMESPACE
+            | yq ea -N '[ .spec.rules[].host ] | unique | .[] |= "https://" + .'
+        when: manual
+
+      EOF
+      done
+
+    - cat generated-config.yml
+  tags:
+    - docker
+  except:
+    - schedules
+    - pipelines
+  only:
+    - stage
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+    - /.*infra-ops.*$/
+    - /^feature.*$/
+  when: manual
+
+Deploy to existed reviews:
+  stage: review
+  needs:
+    - Generate "Deploy to existed reviews"
+  trigger:
+    include:
+      - artifact: generated-config.yml
+        job: Generate "Deploy to existed reviews"
+      - project: shop-app/common-ci
+        file: /common.yml.example
+  only:
+    - stage
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+    - /.*infra-ops.*$/
+    - /^feature.*$/
+  except:
+    - schedules
+    - pipelines

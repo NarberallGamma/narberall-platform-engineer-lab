@@ -1,0 +1,9 @@
+---
+# Example exception list only. Live job inventories stay out of this tree.
+shop-app:
+  db-MYSQL:
+    age: 72
+    size: 5GB
+  db-BINLOG:
+    age: 1
+    size: 50MB

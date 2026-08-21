@@ -1,0 +1,58 @@
+# Common Rules
+.rules:
+  schedule:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  no_schedule:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+  pipeline:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+  no_pipeline:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+      when: never
+  # Branches
+  protected_branches:
+    - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "stage"
+    - if: $CI_COMMIT_BRANCH == "develop"
+  master_branch:
+    - if: $CI_COMMIT_BRANCH == "master"
+  stage_branch:
+    - if: $CI_COMMIT_BRANCH == "stage"
+  develop_branch:
+    - if: $CI_COMMIT_BRANCH == "develop"
+  infra_branch:
+    - if: $CI_COMMIT_REF_SLUG =~ /^infra.*$/
+  # Merge Requests
+  mr_to_protected_branches:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stage"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+  mr_to_master:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"
+  mr_to_stage:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "stage"
+  mr_to_develop:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+.base_rules:
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, pipeline]
+    - !reference [.rules, protected_branches]
+    - !reference [.rules, mr_to_protected_branches]
+
+.build:
+  stage: build
+  extends:
+    - .base_rules
+  variables:
+    GIT_COMMIT_HASH: ${CI_COMMIT_SHORT_SHA}
+    K8S_NAMESPACE: review-${CI_COMMIT_REF_SLUG}
+  script:
+    - werf build
+  tags:
+    - docker

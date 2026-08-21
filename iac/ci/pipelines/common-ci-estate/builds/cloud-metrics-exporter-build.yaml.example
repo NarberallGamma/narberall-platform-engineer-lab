@@ -1,0 +1,43 @@
+include:
+  - local: '/defaults.yaml.example'
+
+# Build the cloud-metrics-exporter image and push it to the container registry.
+# Include directly: project: 'estate/common-ci', file: '/builds/cloud-metrics-exporter-build.yaml.example'
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - k8s-kaniko
+  timeout: 8h
+  interruptible: true
+
+stages:
+  - build
+
+variables:
+  CLOUD_METRICS_EXPORTER_IMAGE_NAME: "cloud-metrics-exporter"
+  CLOUD_METRICS_EXPORTER_IMAGE_TAG: "1.11"
+
+build-cloud-metrics-exporter:
+  stage: build
+  image:
+    name: $KANIKO_IMAGE
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - |
+      if [ -d "$CI_PROJECT_DIR/base-images/cloud-metrics" ]; then
+        CONTEXT="$CI_PROJECT_DIR/base-images/cloud-metrics"
+      elif [ -d "$CI_PROJECT_DIR/cloud-metrics" ]; then
+        CONTEXT="$CI_PROJECT_DIR/cloud-metrics"
+      else
+        echo "Error: cloud-metrics directory not found (base-images/cloud-metrics or cloud-metrics)"
+        exit 1
+      fi
+    - /kaniko/executor --context "$CONTEXT" --dockerfile "$CONTEXT/Dockerfile" --destination $CI_REGISTRY_IMAGE/$CLOUD_METRICS_EXPORTER_IMAGE_NAME:$CLOUD_METRICS_EXPORTER_IMAGE_TAG --custom-platform=linux/amd64
+    - echo "Cloud metrics exporter image built and pushed successfully!"
+  rules:
+    - when: manual

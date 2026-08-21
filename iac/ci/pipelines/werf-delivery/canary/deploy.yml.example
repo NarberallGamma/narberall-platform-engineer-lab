@@ -1,0 +1,49 @@
+include:
+  - local: "canary/common.yml.example"
+  - local: "notify-scripts.yml.example"
+
+Deploy to Dev:
+  extends: .base_converge
+  environment:
+    name: dev
+  variables:
+    WERF_KUBE_CONTEXT: dev
+
+Deploy to Preprod:
+  extends: .base_converge
+  environment:
+    name: preprod
+  variables:
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+  resource_group: preprod
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, platform]
+    - !reference [.rules, production]
+
+Deploy to Prodlike:
+  extends: .base_converge
+  environment:
+    name: prodlike
+  variables:
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+  resource_group: prodlike
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, platform]
+    - !reference [.rules, production]
+
+Deploy to Production:
+  extends: .base_converge
+  stage: production
+  environment:
+    name: production
+  variables:
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+  resource_group: production
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, production]

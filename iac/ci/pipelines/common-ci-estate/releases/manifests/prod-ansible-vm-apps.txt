@@ -1,0 +1,4 @@
+# PROD cutover: ansible docker-apps on the app VM (release-05-deploy-ansible-vm).
+# Format: app_slug limit_host
+# Add a line to include more apps in a future release.
+shop-app host-01.example.com

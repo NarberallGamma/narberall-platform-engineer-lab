@@ -1,0 +1,199 @@
+# Cluster addons: Istio and External Secrets Operator.
+# Deploy image: ci/helmfile (helm + helmfile + helm-diff + kubectl).
+
+stages:
+  - deploy-istio
+  - rollback-istio
+  - deploy-eso
+  - deploy-eso-store
+  - deploy-eso-examples
+  - verify-eso
+  - rollback-eso
+
+variables:
+  REGISTRY_URL: "example.registry"
+  HELM_IMAGE: "${REGISTRY_URL}/ci/helmfile:0.169.1-helm3.18.6-kubectl1.34.3"
+  ISTIO_NAMESPACE: "istio-system"
+  ISTIO_VERSION: "1.30.3"
+  ISTIO_CHART_BASE: "istio/charts/base"
+  ISTIO_CHART_ISTIOD: "istio/charts/istiod"
+  ESO_NAMESPACE: "external-secrets"
+  ESO_VERSION: "2.9.0"
+  ESO_CHART: "eso/charts/external-secrets"
+  ESO_RELEASE: "external-secrets"
+
+default:
+  interruptible: true
+  timeout: 2h
+  tags:
+    - docker
+
+.k8s_helm:
+  image: ${HELM_IMAGE}
+  before_script:
+    - helm version
+    - kubectl version --client
+    - kubectl cluster-info
+    - |
+      if ! kubectl auth can-i create customresourcedefinitions; then
+        echo "ERROR: job ServiceAccount lacks cluster permissions (CRDs)."
+        echo "Apply once from an admin kubeconfig: kubectl apply -f rbac/gitlab-runner-cluster-resources.yaml"
+        exit 1
+      fi
+
+deploy-istio:
+  extends: .k8s_helm
+  stage: deploy-istio
+  script:
+    - |
+      set -euo pipefail
+      echo "Deploying Istio ${ISTIO_VERSION} to namespace ${ISTIO_NAMESPACE}"
+      echo "Charts: vendored ${ISTIO_CHART_BASE} + ${ISTIO_CHART_ISTIOD}"
+      test -f "${ISTIO_CHART_BASE}/Chart.yaml"
+      test -f "${ISTIO_CHART_ISTIOD}/Chart.yaml"
+      kubectl create namespace "${ISTIO_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+      echo "Step 1/2: istio-base (CRDs)..."
+      helm upgrade --install istio-base "${ISTIO_CHART_BASE}" \
+        --namespace "${ISTIO_NAMESPACE}" \
+        --wait \
+        --timeout 5m
+      kubectl get crd | grep istio | head -10 || true
+      echo "Step 2/2: istiod..."
+      helm upgrade --install istiod "${ISTIO_CHART_ISTIOD}" \
+        --namespace "${ISTIO_NAMESPACE}" \
+        --values istio/values.yaml \
+        --wait \
+        --timeout 10m
+      kubectl wait --for=condition=ready pod -l app=istiod -n "${ISTIO_NAMESPACE}" --timeout=600s
+      kubectl get pods -n "${ISTIO_NAMESPACE}" -o wide
+      kubectl get svc -n "${ISTIO_NAMESPACE}"
+      echo "Istio deploy completed. nginx ingress addon is not modified."
+      echo "Sidecars per namespace: kubectl label namespace <ns> istio-injection=enabled"
+  when: manual
+  only:
+    - main
+
+rollback-istio:
+  extends: .k8s_helm
+  stage: rollback-istio
+  script:
+    - |
+      set -euo pipefail
+      echo "Rolling back istiod and istio-base in ${ISTIO_NAMESPACE}"
+      helm rollback istiod -n "${ISTIO_NAMESPACE}" || echo "istiod: no revision to rollback"
+      helm rollback istio-base -n "${ISTIO_NAMESPACE}" || echo "istio-base: no revision to rollback"
+      kubectl get pods -n "${ISTIO_NAMESPACE}" -o wide || true
+  when: manual
+  only:
+    - main
+
+deploy-eso:
+  extends: .k8s_helm
+  stage: deploy-eso
+  script:
+    - |
+      set -euo pipefail
+      echo "Deploying External Secrets Operator ${ESO_VERSION} to namespace ${ESO_NAMESPACE}"
+      echo "Chart: vendored ${ESO_CHART}"
+      test -f "${ESO_CHART}/Chart.yaml"
+      kubectl apply -f eso/manifests/00-namespace.yaml
+      helm upgrade --install "${ESO_RELEASE}" "${ESO_CHART}" \
+        --namespace "${ESO_NAMESPACE}" \
+        --values eso/values.yaml \
+        --wait \
+        --timeout 10m
+      kubectl wait --for=condition=ready pod \
+        -l app.kubernetes.io/name=external-secrets \
+        -n "${ESO_NAMESPACE}" --timeout=600s
+      kubectl get pods -n "${ESO_NAMESPACE}" -o wide
+      kubectl get crd | grep external-secrets || true
+      echo "ESO operator deploy completed. Next: deploy-eso-store"
+  when: manual
+  only:
+    - main
+
+deploy-eso-store:
+  extends: .k8s_helm
+  stage: deploy-eso-store
+  script:
+    - |
+      set -euo pipefail
+      echo "Applying Vault SA + ClusterSecretStore"
+      kubectl apply -f eso/manifests/00-namespace.yaml
+      kubectl apply -f eso/manifests/10-serviceaccount-vault.yaml
+      kubectl apply -f eso/manifests/20-cluster-secret-store.yaml
+      echo "Waiting for ClusterSecretStore Ready..."
+      for i in $(seq 1 60); do
+        READY="$(kubectl get clustersecretstore vault-cluster-secret-store \
+          -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)"
+        echo "attempt=$i Ready=$READY"
+        if [[ "$READY" == "True" ]]; then
+          break
+        fi
+        sleep 5
+      done
+      kubectl get clustersecretstore vault-cluster-secret-store -o wide
+      kubectl describe clustersecretstore vault-cluster-secret-store | tail -40
+      test "$(kubectl get clustersecretstore vault-cluster-secret-store \
+        -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')" = "True"
+  when: manual
+  only:
+    - main
+
+deploy-eso-examples:
+  extends: .k8s_helm
+  stage: deploy-eso-examples
+  script:
+    - |
+      set -euo pipefail
+      echo "Applying eso-demo ExternalSecret + Deployment"
+      kubectl apply -f eso/examples/
+      for i in $(seq 1 36); do
+        SYNC="$(kubectl -n eso-demo get externalsecret eso-demo \
+          -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)"
+        echo "attempt=$i ExternalSecret Ready=$SYNC"
+        if [[ "$SYNC" == "True" ]]; then
+          break
+        fi
+        sleep 5
+      done
+      kubectl -n eso-demo get externalsecret,secret,pods -o wide
+      kubectl -n eso-demo wait --for=condition=ready pod -l app=eso-demo --timeout=300s
+      echo "Demo deploy completed"
+  when: manual
+  only:
+    - main
+
+verify-eso:
+  extends: .k8s_helm
+  stage: verify-eso
+  script:
+    - |
+      set -euo pipefail
+      echo "=== ESO pods ==="
+      kubectl get pods -n "${ESO_NAMESPACE}" -o wide
+      echo "=== CRDs ==="
+      kubectl get crd | grep external-secrets || true
+      echo "=== ClusterSecretStore ==="
+      kubectl get clustersecretstore vault-cluster-secret-store -o wide || true
+      echo "=== ExternalSecrets (all ns) ==="
+      kubectl get externalsecret -A || true
+      echo "=== eso-demo ==="
+      kubectl -n eso-demo get all,externalsecret,secret 2>/dev/null || true
+  when: manual
+  only:
+    - main
+
+rollback-eso:
+  extends: .k8s_helm
+  stage: rollback-eso
+  script:
+    - |
+      set -euo pipefail
+      echo "Rolling back ESO examples + helm release (ClusterSecretStore kept unless deleted manually)"
+      kubectl delete -f eso/examples/ --ignore-not-found || true
+      helm rollback "${ESO_RELEASE}" -n "${ESO_NAMESPACE}" || echo "eso: no revision to rollback"
+      kubectl get pods -n "${ESO_NAMESPACE}" -o wide || true
+  when: manual
+  only:
+    - main

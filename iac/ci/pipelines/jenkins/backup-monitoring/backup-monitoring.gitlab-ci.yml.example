@@ -1,0 +1,96 @@
+# Sanitized GitLab CI: validate Borg monitor config, then copy scripts and
+# install cron on the backup host. Runner tags stay generic.
+# Adjacent scripts live in this directory. Live job inventories stay out.
+
+variables:
+  TECH_PROJECT_NAME: borg_jobs_mon
+
+stages:
+  - validate
+  - deploy
+
+
+.validate_template: &validate_template
+  stage: validate
+  script:
+  - sed --version
+  - find --version
+  - uuidgen --version
+  - jq --version
+  - yamllint --version
+  - pykwalify --version
+  - yq --version
+  - >
+    yamllint --config-data "{ extends: default, rules: { line-length: disable } }" "${CI_PROJECT_DIR}/conf/${BORG_JOBS_MON_CONF_NAME}"
+  - >
+    test -n "$( sed --quiet "s/^---$//;s/[ \\t]\\#.*//g;s/^\\#.*//g;s/[ \\t]//g;p" "${CI_PROJECT_DIR}/conf/${BORG_JOBS_MON_CONF_NAME}" )" && pykwalify --data-file "${CI_PROJECT_DIR}/conf/${BORG_JOBS_MON_CONF_NAME}" --schema-file "${CI_PROJECT_DIR}/conf_schema.yml.example" || echo "Warning: Skipping schema validation on actually empty config file"
+
+.deploy_template: &deploy_template
+  stage: deploy
+  script:
+  - echo -e "\e[0Ksection_start:`date +%s`:envs[collapsed=true]\r\e[0KJob environment variables"
+  - printenv | sort
+  - echo -e "\e[0Ksection_end:`date +%s`:envs\r\e[0K"
+  - test -n "${BACKUP_DIR}" || echo "ERROR! Variable BACKUP_DIR was not defined. Required to know root directory of backups on {${HOSTNAME}} and set BACKUP_DIR variable to deploy job"
+  - test -n "${BACKUP_DIR}"
+  - test -n "${BORG_JOBS_MON_DIR}" || echo "ERROR! Variable BORG_JOBS_MON_DIR was not defined. Required to know root directory for {${TECH_PROJECT_NAME}} on {${HOSTNAME}} and set BORG_JOBS_MON_DIR variable to deploy job"
+  - test -n "${BORG_JOBS_MON_DIR}"
+  - test -n "${BORG_JOBS_MON_CONF_DIR}" || echo "ERROR! Variable BORG_JOBS_MON_CONF_DIR was not defined. Required to know configuration files directory for {${TECH_PROJECT_NAME}} on {${HOSTNAME}} and set BORG_JOBS_MON_CONF_DIR variable to deploy job"
+  - test -n "${BORG_JOBS_MON_CONF_DIR}"
+  - test -n "${BORG_JOBS_MON_CONF_NAME}" || echo "ERROR! Variable BORG_JOBS_MON_CONF_NAME was not defined. Required to know configuration file name for deploy job and set BORG_JOBS_MON_CONF_NAME variable to it"
+  - test -n "${BORG_JOBS_MON_CONF_NAME}"
+  - test -d "${BORG_JOBS_MON_DIR}" || echo "ERROR! Directory of borg_jobs_mon {${BORG_JOBS_MON_DIR}} does not exists. Create it or verify path and check access rights to it"
+  - test -d "${BORG_JOBS_MON_DIR}"
+  - cp "${CI_PROJECT_DIR}/borg_jobs_monitoring.sh" "${BORG_JOBS_MON_DIR}"
+  - chmod +x "${BORG_JOBS_MON_DIR}/borg_jobs_monitoring.sh"
+  - cp "${CI_PROJECT_DIR}/send_to_alerts.sh" "${BORG_JOBS_MON_DIR}"
+  - chmod +x "${BORG_JOBS_MON_DIR}/send_to_alerts.sh"
+  - cp "${CI_PROJECT_DIR}/simple_alert.sh" "${BORG_JOBS_MON_DIR}"
+  - chmod +x "${BORG_JOBS_MON_DIR}/simple_alert.sh"
+  - test -e "${BORG_JOBS_MON_CONF_DIR}" || mkdir "${BORG_JOBS_MON_CONF_DIR}"
+  - test -d "${BORG_JOBS_MON_CONF_DIR}" || echo "ERROR! Directory of configuration files already in use but is not a directory"
+  - test -d "${BORG_JOBS_MON_CONF_DIR}"
+  - cp "${CI_PROJECT_DIR}/conf/${BORG_JOBS_MON_CONF_NAME}" "${BORG_JOBS_MON_CONF_DIR}"
+  - cat "${CI_PROJECT_DIR}/cron_template" | envsubst > "${BORG_JOBS_MON_DIR}/cron_template"
+  - cat "${CI_PROJECT_DIR}/cron_template_dms" | envsubst > "${BORG_JOBS_MON_DIR}/cron_template_dms"
+  - cp "${CI_PROJECT_DIR}/become-message" "${BORG_JOBS_MON_DIR}/become-message"
+  - cp "${CI_PROJECT_DIR}/sudo-become-lecture-file" "${BORG_JOBS_MON_DIR}/sudo-become-lecture-file"
+  - cat "${CI_PROJECT_DIR}/cron_deploy" | envsubst > "${BORG_JOBS_MON_DIR}/cron_deploy"
+  - chmod +x "${BORG_JOBS_MON_DIR}/cron_deploy"
+  - sudo "${BORG_JOBS_MON_DIR}/cron_deploy"
+
+Validate to backup-staging:
+  <<: *validate_template
+  variables:
+    BORG_JOBS_MON_CONF_NAME: backup-staging.yaml
+  tags:
+    - backup
+
+Validate to backup-production:
+  <<: *validate_template
+  variables:
+    BORG_JOBS_MON_CONF_NAME: backup-production.yaml
+  tags:
+    - backup-production
+
+Deploy to backup-staging:
+  <<: *deploy_template
+  variables:
+    BACKUP_DIR: /backup
+    BORG_JOBS_MON_DIR: /backup/.borg_jobs_mon
+    BORG_JOBS_MON_CONF_DIR: /backup/.borg_jobs_mon/conf
+    BORG_JOBS_MON_CONF_NAME: backup-staging.yaml
+  tags:
+    - backup
+  when: manual
+
+Deploy to backup-production:
+  <<: *deploy_template
+  variables:
+    BACKUP_DIR: /backup/borg
+    BORG_JOBS_MON_DIR: /backup/.borg_jobs_mon
+    BORG_JOBS_MON_CONF_DIR: /backup/.borg_jobs_mon/conf
+    BORG_JOBS_MON_CONF_NAME: backup-production.yaml
+  tags:
+    - backup-production
+  when: manual

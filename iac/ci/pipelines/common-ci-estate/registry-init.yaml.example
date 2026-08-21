@@ -1,0 +1,34 @@
+stages:
+  - create-regcred
+
+variables:
+  REGISTRY_SERVER: "example.registry"
+  LEGACY_REGISTRY_USERNAME: "$LEGACY_REGISTRY_USERNAME"
+  LEGACY_REGISTRY_PASSWORD: "$LEGACY_REGISTRY_PASSWORD"
+  EXTERNAL_REGISTRY_SERVER: "example.registry"
+  EXTERNAL_REGISTRY_USERNAME: "$EXTERNAL_REGISTRY_USERNAME"
+  EXTERNAL_REGISTRY_PASSWORD: "$EXTERNAL_REGISTRY_PASSWORD"
+  GITLAB_REGISTRY_SERVER: "example.registry"
+  GITLAB_REGISTRY_USERNAME: "$GITLAB_REGISTRY_USERNAME"
+  GITLAB_REGISTRY_PASSWORD: "$GITLAB_REGISTRY_PASSWORD"
+  TARGET_NAMESPACES: "argocd,default,kafka,estate"
+
+default:
+  tags:
+    - docker
+  timeout: 8h
+  interruptible: true
+
+create-regcred:
+  stage: create-regcred
+  image: $BASE_IMAGE
+  tags:
+    - docker
+  before_script:
+    - init.sh
+  script:
+    - create-regcred.sh
+  when: manual
+  only:
+    - main
+    - develop

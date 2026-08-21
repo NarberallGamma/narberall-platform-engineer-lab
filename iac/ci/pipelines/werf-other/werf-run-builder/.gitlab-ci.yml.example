@@ -1,0 +1,27 @@
+variables:
+  WERF_VERSION: '1.2 beta'
+  WERF_ENV: ''
+
+before_script:
+  - type multiwerf && source <(multiwerf use ${WERF_VERSION})
+  - werf version
+  - type werf && source <(werf ci-env gitlab --verbose)
+
+stages:
+  - make builder
+  - test
+  - build
+  - review
+  - e2e-tests
+  - deploy
+  - destroy
+  - cleanup
+
+include:
+  - local: .gitlab/build-bundle.yaml.example
+  - local: .gitlab/deploy.yaml.example
+  - local: .gitlab/review.yaml.example
+  - local: .gitlab/make-builder.yaml.example
+  - local: .gitlab/tests.yaml.example
+  - local: .gitlab/test-e2e.yaml.example
+  - local: .gitlab/cleanup.yaml.example

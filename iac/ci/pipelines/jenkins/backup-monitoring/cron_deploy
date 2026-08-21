@@ -1,0 +1,27 @@
+#!/bin/bash
+
+set -e
+
+cp "${BORG_JOBS_MON_DIR}/cron_template" "/etc/cron.d/${TECH_PROJECT_NAME}"
+chown root:root "/etc/cron.d/${TECH_PROJECT_NAME}"
+chmod 0644 "/etc/cron.d/${TECH_PROJECT_NAME}"
+
+cp "${BORG_JOBS_MON_DIR}/cron_template_dms" "/etc/cron.d/cron_dms"
+chown root:root "/etc/cron.d/cron_dms"
+chmod 0600 "/etc/cron.d/cron_dms"
+
+cp "${BORG_JOBS_MON_DIR}/become-message" "/etc/become-message"
+chown root:root "/etc/become-message"
+chmod 0644 "/etc/become-message"
+
+visudo -cf "${BORG_JOBS_MON_DIR}/sudo-become-lecture-file"
+cp "${BORG_JOBS_MON_DIR}/sudo-become-lecture-file" "/etc/sudoers.d/become-lecture-file"
+chown root:root "/etc/sudoers.d/become-lecture-file"
+chmod 0440 "/etc/sudoers.d/become-lecture-file"
+
+if test -z "$( grep --fixed-regexp 'cat "/etc/become-message"' "/root/.bashrc" )";
+then
+  echo '' >> "/root/.bashrc"
+  echo '# Output of a message about the need to work under a project user when working with Borg repositories' >> "/root/.bashrc"
+  echo 'cat "/etc/become-message"' >> "/root/.bashrc"
+fi

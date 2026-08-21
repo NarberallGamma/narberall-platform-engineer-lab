@@ -1,0 +1,95 @@
+include:
+  - local: '/defaults.yaml.example'
+
+# argocd.yaml
+stages:
+  - deploy-argocd
+  - deploy-project
+  - deploy-clusters
+  - deploy-repo
+  - deploy-applications
+  - rollback-argocd
+
+variables:
+  ARGOCD_NAMESPACE: argocd
+
+default:
+  tags:
+    - docker
+  timeout: 8h
+  interruptible: true
+
+.k8s_setup: &k8s_setup
+  image: $BASE_IMAGE
+  before_script:
+    - init.sh
+
+deploy-argocd:
+  <<: *k8s_setup
+  stage: deploy-argocd
+  script:
+    - kubectl get nodes
+    - kubectl create namespace $ARGOCD_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+    - helm upgrade --install argocd argo/argo-cd --namespace $ARGOCD_NAMESPACE --values argocd-values.yaml --wait
+    - kubectl patch ingress argocd-server -n $ARGOCD_NAMESPACE --type='merge' -p='{"spec":{"tls":[{"hosts":["argocd.example.com"],"secretName":"wildcard-tls"}]}}'
+    - kubectl rollout status deployment/argocd-server -n $ARGOCD_NAMESPACE --timeout=200s
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-project:
+  <<: *k8s_setup
+  stage: deploy-project
+  script:
+    - |
+      sed "s|\$KUBE_SERVER|$KUBE_SERVER|g" manifests/argocd/argocd-project.yaml | kubectl apply -f -
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-repo:
+  <<: *k8s_setup
+  stage: deploy-repo
+  script:
+    - kubectl delete secret estate-gitlab-repo -n argocd --ignore-not-found
+    - |
+      find manifests/repositories/ -name "*-repo.yaml" -exec sh -c 'sed -e "s|\$ARGOCD_INTEGRATION_TOKEN|$ARGOCD_INTEGRATION_TOKEN|g" -e "s|\$ARGOCD_INTEGRATION_USER|$ARGOCD_INTEGRATION_USER|g" "$1" | kubectl apply -f -' _ {} \;
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-clusters:
+  <<: *k8s_setup
+  stage: deploy-clusters
+  script:
+    - kubectl delete secret k8s-internal-cluster -n argocd --ignore-not-found
+    - |
+      find manifests/clusters/ -name "*.yaml" -exec sh -c 'sed -e "s|\$KUBE_SERVER|$KUBE_SERVER|g" -e "s|\$KUBE_TOKEN|$KUBE_TOKEN|g" -e "s|\$KUBE_CA_DATA|$KUBE_CA_DATA|g" "$1" | kubectl apply -f -' _ {} \;
+  when: manual
+  only:
+    - main
+    - develop
+
+deploy-applications:
+  <<: *k8s_setup
+  stage: deploy-applications
+  script:
+    - |
+      find manifests/applications/ -name "*-app.yaml" -exec sh -c 'sed "s|\$KUBE_SERVER|$KUBE_SERVER|g" "$1" | kubectl apply -f -' _ {} \;
+  when: manual
+  only:
+    - main
+    - develop
+
+rollback-argocd:
+  <<: *k8s_setup
+  stage: rollback-argocd
+  script:
+    - helm rollback argocd -n $ARGOCD_NAMESPACE
+  when: manual
+  only:
+    - main
+    - develop

@@ -1,0 +1,76 @@
+spec:
+  inputs:
+    test_name:
+      description: "generated hidden job name"
+---
+$[[ inputs.test_name ]]:
+  script:
+    - TEST_DIR="/root/${DIR}"
+    - cd $TEST_DIR
+    - pwd
+    - env
+    - ruff check . --config pyproject.toml
+
+    - |+
+      pytest -c pyproject.toml \
+        --cov-config=${CI_PROJECT_DIR}/pyproject.toml \
+        --junitxml ${CI_PROJECT_DIR}/pytest.xml \
+        --cov=portal_api \
+        --cov-report term \
+        --cov-report xml:coverage.xml \
+        --cov-report json:coverage.json \
+        -x \
+        tests
+      cp coverage.json ${CI_PROJECT_DIR}
+      cp coverage.xml ${CI_PROJECT_DIR}
+
+    - |+
+      if test -f "${CI_PROJECT_DIR}/coverage.json" ; then
+          SERVICE=$(echo ${DIR} | sed 's#/#_#')
+          COVERAGE_FILE_NAME=coverage.json
+          TARGET_REF_COVERAGE_PACKAGE_TMP=$(mktemp)
+          echo "[INFO] Current job total coverage:";
+          CURRENT_COVERAGE=$(cat "${CI_PROJECT_DIR}/${COVERAGE_FILE_NAME}" | jq -r '.totals.percent_covered_display' | jq -c 'trunc')
+          echo "${CURRENT_COVERAGE}";
+          curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ${CI_PROJECT_DIR}/${COVERAGE_FILE_NAME} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${SERVICE}/master/${COVERAGE_FILE_NAME}"
+
+          TARGET_REF_COVERAGE_PACKAGE_CMD="curl --header 'JOB-TOKEN: ${CI_JOB_TOKEN}' '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${SERVICE}/master/${COVERAGE_FILE_NAME}' -w '%{http_code}' -o '${TARGET_REF_COVERAGE_PACKAGE_TMP}'";
+          echo "[INFO] Getting coverage PACKAGE from ${TARGET_REF} ref: ${TARGET_REF_COVERAGE_PACKAGE_CMD}";
+          TARGET_REF_COVERAGE_PACKAGE_REQ=$( echo "${TARGET_REF_COVERAGE_PACKAGE_CMD}" | bash );
+          if [[ $DIR == *"libraries"* ]]; then
+             REWRITE_TRIGGER=RELOAD_COV_LIB_$(echo $DIR | awk -F '/' '{print $2}' | tr 'a-z' 'A-Z' | sed 's/-/_/g')
+             echo "REWRITE_TRIGGER: $REWRITE_TRIGGER"
+             REWRITE_COV=${!REWRITE_TRIGGER}
+          fi
+          if [[ $DIR == *"services"* ]]; then
+             REWRITE_TRIGGER=RELOAD_COV_SERVICE_$(echo $DIR | awk -F '/' '{print $2}' | tr 'a-z' 'A-Z' | sed 's/-/_/g')
+             echo "REWRITE_TRIGGER: $REWRITE_TRIGGER"
+             REWRITE_COV=${!REWRITE_TRIGGER}
+          fi
+        if [ "$REWRITE_COV" == "true" ] && [ "$CI_COMMIT_REF_SLUG" == "master" ]; then
+          echo "Rewrite target coverage..."
+          curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ${CI_PROJECT_DIR}/${COVERAGE_FILE_NAME} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${SERVICE}/master/${COVERAGE_FILE_NAME}"
+        else
+          if test "${TARGET_REF_COVERAGE_PACKAGE_REQ}" -ne "200" ; then
+              echo "[WARNING] Error getting target ref coverage report...";
+              exit 1;
+          else
+              echo "[INFO] Target ref total coverage:";
+              TARGET_REF_COVERAGE=$( cat ${TARGET_REF_COVERAGE_PACKAGE_TMP} | jq -r '.totals.percent_covered_display' | jq -c 'trunc')
+              echo "${TARGET_REF_COVERAGE}";
+              RESULT=$(echo "$CURRENT_COVERAGE >= $TARGET_REF_COVERAGE" | bc)
+
+              if  test "$RESULT" -ne 1 ; then
+                  echo "[ERROR] Coverage decreased from ${TARGET_REF_COVERAGE} to ${CURRENT_COVERAGE}. Exiting...";
+                  unlink ${TARGET_REF_COVERAGE_PACKAGE_TMP};
+                  exit 1;
+              fi
+
+              echo "[INFO] Current coverage (${CURRENT_COVERAGE}) is greater or equal to target's (${TARGET_REF_COVERAGE}).";
+              if [ "$CI_COMMIT_REF_SLUG" == "master" ]; then
+                 curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file ${CI_PROJECT_DIR}/${COVERAGE_FILE_NAME} "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${SERVICE}/master/${COVERAGE_FILE_NAME}"
+              fi
+          fi
+        fi
+            unlink ${TARGET_REF_COVERAGE_PACKAGE_TMP};
+      fi

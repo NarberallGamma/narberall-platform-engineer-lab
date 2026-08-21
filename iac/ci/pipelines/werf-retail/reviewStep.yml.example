@@ -1,0 +1,243 @@
+include:
+  - local: '/common.yml.example'
+  - local: '/cleanup.yml.example'
+  - local: '/snippets.yml.example'
+
+.base_review: &base_review
+  extends: .base_werf
+  variables:
+    KUBERNETES_CPU_REQUEST: "0.2"
+    KUBERNETES_MEMORY_REQUEST: "256Mi"
+  script:
+    - export NAMESPACE=${CUSTOM_K8S_NAMESPACE:-${KUBE_NAMESPACE}}
+    - export ENVIRONMENT=$(echo ${CI_ENVIRONMENT_CUSTOM_SLUG:-${CI_COMMIT_REF_SLUG}} | sed -E 's|(^feature-[a-zA-Z-]+-[0-9]+).*|\1|g')
+    - if [[ $(echo ${ENVIRONMENT} | wc -c) -gt 40 ]]; then export ENVIRONMENT=${CI_ENVIRONMENT_SLUG}; fi
+    - !reference [.snippets, create_ns]
+    # - werf helm dependency build .helm
+    - werf converge
+      --require-built-images
+      --namespace ${NAMESPACE}
+      --env $ENVIRONMENT
+      --set "MSSQL=${MSSQL}"
+      --set global.index_name=${CI_COMMIT_BRANCH}
+      --set global.remove_db_on_delete=True
+    - "export PROJNAME=$(cat werf.yaml | grep project: | awk '{print $2}')"
+    - echo "Project urls:"
+    - werf helm -n ${NAMESPACE} get manifest "${PROJNAME}-${ENVIRONMENT}" | yq '.spec.rules[].host' | sort -u | grep -v '\---' | awk '{print "https://" $1}' || true
+  tags:
+    - docker
+
+.deploy_trigger: &deploy_trigger
+  extends: .base_except
+  stage: review
+  needs:
+    - Build
+    - Deploy to review
+  variables:
+    KUBE_NAMESPACE: ${CI_COMMIT_REF_SLUG}
+    UPSTREAM_BRANCH: $CI_COMMIT_REF_SLUG
+    WERF_KUBE_CONTEXT: dev
+    KUBERNETES_CPU_REQUEST: "0.2"
+    KUBERNETES_MEMORY_REQUEST: "256Mi"
+
+.base_needs: &base_needs
+  needs:
+    - Build
+    - Deploy to review
+    - Deploy Haproxy to review
+
+.base_except: &base_except
+  only:
+    - /^feature.*$/
+  except:
+    - schedules
+    - master
+    - main
+    - estate-k8s
+    - infra-ops
+    - dev
+    - develop
+    - tags
+
+Deploy to review:
+  stage: review
+  extends:
+    - .base_except
+    - .base_werf
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+    # url: $DYNAMIC_ENVIRONMENT_URL
+  variables:
+    WERF_KUBE_CONTEXT: dev
+  script:
+    # - "export PROJNAME=$(cat werf.yaml | grep project: | awk '{print $2}')"
+    # - echo "DYNAMIC_ENVIRONMENT_URL=http://${PROJNAME}-${CI_ENVIRONMENT_SLUG}.kube.example.com" >> deploy.env
+    # - echo "PROJNAME=${PROJNAME}" >> deploy.env
+    # - cat deploy.env | grep DYNAMIC_ENVIRONMENT_URL | cut -f2 -d"="
+    - echo "Elasticsearch index - ${CI_COMMIT_REF_SLUG}"
+  when: manual
+  tags:
+    - docker
+  artifacts:
+    reports:
+      dotenv: deploy.env
+
+Deploy code to review:
+  stage: review
+  extends:
+    - .base_werf
+    - .base_review
+    - .base_needs
+    - .base_except
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+    # on_stop: Delete Review Release
+    # auto_stop_in: 1 week
+  variables:
+    KUBE_NAMESPACE: ${CI_COMMIT_REF_SLUG}
+    WERF_KUBE_CONTEXT: dev
+  tags:
+    - docker
+
+Import Dev dump to review:
+  stage: review
+  extends:
+    - .base_werf
+    - .base_except
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+    on_stop: Delete Review Release
+    auto_stop_in: 1 week
+  variables:
+    KUBE_NAMESPACE: ${CI_COMMIT_REF_SLUG}
+    DELETE_FILE: delete-database.yaml
+    IMPORT_FILE: import-database.yaml
+    WERF_KUBE_CONTEXT: dev
+  script:
+    - export ENVIRONMENT=$(echo ${CI_ENVIRONMENT_CUSTOM_SLUG:-${CI_COMMIT_REF_SLUG}} | sed -E 's|(^feature-[a-zA-Z-]+-[0-9]+).*|\1|g')
+    - if [[ $(echo ${ENVIRONMENT} | wc -c) -gt 40 ]]; then export ENVIRONMENT=${CI_ENVIRONMENT_SLUG}; fi
+    - werf render
+      --env $ENVIRONMENT
+      --set MSSQL=${MSSQL}
+      --set global.remove_db_on_delete=True
+      --set global.index_name=${CI_COMMIT_BRANCH} |
+      yq 'select(.metadata.name == "*delete-database" or .metadata.name == "*-job-scripts")' |
+      tee ${DELETE_FILE}
+    - yq -N '(.kind, .metadata.name)' ${DELETE_FILE} | xargs -n2 werf kubectl delete -n ${KUBE_NAMESPACE} || true
+    - werf kubectl apply --namespace=${KUBE_NAMESPACE} -f ${DELETE_FILE}
+    - werf kubectl wait
+      --namespace=${KUBE_NAMESPACE}
+      --for=condition=complete
+      --timeout=240s
+      job $(yq -N 'select(.kind == "Job") | .metadata.name' ${DELETE_FILE})
+    - rm ${DELETE_FILE}
+    - werf render
+      --env $ENVIRONMENT
+      --set MSSQL=${MSSQL}
+      --set global.remove_db_on_delete=True
+      --set global.index_name=${CI_COMMIT_BRANCH} |
+      yq 'select(.metadata.name == "*import-dump")' |
+      tee ${IMPORT_FILE}
+    - yq -N '(.kind, .metadata.name)' ${IMPORT_FILE} | xargs -n2 werf kubectl delete -n ${KUBE_NAMESPACE} || true
+    - werf kubectl apply --namespace=${KUBE_NAMESPACE} -f ${IMPORT_FILE}
+    - werf kubectl wait
+      --namespace=${KUBE_NAMESPACE}
+      --for=condition=complete
+      --timeout=240s
+      job $(yq -N 'select(.kind == "Job") | .metadata.name' ${IMPORT_FILE})
+    - rm ${IMPORT_FILE}
+  when: manual
+  needs:
+    - Build
+    - Deploy to review
+    - Deploy code to review
+  only:
+    variables:
+      - $MSSQL && $CI_COMMIT_REF_SLUG =~ /^feature.*$/
+  tags:
+    - docker
+
+Delete Review Release:
+  stage: destroy
+  extends:
+    - .base_werf
+    - .base_except
+  variables:
+    GIT_STRATEGY: none
+    KUBE_NAMESPACE: ${CI_COMMIT_REF_SLUG}
+    WERF_KUBE_CONTEXT: dev
+  script:
+    - werf dismiss --env ${CI_ENVIRONMENT_SLUG} --namespace ${KUBE_NAMESPACE}
+  when: manual
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+    action: stop
+  needs:
+    - Deploy to review
+  tags:
+    - docker
+
+# FIXME: similar to /review/main.yml → "Destroy review namespace"
+"Delete Review Namespace (with Release)":
+  stage: destroy
+  extends:
+    - .base_werf
+    - .base_except
+  variables:
+    GIT_STRATEGY: none
+    KUBE_NAMESPACE: ${CI_COMMIT_REF_SLUG}
+    EXTERNAL_MSSQL_ENDPOINT_RELEASE: external-endpoints
+    WERF_KUBE_CONTEXT: dev
+  script:
+    - werf kubectl delete gateway "eg-${WERF_NAMESPACE}" --namespace="${WERF_NAMESPACE}" --ignore-not-found
+    - werf kubectl delete envoyproxy "eg-${WERF_NAMESPACE}" --namespace="${WERF_NAMESPACE}" --ignore-not-found
+    - werf kubectl patch gatewayclasses.gateway.networking.k8s.io "eg-${WERF_NAMESPACE}" --type=merge \
+      --patch='{"metadata":{"finalizers":null}}' || true
+    - werf helm list --namespace=${KUBE_NAMESPACE} -a -oyaml | yq '.[].name' | { grep -v ${EXTERNAL_MSSQL_ENDPOINT_RELEASE} || /bin/true; } | xargs -trn1 werf helm uninstall --wait --namespace=${KUBE_NAMESPACE}
+    - werf helm list --namespace=${KUBE_NAMESPACE} -a -oyaml | yq '.[].name' | xargs -trn1 werf helm uninstall --wait --namespace=${KUBE_NAMESPACE}
+    - werf kubectl delete ns ${KUBE_NAMESPACE}
+  when: manual
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+    action: stop
+  needs:
+    - Build
+  tags:
+    - docker
+  only:
+    variables:
+      - $CI_PROJECT_NAME =~ /^server$|web-ui-internal-ci|web-ui-external-ci|^shop$/ && $CI_COMMIT_REF_SLUG =~ /^feature.*$/
+
+Destroy failed Review:
+  stage: destroy
+  extends:
+    - .base_werf
+    - .base_except
+  variables:
+    GIT_STRATEGY: none
+    KUBE_NAMESPACE: ${CI_COMMIT_REF_SLUG}
+    WERF_KUBE_CONTEXT: dev
+    DESTROY: "yes"
+  script:
+    - set -x
+    - >
+      if [ "${DESTROY}" = "yes" ]; then
+        werf dismiss --with-hooks=false --namespace ${KUBE_NAMESPACE} --env ${CI_ENVIRONMENT_SLUG}
+        # werf kubectl delete ns ${KUBE_NAMESPACE}
+      fi
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+  when: manual
+  needs:
+    - Build
+    - Deploy to review
+    - Deploy code to review
+  tags:
+    - docker
+
+Deploy Haproxy to review:
+  extends: .deploy_trigger
+  trigger:
+    project: shop-app/review-haproxy
+    branch: old-ci
+    strategy: depend

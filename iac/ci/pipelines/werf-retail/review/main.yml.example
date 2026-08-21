@@ -1,0 +1,774 @@
+include:
+  - local: '/review/main-vars.yml.example'
+  - local: '/varReplicas.yml.example'
+  - local: '/snippets.yml.example'
+
+.review_werf_vars:
+  variables:
+    WERF_KUBE_CONTEXT: "$CONTEXT_WERF"
+    WERF_SKIP_BUILD: "true"
+    WERF_SET_GLOBAL_INDEX_NAME: global.index_name=$WERF_ENV
+    WERF_SET_GLOBAL_REMOVE_DB_ON_DELETE: "global.remove_db_on_delete=True"
+    WERF_SET_MSSQL: MSSQL=${REVIEW_MSSQL}
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+
+.werf_pre_converge_script: |
+  # optional hook: run immediately before werf converge when a repo needs it
+
+.review_werf:
+  extends:
+    - .base_werf
+    - .review_werf_vars
+  script:
+    - !reference [.werf_pre_converge_script]
+    - if [ -f werf_pre_converge_script.sh ]; then
+        . werf_pre_converge_script.sh;
+      fi
+
+    # - werf helm dependency build .helm
+    - werf converge
+
+    - > # print ingress hosts
+      echo "Project urls:";
+      werf helm get manifest $(werf helm get-release) --namespace $WERF_NAMESPACE
+      | yq ea -N '[ .spec.rules[].host ] | unique | .[] |= "https://" + .'
+  only:
+    refs:
+      - pipelines
+      - branches
+      - tags
+      - merge_requests
+    variables:
+      - $WERF_NEW_NAMESPACE =~ /^feature-.*/
+      - $WERF_EXISTED_NAMESPACE =~ /^feature-.*/
+      - $WERF_NAMESPACE =~ /^feature-.*/
+      - $CI_COMMIT_REF_SLUG =~ /^feature-.*/
+  needs:
+    - job: "Prepare review vars"
+      artifacts: true
+      optional: true
+
+.trigger:
+  variables:
+    UPSTREAM_PROJECT_PATH: $CI_PROJECT_PATH
+    WERF_NAMESPACE: $WERF_NAMESPACE
+    WERF_ENV: $WERF_ENV
+    WERF_KUBE_CONTEXT: dev
+    SAST_DISABLED: "true"
+    SECRET_DETECTION_DISABLED: "true"
+    IMAGE_SCAN_ENABLED: "false"
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+    WERF_SET_CDC_ENABLE: global.cdc_enable=${CDC_ENABLE}
+  trigger:
+    strategy: depend
+  only:
+    refs:
+      - pipelines
+      - branches
+      - tags
+      - merge_requests
+    variables:
+      - $WERF_NEW_NAMESPACE =~ /^feature-.*/
+      - $WERF_EXISTED_NAMESPACE =~ /^feature-.*/
+      - $WERF_NAMESPACE =~ /^feature-.*/
+      - $CI_COMMIT_REF_SLUG =~ /^feature-.*/
+  except:
+    variables:
+      - $CI_PIPELINE_SOURCE == "pipeline"
+  needs:
+    - job: "Prepare review vars"
+      artifacts: true
+    - job: Prepare review namespace
+
+upscale_namespace:
+  stage: review
+#  extends:
+#    - .review_werf_vars
+  script: |
+    kubectl run curl-upscale-$(date +%s)-$CI_JOB_ID \
+      --image=example.registry/shop-app/docker-images/curl:8.14.1 \
+      --restart=Never \
+      --rm -it \
+      --namespace=default \
+      --env="WERF_NAMESPACE=$WERF_NAMESPACE" \
+      -- sh -c '
+        curl -X POST scale-hook.example.svc.cluster.local:8000/scale-up?namespace=$WERF_NAMESPACE;
+      '
+  only:
+    refs:
+      - pipelines
+      - branches
+      - tags
+      - merge_requests
+    variables:
+      - $WERF_NEW_NAMESPACE =~ /^feature-.*/
+      - $WERF_EXISTED_NAMESPACE =~ /^feature-.*/
+      - $WERF_NAMESPACE =~ /^feature-.*/
+      - $CI_COMMIT_REF_SLUG =~ /^feature-.*/
+  tags:
+    - docker
+
+.needs_infra:
+  needs:
+    - job: "Prepare review vars"
+      artifacts: true
+      optional: true
+    - job: Prepare review namespace
+    - job: Deploy review haproxy
+      optional: true
+    - job: Deploy review envoy-gateway
+      optional: true
+    - job: Deploy ingresses
+      optional: true
+    - job: Deploy envoy-gateway-routes
+      optional: true
+    - job: Deploy rabbitmq
+      optional: true
+    - job: Deploy redis
+      optional: true
+    - job: Deploy clickhouse
+      optional: true
+    - job: upscale_namespace
+      optional: true
+
+# also see shop-app/review → Prepare review vars
+Prepare review vars:
+  stage: build
+  before_script:
+    - !reference [.snippets, dump_env]
+  script:
+    - | # feature branches only
+      [[ $CI_COMMIT_REF_SLUG  =~ ^feature.* ]] && WERF_ENV=$CI_COMMIT_REF_SLUG
+
+    - | #
+      if [[ $CI_COMMIT_REF_SLUG =~ (^feature-[a-zA-Z-]+-[0-9]+).* ]] && [[ ${#BASH_REMATCH[1]} < 40 ]]; then
+        WERF_ENV=${BASH_REMATCH[1]}
+        WERF_NAMESPACE=${BASH_REMATCH[1]}
+      fi
+
+    - | # write namespace and environment as a dotenv artifact
+      tee variables.env << EOF
+      WERF_NAMESPACE=$WERF_NAMESPACE
+      WERF_ENV=$WERF_ENV
+      WERF_KUBE_CONTEXT=$WERF_KUBE_CONTEXT
+      EOF
+  artifacts:
+    reports:
+      dotenv: variables.env
+  except:
+    variables:
+      - $CI_PIPELINE_SOURCE == "pipeline"
+  only:
+    refs:
+      - pipelines
+      - branches
+      - tags
+      - merge_requests
+    variables:
+      - $CI_COMMIT_REF_SLUG =~ /^feature-.*/
+  tags:
+    - docker
+
+.base_review_deploy:
+  extends:
+    - .base_werf
+  variables:
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  needs:
+    - job: "Prepare review vars"
+      artifacts: true
+      optional: true
+  when: manual
+  only:
+    refs:
+      - pipelines
+      - branches
+      - tags
+      - merge_requests
+    variables:
+      - $WERF_NEW_NAMESPACE =~ /^feature-.*/
+      - $WERF_EXISTED_NAMESPACE =~ /^feature-.*/
+      - $WERF_NAMESPACE =~ /^feature-.*/
+      - $CI_COMMIT_REF_SLUG =~ /^feature-.*/
+  except:
+    variables:
+      - $CI_PIPELINE_SOURCE == "pipeline"
+  tags:
+    - docker
+
+# Base job definition that will be used for both automatic and manual versions
+.start_deploy_to_review_namespace_base:
+  stage: start_review
+  script:
+    - |
+      JOB_ID=$(curl -s -XGET -H "PRIVATE-TOKEN: ${CI_DEPLOY_TRIGGER_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/jobs" | jq --arg name "Prepare review namespace" '.[] | select(.name == $name) | .id')
+    - |
+      curl -s --request POST --header "PRIVATE-TOKEN: ${CI_DEPLOY_TRIGGER_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/${JOB_ID}/play"
+
+# automatic play for the review hub project
+Start deploy to review namespace (auto):
+  extends:
+    - .base_review_deploy
+    - .start_deploy_to_review_namespace_base
+  when: on_success
+  only:
+    refs:
+      - pipelines
+      - branches
+      - tags
+      - merge_requests
+    variables:
+      - $CI_PROJECT_PATH_SLUG == "shop-app-review"
+  except:
+    variables:
+      - $CI_PIPELINE_SOURCE == "pipeline"
+
+# Manual version for all other projects
+Start deploy to review namespace:
+  extends:
+    - .base_review_deploy
+    - .start_deploy_to_review_namespace_base
+  only:
+    refs:
+      - pipelines
+      - branches
+      - tags
+      - merge_requests
+    variables:
+      - $WERF_NEW_NAMESPACE =~ /^feature-.*/
+      - $WERF_EXISTED_NAMESPACE =~ /^feature-.*/
+      - $WERF_NAMESPACE =~ /^feature-.*/
+      - $CI_COMMIT_REF_SLUG =~ /^feature-.*/
+  except:
+    variables:
+      - $CI_PROJECT_PATH_SLUG == "shop-app-review"
+      - $CI_PIPELINE_SOURCE == "pipeline"
+
+Retry failed jobs in review stage:
+  extends:
+    - .base_review_deploy
+  stage: retry_review
+  script:
+    - |
+      FAILED_JOBS=$(curl -s -XGET -H "PRIVATE-TOKEN: ${CI_DEPLOY_TRIGGER_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/bridges" | jq -r '.[] | select(.status == "failed") | .id')
+      if [ -z "$FAILED_JOBS" ]; then
+          echo "No failed jobs found."
+          exit 0
+      fi
+      echo ${FAILED_JOBS}
+      for JOB_ID in ${FAILED_JOBS}; do
+          echo "Replaying failed job with ID: $JOB_ID"
+          curl -s -XPOST --header "PRIVATE-TOKEN: ${CI_DEPLOY_TRIGGER_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/${JOB_ID}/retry"
+      done
+      echo "All failed jobs have been retried."
+
+Prepare review namespace:
+  stage: review
+  extends:
+    - .base_review_deploy
+  manual_confirmation: "⛔️ do not run this job"
+  script:
+    - !reference [.snippets, create_ns]
+
+Deploy review haproxy:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/review-haproxy
+
+
+Deploy review envoy-gateway:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/envoy-gateway
+
+
+Deploy ingresses:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/ingresses
+  only:
+    variables:
+      - $REVIEW_INGRESSES
+      - $REVIEW_WEB_UI_SHOP_BRANCH
+      - $REVIEW_WEB_UI_EXTERNAL_CI_BRANCH
+
+Deploy envoy-gateway-routes:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/envoy-gateway-routes
+
+Deploy review opentelemetry:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/opentelemetry
+
+Deploy review cilium-policies:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/cilium-network-policies
+
+Deploy rabbitmq:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/rabbitmq
+  only:
+    variables:
+      - $REVIEW_RABBITMQ
+      - $REVIEW_CANIX_BRANCH
+      - $REVIEW_CHAT_BRANCH
+      - $REVIEW_CONSUMERS_BRANCH
+      - $REVIEW_CUSTOMERS_IMPORT_BRANCH
+      - $REVIEW_DELIVERY_BRANCH
+      - $REVIEW_ETL_BRANCH
+      - $REVIEW_EYERATE_BRANCH
+      - $REVIEW_FACE_REKOGNITION_BRANCH
+      - $REVIEW_HUBS_BRANCH
+      - $REVIEW_LEAFLY_BRANCH
+      - $REVIEW_MARKETING_BRANCH
+      - $REVIEW_MARKETING_SEGMENTS_BRANCH
+      - $REVIEW_MJ_BRANCH
+      - $REVIEW_NOTIFICATIONS_BRANCH
+      - $REVIEW_PAYMENTS_BRANCH
+      - $REVIEW_SERVER_BRANCH
+      - $REVIEW_SHORTLINK_BRANCH
+      - $REVIEW_VERISCAN_BRANCH
+      - $REVIEW_WEEDMAPS_BRANCH
+      - $REVIEW_RECOMMENDATION_BRANCH
+      - $REVIEW_SHOP_API_BRANCH
+      - $REVIEW_PROMO_BRANCH
+      - $REVIEW_CONFIRMATIONS_BRANCH
+
+Deploy redis:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/redis
+  only:
+    variables:
+      - $REVIEW_REDIS
+      - $REVIEW_AUTHORIZATION_BRANCH
+      - $REVIEW_CUBE_BRANCH
+      - $REVIEW_CUSTOMERS_IMPORT_BRANCH
+      - $REVIEW_SCHEDULER_BRANCH
+      - $REVIEW_SERVER_BRANCH
+      - $REVIEW_SHORTLINK_BRANCH
+      - $REVIEW_NOTIFICATIONS_BRANCH
+      - $REVIEW_SHOP_API_BRANCH
+      - $REVIEW_LIMIT_SERVICE_BRANCH
+      - $REVIEW_ECOM_KIOSK_BRANCH
+
+Smoke tests:
+  stage: test
+  variables:
+    ENV_NAME: "$WERF_NAMESPACE"
+    SETUP_STAND: "True"
+    ALLURE_LAUNCH_NAME: "Triggered by deploy to $WERF_NAMESPACE"
+    TESTS_MARKER: "refactor_api_basic_smoke"
+  trigger:
+    project: 'shop-app/qa/smoke-tests'
+    branch: 'develop'
+    strategy: depend
+  needs:
+  - job: Prepare review vars
+    artifacts: true
+    optional: true
+  when: manual
+
+Deploy users for clickhouse:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/clickhouse-users
+  only:
+    variables:
+      # Deploy clickhouse ("!reference" produces an error)
+      - $REVIEW_CLICKHOUSE
+      - $REVIEW_CUBE_BRANCH
+      - $REVIEW_ETL_BRANCH
+      - $REVIEW_RECOMMENDATION_BRANCH
+      - $REVIEW_MARKETING_BRANCH
+      - $REVIEW_MARKETING_SEGMENTS_BRANCH
+      - $REVIEW_CUSTOMERS_IMPORT_BRANCH
+      - $REVIEW_WEBANALYTICS_BRANCH
+      - $REVIEW_NOTIFICATIONS_BRANCH
+      - $REVIEW_BI_CLICKHOUSE_BRANCH
+      # Deploy review data-platform-clickhouse ("!reference" produces an error)
+      - $REVIEW_DATAPLATFORM_AIRBYTE_BRANCH
+      - $REVIEW_DATAPLATFORM_ELT_BRANCH
+      - $REVIEW_DATAPLATFORM_DAGSTER_BRANCH
+
+Deploy clickhouse:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/clickhouse
+  only:
+    variables:
+      - $REVIEW_CLICKHOUSE
+      - $REVIEW_CUBE_BRANCH
+      - $REVIEW_ETL_BRANCH
+      - $REVIEW_RECOMMENDATION_BRANCH
+      - $REVIEW_MARKETING_BRANCH
+      - $REVIEW_MARKETING_SEGMENTS_BRANCH
+      - $REVIEW_CUSTOMERS_IMPORT_BRANCH
+      - $REVIEW_WEBANALYTICS_BRANCH
+      - $REVIEW_NOTIFICATIONS_BRANCH
+      - $REVIEW_BI_CLICKHOUSE_BRANCH
+  needs:
+    - job: "Prepare review vars"
+      artifacts: true
+    - job: Prepare review namespace
+    - job: "Deploy users for clickhouse"
+
+Deploy review data-platform-clickhouse:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/bi/data-platform/clickhouse
+  only:
+    variables:
+      - $REVIEW_DATAPLATFORM_AIRBYTE_BRANCH
+      - $REVIEW_DATAPLATFORM_ELT_BRANCH
+      - $REVIEW_DATAPLATFORM_DAGSTER_BRANCH
+  needs:
+    - job: "Prepare review vars"
+      artifacts: true
+      optional: true
+    - job: "Deploy users for clickhouse"
+
+Deploy review data-platform-airbyte:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/bi/data-platform/airbyte
+  only:
+    variables:
+      - $REVIEW_DATAPLATFORM_ELT_BRANCH
+
+Deploy review data-platform-dagster:
+  extends:
+    - .trigger
+  stage: review
+  trigger:
+    project: shop-app/bi/data-platform/dagster
+  only:
+    variables:
+      - $REVIEW_DATAPLATFORM_ELT_BRANCH
+
+Reimport dev dump to DB:
+  stage: reimport
+  extends:
+    - .review_werf
+  variables:
+    DELETE_FILE: /tmp/delete-database-$CI_PIPELINE_ID.yaml
+    IMPORT_FILE: /tmp/import-database-$CI_PIPELINE_ID.yaml
+  resource_group: mssql
+  script:
+    - set -x
+    - |
+      DELETE_RENDER=$(werf render | yq 'select(.metadata.name == "*delete-database" or .metadata.name == "*-job-scripts")')
+      echo "$DELETE_RENDER" | yq -N '(.kind, .metadata.name)' \
+      | xargs -rn2 werf kubectl delete -n ${WERF_NAMESPACE} || true
+    - |
+      echo "$DELETE_RENDER" | werf kubectl apply --namespace=${WERF_NAMESPACE} -f -
+    - |
+      echo "$DELETE_RENDER" | yq -N 'select(.kind == "Job") | .metadata.name' \
+      | xargs -r werf kubectl wait --namespace=${WERF_NAMESPACE} --for=condition=complete --timeout=600s job
+    - |
+      IMPORT_RENDER=$(werf render | yq 'select(.metadata.name == "*import-dump")')
+      echo "$IMPORT_RENDER" | yq -N '(.kind, .metadata.name)' \
+      | xargs -rn2 werf kubectl delete -n ${WERF_NAMESPACE} || true
+    - |
+      echo "$IMPORT_RENDER" | werf kubectl apply --namespace=${WERF_NAMESPACE} -f -
+    - |
+      echo "$IMPORT_RENDER" | yq -N 'select(.kind == "Job") | .metadata.name' \
+      | xargs -r werf kubectl wait --namespace=${WERF_NAMESPACE} --for=condition=complete --timeout=600s job
+  when: manual
+  only:
+    variables:
+      - $REVIEW_MSSQL
+      - ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ ) && $MSSQL
+  needs:
+    - job: "Prepare review vars"
+      artifacts: true
+      optional: true
+  tags:
+    - docker
+
+Import dev dump to clickhouse:
+  stage: review
+  extends:
+    - .review_werf
+  variables:
+    IMPORT_FILE: /tmp/import-clickhouse-database-$CI_PIPELINE_ID.yaml
+  script:
+    - |
+      werf render | yq 'select(.metadata.name == "*import-clickhouse-dump")' | tee ${IMPORT_FILE}
+
+    - |
+      yq -N '(.kind, .metadata.name)' ${IMPORT_FILE} \
+      | xargs -rn2 werf kubectl delete -n ${WERF_NAMESPACE} || true
+
+    - |
+      werf kubectl apply --namespace=${WERF_NAMESPACE} -f ${IMPORT_FILE}
+
+    - |
+      werf kubectl wait --namespace=${WERF_NAMESPACE} --for=condition=complete --timeout=600s \
+      job $(yq -N 'select(.kind == "Job") | .metadata.name' ${IMPORT_FILE})
+
+    - rm ${IMPORT_FILE}
+  when: manual
+  needs:
+    - job: "Prepare review vars"
+      artifacts: true
+      optional: true
+    - job: Prepare review namespace
+    - job: Deploy clickhouse
+  only:
+    variables:
+      - $REVIEW_CLICKHOUSE
+  except:
+    variables:
+      - $CI_PROJECT_PATH == "shop-app/review"
+      - $CI_PIPELINE_SOURCE == "pipeline"
+  tags:
+    - docker
+
+Deploy code:
+  stage: review
+  resource_group: ${WERF_NAMESPACE}
+  extends:
+    - .review_werf
+    - .needs_infra
+  except:
+    variables:
+      - $CI_PROJECT_PATH == "shop-app/review"
+      - $CI_PIPELINE_SOURCE == "pipeline"
+
+.triggered_deploy_needs:
+  needs:
+    - job: "Build"
+      optional: true
+    - job: "Build web-ui"
+      optional: true
+    - job: "Lint web-ui"
+      optional: true
+    - job: "Upload static to S3 for Triggered deploy code DEV"
+      optional: true
+
+Triggered deploy code:
+  extends:
+    - Deploy code
+  stage: multideploy
+  needs: !reference [.triggered_deploy_needs, needs]
+  only:
+    variables:
+      - >
+        $CI_PIPELINE_SOURCE == "pipeline"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $MULTIDEPLOY == "true")
+        && $WERF_ENV
+  except:
+    variables:
+      - $CI_PROJECT_PATH == "shop-app/review"
+      - $CI_PIPELINE_SOURCE == "pipeline" && $MULTIDEPLOY == "true" && $CONTEXT_WERF == "production-reserve"
+  when: on_success
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - api_failure
+      - data_integrity_failure
+    exit_codes:
+      - 1
+      - 137
+
+Triggered deploy to Production reserve-b:
+  extends:
+    - Triggered deploy code
+    - .include_replicas
+  stage: production-reserve
+  needs:
+    - !reference [.triggered_deploy_needs, needs]
+    - job: Triggered deploy code
+      optional: true
+  variables:
+    WERF_KUBE_CONTEXT: $CONTEXT_PRODUCTION_RESERVE
+    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+  only:
+    variables:
+      - >
+        $CI_PIPELINE_SOURCE == "pipeline"
+        && $MULTIDEPLOY == "true"
+        && $WERF_ENV == "production"
+  except:
+    variables:
+      - $CI_PROJECT_PATH == "shop-app/review"
+      - $CI_PIPELINE_SOURCE == "pipeline" && $MULTIDEPLOY == "true" && $CONTEXT_WERF == "production-reserve"
+
+Triggered deploy to tenant-a reserve:
+  extends:
+    - Triggered deploy code
+    - .include_tenant_a_replicas
+  stage: tenant-a-reserve
+  needs:
+    - !reference [.triggered_deploy_needs, needs]
+    - job: Triggered deploy code
+      optional: true
+  variables:
+    WERF_KUBE_CONTEXT: $CONTEXT_TENANT_A_RESERVE
+  after_script: []
+  only:
+    variables:
+      - >
+        $CI_PIPELINE_SOURCE == "pipeline"
+        && $MULTIDEPLOY == "true"
+        && $WERF_ENV == "tenant-a"
+  except:
+    variables:
+      - $DEPLOY_TO_RESERVE_TENANT_A_CLUSTER == "false"
+      - $CI_PROJECT_PATH == "shop-app/review"
+      - $CI_PIPELINE_SOURCE == "pipeline" && $MULTIDEPLOY == "true" && $CONTEXT_WERF == "production-reserve"
+
+#Triggered deploy to NEW Production Reserve:
+#  extends:
+#    - Triggered deploy code
+#    - .include_replicas
+#  stage: production-reserve
+#  needs:
+#    - !reference [.triggered_deploy_needs, needs]
+#    - job: Triggered deploy code
+#      optional: true
+#  variables:
+#    WERF_KUBE_CONTEXT: $CONTEXT_PRODUCTION_RESERVE_NEW
+#    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+#  only:
+#    variables:
+#      - >
+#        $CI_PIPELINE_SOURCE == "pipeline"
+#        && $MULTIDEPLOY == "true"
+#        && $WERF_ENV == "production"
+#        && $DEPLOY_TO_PROD_RESERVE_CLUSTER == "true"
+#  except:
+#    variables:
+#      - $CI_PROJECT_PATH == "shop-app/review"
+#  allow_failure: true
+
+#Triggered deploy to new tenant-a reserve:
+#  extends:
+#    - Triggered deploy code
+#    - .include_tenant_a_replicas
+#  stage: tenant-a-reserve
+#  needs:
+#    - !reference [.triggered_deploy_needs, needs]
+#    - job: Triggered deploy code
+#      optional: true
+#  variables:
+#    WERF_KUBE_CONTEXT: $CONTEXT_TENANT_A_RESERVE_NEW
+#    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+#  after_script: []
+#  only:
+#    variables:
+#      - >
+#        $CI_PIPELINE_SOURCE == "pipeline"
+#        && $MULTIDEPLOY == "true"
+#        && $WERF_ENV == "tenant-a"
+#        && $DEPLOY_TO_PROD_RESERVE_CLUSTER == "true"
+#  except:
+#    variables:
+#      - $CI_PROJECT_PATH == "shop-app/review"
+#  allow_failure: true
+#
+#Triggered deploy to Prime Reserve:
+#  extends:
+#    - Triggered deploy code
+#    - .include_tenant_b_replicas
+#  stage: tenant-b-reserve
+#  needs:
+#    - !reference [.triggered_deploy_needs, needs]
+#    - job: Triggered deploy code
+#      optional: true
+#  environment:
+#    name: tenant-b-reserve
+#  variables:
+#    WERF_KUBE_CONTEXT: $CONTEXT_TENANT_B_RESERVE
+#    WERF_SET_CLUSTER_INFO: global.cluster_type=reserve
+#  after_script: []
+#  only:
+#    variables:
+#      - >
+#        $CI_PIPELINE_SOURCE == "pipeline"
+#        && $MULTIDEPLOY == "true"
+#        && $WERF_ENV == "tenant-b"
+#        && $DEPLOY_TO_PROD_RESERVE_CLUSTER == "true"
+#  except:
+#    variables:
+#      - $CI_PROJECT_PATH == "shop-app/review"
+#  allow_failure: true
+
+# Dismiss
+Dismiss code:
+  stage: destroy
+  resource_group: mssql
+  extends:
+    - .review_werf
+  script:
+    - |
+      werf dismiss || true
+  when: manual
+  needs:
+    - job: "Prepare review vars"
+      artifacts: true
+      optional: true
+  except:
+    variables:
+      - $CI_PROJECT_PATH == "shop-app/review"
+
+# FIXME: similar to /reviewStep.yml → "Delete Review Namespace (with Release)"
+Destroy review namespace:
+  stage: destroy
+  extends:
+    - .review_werf
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - set -x
+    - |
+      werf kubectl delete gateway "eg-${WERF_NAMESPACE}" --namespace="${WERF_NAMESPACE}" --ignore-not-found
+      werf kubectl delete envoyproxy "eg-${WERF_NAMESPACE}" --namespace="${WERF_NAMESPACE}" --ignore-not-found
+      werf kubectl patch gatewayclasses.gateway.networking.k8s.io "eg-${WERF_NAMESPACE}" --type=merge \
+      --patch='{"metadata":{"finalizers":null}}' || true
+
+      werf helm list --namespace=${WERF_NAMESPACE} -a -oyaml | yq '.[].name' \
+      | xargs -trn1 werf helm uninstall --wait --namespace=${WERF_NAMESPACE}
+    - werf kubectl delete ns ${WERF_NAMESPACE}
+  when: manual
+  needs:
+    - job: "Prepare review vars"
+      artifacts: true
+      optional: true
+    - job: "Dismiss code"
+      optional: true
+  except:
+    variables:
+      - $CI_PROJECT_NAME !~ /^server$|web-ui-internal-ci|web-ui-external-ci|^shop|^review$/

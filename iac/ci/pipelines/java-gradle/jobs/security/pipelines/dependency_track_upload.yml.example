@@ -1,0 +1,124 @@
+dependency-track-upload:
+    stage: security
+    tags:
+        - docker
+    image: alpine:3.20
+    before_script:
+        - apk add --no-cache curl jq
+    retry: 2
+    needs:
+        - job: CycloneDX
+          artifacts: true
+    variables:
+        DEFECTDOJO_SCAN_FILE: "dependency-report.json"
+        BOM_FILE: "bom.json"
+        PROJECT_VERSION: "1.0.0"
+        DT_ANALYSIS_WAIT_SECONDS: "60"
+        DT_URL: "https://dtrack.example.com"
+    script:
+        - |
+            set -e
+
+            for _var in DT_API_KEY DT_URL CI_PROJECT_NAME; do
+                eval "_val=\$$_var"
+                if [ -z "$_val" ]; then
+                    echo "ERROR: Required variable '$_var' is not set." >&2
+                    exit 1
+                fi
+            done
+
+            if [ ! -f "${BOM_FILE}" ]; then
+                echo "ERROR: BOM file '${BOM_FILE}' not found." >&2
+                exit 1
+            fi
+
+            echo "Looking up '${CI_PROJECT_NAME}' v${PROJECT_VERSION} in Dependency-Track..."
+
+            PROJECT_ID=$(curl -s \
+                -H "X-Api-Key: ${DT_API_KEY}" \
+                "${DT_URL}/api/v1/project?name=${CI_PROJECT_NAME}&version=${PROJECT_VERSION}" \
+                | jq -r '.[0].uuid // empty')
+
+            if [ -z "$PROJECT_ID" ]; then
+                echo "Project not found. Creating '${CI_PROJECT_NAME}' v${PROJECT_VERSION}..."
+                curl -s \
+                    -X PUT "${DT_URL}/api/v1/project" \
+                    -H "Content-Type: application/json" \
+                    -H "X-Api-Key: ${DT_API_KEY}" \
+                    -d "{
+                        \"name\": \"${CI_PROJECT_NAME}\",
+                        \"version\": \"${PROJECT_VERSION}\",
+                        \"description\": \"Created automatically by GitLab CI\",
+                        \"active\": true
+                    }" > /dev/null
+
+                sleep 5
+
+                PROJECT_ID=$(curl -s \
+                    -H "X-Api-Key: ${DT_API_KEY}" \
+                    "${DT_URL}/api/v1/project?name=${CI_PROJECT_NAME}&version=${PROJECT_VERSION}" \
+                    | jq -r '.[0].uuid // empty')
+            fi
+
+            if [ -z "$PROJECT_ID" ]; then
+                echo "Failed to create or find project '${CI_PROJECT_NAME}'." >&2
+                exit 1
+            fi
+
+            echo "Project UUID: ${PROJECT_ID}"
+            echo "Uploading SBOM to Dependency-Track..."
+
+            UPLOAD_RESPONSE=$(curl -s \
+                -X POST "${DT_URL}/api/v1/bom" \
+                -H "X-Api-Key: ${DT_API_KEY}" \
+                -H "Content-Type: multipart/form-data" \
+                -F "project=${PROJECT_ID}" \
+                -F "bom=@${BOM_FILE}")
+
+            BOM_TOKEN=$(echo "$UPLOAD_RESPONSE" | jq -r '.token // empty')
+            echo "SBOM uploaded successfully."
+
+            if [ -n "$BOM_TOKEN" ]; then
+                echo "Polling for analysis completion (timeout: ${DT_ANALYSIS_WAIT_SECONDS}s)..."
+                _waited=0
+                while true; do
+                    _processing=$(curl -s \
+                        -H "X-Api-Key: ${DT_API_KEY}" \
+                        "${DT_URL}/api/v1/bom/token/${BOM_TOKEN}" \
+                        | jq -r '.processing')
+
+                    if [ "$_processing" = "false" ]; then
+                        echo "Analysis complete."
+                        break
+                    fi
+
+                    if [ "$_waited" -ge "${DT_ANALYSIS_WAIT_SECONDS}" ]; then
+                        echo "Timed out after ${DT_ANALYSIS_WAIT_SECONDS}s. Proceeding anyway..."
+                        break
+                    fi
+
+                    sleep 5
+                    _waited=$((_waited + 5))
+                done
+            else
+                echo "No BOM token returned. Waiting ${DT_ANALYSIS_WAIT_SECONDS}s as fallback..."
+                sleep "${DT_ANALYSIS_WAIT_SECONDS}"
+            fi
+
+            echo "Downloading findings report from Dependency-Track..."
+
+            curl -s \
+                -H "X-Api-Key: ${DT_API_KEY}" \
+                "${DT_URL}/api/v1/bom/cyclonedx/project/${PROJECT_ID}" \
+                -o "${DEFECTDOJO_SCAN_FILE}"
+
+            if [ ! -s "${DEFECTDOJO_SCAN_FILE}" ]; then
+                echo "Report from Dependency-Track is empty." >&2
+                exit 1
+            fi
+
+            echo "Report saved as '${DEFECTDOJO_SCAN_FILE}'."
+    artifacts:
+        expire_in: 2 days
+        paths:
+            - $DEFECTDOJO_SCAN_FILE

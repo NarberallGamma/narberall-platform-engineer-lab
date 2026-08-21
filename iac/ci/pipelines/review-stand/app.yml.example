@@ -1,0 +1,27 @@
+# Image tags for review-stand deploys. Replace tags locally.
+shop-agent:main-00000001
+shop-agreement:main-00000002
+shop-assistant:v1-0-0-00000003
+shop-audit-indexer:main-00000004
+shop-auth:main-00000005
+shop-chat:main-00000006
+shop-clearing:v1-0-0-00000007
+shop-config:main-00000008
+shop-fx:main-00000009
+shop-dict:main-00000010
+gateway:main-00000011
+shop-news-front:main-00000012
+shop-front:main-00000013
+shop-landing:main-00000014
+keycloak:release-1-0-0-00000015
+shop-app:main-00000016
+shop-news:main-00000017
+shop-notify:main-00000018
+shop-settings:main-00000019
+shop-front-web:v1-0-0-00000020
+shop-idp-admin:main-00000021
+shop-tariff:v1-0-0-00000022
+shop-mock:main-00000023
+shop-partners:v1-0-0-00000024
+shop-adapter:main-00000025
+shop-front-mobile:main-00000026

@@ -1,0 +1,28 @@
+include:
+  - local: '/common.yml.example'
+  - local: '/cleanup.yml.example'
+  - local: '/rules/rules.yml.example'
+  - local: 'multiStageInfraInputs.yml.example'
+    inputs:
+      longEnv: Dev
+      env: dev
+  - local: 'multiStageInfraInputs.yml.example'
+    inputs:
+      longEnv: Production
+      env: production
+  - local: 'multiStageInfraInputs.yml.example'
+    inputs:
+      longEnv: Production-reserve-b
+      env: production-reserve-b
+  - local: 'multiStageInfraInputs.yml.example'
+    inputs:
+      longEnv: Production2
+      env: production2
+  - local: 'multiStageInfraInputs.yml.example'
+    inputs:
+      longEnv: Production Reserve
+      env: production-reserve
+
+Build:
+  extends: .base_build
+  stage: build

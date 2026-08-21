@@ -1,0 +1,358 @@
+workflow:
+  rules:
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event") && ($CI_COMMIT_REF_NAME =~ /^release.*$/) && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH)
+      variables:
+        CI_TYPE: "ready_to_prod"
+        RUNNER_TAG: docker
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event") && ($CI_COMMIT_REF_NAME =~ /^sales.*$/) && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH)
+      variables:
+        CI_TYPE: "ready_to_prod"
+        RUNNER_TAG: docker
+    - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "push") && $CI_COMMIT_TAG && $CI_COMMIT_REF_NAME =~ /^release.*$/
+      variables:
+        CI_TYPE: "create_release"
+        RUNNER_TAG: "docker"
+    - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "push") && $CI_COMMIT_TAG && $CI_COMMIT_REF_NAME =~ /^sales.*$/
+      variables:
+        CI_TYPE: "create_release"
+        RUNNER_TAG: "docker"
+
+    # legacy CI repo
+    - if: ($CI_PROJECT_PATH == "shop-app/web-ui-internal-ci" ) && $CI_COMMIT_REF_NAME =~ /^release.*$/ && $CI_OPEN_MERGE_REQUESTS
+      variables:
+        RUNNER_TAG: "docker"
+    - if: ($CI_PROJECT_PATH == "shop-app/services/shop-server" ) && $CI_COMMIT_REF_NAME =~ /^release.*$/ && $CI_OPEN_MERGE_REQUESTS
+      variables:
+        RUNNER_TAG: "docker"
+    # end legacy CI repo rules
+
+    - if: $CI_PIPELINE_SOURCE == "web" && $CI_PROJECT_NAME =~ /^ingresses$/
+
+    - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "push") && $CI_COMMIT_REF_NAME =~ /^release.*$/ && $CI_OPEN_MERGE_REQUESTS
+      when: never
+
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_PROJECT_NAME =~ /^web-ui-.*$/ && $CI_MERGE_REQUEST_TITLE =~ /^(\[Draft\]|\(Draft\)|Draft:)/
+      when: never
+
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_PROJECT_NAME =~ /^web-ui-.*$/ && $CI_COMMIT_REF_NAME !~ /^release.*$/
+      variables:
+        TYPE_BUILD: "disable"
+
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && ( $CI_PROJECT_NAME =~ /^web-ui-.*$/ || $CI_PROJECT_NAME == "NEW_PROJECT")
+
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push" && $CI_PROJECT_NAME == "NEW_PROJECT"
+      when: never
+
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME =~ /^release.*$/ && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release.*$/
+
+    # allow an MR pipeline on feature branches
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_COMMIT_REF_NAME =~ /^feature.*$/ && ($CI_PROJECT_PATH == "shop-app/server" )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+        REVIEW_REDIS: "true"
+
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: never
+
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      variables:
+        SAST_DISABLED: "true"
+        SECRET_DETECTION_DISABLED: "true"
+        IMAGE_SCAN_ENABLED: "false"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/web-ui-external-ci"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_INGRESSES: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/web-ui-shop"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_INGRESSES: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/chat"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_RABBITMQ: "true"
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/confirmations"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/hardware"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-track-fl"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-track"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-inventory"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-pos"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-erp"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-erp2"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-reviews"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-listings-a"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-compliance"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/database"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-catalog"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-id"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/integrations/partner-listings-b"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/notifications"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/shop-api"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_RABBITMQ: "true"
+        REVIEW_REDIS: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/webanalytics"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_CLICKHOUSE: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/product-catalog"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_REDIS: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/tools/admin"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/)
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/bi/cube"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_CLICKHOUSE: "true"
+        REVIEW_REDIS: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/bi/etl"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/)
+      variables:
+        REVIEW_CLICKHOUSE: "true"
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/bi/clickhouse"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/)
+      variables:
+        REVIEW_CLICKHOUSE: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/server"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+        REVIEW_REDIS: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/consumers"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/delivery"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/financial-calculator"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/promo"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/face-match"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/hubs"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/marketing"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_CLICKHOUSE: "true"
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+        REVIEW_REDIS: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/marketing-segments"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_CLICKHOUSE: "true"
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/customers-import"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_CLICKHOUSE: "true"
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/payments"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/scheduler"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_REDIS: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/shortlink"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_RABBITMQ: "true"
+        REVIEW_REDIS: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/authorization"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+        REVIEW_REDIS: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/recommendation"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_RABBITMQ: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/service/screens"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/ecom/api/banners"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - if: >
+        $CI_PROJECT_PATH == "shop-app/services/limit-calculator"
+        && ( $WERF_NAMESPACE =~ /^feature-.*/ || $WERF_EXISTED_NAMESPACE =~ /^feature-.*/ || $WERF_NEW_NAMESPACE =~ /^feature-.*/ || $CI_COMMIT_REF_SLUG =~ /^feature-.*/ )
+      variables:
+        REVIEW_MSSQL: "true"
+
+    - when: always

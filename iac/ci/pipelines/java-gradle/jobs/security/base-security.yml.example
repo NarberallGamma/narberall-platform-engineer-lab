@@ -1,0 +1,11 @@
+stages:
+    - security
+
+include:
+    - local: jobs/security/pipelines/defectdojo_create_engagement.yml.example
+    - local: jobs/security/pipelines/deepsecrets.yml.example
+    - local: jobs/security/pipelines/semgrep.yml.example
+    - local: jobs/security/pipelines/pii_scan.yml.example
+    - local: jobs/security/pipelines/cyclonedx.yml.example
+    - local: jobs/security/pipelines/dependency_track_upload.yml.example
+    - local: jobs/security/pipelines/defectdojo_import_scan.yml.example

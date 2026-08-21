@@ -1,0 +1,12 @@
+# Hub pipeline for the common-ci repo: registry bootstrap plus release includes.
+# Release YAML bodies live under releases/.
+include:
+  - local: 'defaults.yaml.example'
+  - local: 'registry-init.yaml.example'
+  - local: 'releases/release-cutover.yaml.example'
+  - local: 'releases/release-ansible-vm-deploy.yaml.example'
+  - local: 'releases/release-revert.yaml.example'
+
+stages:
+  - create-regcred
+  - releases

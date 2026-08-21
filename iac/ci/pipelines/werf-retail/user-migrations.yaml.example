@@ -1,0 +1,144 @@
+include:
+  - local: '/common.yml.example'
+  - local: '/security-scan.yml.example'
+
+Build:
+  extends: .base_build
+  stage: build
+
+.deploy_user_migrations:
+  extends: .base_deploy
+  dependencies:
+    - Build
+  variables:
+    WERF_SET_USER_MIGRATIONS: global.userMigrations=disabled
+    WERF_KUBE_CONTEXT: dev
+  when: manual
+  except:
+    - schedules
+    - triggers
+    - pipelines
+
+
+Deploy user-migrations to Dev:
+  extends: .deploy_user_migrations
+  stage: dev
+  variables:
+    KUBE_NAMESPACE: dev
+  environment:
+    name: dev
+
+
+Deploy user-migrations to Test-E:
+  extends: .deploy_user_migrations
+  stage: test
+  variables:
+    KUBE_NAMESPACE: test-e
+  environment:
+    name: teste
+
+Deploy user-migrations to TestDB:
+  extends: .deploy_user_migrations
+  stage: test
+  variables:
+    KUBE_NAMESPACE: testdb
+  environment:
+    name: testdb
+
+Deploy user-migrations to Sales:
+  extends: .deploy_user_migrations
+  stage: sales
+  variables:
+    KUBE_NAMESPACE: sales
+  environment:
+    name: sales
+  only:
+    - stage
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+
+Deploy user-migrations to Stage:
+  extends: .deploy_user_migrations
+  stage: stage
+  variables:
+    KUBE_NAMESPACE: stage
+  environment:
+    name: stage
+  only:
+    - dev
+    - develop
+    - development
+    - stage
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+
+Deploy user-migrations to Demo:
+  extends: .deploy_user_migrations
+  stage: demo
+  variables:
+    KUBE_NAMESPACE: demo
+  environment:
+    name: demo
+  only:
+    - dev
+    - develop
+    - development
+    - demo
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+
+Deploy user-migrations to Production:
+  extends: .deploy_user_migrations
+  stage: production
+  variables:
+    KUBE_NAMESPACE: production
+    WERF_KUBE_CONTEXT: ${CONTEXT_PRODUCTION_MAIN}
+    WERF_SET_CLUSTER_INFO: global.cluster_type=production
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${CONTEXT_PRODUCTION_MAIN}
+  environment:
+    name: production
+  #allow_failure: false
+  only:
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+
+Deploy user-migrations to tenant-b:
+  extends: .deploy_user_migrations
+  stage: tenant-b
+  variables:
+    KUBE_NAMESPACE: tenant-b
+    WERF_KUBE_CONTEXT: ${CONTEXT_TENANT_B_MAIN}
+    WERF_SET_CLUSTER_INFO: global.cluster_type=production2
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${CONTEXT_TENANT_B_MAIN}
+  environment:
+    name: tenant-b
+  #allow_failure: false
+  only:
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+
+Deploy user-migrations to tenant-a:
+  extends: .deploy_user_migrations
+  stage: tenant-a
+  variables:
+    KUBE_NAMESPACE: tenant-a
+    WERF_KUBE_CONTEXT: ${CONTEXT_TENANT_A_MAIN}
+    WERF_SET_CLUSTER_INFO: global.cluster_type=production
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${CONTEXT_TENANT_A_MAIN}
+  environment:
+    name: tenant-a
+  only:
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/

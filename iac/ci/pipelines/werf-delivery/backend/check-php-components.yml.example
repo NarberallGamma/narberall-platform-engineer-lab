@@ -1,0 +1,93 @@
+stages:
+  - test
+  - publish
+
+# MRs and branch pipelines workflow
+workflow:
+  rules:
+    # Run merge request pipelines on MR events
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Run branch pipelines from "Run pipeline" page
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    # Do not run a branch pipeline on push when an MR is open
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+      when: never
+    # Run branch pipeline on tags
+    - if: $CI_COMMIT_TAG
+    # Run branch pipeline on all branches
+    - if: $CI_COMMIT_BRANCH
+    # Run branch pipeline on default branch
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    # Optional: run only on platform contractor branches
+    # - if: $CI_COMMIT_BRANCH =~ /^platform.*$/
+
+.init:
+  stage: test
+  before_script:
+    - php -v
+    - composer config gitlab-token.gitlab.example.com "${COMPOSER_TOKEN}"
+    - composer install --prefer-dist --ignore-platform-reqs
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE == "tests"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_TAG
+      when: never
+    - when: always
+  tags:
+    - docker
+
+CodeStyle:
+  extends: .init
+  image:
+    name: ghcr.io/phpstan/phpstan:1-php8.3
+    entrypoint: [""]
+  script:
+    - php -d memory_limit=256M ./vendor/bin/php-cs-fixer check --allow-risky=yes -v --diff --config=.cs_fixer.php --format=gitlab --using-cache=no > $CI_PROJECT_DIR/php-cs-fixer-report.json || true
+    - cat $CI_PROJECT_DIR/php-cs-fixer-report.json
+    - grep -q "\[\]" $CI_PROJECT_DIR/php-cs-fixer-report.json && exit 0 || exit 1
+  artifacts:
+    paths:
+      - php-cs-fixer-report.json
+    reports:
+      codequality: php-cs-fixer-report.json
+
+PHPStan:
+  extends: .init
+  image:
+    name: ghcr.io/phpstan/phpstan:1-php8.3
+    entrypoint: [""]
+  script:
+    - vendor/bin/phpstan clear-result-cache && vendor/bin/phpstan analyse --memory-limit 256M --error-format gitlab > $CI_PROJECT_DIR/phpstan-report.json || true
+    - cat $CI_PROJECT_DIR/phpstan-report.json
+    - grep -q "\[\]" $CI_PROJECT_DIR/phpstan-report.json && exit 0 || exit 1
+  artifacts:
+    paths:
+      - phpstan-report.json
+    reports:
+      codequality: phpstan-report.json
+
+tests:
+  extends: .init
+  image: composer:2.7.9
+  script:
+    - XDEBUG_MODE=coverage vendor/bin/pest --log-junit $CI_PROJECT_DIR/pest-report.xml --coverage-cobertura $CI_PROJECT_DIR/pest-coverage-report.xml
+    - cat $CI_PROJECT_DIR/pest-report.xml
+  artifacts:
+    paths:
+      - pest-coverage-report.xml
+      - pest-report.xml
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: pest-coverage-report.xml
+      junit: pest-report.xml
+Publish Composer:
+  stage: publish
+  script:
+    - 'curl --header "Job-Token: $CI_JOB_TOKEN" --data tag=${CI_COMMIT_TAG} "${CI_API_V4_URL}/projects/$CI_PROJECT_ID/packages/composer"'
+  rules:
+    - if: $CI_COMMIT_TAG
+  tags:
+    - docker

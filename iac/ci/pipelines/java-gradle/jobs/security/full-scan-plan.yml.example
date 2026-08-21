@@ -1,0 +1,175 @@
+---
+# ZAP automation plan. Credentials and shop-app API paths are placeholders.
+env:
+  contexts:
+  - name: "Authentication Test"
+    urls:
+    - "${APP_URL}"
+    includePaths:
+    - "${APP_URL}.*"
+    - "${APP_URL}/api/v1/users/[^/?]+"
+    - "${APP_URL}/api/v1/users/[^/?]+/settings"
+    - "${APP_URL}/api/v1/profile/settings"
+    - "${APP_URL}/api/v1/orders/[^/?]+"
+    - "${APP_URL}/api/v1/orders/[^/?]+/status"
+    - "${APP_URL}/api/v1/orders/[^/?]+/assignee"
+    - "${APP_URL}/api/v1/orders/[^/?]+/close"
+    - "${APP_URL}/api/v1/offers/[^/?]+"
+    - "${APP_URL}/api/v1/customers/[^/?]+"
+    - "${APP_URL}/api/v1/partners/[^/?]+"
+    - "${APP_URL}/api/v1/partners/[^/?]+/tariffs"
+    - "${APP_URL}/api/v1/partners/[^/?]+/services"
+    - "${APP_URL}/api/v1/partners/[^/?]+/payments"
+    - "${APP_URL}/api/v1/catalog/types"
+    - "${APP_URL}/api/v1/catalog/services"
+    - "${APP_URL}/api/v1/catalog/currencies"
+    - "${APP_URL}/api/v1/catalog/countries"
+    - "${APP_URL}/api/v1/profile"
+    - "${APP_URL}/api/v1/orders"
+    - "${APP_URL}/api/v1/users"
+    - "${APP_URL}/api/v1/offers"
+    excludePaths: []
+    authentication:
+      method: "browser"
+      parameters:
+        loginPageUrl: "${APP_URL}/login"
+        loginPageWait: 5
+        browserId: "firefox"
+      verification:
+        method: "poll"
+        loggedInRegex: "\\Q 200 OK\\E"
+        loggedOutRegex: "\\Q 401 Unauthorized\\E"
+        pollFrequency: 60
+        pollUnits: "requests"
+        pollUrl: "${APP_URL}/api/v1/catalog/countries"
+        pollPostData: ""
+    sessionManagement:
+      method: "headers"
+      parameters:
+        Authorization: "Bearer {%json:access_token%}"
+    technology:
+      exclude: []
+    structure:
+      structuralParameters: []
+    users:
+    - name: "scan-user"
+      credentials:
+        password: "CHANGE_ME"
+        username: "CHANGE_ME"
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+    continueOnFailure: false
+  vars: {}
+jobs:
+- parameters:
+    scanOnlyInScope: true
+    enableTags: false
+    disableAllRules: false
+  rules: []
+  name: "passiveScan-config"
+  type: "passiveScan-config"
+- parameters:
+    apiFile: "/opt/zaproxy/specification.json"
+    apiUrl: ""
+    targetUrl: "${APP_URL}"
+    context: "Authentication Test"
+  name: "openapi"
+  type: "openapi"
+- parameters:
+    context: "Authentication Test"
+    user: "scan-user"
+    url: "${APP_URL}/login"
+    maxDuration: 0
+    maxDepth: 0
+    maxChildren: 0
+    acceptCookies: false
+    handleODataParametersVisited: false
+    handleParameters: "IGNORE_COMPLETELY"
+    maxParseSizeBytes: 0
+    parseComments: true
+    parseGit: true
+    parseRobotsTxt: true
+    parseSitemapXml: true
+    parseSVNEntries: true
+    postForm: true
+    processForm: true
+    requestWaitTime: 0
+    sendRefererHeader: true
+    userAgent: ""
+  name: "spider"
+  type: "spider"
+  tests:
+  - onFail: "INFO"
+    statistic: "automation.spider.urls.added"
+    site: ""
+    operator: ">="
+    value: 100
+    name: "At least 100 URLs found"
+    type: "stats"
+- parameters:
+    context: "Authentication Test"
+    user: "scan-user"
+    url: "${APP_URL}/login"
+    maxDuration: 60
+    maxCrawlDepth: 10
+    numberOfBrowsers: 24
+    browserId: "firefox-headless"
+    maxCrawlStates: 0
+    eventWait: 1000
+    reloadWait: 1000
+    clickDefaultElems: true
+    clickElemsOnce: true
+    randomInputs: true
+    inScopeOnly: true
+    runOnlyIfModern: false
+    excludedElements:
+    - description: "exit"
+      element: "a"
+      xpath: "/html/body/div/div[2]/div[1]/div/button"
+  name: "spiderAjax"
+  type: "spiderAjax"
+  tests:
+  - onFail: "INFO"
+    statistic: "spiderAjax.urls.added"
+    site: ""
+    operator: ">="
+    value: 100
+    name: "At least 100 URLs found"
+    type: "stats"
+- parameters:
+    maxDuration: 0
+  name: "passiveScan-wait"
+  type: "passiveScan-wait"
+- parameters:
+    context: "Authentication Test"
+    user: "scan-user"
+    policy: ""
+    maxRuleDurationInMins: 0
+    maxScanDurationInMins: 0
+    maxAlertsPerRule: 0
+  policyDefinition:
+    defaultStrength: "medium"
+    defaultThreshold: "medium"
+    rules: []
+  name: "activeScan"
+  type: "activeScan"
+- parameters:
+    template: "traditional-xml-plus"
+    reportDir: ""
+    reportFile: "zap-report"
+    reportTitle: "ZAP Scanning Report"
+    reportDescription: ""
+    displayReport: false
+  risks:
+  - "low"
+  - "medium"
+  - "high"
+  confidences:
+  - "low"
+  - "medium"
+  - "high"
+  - "confirmed"
+  name: "report"
+  type: "report"

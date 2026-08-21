@@ -1,0 +1,39 @@
+spec:
+  inputs:
+    longEnv:
+      options: ['Dev', 'Production', 'Production-reserve-b', 'Production2', 'Production Reserve']
+    env:
+      options: ['dev', 'production', 'production-reserve-b', 'production2', 'production-reserve']
+---
+
+👀 Plan to $[[ inputs.longEnv ]]:
+  extends: .base_deploy_without_except
+  stage: plan
+  variables:
+    WERF_KUBE_CONTEXT: $[[ inputs.env ]]
+    DELIVERY_WERF_CMD: plan
+  dependencies:
+    - Build
+  environment:
+    name: $[[ inputs.env ]]
+    action: access
+  rules:
+    - !reference [.rules_not_schedule]
+    - !reference [.rules_not_pipeline]
+    - !reference [.rules_not_tag]
+    - when: manual
+
+Deploy to $[[ inputs.longEnv ]]:
+  extends: .base_deploy_without_except
+  stage: deploy
+  variables:
+    WERF_KUBE_CONTEXT: $[[ inputs.env ]]
+  dependencies:
+    - Build
+  environment:
+    name: $[[ inputs.env ]]
+  rules:
+    - !reference [.rules_not_schedule]
+    - !reference [.rules_not_pipeline]
+    - !reference [.rules_not_tag]
+    - when: manual

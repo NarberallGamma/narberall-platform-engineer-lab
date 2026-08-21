@@ -1,0 +1,35 @@
+# Build the Kaniko image and push it to the GitLab Container Registry.
+# Run from the estate/base-images project (kaniko/Dockerfile in that repo).
+# First run uses gcr.io/kaniko-project/executor:debug; later jobs can use
+# $CI_REGISTRY_IMAGE/kaniko:1.0 after this job succeeds.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - docker
+  timeout: 2h
+  interruptible: true
+
+stages:
+  - build
+
+variables:
+  KANIKO_IMAGE_NAME: "kaniko"
+  KANIKO_IMAGE_TAG: "1.0"
+
+build-kaniko:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - cd kaniko
+    - /kaniko/executor --context $CI_PROJECT_DIR/kaniko --dockerfile $CI_PROJECT_DIR/kaniko/Dockerfile --destination $CI_REGISTRY_IMAGE/$KANIKO_IMAGE_NAME:$KANIKO_IMAGE_TAG --custom-platform=linux/amd64
+    - echo "Kaniko image built and pushed to $CI_REGISTRY_IMAGE/$KANIKO_IMAGE_NAME:$KANIKO_IMAGE_TAG"
+  rules:
+    - when: manual

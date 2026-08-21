@@ -1,0 +1,10 @@
+include:
+  - local: .gitlab/common.yaml.example
+
+
+Make Builder:
+  stage: make builder
+  extends:
+    - .build
+  script:
+    - werf build builder

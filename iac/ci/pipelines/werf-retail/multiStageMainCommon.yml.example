@@ -1,0 +1,225 @@
+include:
+  - local: '/common.yml.example'
+  - local: '/cleanup.yml.example'
+  - local: '/security-scan.yml.example'
+  - local: '/sonarqube.yml.example'
+
+Build:
+  extends: .base_build
+  stage: build
+
+.deploy:
+  variables:
+    KUBERNETES_CPU_REQUEST: "0.2"
+    KUBERNETES_MEMORY_REQUEST: "256Mi"
+  extends: .base_deploy
+  dependencies:
+    - Build
+
+.deploy_test:
+  extends: .deploy
+  stage: test
+  when: manual
+  except:
+    refs:
+      - schedules
+      - triggers
+      - pipelines
+      - tags
+      - /^feature.*$/
+      - /^sales.*$/
+      - /^release.*$/
+    variables:
+      - ($CI_TYPE == "ready_to_prod" || $CI_TYPE == "create_release")
+      - ($CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME =~ /^feature.*$/) && ($CI_PROJECT_PATH == "shop-app/server" )
+
+.include_replicas:
+  variables:
+    WERF_SET_RESERVE_CLUSTER_REPLICA1: ${RESERVE_CLUSTER_REPLICA1}
+    WERF_SET_RESERVE_CLUSTER_REPLICA2: ${RESERVE_CLUSTER_REPLICA2}
+    WERF_SET_RESERVE_CLUSTER_REPLICA3: ${RESERVE_CLUSTER_REPLICA3}
+    WERF_SET_RESERVE_CLUSTER_REPLICA4: ${RESERVE_CLUSTER_REPLICA4}
+    WERF_SET_RESERVE_CLUSTER_REPLICA5: ${RESERVE_CLUSTER_REPLICA5}
+    WERF_SET_RESERVE_CLUSTER_REPLICA6: ${RESERVE_CLUSTER_REPLICA6}
+    WERF_SET_RESERVE_CLUSTER_REPLICA7: ${RESERVE_CLUSTER_REPLICA7}
+    WERF_SET_RESERVE_CLUSTER_REPLICA8: ${RESERVE_CLUSTER_REPLICA8}
+    WERF_SET_RESERVE_CLUSTER_REPLICA9: ${RESERVE_CLUSTER_REPLICA9}
+    WERF_SET_RESERVE_CLUSTER_REPLICA10: ${RESERVE_CLUSTER_REPLICA10}
+
+.include_tenant_a_replicas:
+  variables:
+    WERF_SET_RESERVE_TENANT_A_REPLICA1: ${RESERVE_TENANT_A_REPLICA1}
+    WERF_SET_RESERVE_TENANT_A_REPLICA2: ${RESERVE_TENANT_A_REPLICA2}
+    WERF_SET_RESERVE_TENANT_A_REPLICA3: ${RESERVE_TENANT_A_REPLICA3}
+    WERF_SET_RESERVE_TENANT_A_REPLICA4: ${RESERVE_TENANT_A_REPLICA4}
+    WERF_SET_RESERVE_TENANT_A_REPLICA5: ${RESERVE_TENANT_A_REPLICA5}
+    WERF_SET_RESERVE_TENANT_A_REPLICA6: ${RESERVE_TENANT_A_REPLICA6}
+    WERF_SET_RESERVE_TENANT_A_REPLICA7: ${RESERVE_TENANT_A_REPLICA7}
+    WERF_SET_RESERVE_TENANT_A_REPLICA8: ${RESERVE_TENANT_A_REPLICA8}
+    WERF_SET_RESERVE_TENANT_A_REPLICA9: ${RESERVE_TENANT_A_REPLICA9}
+    WERF_SET_RESERVE_TENANT_A_REPLICA10: ${RESERVE_TENANT_A_REPLICA10}
+
+.include_tenant_b_replicas:
+  variables:
+    WERF_SET_RESERVE_TENANT_B_REPLICA1: ${RESERVE_TENANT_B_REPLICA1}
+    WERF_SET_RESERVE_TENANT_B_REPLICA2: ${RESERVE_TENANT_B_REPLICA2}
+    WERF_SET_RESERVE_TENANT_B_REPLICA3: ${RESERVE_TENANT_B_REPLICA3}
+    WERF_SET_RESERVE_TENANT_B_REPLICA4: ${RESERVE_TENANT_B_REPLICA4}
+    WERF_SET_RESERVE_TENANT_B_REPLICA5: ${RESERVE_TENANT_B_REPLICA5}
+    WERF_SET_RESERVE_TENANT_B_REPLICA6: ${RESERVE_TENANT_B_REPLICA6}
+    WERF_SET_RESERVE_TENANT_B_REPLICA7: ${RESERVE_TENANT_B_REPLICA7}
+    WERF_SET_RESERVE_TENANT_B_REPLICA8: ${RESERVE_TENANT_B_REPLICA8}
+    WERF_SET_RESERVE_TENANT_B_REPLICA9: ${RESERVE_TENANT_B_REPLICA9}
+    WERF_SET_RESERVE_TENANT_B_REPLICA10: ${RESERVE_TENANT_B_REPLICA10}
+
+Deploy to Dev:
+  extends: .base_deploy_without_except
+  stage: dev
+  variables:
+    KUBE_NAMESPACE: dev
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  environment:
+    name: dev
+  rules:
+    # skip the job in these cases
+    - if: '$CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "pipeline" || $CI_TYPE == "ready_to_prod" || $CI_TYPE == "create_release"'
+      when: never
+    # run automatically on merge to the default branch
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $MULTIDEPLOY != "true"'
+      when: on_success
+    # otherwise the job is manual
+    - when: manual
+  dependencies:
+    - Build
+
+Deploy to Test-E:
+  extends: .deploy_test
+  variables:
+    KUBE_NAMESPACE: test-e
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  environment:
+    name: teste
+
+Deploy to TestDB:
+  extends: .deploy_test
+  variables:
+    KUBE_NAMESPACE: testdb
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  environment:
+    name: testdb
+
+Deploy to Sales:
+  extends: .base_deploy_without_except
+  stage: sales
+  variables:
+    KUBE_NAMESPACE: sales
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  environment:
+    name: sales
+  rules:
+    # skip the job in these cases
+    - if: '$CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "pipeline" || $CI_COMMIT_BRANCH =~ /^sales.*$/ || $CI_COMMIT_BRANCH =~ /^release.*$/ || $CI_TYPE == "ready_to_prod" || $CI_TYPE == "create_release"'
+      when: never
+    # run automatically on merge to the default branch
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $MULTIDEPLOY != "true"'
+      when: on_success
+    # allow manual execution on specific branches
+    - if: '$CI_COMMIT_BRANCH == "stage" || $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "production"'
+      when: manual
+    # otherwise skip the job
+    - when: never
+  dependencies:
+    - Build
+
+Deploy to Stage:
+  extends: .deploy
+  stage: stage
+  variables:
+    KUBE_NAMESPACE: stage
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  environment:
+    name: stage
+  only:
+    - dev
+    - develop
+    - development
+    - stage
+    - master
+    - production
+  except:
+    refs:
+      - schedules
+      - triggers
+      - pipelines
+      - /^sales.*$/
+      - /^release.*$/
+    variables:
+      - ($CI_TYPE == "ready_to_prod" || $CI_TYPE == "create_release")
+  when: manual
+
+Deploy to Demo:
+  extends: .deploy
+  stage: demo
+  variables:
+    KUBE_NAMESPACE: demo
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  environment:
+    name: demo
+  only:
+    - dev
+    - develop
+    - development
+    - demo
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+  except:
+    refs:
+      - schedules
+      - triggers
+      - pipelines
+    variables:
+      - ($CI_TYPE == "ready_to_prod" || $CI_TYPE == "create_release")
+  when: manual
+
+Deploy to Pilot:
+  extends: .deploy
+  stage: pilot
+  variables:
+    KUBE_NAMESPACE: pilot
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_NEW_RELIC_ENABLED: envs.NEW_RELIC_ENABLED=false
+    WERF_SET_CLUSTER_CONTEXT: global.cluster_context=${WERF_KUBE_CONTEXT}
+  environment:
+    name: pilot
+  only:
+    - dev
+    - develop
+    - development
+    - demo
+    - pilot
+    - master
+    - production
+    - /^sales.*$/
+    - /^release.*$/
+  except:
+    refs:
+      - schedules
+      - triggers
+      - pipelines
+    variables:
+      - ($CI_TYPE == "ready_to_prod" || $CI_TYPE == "create_release")
+  when: manual

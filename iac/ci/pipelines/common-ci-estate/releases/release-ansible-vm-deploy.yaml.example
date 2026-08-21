@@ -1,0 +1,40 @@
+# PROD cutover: after MR merge, wait for the ansible repo sync, then manually
+# deploy allowlisted docker-apps on the app VM (see manifests/prod-ansible-vm-apps.txt).
+# Include from common-ci root .gitlab-ci.yml.example (PROD only).
+
+include:
+  - local: '/defaults.yaml.example'
+  - local: '/releases/defaults-release.yaml.example'
+
+variables:
+  ANSIBLE_REPO_DEPLOY_PATH: "/ansible"
+  ANSIBLE_PROJECT_PATH: "estate/ansible"
+  ANSIBLE_SYNC_TIMEOUT_SEC: "1200"
+  ANSIBLE_SYNC_POLL_SEC: "15"
+
+# Auto after merge: block until ansible main pipeline has synced /ansible
+# (post-merge if an ansible MR was part of this release).
+release-04-wait-ansible-sync:
+  stage: releases
+  extends:
+    - .release_runner
+    - .release_tools
+    - .release_web_main_rules
+  needs:
+    - job: release-03-merge-all-mrs
+  script:
+    - bash "${RELEASE_SCRIPTS_DIR}/ansible_vm_deploy_release.sh" wait
+
+# Manual Play: deploy apps from manifests/prod-ansible-vm-apps.txt
+# Optional Run pipeline / job variable: ANSIBLE_VM_APP=<slug> (single app)
+release-05-deploy-ansible-vm:
+  stage: releases
+  extends:
+    - .release_runner
+    - .release_tools
+    - .release_web_main_rules
+  needs:
+    - job: release-04-wait-ansible-sync
+  when: manual
+  script:
+    - bash "${RELEASE_SCRIPTS_DIR}/ansible_vm_deploy_release.sh" deploy

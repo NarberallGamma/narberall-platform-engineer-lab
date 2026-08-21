@@ -1,0 +1,144 @@
+.need_sentry_release:
+    - pipeline: $PARENT_PIPELINE_ID
+      job: Build
+      artifacts: true
+.need_sentry_release_shop:
+    - pipeline: $PARENT_PIPELINE_ID
+      job: Build web-ui
+      artifacts: true
+
+.base_sentry_script:
+  stage: sentry
+  allow_failure: true
+  interruptible: true
+  script:
+    - find . -name .sentry.helper.sh -exec sh {} \; | grep \/ || echo "File \".sentry.helper.sh\" not found in project"
+  tags:
+    - docker
+
+.before_script_prod_send_sentry_release:
+  before_script:
+    - if [ "$KUBE_NAMESPACE" == "production" ]; then SENTRY_DOMAIN="${SENTRY_DOMAIN}" && SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN}"; fi
+
+.before_script_demo_send_sentry_release:
+  before_script:
+    - if [ "$KUBE_NAMESPACE" == "demo" ]; then SENTRY_DOMAIN="${SENTRY_DOMAIN}" && SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN}"; fi
+
+.sentry_release_store:
+  image: $WERF_STORE_BUILD_DOCKER_IMAGE_NAME
+  extends: .base_sentry_script
+
+.sentry_release_shop:
+  image: $WERF_WEB_UI_SHOP_BUILDER_DOCKER_IMAGE_NAME
+  extends: .base_sentry_script
+
+.sentry_release_cashier:
+  image: $WERF_CASHIER_BUILD_DOCKER_IMAGE_NAME
+  extends: .base_sentry_script
+
+.sentry_release_external:
+  image: $WERF_SHOP_BUILD_DOCKER_IMAGE_NAME
+  extends: .base_sentry_script
+
+######
+######
+Sending to Sentry Production store:
+  extends:
+    - .sentry_release_store
+    - .before_script_prod_send_sentry_release
+  rules:
+    - if: $CI_PROJECT_NAME =~ /^web-ui-portal.*$/
+    - when: never
+  needs:
+    - job: Deploy to Production
+      artifacts: true
+    - !reference [.need_sentry_release]
+
+Sending to Sentry Demo store:
+  extends:
+    - .sentry_release_store
+    - .before_script_demo_send_sentry_release
+  rules:
+    - if: $CI_PROJECT_NAME =~ /^web-ui-portal.*$/
+    - when: never
+  needs:
+    - job: Deploy to Demo
+      artifacts: true
+    - !reference [.need_sentry_release]
+######
+######
+Sending to Sentry Production shop:
+  extends:
+    - .sentry_release_shop
+    - .before_script_prod_send_sentry_release
+  rules:
+    - if: $CI_PROJECT_NAME =~ /^web-ui-shop.*$/
+    - when: never
+  needs:
+    - job: Deploy to Production
+      artifacts: true
+    - !reference [.need_sentry_release_shop]
+
+Sending to Sentry Demo shop:
+  extends:
+    - .sentry_release_shop
+    - .before_script_demo_send_sentry_release
+  rules:
+    - if: $CI_PROJECT_NAME =~ /^web-ui-shop.*$/
+    - when: never
+  needs:
+    - job: Deploy to Demo
+      artifacts: true
+    - !reference [.need_sentry_release_shop]
+######
+######
+Sending to Sentry Production cashier:
+  extends:
+    - .sentry_release_cashier
+    - .before_script_prod_send_sentry_release
+  rules:
+    - if: $CI_PROJECT_NAME =~ /^web-ui-cashier.*$/
+    - when: never
+  needs:
+    - job: Deploy to Production
+      artifacts: true
+    - !reference [.need_sentry_release]
+
+Sending to Sentry Demo сashier:
+  extends:
+    - .sentry_release_cashier
+    - .before_script_demo_send_sentry_release
+  rules:
+    - if: $CI_PROJECT_NAME =~ /^web-ui-cashier.*$/
+    - when: never
+  needs:
+    - job: Deploy to Demo
+      artifacts: true
+    - !reference [.need_sentry_release]
+######
+######
+Sending to Sentry Production external:
+  extends:
+    - .sentry_release_external
+    - .before_script_prod_send_sentry_release
+  rules:
+    - if: $CI_PROJECT_NAME =~ /^web-ui-external-ci.*$/
+    - when: never
+  needs:
+    - job: Deploy to Production
+      artifacts: true
+    - !reference [.need_sentry_release]
+
+Sending to Sentry Demo external:
+  extends:
+    - .sentry_release_external
+    - .before_script_demo_send_sentry_release
+  rules:
+    - if: $CI_PROJECT_NAME =~ /^web-ui-external-ci.*$/
+    - when: never
+  needs:
+    - job: Deploy to Demo
+      artifacts: true
+    - !reference [.need_sentry_release]
+######
+######

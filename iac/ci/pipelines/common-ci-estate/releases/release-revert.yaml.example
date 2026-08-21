@@ -1,0 +1,15 @@
+# Revert a past release (explicit branch). Independent of the cutover chain.
+
+include:
+  - local: '/defaults.yaml.example'
+  - local: '/releases/defaults-release.yaml.example'
+
+release-04-revert-all-mrs:
+  stage: releases
+  extends:
+    - .release_runner
+    - .release_tools
+    - .release_web_main_rules
+  when: manual
+  script:
+    - bash "${RELEASE_SCRIPTS_DIR}/mr_revert_release.sh"

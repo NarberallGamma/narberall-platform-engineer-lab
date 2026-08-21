@@ -1,0 +1,33 @@
+include:
+  - local: "backend/common.yml.example"
+
+## Preprod
+Deploy to Preprod:
+  extends: .base_converge
+  stage: preprod
+  environment:
+    name: preprod
+  variables:
+    WERF_ENV: preprod
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+  resource_group: preprod
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, platform]
+    - !reference [.rules, production]
+
+## Production
+Deploy to Production:
+  extends: .base_converge
+  stage: production
+  environment:
+    name: production
+  variables:
+    WERF_ENV: production
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+  resource_group: production
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, production]

@@ -11,7 +11,7 @@ Pipelines stay in [`../ci/`](../ci/). The build context lives here under [`image
 | Reader | What to take | Then open |
 |--------|----------------|-----------|
 | Founder / PM | CI builds the image. The registry is the hand-off. Helm or Compose is the next button, not a Friday copy. | [`../../docs/for-business.md`](../../docs/for-business.md), [case 12](../../case-studies/12-docker-images.md) |
-| Hiring lead | Docker is a fourth IaC language next to Terraform, Ansible, and Helm: pins, split runtimes, and host stacks. Product proof is one mechanic per folder, not a shop dump. CI YAML in this lab is still a thin catalog. | [`images/`](images/), [`compose/`](compose/), [`../../docs/experience.md`](../../docs/experience.md), [`../ci/`](../ci/) |
+| Hiring lead | Docker is a fourth IaC language next to Terraform, Ansible, and Helm: pins, split runtimes, and host stacks. Product proof is one mechanic per folder, not a shop dump. CI YAML is living kits under [`../ci/`](../ci/) ([case 13](../../case-studies/13-ci-pipelines.md)). | [`images/`](images/), [`compose/`](compose/), [`../../docs/experience.md`](../../docs/experience.md), [`../ci/`](../ci/) |
 | Engineer | Images under `images/{ci,operators,apps}/`. Compose under `compose/`. Each kit README says what shipped vs what is documented only. | Kit tables below |
 
 ```text
@@ -89,7 +89,7 @@ Manager page: [`../../architecture/05-sre.md`](../../architecture/05-sre.md). Ca
 
 **Published:** CI pins and runners, estate operators, one richest app image per mechanic, host and local Compose. The cybersec stack is here for hunters and again next to the Ansible role that copies it onto a VM.
 
-**Stays out:** a hundred-plus near-identical Dockerfiles (one Gradle file covered a shop), extra copies of the same pin, product source trees, vendor binaries, CloudEye Go `src/`, live `.env` and PEM. Pipelines stay a thin catalog under [`../ci/`](../ci/). A couple of kits carry a `.gitlab-ci.yml` next to the Dockerfile.
+**Stays out:** a hundred-plus near-identical Dockerfiles (one Gradle file covered a shop), extra copies of the same pin, product source trees, vendor binaries, CloudEye Go `src/`, live `.env` and PEM. Pipeline YAML lives under [`../ci/pipelines/`](../ci/pipelines/) ([case 13](../../case-studies/13-ci-pipelines.md)). A couple of image kits still carry a thin `.gitlab-ci.yml` next to the Dockerfile (helmfile pin).
 
 Sanitize: [`SANITIZE.md`](SANITIZE.md).
 

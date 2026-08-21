@@ -1,0 +1,79 @@
+.run-e2e:
+  extends: .registry_login
+  stage: app-test
+  image:
+    name: example.registry/ci/node:e2e-ci-22-alpine
+    entrypoint: [""]
+  variables:
+    ALLURE_SERVER_URL: https://allure.example.com
+    CI: true
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/chromium-browser
+
+  script:
+    - |
+      if [ -z "$E2E_TEST_BASE_URL" ]; then
+        echo "E2E_TEST_BASE_URL required"
+        exit 1
+      fi
+    - E2E_TEST_DOMAIN=$(echo "$E2E_TEST_BASE_URL" | awk -F/ '{print $3}')
+    - echo $E2E_TEST_DOMAIN
+    - |
+      if [ -z "$E2E_TEST_DOMAIN" ]; then
+
+        echo "cant get domain from E2E_TEST_BASE_URL"
+        exit 1
+      fi
+
+    - npm ci --no-audit --no-fund
+    - |
+      if [ -n "$E2E_TEST_TAG" ]; then
+        echo "Running tagged e2e tests (tag: $E2E_TEST_TAG)"
+        npm run test:e2e:tag || true
+      else
+        npm run test:e2e || true
+      fi
+
+    - echo "Uploading to Allure"
+    - echo -e "Test_Environment=$E2E_TEST_BASE_URL\nBranch=$CI_COMMIT_REF_NAME\nCommit=$CI_COMMIT_SHORT_SHA\nActor=$GITLAB_USER_LOGIN\nE2E_TEST_TAG=$E2E_TEST_TAG" > allure-results/environment.properties
+    - zip -r allure-results.zip allure-results | wc -l
+    - echo "Uploading results to the Allure server..."
+    - |
+      result_response=$(curl \
+        -X POST "$ALLURE_SERVER_URL/api/result" \
+        -H "Accept: */*" \
+        -H "Content-Type: multipart/form-data" \
+        -F "allureResults=@allure-results.zip;type=application/zip")
+      echo "Server response after result upload: $result_response"
+    - |
+      uuid=$(echo "$result_response" | grep -oE '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
+      if [ -z "$uuid" ]; then
+         echo "Error: failed to extract UUID from the response" >&2
+         exit 1
+      fi
+      echo "Received UUID: $uuid"
+    - echo "Requesting report generation on the Allure server..."
+    - |
+      report_response=$(curl \
+        -X POST "$ALLURE_SERVER_URL/api/report" \
+        -H "Accept: */*" \
+        -H "Content-Type: application/json" \
+        -d "{\"reportSpec\":{\"path\":[\"$CI_PROJECT_NAME\",\"test\", \"$E2E_TEST_DOMAIN\"],\"executorInfo\":{\"buildUrl\":\"$CI_JOB_URL\"}},\"results\":[\"$uuid\"],\"deleteResults\":false}")
+      echo "Server response after report generation: $report_response"
+      report_url=$(echo "$report_response" | grep -oE 'https://allure\.example\.com/allure/reports/[0-9a-fA-F\-]+/')
+      if [ -n "$report_url" ]; then
+         echo "Report URL: $report_url"
+      else
+         echo "Failed to extract the report URL from the response" >&2
+      fi
+
+  allow_failure: true
+  tags:
+    - docker
+  when: manual
+
+# One concrete stand job; per-stand clones were dropped.
+run-e2e:
+  extends: .run-e2e
+  variables:
+    E2E_TEST_BASE_URL: https://shop-app.example.com

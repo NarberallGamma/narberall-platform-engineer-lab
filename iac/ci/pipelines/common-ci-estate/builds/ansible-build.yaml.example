@@ -1,0 +1,43 @@
+include:
+  - local: '/defaults.yaml.example'
+
+# Build the Ansible image (execution environment + collections) and push it to the container registry.
+# Include directly: project: 'estate/common-ci', file: '/builds/ansible-build.yaml.example'
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - k8s-kaniko
+  timeout: 8h
+  interruptible: true
+
+stages:
+  - build
+
+variables:
+  ANSIBLE_IMAGE_NAME: "ansible"
+  ANSIBLE_IMAGE_TAG: "1.0"
+
+build-ansible:
+  stage: build
+  image:
+    name: $KANIKO_IMAGE
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - |
+      if [ -d "$CI_PROJECT_DIR/base-images/ansible" ]; then
+        CONTEXT="$CI_PROJECT_DIR/base-images/ansible"
+      elif [ -d "$CI_PROJECT_DIR/ansible" ]; then
+        CONTEXT="$CI_PROJECT_DIR/ansible"
+      else
+        echo "Error: ansible directory not found (base-images/ansible or ansible)"
+        exit 1
+      fi
+    - /kaniko/executor --context "$CONTEXT" --dockerfile "$CONTEXT/Dockerfile" --destination $CI_REGISTRY_IMAGE/$ANSIBLE_IMAGE_NAME:$ANSIBLE_IMAGE_TAG --custom-platform=linux/amd64
+    - echo "Ansible image built and pushed to $CI_REGISTRY_IMAGE/$ANSIBLE_IMAGE_NAME:$ANSIBLE_IMAGE_TAG"
+  rules:
+    - when: manual

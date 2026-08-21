@@ -1,0 +1,20 @@
+.review:
+  needs:
+    - Build
+    - REVIEW-START
+    - REVIEW-INFRA
+
+REVIEW-INFRA:
+  extends: .review
+  needs:
+    - Build
+    - job: REVIEW-START
+      optional: true
+  variables:
+    APP_NAME_SUFFIX: infra
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "REVIEW"'
+    - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "CODECEPT"'
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - if: !reference [.rules, if, mr]

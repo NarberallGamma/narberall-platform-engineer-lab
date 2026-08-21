@@ -1,0 +1,16 @@
+pii-scan:
+    stage: security
+    image:
+        name: example.registry/security/pii-scanner:latest
+        entrypoint: [""]
+    variables:
+        DEFECTDOJO_SCAN_FILE: "pii-report.json"
+    allow_failure:
+        exit_codes:
+            - 1 # scan passed but PII was found
+    script:
+        - python /app/pii_scanner.py $CI_PROJECT_DIR -o $DEFECTDOJO_SCAN_FILE
+    artifacts:
+        expire_in: 2 days
+        paths:
+            - $DEFECTDOJO_SCAN_FILE

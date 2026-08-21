@@ -1,0 +1,125 @@
+include:
+  - local: autotests/common.yml.example
+
+variables:
+  # Tests variables
+  AUTOTEST_ENV: autotest/default
+  ALLURE_SERVER: "https://allure.example.com"
+  ALLURE_RESULTS_DIRECTORY: "target/allure-results"
+  SELENOID_ADDRESS: "http://10.10.2.20:4444/wd/hub/"
+
+# Tests
+.tests:
+  stage: test
+  image: $WERF_MAVEN_DOCKER_IMAGE_NAME
+  environment:
+    name: $AUTOTEST_ENV
+  variables:
+    ALLURE_PROJECT_ID: "${CI_PROJECT_PATH_SLUG}-${CI_ENVIRONMENT_SLUG}"
+  script:
+    - mvn test -f pom.xml
+  before_script:
+    - !reference [.script_notify_slack_autotest_started]
+
+    - echo "${CI_ENVIRONMENT_SLUG}"
+    - echo "RUNNING ON ${SITE_ADDRESS}"
+    - echo "ALLURE PROJECT ${ALLURE_PROJECT_ID}"
+  # https://github.com/unickq/send-to-allure-docker-service-action/blob/main/script.sh
+  after_script:
+    - |
+      echo "-----------------SEND RESULTS----------------"
+      FILES_TO_SEND=$(ls -dp $ALLURE_RESULTS_DIRECTORY/* | grep -v /$)
+      if [ -z "$FILES_TO_SEND" ]; then
+          echo "no files found"
+          exit 1
+      fi
+      FILES=''
+      for FILE in $FILES_TO_SEND; do
+          FILES+="-F files[]=@$FILE "
+      done
+
+      send_result_cmd="curl -s -X POST '$ALLURE_SERVER/api/allure-docker-service/send-results?project_id=$ALLURE_PROJECT_ID&force_project_creation=true' -H 'Content-Type: multipart/form-data' $FILES"
+
+      echo -e "\e[0Ksection_start:`date +%s`:result[collapsed=true]\r\e[0KSEND RESULTS REQUEST"
+      echo "send_result_cmd: ${send_result_cmd}"
+      send_result_request=$(echo "${send_result_cmd}" | bash)
+      echo "${send_result_request}"
+      echo -e "\e[0Ksection_end:`date +%s`:result\r\e[0K"
+
+      echo
+      echo "-----------------DONE SEND RESULTS----------------"
+
+    - |
+      echo "-----------------GENERATE REPORT----------------"
+      EXECUTION_NAME='GITLAB'
+      EXECUTION_FROM="${CI_JOB_URL}"
+
+      generate_cmd="curl -s -X GET '$ALLURE_SERVER/api/allure-docker-service/generate-report' --get --data-urlencode 'project_id=${ALLURE_PROJECT_ID}' --data-urlencode 'execution_name=${EXECUTION_NAME}' --data-urlencode 'execution_from=${EXECUTION_FROM}'"
+
+      echo -e "\e[0Ksection_start:`date +%s`:generate[collapsed=true]\r\e[0KGENERATE REQUEST"
+      echo "generate_cmd: ${generate_cmd}"
+      generate_request=$(echo "${generate_cmd}" | bash)
+      echo "${generate_request}"
+      echo -e "\e[0Ksection_end:`date +%s`:generate\r\e[0K"
+
+      echo "Report url:"
+      REPORT_URL=$(echo "${generate_request}" | jq -r ".data.report_url")
+      echo "${REPORT_URL}"
+
+      echo
+      echo "-----------------DONE GENERATE REPORT----------------"
+
+    - !reference [.script_notify_slack_autotest_finished]
+  artifacts:
+    when: always
+    paths:
+      - build
+      - target/allure-results
+      - target/surefire-reports
+    expire_in: 1 day
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, manual]
+  tags:
+    - docker
+
+Run Production Tests:
+  extends: .tests
+  environment:
+    name: autotest/production
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "AUTOTEST_PRODUCTION" && $SITE_ADDRESS
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, manual]
+
+Run Preprod Tests:
+  extends: .tests
+  environment:
+    name: autotest/preprod
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "AUTOTEST_PREPROD" && $SITE_ADDRESS
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, manual]
+
+Run Review Tests:
+  extends: .tests
+  environment:
+    name: autotest/review
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "AUTOTEST_REVIEW" && $SITE_ADDRESS
+
+test_compile:
+  stage: test_compile
+  image: $WERF_MAVEN_DOCKER_IMAGE_NAME
+  script:
+    - mvn test-compile -f pom.xml
+  rules:
+    - !reference [.rules, no_schedule]
+    - when: always
+  needs:
+    - Build
+  tags:
+    - docker

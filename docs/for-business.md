@@ -27,7 +27,7 @@ Full six-year narrative: [`experience.md`](experience.md). Diagrams for managers
 
 - Greenfield: apply from reusable modules and a one-button host CI (Terraform → Ansible → Vault → metrics → docs).
 - Legacy: import until `plan` is clean. Proof already in the lab: [case 05](../case-studies/05-legacy-estate-as-code.md) (70+ VMs).
-- CI: **Jenkins** and **GitLab CI + Argo CD** so a branch or tag is the release, not a meeting.
+- CI: **Jenkins** and **GitLab CI + Argo CD** so a branch or tag is the release, not a meeting. Proof: [`../iac/ci/`](../iac/ci/), [case 13](../case-studies/13-ci-pipelines.md).
 - Cluster package: Helm + Argo bootstrap on an existing cluster, plus one richest product chart per mechanic. Proof: [`../iac/helm/`](../iac/helm/), [`../iac/helm/apps/`](../iac/helm/apps/), [case 11](../case-studies/11-helm-estate.md).
 - Images and Compose: one richest Dockerfile per mechanic, then Helm or `compose up`. Proof: [`../iac/docker/`](../iac/docker/), [case 12](../case-studies/12-docker-images.md).
 - AI: OCR/LLM is a **multiplier** on document flow (finance, legal, analysts) and on developer/ops questions. Not a demo chatbot.

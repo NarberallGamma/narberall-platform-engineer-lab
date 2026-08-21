@@ -1,0 +1,29 @@
+include:
+  - local: '/multiStageMainCommon.yml.example'
+
+Ready to Prod:
+  trigger:
+    include:
+      - project: shop-app/common-ci
+        file: /ReleaseCI/ready_to_prod.yml.example
+  stage: production
+  environment:
+    name: production
+  rules:
+    - if: $CI_TYPE == "ready_to_prod"
+    - when: never
+  when: manual
+
+Start Release:
+  trigger:
+    include:
+      - project: shop-app/common-ci
+        file: /ReleaseCI/create_release.yml.example
+  stage: production
+  environment:
+    name: production
+  variables:
+    PARENT_PIPELINE_ID: $CI_PIPELINE_ID
+  rules:
+    - if: $CI_TYPE == "create_release"
+    - when: never

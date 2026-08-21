@@ -1,0 +1,10 @@
+sonarqube-java:
+  stage: app-test
+  image:
+    name: sonarsource/sonar-scanner-cli:11.3
+    entrypoint: [""]
+  script:
+    - sonar-scanner -Dsonar.projectKey=$CI_PROJECT_NAME -Dsonar.java.binaries=build/classes -Dsonar.java.libraries=build/libs -Dsonar.sources=src/main/java
+  tags:
+    - docker
+  allow_failure: true

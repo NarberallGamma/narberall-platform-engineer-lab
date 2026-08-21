@@ -1,0 +1,5 @@
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+MAILTO=""
+
+*/10 * * * * gitlab-runner curl --verbose --request 'POST' --header 'Content-Type: application/json' --data "{ \"labels\": { \"trigger\": \"DeadMansSwitch\", \"dms\": \"$(hostname)\" } }" 'https://alerts.example.com/api/events/custom/CHANGE_ME'

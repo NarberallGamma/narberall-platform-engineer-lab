@@ -1,0 +1,45 @@
+# Release cutover: approve all MRs, then merge to main (same pipeline run).
+# Job names use a numeric prefix so the GitLab UI lists them in cutover order.
+
+include:
+  - local: '/defaults.yaml.example'
+  - local: '/releases/defaults-release.yaml.example'
+
+release-01-preflight:
+  stage: releases
+  extends:
+    - .release_runner
+    - .release_tools
+    - .release_web_main_rules
+  allow_failure: true
+  script:
+    - bash "${RELEASE_SCRIPTS_DIR}/release_gate_check.sh" preflight
+
+release-02-approve-all-mrs:
+  stage: releases
+  extends:
+    - .release_runner
+    - .release_tools
+    - .release_web_main_rules
+  needs:
+    - job: release-01-preflight
+      optional: true
+  when: manual
+  script:
+    - bash "${RELEASE_SCRIPTS_DIR}/mr_approve_active_release.sh"
+  artifacts:
+    reports:
+      dotenv: release_approve.env
+
+release-03-merge-all-mrs:
+  stage: releases
+  extends:
+    - .release_runner
+    - .release_tools
+    - .release_web_main_rules
+  needs:
+    - job: release-02-approve-all-mrs
+      artifacts: true
+  when: manual
+  script:
+    - bash "${RELEASE_SCRIPTS_DIR}/mr_merge_active_release.sh"

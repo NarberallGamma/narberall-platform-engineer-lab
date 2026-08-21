@@ -1,0 +1,29 @@
+# Gradle service hub. jobs/build/* includes are part of the original graph
+# and were not present in the source tree (honest gap). Leave those lines commented.
+# Do not invent build YAML.
+include:
+  - /jobs/common/registry_login.gitlab-ci.yml.example
+  - /jobs/common/setenv.yml.example
+  # - /jobs/build/build.yml
+  # - /jobs/build/build.gradle.yml
+  # - /jobs/build/build.helm.yml
+  # - /jobs/build/maven-publish.yml
+  - /jobs/test/sonarqube.yml.example
+  - /jobs/test/test.yml.example
+  - /jobs/test/run_tests_and_publish_allure.yml.example
+  - /jobs/test/integration-test.gradle.yml.example
+  - /jobs/test/test-postman.yml.example
+  - /jobs/deploy/deploy-dev.yaml.example
+  - /jobs/backup/backup-db.yml.example
+  - /jobs/backup/restore-db.yml.example
+  - /jobs/security/base-security.yml.example
+
+stages:
+  - setenv
+  - app-test
+  - build
+  - maven-publish
+  - deploy-dev
+  - test
+  - backup
+  - security

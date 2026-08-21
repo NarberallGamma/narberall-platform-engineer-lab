@@ -1,0 +1,181 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "dev"
+      variables:
+        ENABLE_TESTS: "true"
+    - if: $CI_COMMIT_REF_NAME == "testdb"
+      variables:
+        ENABLE_TESTS: "true"
+    - if: $CI_COMMIT_REF_NAME == "test-e"
+      variables:
+        ENABLE_TESTS: "true"
+    - if: $CI_COMMIT_REF_NAME == "stage"
+      variables:
+        ENABLE_TESTS: "true"
+        ENABLE_LOCUST: "true"
+    - if: $CI_COMMIT_REF_NAME == "demo"
+      variables:
+        ENABLE_TESTS: "true"
+    - if: $CI_COMMIT_REF_NAME == "pilot"
+      variables:
+        ENABLE_TESTS: "true"
+    - if: $CI_COMMIT_REF_NAME == "sales"
+      variables:
+        ENABLE_TESTS: "true"
+    - if: $CI_COMMIT_REF_NAME == "production"
+    - if: $CI_COMMIT_REF_NAME == "tenant-a"
+    - if: $CI_COMMIT_REF_NAME == "tenant-b"
+    - if: $CI_COMMIT_REF_NAME == "reserve-prod"
+    - when: never
+
+default:
+  image: example.registry/shop-app/docker-images/alpine-curl-yq:1.0.1
+
+variables:
+  WERF_VERSION: "1.2 ea"
+  K8S_NAMESPACE_PREFIX: ""
+
+.runner:
+  tags:
+    - docker
+
+stages:
+  - build
+  - start_deploy
+  - deploy
+  - restart
+  - test
+  - locust
+
+Generate pipeline:
+  stage: build
+  extends: .runner
+  script:
+    - |
+      cat << 'EOF' | tee generated-pipelines.yml
+      .trigger:
+        variables:
+          UPSTREAM_PROJECT_PATH: $CI_PROJECT_PATH
+        trigger:
+          project: $PROJECT
+          branch: $BRANCH
+          strategy: depend
+      EOF
+    - |
+      yq '
+      ( .[] | key as $ctx
+      | .[]
+      | .namespace as $ns
+      | .environment as $env
+      | $ctx + "-" + $env as $stage
+      | .applications
+      | map( split(":") | { "PROJECT": .[0], "BRANCH": .[1] } ) as $matrix | {}
+      | (.[ $ctx + " "+ $ns ] |= (
+          .stage = $stage,
+          .extends = ".trigger",
+          .parallel.matrix = $matrix,
+          .variables |= (
+            .WERF_ENV = $env,
+            .WERF_NAMESPACE = $ns,
+            .CONTEXT_WERF = $ctx,
+            .MULTIDEPLOY = "true",
+            .SAST_DISABLED = "true",
+            .SECRET_DETECTION_DISABLED = "true",
+            .IMAGE_SCAN_ENABLED = "false" ) )
+        )
+      ) as $job ireduce ({ }; $job *. )
+      | .stages = (map(.stage) | flatten | unique)
+      '  config.yaml | tee -a generated-pipelines.yml
+  artifacts:
+    paths:
+      - generated-pipelines.yml
+
+Start deploy as Gitlab Pipeline User:
+  stage: start_deploy
+  extends: .runner
+  script:
+    - |
+      JOB_ID=$(curl -s -XGET -H "PRIVATE-TOKEN: ${CI_DEPLOY_TRIGGER_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/bridges" | jq --arg name "Deploy" '.[] | select(.name == $name) | .id')
+    - |
+      curl -s --request POST --header "PRIVATE-TOKEN: ${CI_DEPLOY_TRIGGER_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/${JOB_ID}/play"
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "production" || $CI_COMMIT_REF_NAME == "tenant-a" || $CI_COMMIT_REF_NAME == "tenant-b"
+      when: never
+    - if: $CI_COMMIT_REF_NAME == "reserve-prod"
+      when: never
+    - when: manual
+  when: manual
+
+Deploy:
+  stage: deploy
+  needs:
+    - job: Generate pipeline
+      artifacts: true
+  environment:
+    name: ${CI_COMMIT_REF_SLUG}
+  trigger:
+    include:
+      - artifact: generated-pipelines.yml
+        job: Generate pipeline
+    strategy: depend
+  when: manual
+  allow_failure: true
+
+Retry failed jobs as Gitlab Pipeline User:
+  extends: .runner
+  stage: restart
+  script:
+    - |
+      FAILED_DOWNSTREAM=$(curl -s -XGET -H "PRIVATE-TOKEN: ${CI_DEPLOY_TRIGGER_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/bridges" | jq '.[].downstream_pipeline.id')
+      if [ -z "$FAILED_DOWNSTREAM" ]; then
+              echo "No failed downstream jobs found."
+              exit 0
+      fi
+      FAILED_JOBS=$(curl -s -XGET -H "PRIVATE-TOKEN: ${CI_DEPLOY_TRIGGER_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/pipelines/${FAILED_DOWNSTREAM}/bridges" | jq -r '.[] | select(.status == "failed") | .id')
+      if [ -z "$FAILED_JOBS" ]; then
+        echo "No failed jobs found."
+              exit 0
+      fi
+      for JOB_ID in $FAILED_JOBS; do
+        echo "Replaying failed job with ID: $JOB_ID"
+        curl -s -XPOST -H "PRIVATE-TOKEN: ${CI_DEPLOY_TRIGGER_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/$JOB_ID/retry" > /dev/null
+      done
+      echo "All failed jobs have been retried."
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "production" || $CI_COMMIT_REF_NAME == "tenant-a" || $CI_COMMIT_REF_NAME == "tenant-b"
+      when: never
+    - if: $CI_COMMIT_REF_NAME == "reserve-prod"
+      when: never
+    - when: manual
+  when: manual
+
+Smoke tests:
+  stage: test
+  variables:
+    ENV_NAME: "bs_${CI_COMMIT_REF_NAME}"
+    ALLURE_LAUNCH_NAME: "Triggered by deploy to ${CI_COMMIT_REF_NAME}"
+    TESTS_KEYWORD_FILTER: "basic_smoke and not ui"
+    PARALLEL_MODE: "true"
+  trigger:
+    project: 'shop-app/qa/smoke-tests'
+    branch: 'develop'
+    strategy: depend
+  needs:
+    - 'Deploy'
+  rules:
+    - if: $ENABLE_TESTS == "true"
+    - when: never
+
+Trigger Locust Job:
+  stage: locust
+  variables:
+    ENV_NAME: "${CI_COMMIT_REF_NAME}"
+  trigger:
+    project: 'shop-app/qa/locust-tests'
+    branch: 'pqa-stage'
+    strategy: depend
+  needs:
+    - job: 'Smoke tests'
+  rules:
+    - if: $ENABLE_LOCUST == "true"
+    - when: never

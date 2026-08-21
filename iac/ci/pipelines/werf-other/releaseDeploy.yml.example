@@ -1,0 +1,64 @@
+include:
+  - local: '/common.yml.example'
+
+Build:
+  extends: .base_build
+  rules:
+    - !reference [.rules, not_changelog]
+    - !reference [.rules, not_schedule]
+    - when: always
+
+# Plan
+Plan Dev:
+  extends: .base_plan
+  environment:
+    name: dev
+    action: prepare
+  variables:
+    WERF_NAMESPACE: dev
+
+Plan Production:
+  extends: .base_plan
+  environment:
+    name: production
+    action: prepare
+  variables:
+    WERF_NAMESPACE: production
+
+Deploy to Dev:
+  extends: .base_deploy
+  environment:
+    name: dev
+  variables:
+    WERF_NAMESPACE: dev
+  rules:
+    - !reference [.rules, not_changelog]
+    - !reference [.rules, not_schedule]
+    - !reference [.rules, manual]
+
+
+Create Release:
+  image: node:20-bullseye
+  stage: release
+  needs:
+    - Deploy to Dev   
+  script:
+    - npm i -g semantic-release @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/changelog @semantic-release/gitlab @semantic-release/npm @semantic-release/git
+    - semantic-release
+  variables:
+    GIT_STRATEGY: clone
+  rules:
+    - !reference [.rules, not_changelog]
+    - !reference [.rules, create_release]
+  tags:
+    - docker
+
+Deploy to Production:
+  extends: .base_deploy
+  environment:
+    name: production
+  variables:
+    WERF_NAMESPACE: production
+  rules:
+    - !reference [.rules, not_schedule]
+    - !reference [.rules, tags]

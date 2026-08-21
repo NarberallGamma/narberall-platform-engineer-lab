@@ -1,0 +1,71 @@
+.snippets:
+  create_ns:
+    - |
+      werf kubectl create ns "${NAMESPACE:-${WERF_NAMESPACE}}" || true
+      werf kubectl label ns "${NAMESPACE:-${WERF_NAMESPACE}}" autoStopReview=true --overwrite
+      werf kubectl patch sa default --namespace="${NAMESPACE:-${WERF_NAMESPACE}}" --type=json --patch-file=/dev/stdin <<EOF || true
+      [{ "op": "test", "path": "/imagePullSecrets", "value": null }
+      ,{ "op": "replace", "path": "/imagePullSecrets", "value": [{"name": "registrysecret"},{"name": "dockerhub"}] }]
+      EOF
+
+      werf kubectl create rolebinding edit-dex-dev-dashboard --namespace="${NAMESPACE:-${WERF_NAMESPACE}}" --clusterrole=edit --group=dex/dev/dashboard || true
+
+      werf helm upgrade -i --namespace="${NAMESPACE:-${WERF_NAMESPACE}}" \
+        eso-this-ns oci://example.registry/shop-app/helm-charts/latest/eso-this-ns --version 0-latest
+
+      # copy the shared database credential secret into the review namespace
+      werf kubectl get secret admin-database-cred --namespace=dumps -ojson \
+        |jq 'del(.metadata.namespace)' \
+        |werf kubectl create --namespace="${NAMESPACE:-${WERF_NAMESPACE}}" -f - \
+        || true
+
+  dump_env:
+    - echo -e "\e[0Ksection_start:$(date +%s):env_section[collapsed=true]\r\e[0KEnv variables"
+    - env -0 | sort -z | tr '\0' '\n'
+    - echo -e "\e[0Ksection_end:$(date +%s):env_section\r\e[0K"
+
+  set_werf_values_by_env:
+    - |
+        if [[ "$CI_PROJECT_NAME" == "hardware" ]]; then
+          if [[ "${WERF_NAMESPACE#feature-}" != "$WERF_NAMESPACE" ]]; then
+            WERF_VALUES_BY_ENV=".helm/values-features.yaml"
+          else
+            WERF_VALUES_BY_ENV=".helm/values-${WERF_ENV}.yaml"
+          fi
+
+          if [[ -f "$WERF_VALUES_BY_ENV" ]]; then
+            export WERF_VALUES_BY_ENV
+          else
+            unset WERF_VALUES_BY_ENV
+          fi
+        fi
+
+  coverage_publish:
+    - |
+      if [[ -f "${COVERAGE_REPORT_FILE_PATH}" ]]; then
+          curl -s --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "${COVERAGE_REPORT_FILE_PATH}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/coverage_${CI_COMMIT_REF_SLUG}/0.0.1/coverage-summary"
+      else
+          echo "[WARN] Coverage report file not found: ${COVERAGE_REPORT_FILE_PATH}"
+      fi
+
+  coverage_download:
+    - |
+        coverage_tmp=$(mktemp)
+        trap 'rm -f "${coverage_tmp}"' EXIT
+
+        echo "[INFO] Downloading coverage to ${coverage_tmp}..."
+
+        coverage_status=$(curl -sS -w "%{http_code}" --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+          -o "${coverage_tmp}" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/coverage_${CI_COMMIT_REF_SLUG}/0.0.1/coverage-summary")
+
+        echo "[INFO] HTTP status from registry: ${coverage_status}"
+
+        if [ "$coverage_status" = "200" ]; then
+          echo "[INFO] Download successful"
+          echo "[INFO] Raw coverage file contents:"
+          cat ${coverage_tmp}
+          exit 0
+        else
+          echo "[WARN] Coverage not found in registry for ${CI_COMMIT_REF_SLUG} (HTTP ${coverage_status})"
+        fi

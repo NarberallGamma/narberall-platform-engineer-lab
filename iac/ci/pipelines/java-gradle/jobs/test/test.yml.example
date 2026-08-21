@@ -1,0 +1,24 @@
+test:
+  extends: .registry_login
+  stage: test
+  image:
+    name: example.registry/ci/kaniko-executor:v1.24.0-debug
+    entrypoint: [""]
+  variables:
+    GRADLE_PARAMS: "--no-daemon build"
+    NPM_CI_COMMAND: "echo"
+    NPM_COMMAND: "echo"
+  script:
+    - env
+    - /kaniko/executor --cache=false  --cache-repo $CI_REGISTRY_IMAGE/cache --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --build-arg VERSION=$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA --build-arg GRADLE_PARAMS="$GRADLE_PARAMS" --build-arg NPM_COMMAND="$NPM_COMMAND" --build-arg NPM_CI_COMMAND="$NPM_CI_COMMAND" --build-arg RUNTIME_IMAGE="$RUNTIME_IMAGE" --build-arg RUNTIME_IMAGE_V17="$RUNTIME_IMAGE_V17" --build-arg RUNTIME_IMAGE_V21="$RUNTIME_IMAGE_V21" --build-arg BUILD_IMAGE="$BUILD_IMAGE" --build-arg GRADLE_IMAGE="$GRADLE_IMAGE" --build-arg GRADLE_IMAGE_V17="$GRADLE_IMAGE_V17" --build-arg GRADLE_IMAGE_V21="$GRADLE_IMAGE_V21" --build-arg NODE_IMAGE_V22="$NODE_IMAGE_V22" --build-arg NODE_IMAGE_V20="$NODE_IMAGE_V20" --build-arg NGINX_IMAGE="$NGINX_IMAGE" --no-push
+  tags:
+    - k8s-kaniko
+  rules:
+    - if: '$GITLAB_USER_LOGIN =~ /^(ci-operator|release-bot)$/'
+      when: manual
+    - when: never
+  needs:
+    - job: build-manual
+      optional: true
+    - job: gradle build
+      optional: true

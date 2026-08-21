@@ -1,0 +1,41 @@
+# Review-stand hub. Child pipelines create a namespace, deploy apps, or expire stands.
+# Catalog copies keep the .example suffix; include paths match those names.
+
+stages:
+  - deploy
+  - destroy
+
+start-app:
+  stage: deploy
+  variables:
+    MANUAL_DEPLOY: "true"
+  when: manual
+  allow_failure: true
+  trigger:
+    include:
+      - local: /ci/deploy-app.yaml.example
+    strategy: depend
+
+start-all:
+  stage: deploy
+  variables:
+    MANUAL_DEPLOY: "true"
+    MANUAL_NS: "true"
+  when: manual
+  allow_failure: true
+  trigger:
+    include:
+      - local: /ci/ns.yaml.example
+      - local: /ci/deploy-app.yaml.example
+    strategy: depend
+
+start-cleanup:
+  stage: deploy
+  trigger:
+    include:
+      - local: /ci/cleanup.yaml.example
+    strategy: depend
+  rules:
+    - if: $PIPELINE_TYPE == "cleanup"
+      when: always
+    - when: never

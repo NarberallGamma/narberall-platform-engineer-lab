@@ -8,7 +8,7 @@ I design and ship platforms end to end: cloud project bootstrap (IAM, VPC, netwo
 
 The same ownership covers **greenfield** (empty cloud or rack → production) and **legacy** (hand-built estates → IaC, runbooks, monitoring, cheaper to run). A large share of that work was **loaded production**: high RPS, large user bases, **~99.9% annual SLA**, multi-zone HA, and changes that must not take the product down. Security is in the first delivery (hardening, EDR, least privilege, Vault / ESO, CI gates), not a later project. IaC and pipelines are split and laid out so developers, on-call, and **audit** can follow them. I ship in a **team with a lead** and as the **single platform owner** on one or several concurrent projects (reachable). On later engagements I **trained people and delegated** as a de facto lead while reporting to PMs, CTOs, and project-wide tech leads. About **six years** of that pattern: bank/SBP-class payments, blockchain, delivery e-commerce, 50+ microservice estates and heavy JVM monoliths. About **four of those years** I did Ansible, Helm, CI, bash, and deploys **by hand**, before coding agents existed. Much of this lab is from that period. I use AI now the way any current engineer does (research through drafting charts and pipelines) because the business calendar requires it. I still can without agents. One person is simply slower than ten agents on one task. Full narrative: [`docs/experience.md`](docs/experience.md).
 
-This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terragrunt**, **Ansible**, **Helm** (cluster reference kits and [`iac/helm/apps/`](iac/helm/apps/) samples), **Docker / Compose** (one mechanic per image, host and local stacks under [`iac/docker/`](iac/docker/)), diagrams, and the portfolio site source.
+This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terragrunt**, **Ansible**, **Helm** (cluster reference kits and [`iac/helm/apps/`](iac/helm/apps/) samples), **Docker / Compose** (one mechanic per image, host and local stacks under [`iac/docker/`](iac/docker/)), **CI** (living kits under [`iac/ci/pipelines/`](iac/ci/pipelines/)), diagrams, and the portfolio site source.
 
 **Live site:** _(add URL after first deploy)_  
 **License:** MIT
@@ -30,7 +30,7 @@ This repo is my public lab: NDA-safe case studies, **sanitized Terraform / Terra
 | Engineer reviewing Ansible kits (bootstrap, app, backup, AWS, KB, metrics) | [`iac/ansible/reference/`](iac/ansible/reference/) (`ansible-bootstrap`, `ansible-app-platform`, `ansible-backup-borg`, `ansible-aws-hosts`, `ansible-kb-linux`, `monitoring-starter`, `ansible-runner`) |
 | Engineer reviewing Helm / GitOps cluster | [`iac/helm/`](iac/helm/) then [`iac/helm/reference/helm-estate-cluster/`](iac/helm/reference/helm-estate-cluster/) and product samples [`iac/helm/apps/`](iac/helm/apps/) then [`case-studies/11-helm-estate.md`](case-studies/11-helm-estate.md) |
 | Engineer reviewing Docker / Compose | [`iac/docker/`](iac/docker/) then [`iac/docker/images/`](iac/docker/images/) and [`iac/docker/compose/`](iac/docker/compose/) then [`case-studies/12-docker-images.md`](case-studies/12-docker-images.md) |
-| Engineer reviewing CI (infra + builds + gates) | [`iac/ci/`](iac/ci/) then [`diagrams/iac/ci-turnkey.md`](diagrams/iac/ci-turnkey.md) |
+| Engineer reviewing CI (infra + builds + gates) | [`iac/ci/`](iac/ci/) then [`iac/ci/pipelines/`](iac/ci/pipelines/) then [`case-studies/13-ci-pipelines.md`](case-studies/13-ci-pipelines.md) |
 | Engineer reviewing OS / hardware depth | [`practice/home-lab/os-workstation.md`](practice/home-lab/os-workstation.md) |
 | Engineer reviewing MCP / multi-agent workstation | [`practice/workstation/mcp-ops-toolchain.md`](practice/workstation/mcp-ops-toolchain.md) then [`practice/workstation/reference/`](practice/workstation/reference/) and [`docs/security-ai.md`](docs/security-ai.md) (Cursor, Claude Code, Codex, local LLM; Linux, macOS, or WSL) |
 | Engineer reviewing SRE / monitoring | [`docs/sre/`](docs/sre/) then [`architecture/05-sre.md`](architecture/05-sre.md), overlay [`iac/helm/reference/helm-estate-cluster/monitoring/`](iac/helm/reference/helm-estate-cluster/monitoring/), and [case 11](case-studies/11-helm-estate.md) |
@@ -43,7 +43,7 @@ iac/
   ansible/      # Linux / Xray / LLM / estate / payments + reference/ kits
   helm/         # Cluster GitOps: reference/ kits (mesh, ESO, Argo, obs) + apps/ product samples
   docker/       # Images + Compose: one mechanic per Dockerfile, host/local stacks
-  ci/           # CI catalog: turnkey map + sanitized pipelines/
+  ci/           # CI catalog: turnkey map + living kits under pipelines/
 practice/
   workstation/  # Multi-agent desk + MCP + local/API models; bash/Docker kit, any OS
   home-lab/     # GPU compose, OS/hardware, Ansible edge
@@ -287,7 +287,7 @@ All cloud write-ups and Terraform live under **[`iac/`](iac/)**.
 | [`iac/ansible/`](iac/ansible/) | Ansible map + kits under `iac/ansible/reference/` |
 | [`iac/helm/`](iac/helm/) | Helm / GitOps: cluster kits under `iac/helm/reference/` and curated product samples under `iac/helm/apps/` |
 | [`iac/docker/`](iac/docker/) | **Images + Compose:** one richest Dockerfile per mechanic, host and local stacks |
-| [`iac/ci/`](iac/ci/) | **CI catalog:** turnkey map (Jenkins + GitLab CI, Java builds, gates, MR, revoke) |
+| [`iac/ci/`](iac/ci/) | **CI catalog:** living kits (estate includes, Java hubs, werf, Jenkins). Case: [`case-studies/13-ci-pipelines.md`](case-studies/13-ci-pipelines.md) |
 | [`iac/terraform/vmware/`](iac/terraform/vmware/) | **VCD greenfield:** catalog, guest init, DB-class VM, `vmware/vcd` |
 | [`iac/terraform/RESOURCES.md`](iac/terraform/RESOURCES.md) | Clouds × resource types in code |
 | [`iac/terraform/aws/`](iac/terraform/aws/) | AWS root + multi-account slice + Terragrunt live |
@@ -309,7 +309,7 @@ flowchart TB
     ANS[ansible/]
     Helm[helm/]
     Dock[docker/]
-    CI[ci/ one-button]
+    CI[ci/ living kits]
   end
   Cloud --> TF
   ANS --> RefA[ansible/reference]
@@ -392,6 +392,7 @@ LLMOps first (process speed), then cloud:
 - [Huawei-class estate Ansible](case-studies/10-ansible-estate.md)
 - [Helm estate / GitOps cluster](case-studies/11-helm-estate.md)
 - [Docker images and Compose stacks](case-studies/12-docker-images.md)
+- [CI pipelines (GitLab, Jenkins, werf)](case-studies/13-ci-pipelines.md)
 
 ---
 

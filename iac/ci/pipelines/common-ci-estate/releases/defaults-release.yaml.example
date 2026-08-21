@@ -1,0 +1,40 @@
+# Release upgrade CI defaults (include after defaults.yaml.example).
+# Group CI/CD variables: RELEASE_BOT_TOKEN (required, masked).
+# RELEASE_CURRENT_BRANCH / RELEASE_TITLE_PREFIX: set on first push of a new upgrade branch.
+
+variables:
+  RELEASE_TARGET_BRANCH: "main"
+  RELEASE_GROUP_PATH: "estate"
+  COMMON_CI_PROJECT: "estate/common-ci"
+  COMMON_CI_REF: "main"
+  RELEASE_BRANCH_PATTERN: '^upgrade/shop-app-[0-9.]+-estate-[0-9.]+-(preprod|prod)$'
+  RELEASE_MERGE_COUNTDOWN_SEC: "60"
+  RELEASE_MERGE_PAUSE_SEC: "2"
+  RELEASE_TITLE_PREFIX: "PROD release"
+
+.release_web_main_rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "main"
+
+.release_runner:
+  tags:
+    - docker
+  timeout: 2h
+  interruptible: true
+  image: $BASE_IMAGE
+
+.release_tools:
+  before_script:
+    - |
+      if [[ -z "${RELEASE_SCRIPTS_DIR:-}" ]]; then
+        export RELEASE_SCRIPTS_DIR="${CI_PROJECT_DIR}/releases/scripts"
+      fi
+      if [[ ! -f "${RELEASE_SCRIPTS_DIR}/release_lib.sh" ]]; then
+        echo "Fetching release scripts from ${COMMON_CI_PROJECT}@${COMMON_CI_REF}..."
+        git clone --depth 1 --branch "${COMMON_CI_REF}" \
+          "${CI_SERVER_PROTOCOL}://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${COMMON_CI_PROJECT}.git" /tmp/common-ci-release
+        export RELEASE_SCRIPTS_DIR=/tmp/common-ci-release/releases/scripts
+      fi
+      # shellcheck source=/dev/null
+      source "${RELEASE_SCRIPTS_DIR}/release_lib.sh"
+      release_install_tools

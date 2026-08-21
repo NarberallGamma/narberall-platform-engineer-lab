@@ -1,0 +1,3 @@
+# Generic PROD release repo list (helm + ansible). Not a live inventory.
+shop-app
+estate-ansible

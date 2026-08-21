@@ -1,0 +1,62 @@
+include:
+  - local: "canary/common.yml.example"
+
+Plan to Dev:
+  extends: .base_plan
+  environment:
+    name: dev
+    action: prepare
+  variables:
+    WERF_KUBE_CONTEXT: dev
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, platform]
+
+Plan to Preprod:
+  extends: .base_plan
+  environment:
+    name: preprod
+    action: prepare
+  variables:
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, platform]
+
+Plan to Prodlike:
+  extends: .base_plan
+  environment:
+    name: prodlike
+    action: prepare
+  variables:
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, platform]
+
+Plan to Production:
+  extends: .base_plan
+  environment:
+    name: production
+    action: prepare
+  variables:
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, platform]
+
+Plan to Production:
+  extends: .base_plan
+  environment:
+    name: production
+    action: prepare
+  variables:
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, platform]

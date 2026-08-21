@@ -1,0 +1,13 @@
+CycloneDX:
+    stage: security
+    tags:
+        - docker
+    image:
+        name: ghcr.io/cyclonedx/cdxgen:v9.8.10
+        entrypoint: [""]
+    script:
+        - node /opt/cdxgen/bin/cdxgen.js --required-only -t ${CDXGEN_LANG} -r -o bom.json --spec-version 1.4
+    artifacts:
+        expire_in: 2 days
+        paths:
+            - bom.json

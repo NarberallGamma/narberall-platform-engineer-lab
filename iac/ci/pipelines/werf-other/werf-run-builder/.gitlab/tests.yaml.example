@@ -1,0 +1,29 @@
+include:
+  - local: .gitlab/common.yaml.example
+
+.test:
+  stage: test
+  extends:
+    - .base_rules
+  tags:
+    - docker
+  needs:
+    - Make Builder
+
+Run Linter:
+  extends: .test
+  script: werf run builder -- bash -c "pnpm run lint:js"
+
+Run Tests:
+  extends: .test
+  script: werf run builder -- bash -c "pnpm run test:unit"
+
+# Simple job for all MRs to ensure pipeline is always created
+Pipeline Check:
+  stage: test
+  script:
+    - echo "✅ Pipeline created successfully"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  tags:
+    - docker

@@ -1,0 +1,13 @@
+# Estate common-ci: single pin for CI image versions.
+# Include at the top of a pipeline file:
+#   include:
+#     - local: '/defaults.yaml.example'
+#
+# After bumping base-runner: update BASE_RUNNER_IMAGE_TAG here and rebuild (build-base-runner).
+
+variables:
+  CI_REGISTRY_BASE: "example.registry/estate/base-images"
+  BASE_RUNNER_IMAGE_TAG: "1.4"
+  BASE_IMAGE: "example.registry/estate/base-images/base-runner:1.4"
+  KANIKO_IMAGE_TAG: "1.0"
+  KANIKO_IMAGE: "example.registry/estate/base-images/kaniko:1.0"

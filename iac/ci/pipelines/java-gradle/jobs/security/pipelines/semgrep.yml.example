@@ -1,0 +1,16 @@
+semgrep:
+    stage: security
+    tags:
+        - docker
+    variables:
+        DEFECTDOJO_SCAN_FILE: "semgrep-report.json"
+    allow_failure:
+        exit_codes:
+            - 1 # scan passed but vulnerabilities were found
+    script:
+        - semgrep scan --json -o $DEFECTDOJO_SCAN_FILE
+        - check_qg.py $DEFECTDOJO_SCAN_FILE
+    artifacts:
+        expire_in: 2 days
+        paths:
+            - $DEFECTDOJO_SCAN_FILE

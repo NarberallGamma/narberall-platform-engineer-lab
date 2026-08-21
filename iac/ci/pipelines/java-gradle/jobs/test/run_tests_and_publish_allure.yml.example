@@ -1,0 +1,68 @@
+run_tests_and_publish_allure:
+  stage: test
+  image: $GRADLE_IMAGE
+  variables:
+    # Allure server URL (shared across projects)
+    ALLURE_SERVER_URL: "https://allure.example.com"
+    DOCKER_HOST: "tcp://172.17.0.1:2375"
+  script:
+    - echo "Running tests and generating a local report..."
+    - gradle test -PjacocoHtmlReportEnabled=false
+    - echo "Installing zip..."
+    - apt-get update && apt-get install -y zip
+    - echo "Archiving the allure-results directory..."
+    - cd build/ && zip -r allure-results.zip allure-results | wc -l && cd ..
+    - echo "Uploading results to the Allure server..."
+    - |
+      find .
+      ls -lah build/
+      echo curl --silent --resolve allure.example.com:443:10.10.0.42 \
+        -X POST "$ALLURE_SERVER_URL/api/result" \
+        -H "Accept: */*" \
+        -H "Content-Type: multipart/form-data" \
+        -F "allureResults=@build/allure-results.zip;type=application/zip"
+
+      result_response=$(curl --silent --resolve allure.example.com:443:10.10.0.42 \
+        -X POST "$ALLURE_SERVER_URL/api/result" \
+        -H "Accept: */*" \
+        -H "Content-Type: multipart/form-data" \
+        -F "allureResults=@build/allure-results.zip;type=application/zip")
+      echo "Server response after result upload: $result_response"
+    - |
+      uuid=$(echo "$result_response" | grep -oE '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
+      if [ -z "$uuid" ]; then
+         echo "Error: failed to extract UUID from the response" >&2
+         exit 1
+      fi
+      echo "Received UUID: $uuid"
+    - echo "Requesting report generation on the Allure server..."
+    - |
+      echo curl --silent --resolve allure.example.com:443:10.10.0.42 \
+        -X POST "$ALLURE_SERVER_URL/api/report" \
+        -H "Accept: */*" \
+        -H "Content-Type: application/json" \
+        -d "{\"reportSpec\":{\"path\":[\"$CI_PROJECT_NAME\",\"test\"],\"executorInfo\":{\"buildUrl\":\"$CI_JOB_URL\"}},\"results\":[\"$uuid\"],\"deleteResults\":false}"
+
+      report_response=$(curl --silent --resolve allure.example.com:443:10.10.0.42 \
+        -X POST "$ALLURE_SERVER_URL/api/report" \
+        -H "Accept: */*" \
+        -H "Content-Type: application/json" \
+        -d "{\"reportSpec\":{\"path\":[\"$CI_PROJECT_NAME\",\"test\"],\"executorInfo\":{\"buildUrl\":\"$CI_JOB_URL\"}},\"results\":[\"$uuid\"],\"deleteResults\":false}")
+      echo "Server response after report generation: $report_response"
+      report_url=$(echo "$report_response" | grep -oE 'https://allure\.example\.com/allure/reports/[0-9a-fA-F\-]+/')
+      if [ -n "$report_url" ]; then
+         echo "Report URL: $report_url"
+      else
+         echo "Failed to extract the report URL from the response" >&2
+      fi
+  tags:
+    - docker
+  rules:
+    - when: manual
+  allow_failure: true
+  timeout: 3h
+  artifacts:
+    when: always
+    paths:
+      - build/allure-results.zip
+    expire_in: 1 hour

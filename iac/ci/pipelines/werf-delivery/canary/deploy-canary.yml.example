@@ -1,0 +1,145 @@
+## Plan
+Canary Plan to Dev:
+  extends: .base_plan
+  environment:
+    name: dev
+    action: prepare
+  variables:
+    APP_NAME_SUFFIX: canary
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_CANARY: canary.enabled=true
+    WERF_SET_REPLICAS: app.replicas=1
+    WERF_SET_POSTGRESQL: postgresql.enabled=false
+  before_script:
+    - !reference [.scripts, setup_werf]
+    - !reference [.scripts, app_name]
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, manual]
+
+Canary Plan to Preprod:
+  extends: .base_plan
+  environment:
+    name: preprod
+    action: prepare
+  variables:
+    APP_NAME_SUFFIX: canary
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+    WERF_SET_CANARY: canary.enabled=true
+    WERF_SET_REPLICAS: app.replicas=1
+    WERF_SET_POSTGRESQL: postgresql.enabled=false
+  before_script:
+    - !reference [.scripts, setup_werf]
+    - !reference [.scripts, app_name]
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, manual]
+
+Canary Plan to Production:
+  extends: .base_plan
+  environment:
+    name: production
+    action: prepare
+  variables:
+    APP_NAME_SUFFIX: canary
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+    WERF_SET_CANARY: canary.enabled=true
+    WERF_SET_REPLICAS: app.replicas=1
+    WERF_SET_POSTGRESQL: postgresql.enabled=false
+  before_script:
+    - !reference [.scripts, setup_werf]
+    - !reference [.scripts, app_name]
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, manual]
+
+## Deploy
+Canary Deploy to Dev:
+  extends: .base_converge
+  environment:
+    name: dev
+  variables:
+    APP_NAME_SUFFIX: canary
+    WERF_KUBE_CONTEXT: dev
+    WERF_SET_CANARY: canary.enabled=true
+    WERF_SET_REPLICAS: app.replicas=1
+    WERF_SET_POSTGRESQL: postgresql.enabled=false
+  before_script:
+    - !reference [.base_converge, before_script]
+    - !reference [.scripts, setup_werf]
+    - !reference [.scripts, app_name]
+
+Canary Deploy to Preprod:
+  extends: .base_converge
+  environment:
+    name: preprod
+  variables:
+    APP_NAME_SUFFIX: canary
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+    WERF_SET_CANARY: canary.enabled=true
+    WERF_SET_REPLICAS: app.replicas=1
+    WERF_SET_POSTGRESQL: postgresql.enabled=false
+  before_script:
+    - !reference [.base_converge, before_script]
+    - !reference [.scripts, setup_werf]
+    - !reference [.scripts, app_name]
+  resource_group: preprod
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, platform]
+    - !reference [.rules, canary]
+    - !reference [.rules, production]
+
+Canary Deploy to Production:
+  extends: .base_converge
+  stage: production
+  environment:
+    name: production
+  variables:
+    APP_NAME_SUFFIX: canary
+    WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+    WERF_SET_CANARY: canary.enabled=true
+    WERF_SET_REPLICAS: app.replicas=1
+    WERF_SET_POSTGRESQL: postgresql.enabled=false
+  before_script:
+    - !reference [.base_converge, before_script]
+    - !reference [.scripts, setup_werf]
+    - !reference [.scripts, app_name]
+  resource_group: production
+  rules:
+    - !reference [.rules, no_schedule]
+    - !reference [.rules, no_pipeline]
+    - !reference [.rules, canary]
+    - !reference [.rules, production]
+
+## Dismiss
+# Dismiss Canary on Dev:
+#   extends: Canary Deploy to Dev
+#   stage: .post
+#   environment:
+#     action: stop
+#   script:
+#     - !reference [.scripts, setup_werf]
+#     - werf dismiss
+
+# Dismiss Canary on Preprod:
+#   extends: Canary Deploy to Preprod
+#   stage: .post
+#   environment:
+#     action: stop
+#   script:
+#     - !reference [.scripts, setup_werf]
+#     - werf dismiss
+
+# Dismiss Canary on Production:
+#   extends: Canary Deploy to Production
+#   stage: .post
+#   environment:
+#     action: stop
+#   script:
+#     - !reference [.scripts, setup_werf]
+#     - werf dismiss

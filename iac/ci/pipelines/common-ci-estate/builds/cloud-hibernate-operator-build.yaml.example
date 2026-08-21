@@ -1,0 +1,40 @@
+# Build the cloud-hibernate-operator image and push it to the container registry.
+# Include directly: project: 'estate/common-ci', file: '/builds/cloud-hibernate-operator-build.yaml.example'
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - k8s-kaniko
+  timeout: 8h
+  interruptible: true
+
+stages:
+  - build
+
+variables:
+  CLOUD_HIBERNATE_OPERATOR_IMAGE_NAME: "cloud-hibernate-operator"
+  CLOUD_HIBERNATE_OPERATOR_IMAGE_TAG: "3.2.1"
+
+build-cloud-hibernate-operator:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - |
+      if [ -d "$CI_PROJECT_DIR/base-images/cloud-hibernate-operator" ]; then
+        CONTEXT="$CI_PROJECT_DIR/base-images/cloud-hibernate-operator"
+      elif [ -d "$CI_PROJECT_DIR/cloud-hibernate-operator" ]; then
+        CONTEXT="$CI_PROJECT_DIR/cloud-hibernate-operator"
+      else
+        echo "Error: cloud-hibernate-operator directory not found (base-images/cloud-hibernate-operator or cloud-hibernate-operator)"
+        exit 1
+      fi
+    - /kaniko/executor --context "$CONTEXT" --dockerfile "$CONTEXT/Dockerfile" --destination $CI_REGISTRY_IMAGE/$CLOUD_HIBERNATE_OPERATOR_IMAGE_NAME:$CLOUD_HIBERNATE_OPERATOR_IMAGE_TAG --custom-platform=linux/amd64
+    - echo "Cloud Hibernate Operator image built and pushed successfully!"
+  rules:
+    - when: manual

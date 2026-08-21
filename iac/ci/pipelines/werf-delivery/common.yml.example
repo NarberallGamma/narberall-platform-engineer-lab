@@ -1,0 +1,188 @@
+variables:
+  WERF_NELM=0
+
+include:
+  - local: "notify-scripts.yml.example"
+
+.app_name:
+  - export APP_NAME=`cat werf.yaml | grep project | awk '{print $2}'`
+
+.needs_converge: &needs_converge
+  - Build
+
+.base_werf: &base_werf
+  - type trdl && . $(trdl use werf ${WERF_VERSION:-1.2 ea})
+  - type werf && source $(werf ci-env gitlab --as-file)
+  - echo -e "\e[0Ksection_start:`date +%s`:envs[collapsed=true]\r\e[0KJob environment variables"
+  - printenv | sort
+  - echo -e "\e[0Ksection_end:`date +%s`:envs\r\e[0K"
+
+.base_converge:
+  stage: deploy
+  script:
+    - !reference [.base_werf]
+    - werf helm dependency build .helm/
+    - werf helm lint .helm/
+      --ignore-secret-key
+    - werf render
+      --validate
+      --ignore-secret-key > render.yaml
+    - werf converge
+      --skip-build
+  artifacts:
+    when: always
+    paths:
+      - render.yaml
+    expire_in: 1 week
+  dependencies:
+    - Build
+  needs: !reference [.needs_converge]
+  variables:
+    WERF_KUBE_CONTEXT: dev
+  tags: [docker]
+
+.rule_partner_a: &rule_partner_a
+  - if: '$CI_COMMIT_BRANCH == "partner-a-stage"'
+    variables:
+      WERF_ENV: "partner-a"
+      WERF_KUBE_CONTEXT: dev
+  - if: '$CI_COMMIT_BRANCH == "partner-b-stage"'
+    variables:
+      WERF_KUBE_CONTEXT: dev
+
+.rule_partner_a_manual: &rule_partner_a_manual
+  - if: '$CI_COMMIT_BRANCH == "partner-a-stage"'
+    when: manual
+    allow_failure: true
+    variables:
+      WERF_ENV: "partner-a"
+      WERF_KUBE_CONTEXT: dev
+  - if: '$CI_COMMIT_BRANCH == "partner-b-stage"'
+    when: manual
+    allow_failure: true
+    variables:
+      WERF_KUBE_CONTEXT: dev
+
+# Legacy partner-a production rule; a dedicated deploy include is preferred
+.rule_partner_a_production: &rule_partner_a_production
+  - if: '$CI_COMMIT_BRANCH == "partner-a-master" || $CI_COMMIT_BRANCH == "platform-partner-a-production"'
+    when: manual
+    allow_failure: true
+    variables:
+      WERF_ENV: "partner-a-production"
+      WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+# Legacy partner-b production rule; a dedicated deploy include is preferred
+.rule_partner_b_production: &rule_partner_b_production
+  - if: '$CI_COMMIT_BRANCH == "partner-b-master" || $CI_COMMIT_BRANCH == "platform-partner-b-production"'
+    when: manual
+    allow_failure: true
+    variables:
+      WERF_ENV: "partner-b-production"
+      WERF_KUBE_CONTEXT: "${KUBE_CONTEXT_PROD}"
+
+.rule_default: &rule_default
+  - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    when: never
+  - if: '$CI_PIPELINE_SOURCE == "pipeline"'
+    when: never
+
+.rule_static: &rule_static
+  - if: '$CI_COMMIT_BRANCH == "stage"'
+  - if: '$CI_COMMIT_BRANCH == "postgres-demo"'
+  - if: '$CI_COMMIT_BRANCH == "demo"'
+  - if: '$CI_COMMIT_BRANCH == "loyalty"'
+  - if: '$CI_COMMIT_BRANCH =~ /^team\/.*$/'
+  - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "STATIC"'
+  - !reference [.rule_partner_a]
+
+.rule_static_manual: &rule_static_manual
+  - if: '$CI_COMMIT_BRANCH == "stage"'
+    allow_failure: true
+    when: manual
+  - if: '$CI_COMMIT_BRANCH == "postgres-demo"'
+    allow_failure: true
+    when: manual
+  - if: '$CI_COMMIT_BRANCH == "demo"'
+    allow_failure: true
+    when: manual
+  - if: '$CI_COMMIT_BRANCH == "loyalty"'
+    allow_failure: true
+    when: manual
+  - if: '$CI_COMMIT_BRANCH =~ /^team\/.*$/'
+    allow_failure: true
+    when: manual
+  - !reference [.rule_partner_a_manual]
+
+.rule_production: &rule_production
+  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    when: manual
+  - if: "$CI_COMMIT_TAG"
+    when: manual
+
+.rule_migrations_switch:
+    - if: $EXTRA_BUTTONS != "ON"
+      when: never
+
+.rule_not_schedule: &rule_not_schedule
+  - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    when: never
+
+.rule_not_mr: &rule_not_mr
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    when: never
+
+.rule_not_pipeline: &rule_not_pipeline
+  - if: '$CI_PIPELINE_SOURCE == "pipeline"'
+    when: never
+
+.rule_pipeline_review: &rule_pipeline_review
+  - if: '$CI_PIPELINE_SOURCE == "pipeline" && $TRIGGER == "REVIEW"'
+    when: on_success
+
+stages:
+  - build
+  - test
+  - tests-approve
+  - review-start
+  - publish
+  - preprod
+  - deploy
+  - tests
+  - cleanup
+
+Build:
+  stage: build
+  before_script:
+    - !reference [.script_notify_slack_build_started]
+  script:
+    - !reference [.base_werf]
+    - werf build --save-build-report --build-report-path=build.env
+  after_script:
+    - !reference [.script_notify_slack_build_finished]
+  tags: [docker]
+  rules:
+    - !reference [.rule_not_schedule]
+    - !reference [.rule_pipeline_review]
+    - !reference [.rule_static]
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    - if: "$CI_COMMIT_BRANCH =~ /^platform.*$/"
+    - if: '$CI_COMMIT_BRANCH =~ "/^partner-a.*/"'
+    - if: '$CI_COMMIT_BRANCH =~ "/^partner-b.*/"'
+    - if: "$CI_COMMIT_TAG"
+  artifacts:
+    reports:
+      dotenv:
+        - thread.env
+        - build.env
+
+Cleanup:
+  stage: cleanup
+  script:
+    - !reference [.base_werf]
+    - werf cr login -u nobody -p ${WERF_IMAGES_CLEANUP_PASSWORD} ${WERF_REPO}
+    - werf cleanup
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - when: never
+  tags: [docker]

@@ -1,0 +1,109 @@
+---
+variables:
+  GIT_STRATEGY: clone
+  WERF_VERSION: "2 stable"
+  K8S_NAMESPACE_PREFIX: ""
+  HELM_DIRECTORY: ".helm"
+
+before_script:
+  - type trdl && . $(~/bin/trdl use werf ${WERF_VERSION})
+  - werf version
+  - type werf && source <(werf ci-env gitlab)
+  - echo -e "\e[0Ksection_start:`date +%s`:envs[collapsed=true]\r\e[0KJob environment variables"
+  - env -0 | sort -z | tr '\0' '\n'
+  - echo -e "\e[0Ksection_end:`date +%s`:envs\r\e[0K"
+
+.base_builds:
+  stage: build
+  variables:
+    WERF_SAVE_BUILD_REPORT: 'yes'
+    WERF_BUILD_REPORT_PATH: build.env
+  script:
+    - werf build  --repo $WERF_REPO/$RELEASE_NAME
+    - cat build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+  dependencies:
+    - Build
+  needs:
+    - job: Build
+      artifacts: true
+  tags:
+    - docker
+  interruptible: true
+
+.multi_deploy: &multi_deploy
+  variables:
+    WERF_VALUES_1: ".werf/common-templates/values.yaml"
+    WERF_SECRET_VALUES_1: ".werf/common-templates/secret-values.yaml"
+  script:
+    - werf plan --repo $WERF_REPO/$RELEASE_NAME --release=${RELEASE_NAME}-${WERF_NAMESPACE}
+    - werf converge --repo $WERF_REPO/$RELEASE_NAME --release=${RELEASE_NAME}-${WERF_NAMESPACE}
+  dependencies:
+    - Build
+  tags:
+    - docker
+
+.multi_deploy_to_dev: &multi_deploy_to_dev
+  extends: .multi_deploy
+  stage: dev
+  variables:
+    WERF_KUBE_CONTEXT: cluster-a
+    WERF_NAMESPACE: dev
+    WERF_ENV: dev
+  environment:
+    name: dev
+
+.multi_deploy_to_dev_analytics_secondary: &multi_deploy_to_dev_analytics_secondary
+  extends: .multi_deploy
+  stage: dev_secondary
+  variables:
+    WERF_KUBE_CONTEXT: cluster-b
+    WERF_NAMESPACE: analytics
+    WERF_ENV: dev-secondary
+  environment:
+    name: dev-secondary
+  tags:
+    - docker
+
+.multi_deploy_to_dev_secondary: &multi_deploy_to_dev_secondary
+  extends: .multi_deploy
+  stage: dev_secondary
+  variables:
+    WERF_KUBE_CONTEXT: cluster-b
+    WERF_NAMESPACE: dev
+    WERF_ENV: dev-secondary
+  environment:
+    name: dev-secondary
+  tags:
+    - docker
+
+.multi_deploy_to_production: &multi_deploy_to_production
+  extends: .multi_deploy
+  stage: production
+  variables:
+    WERF_NAMESPACE: production
+    WERF_KUBE_CONTEXT: cluster-prod
+    WERF_ENV: production
+  environment:
+    name: production
+  tags:
+    - docker
+
+.base_cleanup: &base_cleanup
+  stage: cleanup
+  script:
+    - unset WERF_KUBE_CONTEXT
+    - set -x
+    - bash -c "${CUSTOM_SCRIPT}"
+    - werf cr login -u nobody -p ${WERF_IMAGES_CLEANUP_PASSWORD} ${WERF_REPO}
+    - werf cleanup --repo $WERF_REPO/$RELEASE_NAME ${CLEANUP_OPTIONS}
+  rules:
+  - if: $CLEANUP_DISABLED == "true"
+    when: never
+  - if: $RENOVATE_SCHEDULE_ENABLED == "true"
+    when: never
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $CLEANUP_CRON == "true"
+  tags:
+    - docker

@@ -1,0 +1,68 @@
+# Shop UI + API tests with Allure Server upload.
+# Full job body, not an include of the shared Gradle base.
+
+workflow:
+  name: "https://allure.dev.example.com/ui/results"
+
+stages:
+  - test
+  - report
+
+UI test with Allure:
+  stage: test
+  image:
+    name: mirror.gcr.io/gradle:8.8.0-jdk17
+  services:
+    - name: selenium/standalone-chrome
+      alias: selenium
+  variables:
+    DISPLAY: ":99"
+    SELENIUM_REMOTE_URL: "http://selenium:4444/wd/hub"
+    STAND: "test"
+  script:
+    - standPath=$(echo $STAND | tr '[:upper:]' '[:lower:]')
+    - if [[ $standPath != 'dev' && $standPath != 'test' && $standPath != 'demo' ]]; then echo "Unknown stand '$standPath' for testing" >&2 && exit 1; fi
+    - echo Test run is performed for $standPath stand
+    - gradle --no-daemon test || true
+    - apt update && apt install -y zip
+    - cd build/ && zip -r allure-results.zip allure-results | wc -l
+    - "request_uuid=$(curl --resolve allure.dev.example.com:443:10.10.6.20 -X POST 'https://allure.dev.example.com/api/result' -H 'Accept: */*' -H 'Content-Type: multipart/form-data' -F 'allureResults=@allure-results.zip;type=application/zip' | grep --color=never -oE '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')"
+    - echo Received uuid\($request_uuid\) when uploading \'allure-results.zip\'
+    - "curl --resolve allure.dev.example.com:443:10.10.6.20 -X POST 'https://allure.dev.example.com/api/report' -H 'Accept: */*' -H 'Content-Type: application/json' -d '{\"reportSpec\":{\"path\":[\"auto-ui\",\"'\"$standPath\"'\"],\"executorInfo\":{\"buildUrl\":\"'\"$CI_JOB_URL\"'\"}},\"results\":[\"'\"$request_uuid\"'\"],\"deleteResults\":false}' -f"
+    - if [[ $? != 0 ]]; then echo 'Failed to generate report in Allure Server' >&2 && exit 1; fi
+  tags:
+    - docker
+  allow_failure: true
+  timeout: 2h
+
+API test with Postman:
+  stage: test
+  image:
+    name: postman/newman
+    entrypoint:
+      - "/bin/sh"
+      - "-c"
+  variables:
+    POSTMAN_COLLECTION: "flow.postman_collection.json"
+    POSTMAN_ENVIRONMENT: "test.postman_environment.json"
+    POSTMAN_TIMEOUT: "30000"
+    POSTMAN_ITERATIONS: "1"
+    POSTMAN_DELAY: "1000"
+    ALLURE_RESULTS_DIR: "allure-results"
+    API_BASE_URL: "https://test.example.com"
+  script:
+    - apk update
+    - apk add zip
+    - apk add curl
+    - npm install -g newman newman-reporter-allure
+    - newman run "$POSTMAN_COLLECTION" -e "$POSTMAN_ENVIRONMENT" --timeout-request "$POSTMAN_TIMEOUT" --iteration-count "$POSTMAN_ITERATIONS" --delay-request "$POSTMAN_DELAY" --env-var "url=$API_BASE_URL" --reporters cli,allure --reporter-allure-export "$ALLURE_RESULTS_DIR/allure-api-results.json" || true
+    - cd "$ALLURE_RESULTS_DIR" && zip -r allure-api-results.zip *
+    - "request_uuid=$(curl --resolve allure.dev.example.com:443:10.10.6.20 -X POST 'https://allure.dev.example.com/api/result' -H 'Accept: */*' -H 'Content-Type: multipart/form-data' -F 'allureResults=@allure-api-results.zip;type=application/zip' | grep --color=never -oE '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')"
+    - echo Received uuid\($request_uuid\) when uploading \'allure-api-results\'
+    - "curl --resolve allure.dev.example.com:443:10.10.6.20 -X POST 'https://allure.dev.example.com/api/report' -H 'Accept: */*' -H 'Content-Type: application/json' -d '{\"reportSpec\":{\"path\":[\"auto-api\",\"test\"],\"executorInfo\":{\"buildUrl\":\"'\"$CI_JOB_URL\"'\"}},\"results\":[\"'\"$request_uuid\"'\"],\"deleteResults\":false}' -f"
+    - if [[ $? != 0 ]]; then echo 'Failed to generate report in Allure Server' >&2 && exit 1; fi
+  tags:
+    - docker
+  when: manual
+  allow_failure: true
+  timeout: 2h

@@ -1,16 +1,15 @@
 #!/bin/bash
-#Description: Используется для создания или обновления инвентаризационных
-#             файлов Ansible 
+#Description: Used to create or update Ansible inventory files 
 
 ################################################################################
-#Значения по умолчанию
+#Default values
 SSH_CONFIG_PATH="${HOME}/.ssh/config"
 INVENTORIES_DIR="./inventories"
 TFADM_USER="tfadm"
 
 ################################################################################
-#Определения функций
-#Выводит сообщение в STDOUT
+#Function definitions
+#Print a message to STDOUT
 #${1} - message
 print_message()
 {
@@ -27,9 +26,9 @@ print_message()
 }
 
 ################################################################################
-#Точка входа
+#Entry point
 
-#Объявления и определения переменных
+#Variable declarations and definitions
 PROJECT_FILTER=""
 SSH_CONFIG_CONTENT=""
 SSH_CONFIG_CONTENT_TFADM_USER_PART=""
@@ -39,7 +38,7 @@ PROJECTS=""
 TFADM_USER_HOSTS=""
 PROJECT_LIMIT_FILE=""
 
-#Разбор аргументов командной строки
+#Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options f:l: --longoptions ,project-filter:,project-limit-file: -- "${@}" 2>/dev/null )"
 if test "${?}" -gt 0;
 then
@@ -58,7 +57,7 @@ do
   esac
 done
 
-#Работа
+#Work
 if test ! -f "${SSH_CONFIG_PATH}";
 then
   print_message "SSH-client configuration file does not exists. Nothing was done"
@@ -150,7 +149,7 @@ then
   find "${INVENTORIES_DIR}" -mindepth 1 -maxdepth 1 -regex ".*\/project_.*\.yml$" -type f -delete
 fi
 
-#Получение списка узлов с пользователем tfadm
+#Collect hosts that use the tfadm user
 ssh_host=""
 ssh_user=""
 IFS=$'\n'

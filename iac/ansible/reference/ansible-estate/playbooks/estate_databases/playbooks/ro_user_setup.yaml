@@ -1,9 +1,9 @@
 ---
-# Плейбук read-only дополнительной учётки: GRANT CONNECT + SELECT (без OWNER, без treasury_user/schema_flyway).
-# Запуск: ansible-playbook ro_user_setup.yaml --extra-vars "ro_user=superset_main ro_password=..."
+# Extra read-only account playbook: GRANT CONNECT + SELECT (no OWNER, no treasury_user/schema_flyway).
+# Run: ansible-playbook ro_user_setup.yaml --extra-vars "ro_user=superset_main ro_password=..."
 #         ansible-playbook ro_user_setup.yaml --extra-vars "ro_user=... ro_password=... db_name=treasury_contract|db_list=[...]"
-# Без db_name / db_list используется default_databases из vars ниже.
-- name: Создание RO-пользователя PostgreSQL (GRANT CONNECT + SELECT, без OWNER)
+# Without db_name / db_list, default_databases from vars below is used.
+- name: Create a PostgreSQL RO user (GRANT CONNECT + SELECT, no OWNER)
   hosts: localhost
   connection: local
   become: false
@@ -17,11 +17,11 @@
     ro_user: "superset_main"
     ro_password: ""
 
-    # Роль-создатель объектов для ALTER DEFAULT PRIVILEGES FOR ROLE (не OWNER доп. учётки).
+    # Object-creator role for ALTER DEFAULT PRIVILEGES FOR ROLE (not the extra account OWNER).
     default_privileges_for_role: schema_flyway
 
-    # Полный список прикладных БД estate (снимок RDS prod, 2026-07). Переопределение: db_name или db_list.
-    # treasury_contract_restored_3: временная/восстановленная БД, может отсутствовать на preprod.
+    # Full list of estate application databases (RDS prod snapshot, 2026-07). Override: db_name or db_list.
+    # treasury_contract_restored_3: temporary/restored database, may be absent on preprod.
     default_databases:
       - cryptopro_service
       - hsm
@@ -49,33 +49,33 @@
       - treasury_web
 
   pre_tasks:
-    - name: Проверить ro_user и ro_password
+    - name: Check ro_user and ro_password
       ansible.builtin.fail:
-        msg: "Задать ro_user и ro_password в vars плейбука или через --extra-vars"
+        msg: "Set ro_user and ro_password in playbook vars or via --extra-vars"
       when: >
         ro_user is not defined or (ro_user | default('') | trim | length) == 0
         or ro_password is not defined or (ro_password | default('') | length) == 0
 
-    - name: Определить список баз данных для обработки
+    - name: Resolve the database list to process
       ansible.builtin.set_fact:
         db_list: "{{ db_list | default(default_databases) }}"
       when: db_name is not defined or db_name == '' or db_name is none
 
-    - name: Определить список баз данных из db_name
+    - name: Resolve the database list from db_name
       ansible.builtin.set_fact:
         db_list: "{{ [db_name] }}"
       when: db_name is defined and db_name != '' and db_name is not none
 
-    - name: Проверить, что список БД не пуст
+    - name: Fail when the database list is empty
       ansible.builtin.fail:
-        msg: "ОШИБКА: список баз данных пуст. Указать db_name или db_list"
+        msg: "ERROR: database list is empty. Set db_name or db_list"
       when: db_list is not defined or db_list | length == 0
 
-    - name: Показать параметры
+    - name: Show parameters
       ansible.builtin.debug:
         msg:
-          - "RO-пользователь: {{ ro_user }}"
-          - "Базы ({{ db_list | length }}): {{ db_list | join(', ') }}"
+          - "RO user: {{ ro_user }}"
+          - "Databases ({{ db_list | length }}): {{ db_list | join(', ') }}"
 
   roles:
     - ro_user

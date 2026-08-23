@@ -1,12 +1,12 @@
 apiVersion: 1
-# Датасорс был создан без явного uid — provisioning не умеет менять uid,
-# поэтому пересоздаём (данных в датасорсе нет, это просто указатель).
+# Datasource was created without an explicit uid — provisioning cannot change
+# uid, so it is recreated (no data in the datasource; it is just a pointer).
 deleteDatasources:
   - name: VictoriaMetrics
     orgId: 1
 datasources:
   - name: VictoriaMetrics
-    uid: victoriametrics   # стабильный uid — на него ссылаются дашборды
+    uid: victoriametrics   # stable uid — dashboards reference it
     type: prometheus
     access: proxy
     url: http://victoriametrics:8428

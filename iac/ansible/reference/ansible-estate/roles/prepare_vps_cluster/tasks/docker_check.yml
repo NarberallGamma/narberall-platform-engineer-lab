@@ -1,31 +1,31 @@
 ---
-- name: Проверить наличие Docker Engine
+- name: Check that Docker Engine is present
   ansible.builtin.command: docker info
   register: vps_docker_info
   changed_when: false
   failed_when: vps_docker_info.rc != 0
   tags: [vps, docker, prepare_vps]
 
-- name: Проверить наличие Docker Compose V2 (плагин)
+- name: Check that Docker Compose V2 (plugin) is present
   ansible.builtin.command: docker compose version
   register: vps_docker_compose_check
   changed_when: false
   failed_when: vps_docker_compose_check.rc != 0
   tags: [vps, docker, prepare_vps]
 
-- name: Убедиться, что каталог data-root Docker существует
+- name: Ensure Docker data-root directory exists
   ansible.builtin.stat:
     path: "{{ docker_data_dir | default('/docker/system') }}"
   register: vps_docker_data_dir_stat
   tags: [vps, docker, prepare_vps]
 
-- name: Предупреждение при отсутствии каталога data-root Docker
+- name: Warn if Docker data-root directory is missing
   ansible.builtin.debug:
-    msg: "Каталог {{ docker_data_dir | default('/docker/system') }} не найден; ожидается предварительный прогон prepare_servers с enable_docker."
+    msg: "Directory {{ docker_data_dir | default('/docker/system') }} not found; a prior prepare_servers run with enable_docker is expected."
   when: not vps_docker_data_dir_stat.stat.exists
   tags: [vps, docker, prepare_vps]
 
-- name: Создать базовый каталог приложений Docker Compose
+- name: Create base directory for Docker Compose applications
   ansible.builtin.file:
     path: "{{ vps_docker_apps_base_dir }}"
     state: directory

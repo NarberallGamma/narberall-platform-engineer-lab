@@ -10,7 +10,7 @@
       - xui_extra_inbound_protocol in ['trojan', 'shadowsocks']
       - xui_extra_inbound_port | int > 0
     fail_msg: >-
-      extra inbound: поддерживаются только protocol=trojan/shadowsocks и port > 0.
+      extra inbound: only protocol=trojan/shadowsocks and port > 0 are supported.
 
 - name: Set extra inbound identity facts
   ansible.builtin.set_fact:

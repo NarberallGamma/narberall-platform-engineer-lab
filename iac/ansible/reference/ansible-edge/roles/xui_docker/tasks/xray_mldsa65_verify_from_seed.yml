@@ -1,7 +1,7 @@
 ---
-# Verify (публичный ключ PQ для клиента/outbound) выводится из Seed: xray mldsa65 -i "<seed>"
+# Verify (PQ public key for client/outbound) is derived from Seed: xray mldsa65 -i "<seed>"
 
-- name: Clear invalid mldsa65 verify (сырой stdout, Seed/Veify в значении)
+- name: Clear invalid mldsa65 verify (raw stdout, Seed/Veify in the value)
   ansible.builtin.set_fact:
     xui_reality_mldsa65_verify: ""
   when:
@@ -48,7 +48,7 @@
       - xui_reality_mldsa65_verify | default('') is not search('Seed:')
       - xui_reality_mldsa65_verify | default('') is not search('Veify:')
     fail_msg: >-
-      Не удалось извлечь Verify/Veify из вывода xray mldsa65 -i (ожидается одна строка ключа после Verify:/Veify:).
+      Failed to extract Verify/Veify from xray mldsa65 -i output (expected a single key line after Verify:/Veify:).
   when:
     - xui_mldsa65_derive_raw is defined
     - xui_mldsa65_derive_raw.stdout is defined

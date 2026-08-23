@@ -1,5 +1,5 @@
-# Управляется Ansible — секреты для Docker Compose (env_file рядом с docker-compose.yml).
-# При отключённых llm_dev_enable_* блоках ниже файл может содержать только этот комментарий.
+# Managed by Ansible — secrets for Docker Compose (env_file next to docker-compose.yml).
+# When the llm_dev_enable_* blocks below are off, the file may contain only this comment.
 {% if llm_dev_enable_api_key | bool %}
 LLAMA_SERVER_API_KEY={{ llm_dev_api_key }}
 {% endif %}

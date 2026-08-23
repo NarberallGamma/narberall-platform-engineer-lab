@@ -1,61 +1,61 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа
+# Primary backup method
 
-# Его можно применять если (должны выполняться все условия):
-#   1. на узле с сервером MySQL доступна утилита innobackupex
-#   2. для работы со всеми таблицами во всех базах MySQL используется движок InnoDB
-#   3. в случае создания бэкапа со slave-сервера, на нем НЕ производятся
-#      DDL-модификации (изменения структур баз данных), иначе бэкап будет неконсистентным
+# Applicable when (all of the following must hold):
+#   1. innobackupex is available on the MySQL server node
+#   2. every table in every MySQL database uses the InnoDB engine
+#   3. when backing up from a slave, that slave is NOT running
+#      DDL (schema changes), otherwise the backup will be inconsistent
 
-# Принцип работы:
-#   - вызов innobackupex с передачей дампа в stdout
-#   - резервное копирование дампа с помощью borg с получением дампа из stdin
+# How it works:
+#   - run innobackupex and send the dump to stdout
+#   - back up the dump with Borg, reading the dump from stdin
 
-# Поддерживаемые опции:
-# -c|--defaults-file         -    путь к файлу с параметрами подключения к
-#                                 MySQL-серверу и работы с ним, такими как host,
-#                                 user, password, socket и т.п. (опция innobackupex
-#                                 --defaults-file). Без указания этой опции
-#                                 будет использован файл указанный в переменной
+# Supported options:
+# -c|--defaults-file         -    path to the connection-parameter file for
+#                                 the MySQL server (host,
+#                                 user, password, socket, and similar (innobackupex option
+#                                 --defaults-file). When omitted,
+#                                 the file named in the variable
 #                                 ${DEFAULTS_FILE_DEFAULT}
-# -n|--ulimit-n                 - устанавливает максимальное количество
-#                                 одновременно открытых файловых дескрипторов
-#                                 для процесса. Без указания этой опции будет
-#                                 использовано значение указанное в переменной
+# -n|--ulimit-n                 - sets the maximum number of
+#                                 simultaneously open file descriptors
+#                                 for the process. When omitted,
+#                                 the value from the variable
 #                                 ${ULIMIT_N_DEFAULT}
-# -a|--add-innobackupex-option  - дополнительная опция которая будет передана
-#                                 innobackupex. Если опция innobackupex имеет
-#                                 значение, то его необходимо указать либо через
-#                                 знак равенства ( = ) (возможно только для
-#                                 длинных опций), либо через пробел, но в
-#                                 этом случае опцию innobackupex вместе с ее
-#                                 значением необходимо поместить в двойные или
-#                                 одинарные кавычки. Например:
+# -a|--add-innobackupex-option  - extra option passed to
+#                                 innobackupex. When an innobackupex option has
+#                                 a value, pass it either with
+#                                 an equals sign ( = ) (long options only),
+#                                 long options), or as a space, but in
+#                                 that case the innobackupex option together with its
+#                                 the value must be wrapped in double or
+#                                 single quotes. For example:
 #                                   - --add-innobackupex-option --databases=db1
 #                                   - --add-innobackupex-option '--databases db1'
 #                                   - --add-innobackupex-option "---databases db1"
-#                                 Опция может быть указана несколько раз,
-#                                 innobackupex будут переданы все указанные опции
-#                                 Скрипт всегда добавляет опцию --stream=xbstream
-# -k|--prune                    - строка с опциями алгоритма сохранения резервных
-#                                 копий в формате программы Borg, например
+#                                 The option may be repeated,
+#                                 innobackupex will receive all listed options
+#                                 The script always adds --stream=xbstream
+# -k|--prune                    - retention-options string
+#                                 copies in Borg format, e.g.
 #                                 '--keep-hourly 72 --keep-within=30d'
-#                                 Необязательный аргумент, без указания этой опции
-#                                 будет использовано значение ${CUSTOMPRUNE_DEFAULT}
+#                                 Optional. When omitted,
+#                                 ${CUSTOMPRUNE_DEFAULT} is used
 
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория, без указания будет
-#        использовано имя заданное в ${NAMEOFBACKUP_DEFAULT}
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix. When omitted,
+#        the name from ${NAMEOFBACKUP_DEFAULT} is used
 
-# Владельцем файла указанного опцией --defaults-file должен быть 'root:root' и
-# для него должны быть установлены права '0400'
+# The file given by --defaults-file must be owned by 'root:root' and
+# mode must be '0400'
 
-# Установка зависимостей:
+# Dependency installation:
 # - innobackupex:
 #   - Debian/Ubuntu - sudo apt-get install percona-xtrabackup
 
-# Пример использования в schedule:
+# Schedule example:
 # borg_run_on.sh 10.0.0.1 borg_backup_mysql.sh
 # borg_run_on.sh 10.0.0.1 borg_backup_mysql.sh 'MYSQL'
 # borg_run_on.sh 10.0.0.1 borg_backup_mysql.sh 'MYSQL --defaults-file "/etc/mysql/debian.cnf"'
@@ -104,7 +104,7 @@ CUSTOMPRUNE=""
 REPOSITORY=""
 EFFECTIVE_OPTIONS=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options c:n:a:k: --longoptions ,defaults-file:,ulimit-n:,add-innobackupex-option:,prune: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

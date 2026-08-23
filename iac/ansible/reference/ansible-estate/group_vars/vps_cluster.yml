@@ -1,9 +1,9 @@
-# Переменные для группы [vps_cluster]: blockchain egress (Envoy, firewall, SSH).
-# Применяются автоматически к хостам vps_cluster; playbook: prepare_vps_cluster.yml
+# Variables for group [vps_cluster]: blockchain egress (Envoy, firewall, SSH).
+# Applied automatically to vps_cluster hosts; playbook: prepare_vps_cluster.yml
 #
-# Предварительное условие: прогон prepare_servers (Docker в /docker/system, enable_docker: true).
+# Prerequisite: run prepare_servers (Docker in /docker/system, enable_docker: true).
 
-# --- Включатели блоков роли prepare_vps_cluster ---
+# --- Feature flags for role prepare_vps_cluster ---
 enable_vps_docker_check: true
 enable_vps_admin_user: true
 enable_vps_ssh: true
@@ -13,19 +13,19 @@ enable_vps_envoy: true
 enable_vps_envoy_logging: true
 enable_vps_chrony: true
 
-# --- Admin-пользователь VPS ---
+# --- VPS admin user ---
 vps_admin_username: admin_vps
 vps_admin_password_length: 30
-# true: сгенерировать новый пароль при каждом прогоне и перезаписать credentials в artifacts
+# true: generate a new password on every run and overwrite credentials in artifacts
 vps_admin_regenerate_password: false
-# Открытые SSH-ключи (добавляются в authorized_keys, можно несколько)
+# Public SSH keys (added to authorized_keys; several are allowed)
 vps_admin_ssh_public_keys:
   - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA admin@example.com"
 
-# --- SSH (по умолчанию: любой IP, root разрешён) ---
-# vps_ssh_disable_root_login: запретить вход root по SSH (sshd PermitRootLogin no)
+# --- SSH (default: any IP, root allowed) ---
+# vps_ssh_disable_root_login: deny root SSH login (sshd PermitRootLogin no)
 vps_ssh_disable_root_login: false
-# vps_ssh_restrict_source_ips: ufw allow 22 только с vps_ssh_allowed_source_cidrs
+# vps_ssh_restrict_source_ips: ufw allow 22 only from vps_ssh_allowed_source_cidrs
 vps_ssh_restrict_source_ips: false
 vps_ssh_allowed_source_cidrs:
   - "203.0.113.21/32"  # estate-prod-gitlab, public egress
@@ -35,9 +35,9 @@ vps_ssh_allowed_source_cidrs:
   - "203.0.113.23/32"      # estate-prod Kubernetes pod public egress
   - "10.10.14.0/24"       # estate-prod Kubernetes node subnet
 
-# --- Firewall: источники трафика от Kubernetes / estate ---
-# Публичные IP NAT cloud.ru (egress из кластера к VPS). Формат CIDR.
-# Также добавлены внутренние источники, которые могут приходить к VPS через GRE/IPsec.
+# --- Firewall: traffic sources from Kubernetes / estate ---
+# Public NAT IPs of cloud.ru (egress from the cluster to VPS). CIDR format.
+# Internal sources that may reach VPS via GRE/IPsec are also listed.
 vps_k8s_egress_source_cidrs:
   - "203.0.113.23/32"      # estate-prod Kubernetes pod public egress
   - "172.16.0.0/24"      # estate-prod pod CIDR, observed platform pods
@@ -51,7 +51,7 @@ vps_k8s_egress_source_cidrs:
 vps_firewall_allow_outgoing: true
 vps_envoy_listen_port: 443
 
-# --- Docker Compose: каталог приложений на хосте ---
+# --- Docker Compose: application directory on the host ---
 vps_docker_apps_base_dir: "/docker/apps"
 
 # --- Envoy (TLS passthrough, SNI dynamic forward proxy) ---
@@ -61,8 +61,8 @@ vps_envoy_container_name: "envoy-egress"
 vps_envoy_admin_port: 9901
 vps_envoy_compose_pull: "always"
 
-# --- Envoy access log (файл + logrotate, как /docker/nginx/logs на proxy01mosvkc) ---
-# vps_envoy_access_log_to_stdout: true  # дублировать в docker logs
+# --- Envoy access log (file + logrotate, same as /docker/nginx/logs on proxy01mosvkc) ---
+# vps_envoy_access_log_to_stdout: true  # also write to docker logs
 # vps_envoy_logrotate_rotate: 7
 # vps_envoy_logrotate_maxage: 7
 

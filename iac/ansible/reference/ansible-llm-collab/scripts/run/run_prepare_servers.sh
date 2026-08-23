@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Подготовка серверов (prepare_servers).
+# Server preparation (prepare_servers).
 #
-# SSH-ключ с passphrase (WSL): eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
+# SSH key with a passphrase (WSL): eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
 #   ./scripts/run/run_prepare_servers.sh --remote --limit HOST --ssh-key ~/.ssh/your_key --ssh-agent
-# Только --ssh-agent (без --ssh-key): ключи из agent, сброс пути к ключу из inventory.
+# --ssh-agent only (no --ssh-key): keys from the agent; clear the inventory key path.
 # CIS hardening: ./scripts/run/run_cis_ubuntu24.sh
-# Подробнее: scripts/run/lib/docker_ssh.sh
+# Details: scripts/run/lib/docker_ssh.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/docker_ssh.sh

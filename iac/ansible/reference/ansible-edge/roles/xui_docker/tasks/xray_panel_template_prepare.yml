@@ -1,6 +1,6 @@
 ---
-# Совместимость Xray template API: 3.0.x — /panel/xray/*, 3.3+ — /panel/api/xray/*.
-# На 3.3+ Bearer API token проходит checkAPIAuth; cookie нужна только для legacy /panel/xray.
+# Xray template API compatibility: 3.0.x — /panel/xray/*, 3.3+ — /panel/api/xray/*.
+# On 3.3+ a Bearer API token passes checkAPIAuth; cookie is needed only for legacy /panel/xray.
 
 - name: Read 3X-UI panel version from container
   ansible.builtin.command:

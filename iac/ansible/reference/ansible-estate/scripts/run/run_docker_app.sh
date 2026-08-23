@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Docker app: один compose-сервис в /docker/apps/<slug> на любой VM из inventory
+# Docker app: one compose service in /docker/apps/<slug> on any VM from inventory
 #
 #   ./scripts/run/run_docker_app.sh deploy cert-monitoring --prod --limit estate-prod-gitlab
 #   ./scripts/run/run_docker_app.sh deploy cert-orchestrator --preprod --limit estate-preprod-gitlab
@@ -83,8 +83,8 @@ Apps:
   treasury-policy-gateway
   cryptopro
 
-Каждое приложение: отдельный плейбук + inventory group (cert_monitoring, …, cryptopro_vm для hsm-adapter / policy-gateway / cryptopro на одной VM).
-TLS hsm-adapter / policy-gateway / cryptopro: edge-lb vhost (не nginx на cryptopro VM). Секреты: DOCKER_APPS_VAULT_SECRETS.md
+Each app: a dedicated playbook + inventory group (cert_monitoring, …, cryptopro_vm for hsm-adapter / policy-gateway / cryptopro on one VM).
+TLS for hsm-adapter / policy-gateway / cryptopro: edge-lb vhost (not nginx on the cryptopro VM). Secrets: DOCKER_APPS_VAULT_SECRETS.md
 
 Options:
   --prod | --preprod     inventory
@@ -93,15 +93,15 @@ Options:
   --ssh-agent            ssh-agent for passphrase key
   --ask-pass             SSH password
 
-  --                     аргументы ansible-playbook (например: -- -e key=val --check)
+  --                     ansible-playbook arguments (example: -- -e key=val --check)
 
 Examples:
-  # С control node (estate-prod-gitlab / estate-preprod-gitlab): bootstrap-ключ .ssh/ansible_ssh_key, user ansible (host_vars)
+  # From the control node (estate-prod-gitlab / estate-preprod-gitlab): bootstrap key .ssh/ansible_ssh_key, user ansible (host_vars)
   ./scripts/run/run_docker_app.sh deploy cert-monitoring --prod --limit estate-prod-gitlab
   ./scripts/run/run_docker_app.sh deploy cert-orchestrator --preprod --limit estate-preprod-gitlab
   ./scripts/run/run_docker_app.sh deploy cloud-hibernate-operator --prod --limit estate-prod-gitlab
 
-  # С рабочей станции на другую VM: root + cloud key
+  # From a workstation to another VM: root + cloud key
   ./scripts/run/run_docker_app.sh deploy cert-monitoring --prod --limit SOME_HOST --ssh-key ~/.ssh/estate-prod-ecs-key.pem
 EOF
   exit 0
@@ -140,7 +140,7 @@ ANSIBLE_EXTRA=()
 docker_ssh_apply
 control_node_env_apply
 
-# Control node (/ansible на GitLab): bootstrap-ключ + user ansible (inventory [all:vars] root)
+# Control node (/ansible on GitLab): bootstrap key + user ansible (inventory [all:vars] root)
 if [[ -f .ssh/ansible_ssh_key && -z "${SSH_KEY_PATH:-}" && -z "${USE_SSH_AGENT:-}" ]]; then
   ANSIBLE_EXTRA+=(-e ansible_user=ansible)
 fi

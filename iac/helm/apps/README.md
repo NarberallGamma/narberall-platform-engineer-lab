@@ -62,7 +62,7 @@ apps/
 | [`chart-flant-lib/`](chart-flant-lib/) | Chart.yaml + HTTPS flant-lib dependency | One packaging shape |
 | [`chart-local-subchart/`](chart-local-subchart/) | Chart.yaml + local subchart | Other packaging shape |
 | [`oci-common-app/`](oci-common-app/) | Chart.yaml + OCI `common` library | Library tarball is not in git |
-| [`werf-monorepo-sample/`](werf-monorepo-sample/) | Shared werf values + one cache-proxy unit | Not forty donor/slot charts |
+| [`werf-monorepo-sample/`](werf-monorepo-sample/) | Shared werf values + one cache-proxy unit + consumer CI include | Not forty donor/slot charts. The `.gitlab-ci.yml.example` includes the factory in [`../../ci/pipelines/werf-other/monorepo-unit/`](../../ci/pipelines/werf-other/monorepo-unit/) |
 
 The nine estate mechanics sit under [`treasury-ved-pattern/`](treasury-ved-pattern/) (auth, operator UI, three CryptoPro variants, gRPC, websocket truststore, static site, monolith overlay). The integration ExternalSecret is the extra SAMPLE next to them. Shared libraries are `_libs/base-chart` and `_libs/front-base` once.
 

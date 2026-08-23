@@ -1,14 +1,15 @@
-# Utility-скрипты (ansible-репозиторий)
+# Utility scripts (ansible repository)
 
-Вспомогательные скрипты для инженеров estate на серверах и в CI, связанные с ansible/playbooks.
+Helper scripts for estate engineers on servers and in CI, tied to ansible/playbooks.
 
-## Структура
+## Layout
 
 ```
 utility/
-├── README.md           # этот файл
+├── README.md           # this file
 ├── db/                 # PostgreSQL / RDS
 ├── api/                # Treasury / treasury API
-├── kube/               # kubectl, логи, переключение кластеров
+├── kube/               # kubectl, logs, cluster switch
 └── etc/                # SSH config paths
 ```
+

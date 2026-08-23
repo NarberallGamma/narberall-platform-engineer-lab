@@ -1,6 +1,6 @@
-// конфигурация настроек из раздела settings в статике
+// static configuration of settings from the settings section
 {
-    // Конфигурация настроек аутентификации
+    // Authentication settings
     "AuthenticationConfiguration": {
         "RevokeSessionsOnCredentialChange": false,
         "RequireAuthenticatedUserForSignOutMessage": true,
@@ -18,7 +18,7 @@
         "SssoSessionDuration": 60
     },
     "Services": {
-        //Конфигурация сервиса аутентификации
+        // Authentication service configuration
         "VerificationCodes": {
             "ChannelService": "email",
             "AllowFallbackIfServiceUnavailable": true,
@@ -26,7 +26,7 @@
             "MaxInvalidCodeAttempts": 2,
             "CodeLength": 8
         },
-        //Конфигурация сервиса сброса паролей
+        // Password-reset service configuration
         "PasswordReset": {
             "Enabled": true,
             "ForceReset": true,
@@ -34,7 +34,7 @@
             "MessageTemplate": "Dear {UserName}, thank you for your registration. Your password is: {Password}!"
         }
     },
-    //Конфигурация кабинета самообслуживания
+    // Self-service portal configuration
     "SelfServiceSettings": {
         "Enabled": true,
         "ApplicationName": "Access Manager",
@@ -76,7 +76,7 @@
         "AllowRefreshSession": true,
         "SessionLifeTime": 180
     },
-// Конфигурация парольной политики
+// Password policy configuration
     "PasswordPolicy": {
         "Enabled": true,
         "AllowBlacklistedPasswords": true,

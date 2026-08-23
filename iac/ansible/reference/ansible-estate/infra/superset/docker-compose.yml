@@ -1,9 +1,9 @@
-# PostgreSQL и Redis в этом же compose; наружу только 127.0.0.1:8088 (прокси — отдельный nginx).
-# Первый запуск: см. README (db+redis → superset-init → остальные сервисы).
+# PostgreSQL and Redis in this same compose; only 127.0.0.1:8088 is exposed (proxy is a separate nginx).
+# First start: see README (db+redis → superset-init → remaining services).
 #
-# Ориентир по командам и сервисам: apache/superset — docker-compose-non-dev.yml
+# Command and service naming follows apache/superset docker-compose-non-dev.yml
 # https://github.com/apache/superset/blob/master/docker-compose-non-dev.yml
-# (образ с Docker Hub вместо build; профиль init у superset-init — чтобы повторный up не гонял docker-init.sh).
+# (Docker Hub image instead of build; init profile on superset-init so a repeat up does not re-run docker-init.sh).
 
 x-superset-env: &superset-env
   env_file: .env

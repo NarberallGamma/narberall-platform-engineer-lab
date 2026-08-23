@@ -1,19 +1,19 @@
 #!/bin/bash
 # change_databases_owner.sh
-# Скрипт для смены владельца (owner) баз данных на целевом сервере
-# Использует peer authentication (подключение как postgres пользователь на localhost)
+# Script to change the owner of databases on the target server
+# Uses peer authentication (connect as the postgres user on localhost)
 # Usage: ./change_databases_owner.sh [dblist_file.txt]
-#   Если указан файл со списком БД - будет менять owner только у указанных БД
+#   When a list file is passed, only listed databases change owner
 
 # ============================================
-# НАСТРОЙКИ
+# SETTINGS
 # ============================================
-NEW_OWNER="svc_postgres_1c"  # Новый владелец для БД
-NEW_OWNER_PASSWORD=""         # Пароль для нового пользователя (если нужно создать)
-# Если NEW_OWNER_PASSWORD пуст - пароль будет запрошен интерактивно при создании пользователя
+NEW_OWNER="svc_postgres_1c"  # new database owner
+NEW_OWNER_PASSWORD=""         # password for a new role (if it must be created)
+# When NEW_OWNER_PASSWORD is empty, the password is prompted interactively when creating the role
 
-# Опционально: автоматически создавать пользователя если его нет
-AUTO_CREATE_USER=false        # true - создавать автоматически, false - спрашивать
+# Optional: create the role automatically when missing
+AUTO_CREATE_USER=false        # true - create automatically, false - ask
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -23,7 +23,7 @@ NC='\033[0m'
 DB_LIST_FILE="$1"
 
 # ============================================
-# ФУНКЦИИ
+# FUNCTIONS
 # ============================================
 
 check_user_exists() {
@@ -44,13 +44,13 @@ create_user() {
     local password=$2
     
     if [ -n "$password" ]; then
-        # Используем экранирование пароля для безопасности
+        # Escape the password for safety
         psql -d postgres -c \
             "CREATE USER \"$username\" WITH PASSWORD '$password'" >/dev/null 2>&1
         return $?
     else
-        # Интерактивный ввод пароля - используем read для безопасного ввода
-        return 1  # Не должно вызываться без пароля
+        # Interactive password prompt - use read for safe input
+        return 1  # must not be called without a password
     fi
 }
 
@@ -63,7 +63,7 @@ change_db_owner() {
 }
 
 # ============================================
-# ПРОВЕРКА ПОДКЛЮЧЕНИЯ
+# CONNECTION CHECK
 # ============================================
 
 echo "=== Change Databases Owner Tool ==="
@@ -73,7 +73,7 @@ if [ -n "$DB_LIST_FILE" ]; then
 fi
 echo ""
 
-# Проверка подключения к PostgreSQL
+# Check PostgreSQL connection
 if ! psql -d postgres -c "SELECT 1" >/dev/null 2>&1; then
     echo -e "${RED}Error: Cannot connect to PostgreSQL!${NC}"
     echo "Make sure you are running as postgres user with peer authentication enabled."
@@ -81,7 +81,7 @@ if ! psql -d postgres -c "SELECT 1" >/dev/null 2>&1; then
 fi
 
 # ============================================
-# ПРОВЕРКА И СОЗДАНИЕ ПОЛЬЗОВАТЕЛЯ
+# CHECK AND CREATE ROLE
 # ============================================
 
 if ! check_user_exists "$NEW_OWNER"; then
@@ -97,7 +97,7 @@ if ! check_user_exists "$NEW_OWNER"; then
         echo "Creating user '$NEW_OWNER'..."
         
         if [ -z "$NEW_OWNER_PASSWORD" ]; then
-            # Интерактивный ввод пароля
+            # Interactive password prompt
             read -sp "Enter password for user '$NEW_OWNER': " password_input
             echo ""
             read -sp "Confirm password: " password_confirm
@@ -131,7 +131,7 @@ else
 fi
 
 # ============================================
-# ПОЛУЧЕНИЕ СПИСКА БАЗ ДАННЫХ
+# GET DATABASE LIST
 # ============================================
 
 echo ""
@@ -145,7 +145,7 @@ if [ -n "$DB_LIST_FILE" ]; then
     
     echo "Reading database list from file: $DB_LIST_FILE"
     
-    # Получить все доступные БД
+    # Get all available databases
     psql -d postgres -tAc \
       "SELECT datname
        FROM pg_database
@@ -157,16 +157,16 @@ if [ -n "$DB_LIST_FILE" ]; then
     not_found_count=0
     > /tmp/missing_dbs.txt
     
-    # Проверить каждую БД из списка
+    # Check each database from the list
     while IFS= read -r requested_db || [ -n "$requested_db" ]; do
-        # Пропускаем пустые строки и комментарии, очищаем от пробелов и невидимых символов
+        # Skip empty lines and comments; strip spaces and invisible characters
         requested_db=$(echo "$requested_db" | sed 's/#.*$//' | tr -d '\r\n' | xargs)
         if [ -z "$requested_db" ]; then continue; fi
         
-        # Экранируем одинарные кавычки в имени БД для SQL (удваиваем их)
+        # Escape single quotes in the database name for SQL (double them)
         escaped_db=$(printf '%s' "$requested_db" | sed "s/'/''/g")
         
-        # Проверить существование БД через SQL запрос
+        # Check that the database exists via SQL
         db_exists=$(psql -d postgres -tAc \
             "SELECT 1 FROM pg_database WHERE datname = '$escaped_db'" 2>/dev/null | tr -d '[:space:]')
         
@@ -201,7 +201,7 @@ if [ -n "$DB_LIST_FILE" ]; then
     
     rm -f /tmp/all_available_dbs.txt /tmp/missing_dbs.txt
 else
-    # Получить все БД (кроме системных)
+    # Get all databases (except system ones)
     psql -d postgres -tAc \
       "SELECT datname
        FROM pg_database
@@ -220,7 +220,7 @@ if [ "$db_count" -eq 0 ]; then
 fi
 
 # ============================================
-# ПРЕДВАРИТЕЛЬНЫЙ ПРОСМОТР
+# PREVIEW
 # ============================================
 
 echo ""
@@ -263,7 +263,7 @@ if [ $need_change -eq 0 ]; then
 fi
 
 # ============================================
-# ПОДТВЕРЖДЕНИЕ
+# CONFIRMATION
 # ============================================
 
 read -p "Change owner for $need_change database(s)? (yes/no): " confirm
@@ -274,7 +274,7 @@ if [ "$confirm" != "yes" ]; then
 fi
 
 # ============================================
-# СМЕНА OWNER
+# CHANGE OWNER
 # ============================================
 
 echo ""
@@ -299,7 +299,7 @@ while IFS='|' read -r dbname current_owner; do
 done < databases_need_change.txt
 
 # ============================================
-# РЕЗУЛЬТАТЫ
+# RESULTS
 # ============================================
 
 echo ""

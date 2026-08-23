@@ -15,7 +15,7 @@ Yarp:
         ReverseAccessMode.TrustedSecrets.0: d1d8a244ed10a4068d5b01698d7e55e52dab8f5b
         Tracing.Enable: true
   Routes:
-  # Роут для проверки доступности нод класстера
+  # Route to check cluster node availability
     ra-health:
       ClusterId: ra-health
       Match:

@@ -25,7 +25,7 @@
       changed_when: false
       register: am_cert_fingerprint
 
-    # Формирования спика для 
+    # Build the list of 
     - name: "List directories in {{ am_realms_folder }}" 
       find:
         paths: "{{ am_realms_folder }}"

@@ -1,49 +1,49 @@
-# Telegram VPS egress на GitLab (local Envoy)
+# Telegram VPS egress on GitLab (local Envoy)
 
-Local Envoy в Docker-сети `telegram-vps-egress`: TCP proxy с failover VPS-01 -> VPS-02.  
-Контейнеры docker_app подключаются к сети и резолвят `api.telegram.org` в IP proxy (без bind :443 на хосте, nginx GitLab не затрагивается).
+Local Envoy in Docker network `telegram-vps-egress`: TCP proxy with failover VPS-01 -> VPS-02.  
+docker_app containers join the network and resolve `api.telegram.org` to the proxy IP (no bind :443 on the host; GitLab nginx is not touched).
 
-## Изоляция плейбуков
+## Playbook isolation
 
-| Слой | Плейбук | group_vars | Переменные |
+| Layer | Playbook | group_vars | Variables |
 |------|---------|------------|------------|
-| **Egress proxy** | `telegram_vps_egress.yml` | `telegram_vps_egress.yml` | `telegram_vps_egress_*` (сеть, Envoy, VPS backends) |
-| **Docker apps (клиент)** | `docker_app_*.yml` | `group_vars/<service>.yml` | `docker_app.telegram_egress.*` |
+| **Egress proxy** | `telegram_vps_egress.yml` | `telegram_vps_egress.yml` | `telegram_vps_egress_*` (network, Envoy, VPS backends) |
+| **Docker apps (client)** | `docker_app_*.yml` | `group_vars/<service>.yml` | `docker_app.telegram_egress.*` |
 
-Плейбуки **не** подключают чужие `vars_files`. Egress деплоится отдельно; docker_app только подключает external network и `extra_hosts` по своим vars.
+Playbooks do **not** include other `vars_files`. Egress is deployed separately; docker_app only attaches the external network and `extra_hosts` from its own vars.
 
-Согласование вручную: `network_name` и IP в `extra_hosts` должны совпадать с тем, что создаёт egress (`telegram-vps-egress`, `172.30.100.2` по умолчанию).
+Manual alignment: `network_name` and the IP in `extra_hosts` must match what egress creates (`telegram-vps-egress`, `172.30.100.2` by default).
 
-## Компоненты egress
+## Egress components
 
-| Компонент | Путь / имя |
+| Component | Path / name |
 |-----------|------------|
-| Роль | `roles/telegram_vps_egress/` |
-| Плейбук | `playbooks/telegram_vps_egress.yml` |
+| Role | `roles/telegram_vps_egress/` |
+| Playbook | `playbooks/telegram_vps_egress.yml` |
 | Inventory group | `[telegram_vps_egress]` |
 | group_vars | `group_vars/telegram_vps_egress.yml` |
-| Proxy на хосте | `/docker/apps/telegram-vps-egress/` |
+| Proxy on the host | `/docker/apps/telegram-vps-egress/` |
 | Docker network | `telegram-vps-egress` (`telegram_vps_egress_subnet`) |
 | Proxy IP | `telegram_vps_egress_proxy_ip` |
 
-## Порядок деплоя
+## Deploy order
 
 ```bash
 cd /ansible && source .env.vault
 
-# 1. Proxy (один раз или после смены VPS backends)
+# 1. Proxy (once, or after VPS backend changes)
 ./scripts/run/run_telegram_vps_egress.sh --preprod --limit estate-preprod-gitlab
 
-# 2. Пересобрать compose приложений (подключат network + extra_hosts)
+# 2. Rebuild application compose (attach network + extra_hosts)
 ./scripts/run/run_docker_app.sh deploy cert-monitoring --preprod --limit estate-preprod-gitlab
 ./scripts/run/run_docker_app.sh deploy cert-orchestrator --preprod --limit estate-preprod-gitlab
 ```
 
 Prod: `--prod --limit estate-prod-gitlab` (cert-monitoring, cloud-hibernate-operator).
 
-## Клиентские vars (docker_app)
+## Client vars (docker_app)
 
-В `group_vars/<service>.yml` внутри `docker_app` (без ссылок на `telegram_vps_egress_*`):
+In `group_vars/<service>.yml` inside `docker_app` (no references to `telegram_vps_egress_*`):
 
 ```yaml
 docker_app:
@@ -55,9 +55,9 @@ docker_app:
         ip: 172.30.100.2
 ```
 
-При смене subnet/proxy IP в egress: обновить `extra_hosts` в каждом сервисе отдельно.
+When changing subnet/proxy IP in egress: update `extra_hosts` in each service separately.
 
-## Схема
+## Diagram
 
 ```text
 docker app (cert-monitoring / orchestrator / hibernate)
@@ -74,7 +74,7 @@ docker app (cert-monitoring / orchestrator / hibernate)
  Telegram API
 ```
 
-## Проверка
+## Check
 
 ```bash
 docker ps --filter name=telegram-vps-egress
@@ -86,10 +86,10 @@ docker exec cert-monitoring curl -sv --max-time 15 \
   https://api.telegram.org/bot<TOKEN>/getMe 2>&1 | tail -15
 ```
 
-## Откат
+## Rollback
 
-1. В service group_vars: `telegram_egress.enabled: false`, при необходимости legacy `docker_app_telegram_vps_enabled: true`.
+1. In service group_vars: `telegram_egress.enabled: false`, and if needed legacy `docker_app_telegram_vps_enabled: true`.
 2. Redeploy docker_app.
-3. Остановить proxy: `docker compose -f /docker/apps/telegram-vps-egress/docker-compose.yml down`
+3. Stop the proxy: `docker compose -f /docker/apps/telegram-vps-egress/docker-compose.yml down`
 
-См. также: `roles/telegram_vps_egress/README.md`, `DOCKER_APPS.md`
+See also: `roles/telegram_vps_egress/README.md`, `DOCKER_APPS.md`

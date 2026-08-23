@@ -1,19 +1,19 @@
-{{/* Компактные телеграм-сообщения sec-stack (parse_mode HTML).
-     Лимит telegram 4096 символов -> показываем максимум 8 алертов из группы. */}}
+{{/* Compact sec-stack Telegram messages (parse_mode HTML).
+     Telegram 4096-character limit -> show at most 8 alerts from the group. */}}
 {{ define "sec-stack.telegram" }}
 {{- if .Alerts.Firing }}
-{{- if eq .CommonLabels.severity "critical" }}🔴{{ else }}🟠{{ end }} <b>{{ .CommonLabels.alertname }}</b> — горит: {{ len .Alerts.Firing }}
+{{- if eq .CommonLabels.severity "critical" }}🔴{{ else }}🟠{{ end }} <b>{{ .CommonLabels.alertname }}</b> — firing: {{ len .Alerts.Firing }}
 {{- range $i, $a := .Alerts.Firing }}
 {{- if lt $i 8 }}
 ▪️ {{ $a.Annotations.summary }}{{ if $a.GeneratorURL }} <a href="{{ $a.GeneratorURL }}">📈</a>{{ end }}
 {{- end }}
 {{- end }}
 {{- if gt (len .Alerts.Firing) 8 }}
-<i>…показаны 8 из {{ len .Alerts.Firing }}, полный список — <a href="http://10.10.1.10:3000/d/sec-stack-overview">на дашборде</a></i>
+<i>…showing 8 of {{ len .Alerts.Firing }}, full list — <a href="http://10.10.1.10:3000/d/sec-stack-overview">on the dashboard</a></i>
 {{- end }}
 {{- end }}
 {{- if .Alerts.Resolved }}
-✅ <b>{{ .CommonLabels.alertname }}</b> — погасло: {{ len .Alerts.Resolved }}
+✅ <b>{{ .CommonLabels.alertname }}</b> — resolved: {{ len .Alerts.Resolved }}
 {{- range $i, $a := .Alerts.Resolved }}
 {{- if lt $i 8 }}
 ▪️ {{ $a.Annotations.summary }}

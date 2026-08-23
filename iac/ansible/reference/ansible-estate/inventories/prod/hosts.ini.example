@@ -45,14 +45,14 @@ estate-prod-teleport-k8s-01 ansible_host=10.10.16.10
 [gitlab]
 estate-prod-gitlab ansible_host=10.10.16.62
 
-# Docker compose apps (/docker/apps) — любая VM может быть в группе
+# Docker compose apps (/docker/apps) — any VM may be in the group
 [cert_monitoring]
 estate-prod-gitlab
 
 [cert_orchestrator]
 # estate-prod-gitlab
 
-# Целевые хосты для SSL deploy (playbook setup_cert_orchestrator_ssh_user.yml)
+# Target hosts for SSL deploy (playbook setup_cert_orchestrator_ssh_user.yml)
 [cert_orchestrator_ssh_targets]
 estate-prod-gitlab
 
@@ -70,7 +70,7 @@ estate-vps-cluster-01 ansible_host=203.0.113.11
 estate-vps-cluster-02 ansible_host=203.0.113.12
 # OUTDATED: estate-vps-cluster-03 ansible_host=203.0.113.13
 
-# Серверы для мониторинга
+# Servers for monitoring
 [monitoring_servers]
 estate-prod-vault-1 ansible_host=10.10.16.11
 estate-prod-vault-2 ansible_host=10.10.16.159

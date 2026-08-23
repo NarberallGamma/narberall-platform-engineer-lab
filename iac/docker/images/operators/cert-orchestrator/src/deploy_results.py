@@ -1,4 +1,4 @@
-"""Результат раскладки cert на один target (K8s namespace, nginx host, …)."""
+"""Result of deploying a cert to one target (K8s namespace, nginx host, …)."""
 
 from __future__ import annotations
 

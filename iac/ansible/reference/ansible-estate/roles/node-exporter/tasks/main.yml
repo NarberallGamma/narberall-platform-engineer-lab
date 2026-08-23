@@ -1,5 +1,5 @@
 ---
-# Node Exporter: Docker Compose в /docker/apps/node-exporter
+# Node Exporter: Docker Compose under /docker/apps/node-exporter
 
 - name: Check Docker availability
   ansible.builtin.command: docker --version

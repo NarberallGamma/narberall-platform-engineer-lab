@@ -1,5 +1,5 @@
 ---
-# Vault Docker Role - развертывание Vault нод в Docker контейнерах
+# Vault Docker Role - deploy Vault nodes in Docker containers
 
 - name: Install Docker
   apt:

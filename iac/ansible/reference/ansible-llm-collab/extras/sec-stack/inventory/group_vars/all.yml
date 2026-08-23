@@ -1,4 +1,4 @@
-ansible_user: ubuntu          # TODO: пользователь на ВМ
+ansible_user: ubuntu          # TODO: user on the VM
 ansible_become: true
 
 # Internal DNS (zone example.com); role dns.

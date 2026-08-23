@@ -1,8 +1,8 @@
-//лдап каталог + виндовые модули
+// LDAP directory + Windows modules
 {
-    //Конфигурация плагинов
+    // Plugin configuration
     "Plugins": {
-        //Модули аутентификации
+        // Authentication modules
         "IAuthenticationModule": 
 		[
             //WindowsLoginModule
@@ -32,7 +32,7 @@
 			}
 			
         ],
-        // Хранилища пользователей
+        // User stores
         "IIdentityStore": [
 			//LDAP CATALOG
 			{
@@ -62,7 +62,7 @@
             }
         ],
     },
-    //Конфигурация потоков аутентификации
+    // Authentication flow configuration
     "AuthFlows": 
 	{
         "Default": 

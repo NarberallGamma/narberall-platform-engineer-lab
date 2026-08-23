@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Вызывается модулем ansible.builtin.script. Переменные среды: GF_CONTAINER, GF_FOLDER_ID,
-# GF_GROUP, GF_PATH, GF_OP (allow|deny), GF_PERMS, GF_PATH_ALT (альтернативный полный путь или пусто),
+# Invoked by ansible.builtin.script. Environment: GF_CONTAINER, GF_FOLDER_ID,
+# GF_GROUP, GF_PATH, GF_OP (allow|deny), GF_PERMS, GF_PATH_ALT (alternate full path or empty),
 # GF_IGNORE_PATH_NOT_FOUND (0|1).
 set -u
 

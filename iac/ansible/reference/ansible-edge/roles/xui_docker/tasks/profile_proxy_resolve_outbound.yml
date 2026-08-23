@@ -1,5 +1,5 @@
 ---
-# Legacy-переменные xui_outbound_* для xray-profile.yaml.j2 (список xui_outbounds[])
+# Legacy xui_outbound_* variables for xray-profile.yaml.j2 (xui_outbounds[] list)
 
 - name: Load proxy-outbounds.json when primary outbound fact is missing
   ansible.builtin.slurp:
@@ -110,6 +110,6 @@
       - xui_outbound_address | default('') | length > 0
       - xui_outbound_public_key | default('') | length > 0
     fail_msg: >-
-      Нет данных outbound для профиля proxy. Выполнить --tags xray,autoconfigure
-      (создаёт proxy-outbounds.json / proxy-to-main.json) или задать legacy xui_outbound_*.
+      No outbound data for the proxy profile. Run --tags xray,autoconfigure
+      (creates proxy-outbounds.json / proxy-to-main.json) or set legacy xui_outbound_*.
   when: xui_profile == 'proxy'

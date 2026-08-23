@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 
-# Принцип работы:
-#   - определение роли postgresql-инстанса через api patroni (wal-ы бэкапятся только с мастера)
-#   - резервное копирование архивов WAL-файлов с помощью restic_backup_files.sh
-#   - удаление старых архивов WAL-файлов с помощью find
+# How it works:
+#   - detect the PostgreSQL instance role via the Patroni API (WALs are backed up from the master only)
+#   - back up WAL archives with restic_backup_files.sh
+#   - delete old WAL archives with find
 
-# Примеры использования в schedule:
+# Schedule examples:
 # restic_run_on.sh 10.0.0.1 <restic_bucket_from_values> restic_backup_wals_patroni.sh '/var/backups/pgsql/wal'
 # restic_run_on.sh 10.0.0.1 <restic_bucket_from_values> restic_backup_wals_patroni.sh '/var/backups/pgsql/wal 60'
 # restic_run_on.sh 10.0.0.1 <restic_bucket_from_values> restic_backup_wals_patroni.sh '/var/backups/pgsql/wal 60 --prune "--keep-hourly 3 --keep-within=30d"'
 
-# Попытки указать в качестве каталога с архивами WAL-файлов каталоги уровня
-# меньше чем 3 т.е. '/', '/etc', '/var' и т.п., а также каталоги перечисленные
-# в ${PROTECTED_DIRS} приведут к аварийному завершению скрипта и отсутствию бэкапов
+# Using a WAL-archive directory whose depth is
+# shallower than 3, i.e. '/', '/etc', '/var' and similar, and directories listed
+# in ${PROTECTED_DIRS} abort the script and produce no backups
 
 ################################################################################
 
@@ -40,10 +40,10 @@ function alert {
   backup_notify --trigger backup --label backup_target="${BACKUP_TARGET}" --label backup_type="${BACKUP_TYPE}" --summary "${MESSAGE}" "${FULL_MESSAGE}"
 }
 
-# Корректно сравнивает пути VFS
-# uncertain - неопределенное состояние, один из аргументов не VFS-путь
-# equal     - пути равны
-# not_equal - пути не равны
+# Compare VFS paths correctly
+# uncertain - indeterminate: one argument is not a VFS path
+# equal     - paths are equal
+# not_equal - paths are not equal
 # ${1} - one path
 # ${2} - two path
 compare_vfs_paths()
@@ -93,10 +93,10 @@ compare_vfs_paths()
   return 0
 }
 
-# Определяет уровень (глубину) переданного пути относительно корня VFS
-# 0 - не VFS путь
+# Return the depth of the given path relative to the VFS root
+# 0 - not a VFS path
 # 1 - '/'
-# 2 - '/etc', '/root', '/var' и т.п.
+# 2 - '/etc', '/root', '/var' and similar
 # ${1} - path
 get_vfs_path_level()
 {
@@ -123,7 +123,7 @@ get_vfs_path_level()
   return 0
 }
 
-#Проверяет входную строку на соответствие положительному числовому формату
+# Check that the input string is a positive number
 #${1} - string
 check_to_positive_number_format()
 {
@@ -144,7 +144,7 @@ check_to_positive_number_format()
 
 CUSTOMPRUNE=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options k: --longoptions ,prune: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

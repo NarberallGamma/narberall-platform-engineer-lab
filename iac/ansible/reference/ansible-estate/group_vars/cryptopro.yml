@@ -1,9 +1,9 @@
 # cryptopro — docker app (prod VM cryptopro-01).
 # Escrow signing via CryptoPro CSP; certificate imported via Swagger after deploy (not from the playbook).
-# TLS на edge-lb (vhost cryptopro.example.com, не web.example.com WAF).
-# Плейбук: playbooks/docker_app_cryptopro.yml | inventory: [cryptopro_vm]
+# TLS on edge-lb (vhost cryptopro.example.com, not web.example.com WAF).
+# Playbook: playbooks/docker_app_cryptopro.yml | inventory: [cryptopro_vm]
 #
-# Секреты: Vault mount secret, path cryptopro-service-app.
+# Secrets: Vault mount secret, path cryptopro-service-app.
 
 docker_app_vault_mount_point: secret
 docker_app_vault_path: cryptopro-service-app
@@ -33,6 +33,6 @@ cryptopro_db_host: "10.10.16.30"
 cryptopro_db_name: cryptopro_service
 cryptopro_db_sslmode: require
 
-# Публичный URL (edge-lb vhost TBD)
+# Public URL (edge-lb vhost TBD)
 cryptopro_public_domain: cryptopro.example.com
 cryptopro_public_path_prefix: /api/v0/cryptopro-service/

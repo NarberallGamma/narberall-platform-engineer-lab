@@ -1,24 +1,24 @@
 ---
 sec_stack_dir: /opt/sec-stack
-sec_stack_grafana_admin_password: changeme # переопределяется из SOPS-секретов
-sec_stack_panos_api_keys: {} # переопределяется из SOPS-секретов, см. group_vars/sec_stack/
+sec_stack_grafana_admin_password: changeme # overridden from SOPS secrets
+sec_stack_panos_api_keys: {} # overridden from SOPS secrets, see group_vars/sec_stack/
 
-# Telegram-бот sec-stack (@sec_stack_bot). Токен — из SOPS; chat_id — числа
-# (получить: написать в чат с ботом, затем /getUpdates). 0 = приёмник выключен.
-sec_stack_telegram_bot_token: "" # переопределяется из SOPS-секретов
-sec_stack_telegram_chat_id_default: 0 # обычный чат (warning и ниже)
-sec_stack_telegram_chat_id_critical: 0 # чат "вахтёр ругается"
-sec_stack_heartbeat_url: "" # healthchecks.io ping URL для DeadManSwitch
+# sec-stack Telegram bot (@sec_stack_bot). Token comes from SOPS; chat_id is numeric
+# (obtain by messaging the bot, then /getUpdates). 0 = receiver disabled.
+sec_stack_telegram_bot_token: "" # overridden from SOPS secrets
+sec_stack_telegram_chat_id_default: 0 # regular chat (warning and below)
+sec_stack_telegram_chat_id_critical: 0 # "watchman yelling" chat
+sec_stack_heartbeat_url: "" # healthchecks.io ping URL for DeadManSwitch
 
-# Registry GitLab: откуда тянется образ edr-exporter (собирается CI проекта
-# cybersec/edr-coverage). Нужен deploy-токен со scope read_registry — из SOPS.
-# Пустой токен = логин пропускается (образ уже локально или registry публичный).
+# GitLab registry that provides the edr-exporter image (built by CI of
+# cybersec/edr-coverage). Needs a deploy token with read_registry — from SOPS.
+# Empty token = login is skipped (image already local or registry is public).
 sec_stack_registry_host: git.example.com
-sec_stack_registry_user: "" # переопределяется из SOPS-секретов
-sec_stack_registry_token: "" # переопределяется из SOPS-секретов
+sec_stack_registry_user: "" # overridden from SOPS secrets
+sec_stack_registry_token: "" # overridden from SOPS secrets
 
-# Конфиги сборщиков edr-exporter: имя файла в /config -> содержимое. Задаётся
-# из SOPS (secrets.sops.yml). Пусто = сбор не идёт (нет кредов), экспортер
-# считает по готовым CSV. Ожидаемые ключи: ad_config.yaml, vkcloud_config.yaml,
+# edr-exporter collector configs: filename in /config -> contents. Set
+# from SOPS (secrets.sops.yml). Empty = no collection (no creds); the exporter
+# scores from existing CSV. Expected keys: ad_config.yaml, vkcloud_config.yaml,
 # sbc-adv_config.yaml, edr_config.json.
 sec_stack_edr_configs: {}

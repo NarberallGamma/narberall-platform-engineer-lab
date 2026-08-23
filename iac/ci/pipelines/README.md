@@ -20,7 +20,7 @@ Catalog YAML is `*.yml.example` / `*.yaml.example` / `Jenkinsfile.example`. Scri
 | [`shop-test-allure/`](shop-test-allure/) | GitLab CI | Gradle + Chrome UI and Newman API, then Allure upload |
 | [`werf-retail/`](werf-retail/) | GitLab CI + werf | Multi-stage, Trivy / Grype / SAST, Sonar, cleanup, review, ReleaseCI, one BI env |
 | [`werf-delivery/`](werf-delivery/) | GitLab CI + werf | Review start/stop, canary overlay, Slack notify, PHP gates, `werf cleanup` |
-| [`werf-other/`](werf-other/) | GitLab CI + werf | Shared hub plus monorepo unit, PHP review quota, `werf run` builder, OpenTofu |
+| [`werf-other/`](werf-other/) | GitLab CI + werf | Shared hub plus monorepo unit, PHP review quota, `werf run` builder, OpenTofu. App-side consumer: [`../../helm/apps/werf-monorepo-sample/.gitlab-ci.yml.example`](../../helm/apps/werf-monorepo-sample/.gitlab-ci.yml.example) |
 | [`jenkins/`](jenkins/) | Jenkins + GitLab CI | `Jenkinsfile.example` (build → push → AWX). Borg backup-monitor. Include stub of missing `infra/common-ci` |
 | [`github-actions/`](github-actions/) | GitHub Actions | werf publish, Helm chart-testing / KinD, Go release matrix |
 | [`helmfile-dev/`](helmfile-dev/) | GitLab CI | Two DEV pipelines: `docker build` then `helmfile apply` (llm + feed) |

@@ -4,7 +4,7 @@
 
 I used these as **separate GitLab project roots**, not one mega include. The hub at this folder root is werf 2 plus semantic-release. The four subfolders are mini-roots: copy that folder as the project root, or include the `.example` paths as-is in a lab project. Not Trivy. Not SonarQube. Those gates live in the sibling retail kit ([`../werf-retail/`](../werf-retail/)). Review start/stop and canary live in [`../werf-delivery/`](../werf-delivery/).
 
-Brand names, live GitLab hosts, and runner tags that named a dedicated werf pool are stripped. Job bodies stay intact. Charts and `werf.yaml` stay with the app (lab samples: [`../../../helm/apps/werf-monorepo-sample/`](../../../helm/apps/werf-monorepo-sample/), [`../../../helm/apps/werf-raw/webapps/`](../../../helm/apps/werf-raw/webapps/)). Sanitize: [`../../SANITIZE.md`](../../SANITIZE.md).
+Brand names, live GitLab hosts, and runner tags that named a dedicated werf pool are stripped. Job bodies stay intact. Charts and `werf.yaml` stay with the app (lab samples: [`../../../helm/apps/werf-monorepo-sample/`](../../../helm/apps/werf-monorepo-sample/), [`../../../helm/apps/werf-raw/webapps/`](../../../helm/apps/werf-raw/webapps/)). The monorepo sample has the **consumer** next to the charts: [`../../../helm/apps/werf-monorepo-sample/.gitlab-ci.yml.example`](../../../helm/apps/werf-monorepo-sample/.gitlab-ci.yml.example) (`include: project` + `spec:inputs` into this factory). Sanitize: [`../../SANITIZE.md`](../../SANITIZE.md).
 
 ```text
 werf-other/                          # hub mini-root (werf 2 ea)

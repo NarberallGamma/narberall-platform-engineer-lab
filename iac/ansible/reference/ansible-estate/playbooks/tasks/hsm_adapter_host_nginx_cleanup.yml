@@ -1,9 +1,9 @@
 ---
-# Полная очистка legacy host apt nginx на hsm-adapter (TLS на edge-lb).
-# Переменные: group_vars/hsm-adapter.yml (hsm_adapter_purge_host_nginx, hsm_adapter_nginx_*).
+# Full cleanup of legacy host apt nginx on hsm-adapter (TLS on edge-lb).
+# Variables: group_vars/hsm-adapter.yml (hsm_adapter_purge_host_nginx, hsm_adapter_nginx_*).
 # Include: migrate_hsm_adapter_legacy.yml
 
-- name: Бэкап /etc/nginx в tar.gz перед удалением
+- name: Back up /etc/nginx to tar.gz before removal
   ansible.builtin.shell: |
     set -euo pipefail
     src="/etc/nginx"
@@ -24,7 +24,7 @@
   when: hsm_adapter_purge_host_nginx | default(true) | bool
   tags: [migrate, cleanup]
 
-- name: Отключить sites-enabled (host nginx)
+- name: Remove sites-enabled (host nginx)
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
@@ -32,7 +32,7 @@
   when: hsm_adapter_purge_host_nginx | default(true) | bool
   tags: [migrate, cleanup]
 
-- name: Удалить sites-available (host nginx)
+- name: Remove sites-available (host nginx)
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
@@ -40,7 +40,7 @@
   when: hsm_adapter_purge_host_nginx | default(true) | bool
   tags: [migrate, cleanup]
 
-- name: Остановить и отключить host nginx
+- name: Stop and disable host nginx
   ansible.builtin.systemd:
     name: nginx
     state: stopped
@@ -49,7 +49,7 @@
   when: hsm_adapter_purge_host_nginx | default(true) | bool
   tags: [migrate, cleanup]
 
-- name: Удалить apt-пакеты nginx
+- name: Remove nginx apt packages
   ansible.builtin.apt:
     name: "{{ item }}"
     state: absent
@@ -58,7 +58,7 @@
   when: hsm_adapter_purge_host_nginx | default(true) | bool
   tags: [migrate, cleanup]
 
-- name: autoremove после purge nginx
+- name: autoremove after nginx purge
   ansible.builtin.apt:
     autoremove: true
     purge: true
@@ -66,7 +66,7 @@
   failed_when: false
   tags: [migrate, cleanup]
 
-- name: dpkg purge nginx (fallback при ошибке apt sources)
+- name: dpkg purge nginx (fallback when apt sources fail)
   ansible.builtin.command:
     argv:
       - dpkg
@@ -79,7 +79,7 @@
   when: hsm_adapter_purge_host_nginx | default(true) | bool
   tags: [migrate, cleanup]
 
-- name: Удалить каталоги и артефакты host nginx
+- name: Remove host nginx directories and leftover files
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
@@ -87,7 +87,7 @@
   when: hsm_adapter_purge_host_nginx | default(true) | bool
   tags: [migrate, cleanup]
 
-- name: Assert nginx apt-пакеты удалены
+- name: Assert nginx apt packages are removed
   ansible.builtin.shell: |
     set -euo pipefail
     if dpkg -l 'nginx*' 2>/dev/null | grep -E '^ii'; then
@@ -99,17 +99,17 @@
   when: hsm_adapter_purge_host_nginx | default(true) | bool
   tags: [migrate, cleanup, verify]
 
-- name: Проверить отсутствие /etc/nginx
+- name: Check that /etc/nginx is gone
   ansible.builtin.stat:
     path: /etc/nginx
   register: hsm_adapter_nginx_etc_stat
   when: hsm_adapter_purge_host_nginx | default(true) | bool
   tags: [migrate, cleanup, verify]
 
-- name: Assert /etc/nginx удалён
+- name: Assert /etc/nginx is removed
   ansible.builtin.assert:
     that:
       - not hsm_adapter_nginx_etc_stat.stat.exists
-    fail_msg: "/etc/nginx всё ещё существует после purge host nginx"
+    fail_msg: "/etc/nginx still exists after host nginx purge"
   when: hsm_adapter_purge_host_nginx | default(true) | bool
   tags: [migrate, cleanup, verify]

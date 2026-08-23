@@ -1,5 +1,5 @@
 ---
-# Один дополнительный path Vault (docker_app_vault_extra_reads), merge в app_vault.
+# One extra Vault path (docker_app_vault_extra_reads), merge into app_vault.
 
 - name: "{{ docker_app.slug }} | Vault extra path {{ vault_extra.path }}"
   ansible.builtin.set_fact:

@@ -29,56 +29,58 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Каталог с исходными CSV и результатами. В контейнере экспортера — /data.
+# Directory with source CSVs and results. In the exporter container this is /data.
 DATA_DIR = Path(os.environ.get("EDR_DATA_DIR", "."))
 EXCLUSIONS_FILE = DATA_DIR / "exclusions.yaml"
-# Соответствия «хост -> имя агента», которые из данных не выводятся: маки
-# регистрируются в EDR под локальным именем, доменного нет ни в одном поле API.
+# Mappings "host -> agent name" that cannot be derived from the data: Macs
+# register in EDR under a local name; the domain name is in no API field.
 ALIASES_FILE = DATA_DIR / "aliases.yaml"
 
 # Column names
 VM_HOSTNAME_COL = "hostname"
-VM_OS_HOSTNAME_COL = "os_hostname"  # hostname внутри ОС (только SberCloud, см. ниже)
+VM_OS_HOSTNAME_COL = "os_hostname"  # in-guest hostname (SberCloud only, see below)
 VM_SOURCEIP_COL = "sourceip"
 VM_ENABLED_COL  = "enabled"    # present in -ad.csv
 VM_DN_COL       = "dn"         # present in -ad.csv
 EDR_NAME_COL    = "name"
 EDR_ONLINE_COL  = "isonline"
-# Имена колонок в *_edr.csv пишет API_TO_CSV в vendor-edr.py. Все в нижнем
-# регистре. Расхождение здесь тихо ломает целый проход матчинга.
+# Column names in *_edr.csv are written by API_TO_CSV in vendor-edr.py. All
+# lowercase. A mismatch here silently breaks a whole matching pass.
 EDR_IP_COL      = "sourceip"   # optional IP column in EDR files
-EDR_LASTSEEN_COL = "lastseenat"  # время последней связи агента (для окна «молчит»)
-EDR_OSNAME_COL  = "osname"     # только для разбора дублей имён, в матчинге не участвует
-EDR_LASTUSER_COL = "lastuser"  # только для подсказок к aliases.yaml
-# Имя, под которым агент виден в панели EDR: обычно FQDN, а у обрезанных имён —
-# единственный способ опознать машину ('192' в панели показан как 192.168.1.11).
+EDR_LASTSEEN_COL = "lastseenat"  # last agent contact time (for the silence window)
+EDR_OSNAME_COL  = "osname"     # only for name-duplicate analysis, not used in matching
+EDR_LASTUSER_COL = "lastuser"  # only for aliases.yaml hints
+# Name under which the agent is shown in the EDR console: usually an FQDN; for
+# truncated names the only way to identify the machine ('192' is shown as 192.168.1.11).
 EDR_DISPLAYNAME_COL = "displayname"
-# Имя, которое агент рапортует о себе сам (inventory.hostname из /agents/{id}).
-# Заполнено только у обогащённых записей — тех, чьё имя в списке не идентифицирует
-# машину; для агента '192' здесь лежит настоящее доменное имя.
+# Name the agent reports about itself (inventory.hostname from /agents/{id}).
+# Filled only on enriched records — those whose list name does not identify
+# a machine; for agent '192' this holds the real domain name.
 EDR_INV_HOSTNAME_COL = "inv_hostname"
 COMPANY_COL     = "company"
 SOURCE_TYPE_COL = "source_type"
 EXCLUDED_COL    = "excluded"
-# чем хост сматчен с агентом: hostname | alias | inv_hostname | os_hostname | ip | ''
+# how the host was matched to an agent: hostname | alias | inv_hostname | os_hostname | ip | ''
 MATCHED_BY_COL  = "matched_by"
-IN_AD_COL       = "in_ad"       # хост есть в AD-выгрузке (доменный)
-# Имя хоста занято машинами разных компаний — по имени такой хост не матчим:
-# агент с этим именем один, а машин несколько, и он достался бы всем сразу
+IN_AD_COL       = "in_ad"       # host is in the AD export (domain-joined)
+# Hostname is used by machines of different companies — do not match such a host
+# by name: there is one agent with that name and several machines, so it would
+# be given to all of them at once
 NAME_SHARED_COL = "name_shared"
-# Тип managed-сервиса из выгрузки облака ('' — обычная ВМ). Агент на такие ноды
-# поставить нельзя, поэтому в пул подсчёта они не входят, но из отчёта и метрик
-# не пропадают — иначе занижение знаменателя было бы незаметным.
+# Managed-service kind from the cloud export ('' — ordinary VM). An agent cannot
+# be installed on those nodes, so they stay out of the counting pool, but they
+# remain in the report and metrics — otherwise a shrinking denominator would
+# go unnoticed.
 MANAGED_COL     = "managed"
 
 TEMP_HOSTNAME_PREFIX = "CL1"   # temporary VMs to skip
 AD_FILE_SUFFIX       = "-ad"   # marks a file as workstation source
-EDR_FILE_SUFFIX      = "_edr"  # {company}_edr.csv — выгрузка агентов
-# Суффиксы файлов инвентаря. Имя компании выделяем по ним, а не по префиксу:
-# глоб '{company}*.csv' перетягивает чужие файлы у компаний с общим началом
-# имени ('project-b' забрал бы файлы 'project-b-test'), и это никак не проявляется.
+EDR_FILE_SUFFIX      = "_edr"  # {company}_edr.csv — agent export
+# Inventory file suffixes. The company name is taken from them, not a prefix:
+# glob '{company}*.csv' would pull in other companies that share a name prefix
+# ('project-b' would take 'project-b-test' files), and that would not show up.
 INVENTORY_SUFFIXES   = (AD_FILE_SUFFIX, "-vkcloud", "-sbc-adv")
-# Пишет сам пайплайн — это не инвентарь и не потерянный источник
+# Written by the pipeline itself — not inventory and not a lost source
 GENERATED_CSV        = ("edr_coverage_report.csv", "edr_report.csv")
 OUTPUT_CSV           = DATA_DIR / "edr_coverage_report.csv"
 OUTPUT_JSON          = DATA_DIR / "edr_metrics.json"
@@ -90,25 +92,25 @@ OUTPUT_JSON          = DATA_DIR / "edr_metrics.json"
 
 def _norm_host(values: pd.Series) -> pd.Series:
     """
-    Ключ сопоставления имён хостов: регистр не значим, '_' — это '-'.
+    Host-name match key: case does not matter, '_' is '-'.
 
-    Подчёркивание допустимо в имени ВМ в облаке, но не в hostname по RFC 1123:
-    cloud-init заменяет его дефисом, и агент EDR регистрируется уже под изменённым
-    именем ('ecs-corp-mfa_radius-az1-01' -> 'ecs-corp-mfa-radius-az1-01').
-    Точки не трогаем — FQDN в именах не встречается ни в одной выгрузке
-    (у AD полное имя лежит отдельной колонкой fqdn).
+    Underscore is allowed in a cloud VM name but not in a hostname per RFC 1123:
+    cloud-init replaces it with a hyphen, and the EDR agent registers under the
+    rewritten name ('ecs-corp-mfa_radius-az1-01' -> 'ecs-corp-mfa-radius-az1-01').
+    Dots are left alone — FQDNs do not appear in any export
+    (AD keeps the full name in a separate fqdn column).
 
-    Применять к обеим сторонам джойна, иначе правило разъедется.
+    Apply to both sides of the join, or the rule will drift.
     """
     return values.astype(str).str.strip().str.upper().str.replace("_", "-", regex=False)
 
 
 def _split_ips(value) -> list[str]:
     """
-    Адреса хоста из ячейки sourceip.
+    Host addresses from the sourceip cell.
 
-    Коллекторы пишут их строкой через запятую, но в исторических выгрузках VK
-    Cloud лежит python-репр списка: "['10.0.2.19', '203.0.113.10']".
+    Collectors write them as a comma-separated string, but historical VK Cloud
+    exports store a Python list repr: "['10.0.2.19', '203.0.113.10']".
     """
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return []
@@ -120,8 +122,8 @@ def _split_ips(value) -> list[str]:
 
 def _unique_ips(values: pd.Series) -> tuple[pd.Series, set[str]]:
     """
-    Развернуть колонку с адресами в Series (индекс исходной строки -> один адрес)
-    и вернуть вместе с множеством адресов, встречающихся ровно один раз.
+    Explode the address column into a Series (source-row index -> one address)
+    and return it together with the set of addresses that occur exactly once.
     """
     exploded = values.map(_split_ips).explode().dropna()
     exploded = exploded[exploded != ""]
@@ -167,15 +169,15 @@ def load_exclusions(path: Path = EXCLUSIONS_FILE) -> dict[str, dict]:
 
 def load_aliases(path: Path = ALIASES_FILE) -> dict[str, dict[str, str]]:
     """
-    Ручные соответствия «хост -> имя агента»: {company: {хост: агент}}.
+    Manual mappings "host -> agent name": {company: {host: agent}}.
 
-    Нужны там, где связь есть, но в данных её нет: доменный мак регистрируется
-    в EDR под локальным именем ('MacBook-Air-admin.local', '192'), и доменного
-    имени нет ни в одном поле API. Гадать по имени пользователя нельзя — второй
-    ноутбук у того же человека молча испортил бы метрику, — поэтому решение
-    принимает человек, а merge3 только подсказывает кандидатов в логе.
+    Needed where the link exists but the data does not show it: a domain-joined
+    Mac registers in EDR under a local name ('MacBook-Air-admin.local', '192'),
+    and the domain name is in no API field. Guessing by username is not allowed —
+    a second laptop of the same person would silently break the metric — so a
+    human decides, and merge3 only suggests candidates in the log.
 
-    Формат:
+    Format:
       companies:
         project-e:
           m-user-a: MAC
@@ -189,7 +191,7 @@ def load_aliases(path: Path = ALIASES_FILE) -> dict[str, dict[str, str]]:
                   for host, agent in (pairs or {}).items()}
         for company, pairs in (data.get("companies") or {}).items()
     }
-    logger.info("Loaded aliases: %d соответствий в %d компаниях",
+    logger.info("Loaded aliases: %d mappings in %d companies",
                 sum(len(v) for v in result.values()), len(result))
     return result
 
@@ -271,7 +273,7 @@ def _split_metrics(pool: pd.DataFrame) -> tuple[dict, dict]:
 # ---------------------------------------------------------------------------
 
 def _inventory_company(path: Path) -> str | None:
-    """Компания из имени файла инвентаря; None — имя не по схеме."""
+    """Company from the inventory file name; None if the name does not match the scheme."""
     for suffix in INVENTORY_SUFFIXES:
         if path.stem.endswith(suffix):
             return path.stem[: -len(suffix)]
@@ -282,14 +284,15 @@ def discover_companies() -> dict[str, list[Path]]:
     """
     Find companies via *_edr.csv files and attach their inventory files.
 
-    Компанию задаёт выгрузка агентов: без неё считать покрытие не от чего, а
-    заводить компанию с пустым пулом агентов нельзя — компании общего тенанта
-    показали бы 0% при живых агентах в чужом файле.
+    The company is defined by the agent export: without it there is nothing to
+    compute coverage from, and a company with an empty agent pool must not be
+    created — companies on a shared tenant would show 0% while live agents sat
+    in another file.
 
-    Поэтому инвентарь без выгрузки агентов — не тихий пропуск, а предупреждение:
-    четыре компании (project-g, project-h, project-i, project-j) так полгода не
-    попадали ни в одну метрику. Лечится это конфигом EDR, а не кодом, но
-    молчать об этом нельзя.
+    So inventory without an agent export is a warning, not a silent skip:
+    four companies (project-g, project-h, project-i, project-j) stayed out of
+    every metric for half a year that way. The fix is the EDR config, not
+    code, but it must not be silent.
     """
     edr_files = list(DATA_DIR.glob(f"*{EDR_FILE_SUFFIX}.csv"))
     if not edr_files:
@@ -322,14 +325,14 @@ def discover_companies() -> dict[str, list[Path]]:
 
     for company in sorted(set(inventory) - set(known)):
         logger.warning(
-            "Инвентарь без выгрузки агентов: компания '%s' (%s) не попадёт ни в одну "
-            "метрику — нет %s%s.csv. Если её агенты лежат в общем тенанте, добавить "
-            "компанию в конфиг EDR",
+            "Inventory without an agent export: company '%s' (%s) will not appear in any "
+            "metric — missing %s%s.csv. If its agents live in a shared tenant, add "
+            "the company to the EDR config",
             company, ", ".join(f.name for f in inventory[company]), company, EDR_FILE_SUFFIX,
         )
     if unknown:
         logger.warning(
-            "CSV не отнесены ни к одной компании: %s — имя должно оканчиваться на %s",
+            "CSV files assigned to no company: %s — the name must end with %s",
             ", ".join(unknown), " / ".join(INVENTORY_SUFFIXES),
         )
 
@@ -341,7 +344,7 @@ def discover_companies() -> dict[str, list[Path]]:
 # ---------------------------------------------------------------------------
 
 def _first_non_empty(values: pd.Series):
-    """Первое непустое значение колонки внутри группы (иначе — первое)."""
+    """First non-empty column value inside the group (otherwise the first)."""
     for value in values:
         if pd.notna(value) and str(value).strip() != "":
             return value
@@ -350,14 +353,14 @@ def _first_non_empty(values: pd.Series):
 
 def _collapse_hosts(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Одна строка на хост: дубли склеиваются, а не отбрасываются.
+    One row per host: duplicates are merged, not dropped.
 
-    Доменный сервер попадает и в AD, и в облачную выгрузку. Выбросив одну из
-    строк, потеряли бы либо sourceip (нужен для матчинга по IP), либо dn (нужен
-    для исключений по OU). Поэтому: sourceip объединяем, dn/enabled приходят из
-    AD-строки, managed — из облачной, source_type=server, если хост есть в
-    облаке (VDI тоже считаем сервером), факт присутствия в домене остаётся в
-    in_ad. Ключ группировки нормализован: AD пишет 'PROJ-B-…', облако — 'proj-b-…'.
+    A domain server appears in both AD and the cloud export. Dropping one of
+    the rows would lose either sourceip (needed for IP matching) or dn (needed
+    for OU exclusions). So: sourceip is unioned, dn/enabled come from the AD
+    row, managed from the cloud row, source_type=server if the host is in the
+    cloud (VDI is also counted as a server), and domain presence stays in
+    in_ad. The grouping key is normalized: AD writes 'PROJ-B-…', cloud 'proj-b-…'.
     """
     key = _norm_host(df[VM_HOSTNAME_COL]).rename("_key")
     if not key.duplicated().any():
@@ -376,7 +379,7 @@ def _collapse_hosts(df: pd.DataFrame) -> pd.DataFrame:
         agg[VM_SOURCEIP_COL] = _merge_ips
 
     collapsed = df.groupby(key, sort=False).agg(agg).reset_index(drop=True)
-    logger.info("  Дублей hostname склеено: %d", len(df) - len(collapsed))
+    logger.info("  Duplicate hostnames merged: %d", len(df) - len(collapsed))
     return collapsed
 
 
@@ -409,8 +412,9 @@ def load_vm(company: str, file_paths: list[Path]) -> pd.DataFrame:
             cols.append(MANAGED_COL)
         if from_ad:
             cols += [c for c in (VM_ENABLED_COL, VM_DN_COL) if c in df.columns]
-        # Тип из данных: AD отдаёт и серверы, и рабочие места, и различает их
-        # колонкой. Без колонки — по имени файла, как в старых выгрузках.
+        # Type from the data: AD returns both servers and workstations and
+        # distinguishes them with a column. Without the column — by file name,
+        # as in older exports.
         has_type = SOURCE_TYPE_COL in df.columns
         if has_type:
             cols.append(SOURCE_TYPE_COL)
@@ -456,11 +460,11 @@ def load_edr(company: str) -> pd.DataFrame:
         if EDR_NAME_COL not in df.columns:
             logger.warning("%s has no '%s' column", fp.name, EDR_NAME_COL)
             return pd.DataFrame()
-        # Берём все колонки как есть, без отбора списком: отбор дважды отключал
-        # логику молча (сначала проход по IP — из-за имени колонки, потом
-        # подсказки по lastuser — колонку просто забыли внести в список), а
-        # выигрыша не давал. Файл пишем мы сами, колонок два десятка, и в отчёт
-        # отсюда ничего не попадает — в него идут только колонки инвентаря.
+        # Keep all columns as-is, no allow-list: an allow-list twice silently
+        # disabled logic (first the IP pass — because of a column name, then
+        # lastuser hints — the column was simply left out of the list) and
+        # bought nothing. This file is written here, there are about twenty
+        # columns, and none of them enter the report — only inventory columns do.
         return df
     except Exception as e:
         logger.error("Cannot read %s: %s", fp.name, e)
@@ -471,24 +475,25 @@ def load_edr(company: str) -> pd.DataFrame:
 # EDR matching
 # ---------------------------------------------------------------------------
 
-# Имя агента, состоящее только из цифр и точек, — не идентификатор машины.
-# macOS берёт LocalHostName из сетевого имени и режет его по первой точке: хост
-# с именем '192.168.1.15' регистрируется в EDR как '192', и под этим именем
-# сходятся разные машины (в выгрузке от 2026-08-12 — два ноутбука разных
-# пользователей). Такие записи из матчинга по имени исключаем.
+# An agent name of only digits and dots is not a machine identifier.
+# macOS takes LocalHostName from the network name and cuts it at the first
+# dot: a host named '192.168.1.15' registers in EDR as '192', and different
+# machines collide under that name (export of 2026-08-12 — two laptops of
+# different users). Those records are excluded from name matching.
 _NUMERIC_AGENT_NAME = re.compile(r"^[\d.]+$")
 
 
 def _agent_key(edr_df: pd.DataFrame) -> pd.Series:
     """
-    Ключ записи агента: имя, а для обрезанных имён — displayName.
+    Agent-record key: the name, and for truncated names — displayName.
 
-    Три разных мака приезжают под одним именем '192', но в панели они видны как
-    192.168.1.11 / .15 / .8 — это их displayName. Взяв его за ключ, мы получаем
-    три различимые записи вместо одной схлопнутой: дедуп перестаёт терять две из
-    трёх, а в aliases.yaml можно сослаться на конкретную машину, а не на
-    «какой-нибудь 192». Матчиться по такому ключу всё равно нельзя (это адрес, а
-    не имя хоста) — его отсеет _drop_unusable_agent_names.
+    Three different Macs arrive under the same name '192', but in the console
+    they are shown as 192.168.1.11 / .15 / .8 — that is their displayName.
+    Using it as the key yields three distinct records instead of one collapsed
+    one: dedup stops losing two of three, and aliases.yaml can point at a
+    specific machine instead of "some 192". Matching on that key is still not
+    allowed (it is an address, not a hostname) — _drop_unusable_agent_names
+    will reject it.
     """
     key = _norm_host(edr_df[EDR_NAME_COL])
     if EDR_DISPLAYNAME_COL not in edr_df.columns:
@@ -499,12 +504,12 @@ def _agent_key(edr_df: pd.DataFrame) -> pd.Series:
 
 
 def _drop_unusable_agent_names(edr_df: pd.DataFrame) -> pd.DataFrame:
-    """Выбросить записи EDR, чей ключ не может служить ключом сопоставления."""
+    """Drop EDR records whose key cannot serve as a match key."""
     unusable = edr_df["_host"].str.match(_NUMERIC_AGENT_NAME)
     if unusable.any():
         logger.warning(
-            "  EDR: %d записей с неинформативным именем агента (%s) — по имени не матчим, "
-            "ссылаться на них можно из aliases.yaml",
+            "  EDR: %d records with a non-informative agent name (%s) — not matched by name, "
+            "they can be referenced from aliases.yaml",
             int(unusable.sum()),
             ", ".join(sorted(set(edr_df.loc[unusable, "_host"]))[:5]),
         )
@@ -513,9 +518,9 @@ def _drop_unusable_agent_names(edr_df: pd.DataFrame) -> pd.DataFrame:
 
 def _sort_agents(edr_df: pd.DataFrame, has_online: bool, has_seen: bool) -> pd.DataFrame:
     """
-    Записи агентов от самой достоверной к наименее: сначала живые, среди равных —
-    с самой свежей регистрацией. На этот порядок опираются все keep='first' ниже,
-    поэтому он задаётся один раз и до всех проходов.
+    Agent records from most to least trustworthy: live first, and among equals
+    the freshest registration. Every keep='first' below relies on this order,
+    so it is set once and before all passes.
     """
     sort_cols = (["_online"] if has_online else []) + (["_seen"] if has_seen else [])
     return edr_df.sort_values(sort_cols, ascending=False, kind="mergesort") if sort_cols else edr_df
@@ -523,31 +528,32 @@ def _sort_agents(edr_df: pd.DataFrame, has_online: bool, has_seen: bool) -> pd.D
 
 def _dedup_agents(edr_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Одна запись на имя хоста.
+    One record per hostname.
 
-    Переустановка агента создаёт в EDR новую запись с другим id: старая offline,
-    новая online. Без схлопывания хост размножился бы в отчёте и раздул VM_TOTAL.
-    Порядок задан в _sort_agents, поэтому keep='first' — это не «первый
-    попавшийся», а «живой агент, среди равных самая свежая регистрация».
+    Reinstalling the agent creates a new EDR record with a different id: the
+    old one is offline, the new one online. Without collapsing, the host would
+    multiply in the report and inflate VM_TOTAL. Order is set in _sort_agents,
+    so keep='first' is not "whichever came first" but "the live agent, and
+    among equals the freshest registration".
     """
     dup_agents = int(edr_df.duplicated(subset=["_host"]).sum())
     if dup_agents:
-        logger.info("  EDR: %d дублирующихся записей агентов схлопнуто", dup_agents)
+        logger.info("  EDR: %d duplicate agent records collapsed", dup_agents)
     _warn_name_collisions(edr_df)
     return edr_df.drop_duplicates(subset=["_host"], keep="first")
 
 
 def _warn_name_collisions(edr_df: pd.DataFrame) -> None:
     """
-    Отделить переустановку от разных машин под одним именем.
+    Separate a reinstall from different machines under one name.
 
-    Почти все дубли — перерегистрация одной машины: агент ставится до ввода в
-    домен (domain=WORKGROUP, версия ниже, sourceIP пуст), потом появляется вторая
-    запись; osname у таких записей совпадает. Разные машины выдаёт именно osname
-    (проверено 2026-08-12: из 22 групп дублей 20 — переустановка, 2 — коллизия:
-    три мака с именем '192' и два MACBOOK-AIR-ADMIN). Схлопывание в этом случае
-    прячет машину, поэтому пишем предупреждение — разбирается это в панели EDR,
-    не кодом.
+    Almost all duplicates are a re-registration of one machine: the agent is
+    installed before domain join (domain=WORKGROUP, older version, empty
+    sourceIP), then a second record appears; osname on those records matches.
+    Different machines are given away by osname (checked 2026-08-12: of 22
+    duplicate groups, 20 were a reinstall, 2 a collision: three Macs named
+    '192' and two MACBOOK-AIR-ADMIN). Collapsing in that case hides a machine,
+    so a warning is written — this is resolved in the EDR console, not in code.
     """
     if EDR_OSNAME_COL not in edr_df.columns:
         return
@@ -556,9 +562,9 @@ def _warn_name_collisions(edr_df: pd.DataFrame) -> None:
     for name, group in dups.groupby("_host", sort=False):
         if group[EDR_OSNAME_COL].astype(str).nunique() <= 1:
             continue
-        # displayName — то, под чем машина видна в панели EDR: у обрезанных имён
-        # это единственный способ понять, о каких хостах речь ('192' в панели
-        # показан как 192.168.1.11 / .15 / .8)
+        # displayName — how the machine is shown in the EDR console: for
+        # truncated names this is the only way to tell which hosts are meant
+        # ('192' is shown as 192.168.1.11 / .15 / .8)
         shown = (
             sorted(set(group[EDR_DISPLAYNAME_COL].astype(str)))
             if EDR_DISPLAYNAME_COL in group.columns else []
@@ -566,19 +572,19 @@ def _warn_name_collisions(edr_df: pd.DataFrame) -> None:
         collisions.append(f"{name} ({', '.join(shown)})" if shown else name)
     if collisions:
         logger.warning(
-            "  EDR: под одним именем разные машины (различается ОС): %s — "
-            "в покрытии останется одна, разобрать в панели",
+            "  EDR: different machines under one name (OS differs): %s — "
+            "coverage will keep one, resolve in the console",
             "; ".join(sorted(collisions)),
         )
 
 
 def _name_usable(out: pd.DataFrame) -> pd.Series:
     """
-    Можно ли матчить этот хост по имени. Нельзя, когда имя занято машинами
-    разных компаний: агент с таким именем один, а хостов несколько. Правило
-    распространяется на все имя-подобные ключи (hostname, os_hostname,
-    inv_hostname) — os_hostname у одноимённых ВМ тоже совпадает. Ручной alias
-    остаётся: там человек указал конкретного агента.
+    Whether this host can be matched by name. It cannot when the name is used
+    by machines of different companies: there is one agent with that name and
+    several hosts. The rule applies to all name-like keys (hostname,
+    os_hostname, inv_hostname) — os_hostname of same-named VMs matches too.
+    A manual alias still works: a human pointed at a specific agent.
     """
     if NAME_SHARED_COL not in out.columns:
         return pd.Series(True, index=out.index)
@@ -587,7 +593,7 @@ def _name_usable(out: pd.DataFrame) -> pd.Series:
 
 def _claim_agent(out: pd.DataFrame, vm_idx, agent: pd.Series, how: str, has_online: bool,
                  claimed: set[str] | None = None) -> None:
-    """Отметить хост покрытым агентом, найденным не по основному имени."""
+    """Mark the host as covered by an agent found other than by the primary name."""
     out.at[vm_idx, "has_edr"]      = True
     out.at[vm_idx, MATCHED_BY_COL] = how
     if has_online:
@@ -600,12 +606,12 @@ def _claim_agent(out: pd.DataFrame, vm_idx, agent: pd.Series, how: str, has_onli
 
 def _warn_ip_contradicts_name(out: pd.DataFrame, edr_df: pd.DataFrame) -> None:
     """
-    Имя сошлось, а адреса противоречат — повод усомниться в матче.
+    The name matched but the addresses contradict — reason to doubt the match.
 
-    Требовать совпадения адресов нельзя: у 291 хоста из 420 сматченных адреса
-    нет вовсе (AD его не хранит), правило срезало бы две трети верных матчей.
-    Зато там, где адрес известен с обеих сторон, он совпадает в 129 случаях из
-    129 — поэтому расхождение означает, что под одним именем разные машины.
+    Requiring address equality is not possible: 291 of 420 matched hosts have
+    no address at all (AD does not store it), and the rule would cut two thirds
+    of correct matches. Where the address is known on both sides, it matches
+    in 129 of 129 cases — so a mismatch means different machines under one name.
     """
     if VM_SOURCEIP_COL not in out.columns or EDR_IP_COL not in edr_df.columns:
         return
@@ -617,11 +623,11 @@ def _warn_ip_contradicts_name(out: pd.DataFrame, edr_df: pd.DataFrame) -> None:
         ours = set(_split_ips(out.at[idx, VM_SOURCEIP_COL]))
         if theirs and ours and not (theirs & ours):
             suspicious.append(f"{out.at[idx, VM_HOSTNAME_COL]} "
-                              f"(хост {','.join(sorted(ours))} против агента {','.join(sorted(theirs))})")
+                              f"(host {','.join(sorted(ours))} vs agent {','.join(sorted(theirs))})")
     if suspicious:
         logger.warning(
-            "Имя совпало, а адреса разошлись у %d хостов — возможно, это разные "
-            "машины под одним именем: %s",
+            "Name matched but addresses diverged for %d hosts — these may be different "
+            "machines under one name: %s",
             len(suspicious), "; ".join(suspicious[:5]),
         )
 
@@ -629,12 +635,11 @@ def _warn_ip_contradicts_name(out: pd.DataFrame, edr_df: pd.DataFrame) -> None:
 def _match_by_alias(out: pd.DataFrame, by_name: pd.DataFrame, aliases: dict,
                     has_online: bool, claimed: set[str]) -> int:
     """
-    Проход по ручным соответствиям из aliases.yaml.
+    Pass over manual mappings from aliases.yaml.
 
-    Дополняет матчинг по имени, а не переопределяет его: применяется только к
-    хостам, которые не нашлись сами. Соответствие на несуществующего агента —
-    не молчаливый промах, а предупреждение: скорее всего, агент переустановлен
-    и запись в файле протухла.
+    Complements name matching rather than overriding it: applied only to hosts
+    that did not match on their own. A mapping to a missing agent is a warning,
+    not a silent miss: the agent was likely reinstalled and the file entry is stale.
     """
     if not aliases:
         return 0
@@ -648,23 +653,24 @@ def _match_by_alias(out: pd.DataFrame, by_name: pd.DataFrame, aliases: dict,
         if target not in agents.index:
             stale.append(f"{out.at[vm_idx, VM_HOSTNAME_COL]} -> {target}")
             continue
-        # ключ агента здесь ушёл в индекс, поэтому отмечаем его отдельно
+        # the agent key went into the index here, so it is marked separately
         _claim_agent(out, vm_idx, agents.loc[target], "alias", has_online)
         claimed.add(target)
         matched += 1
     if stale:
-        logger.warning("  aliases.yaml: агент не найден в выгрузке: %s", "; ".join(stale))
+        logger.warning("  aliases.yaml: agent not found in the export: %s", "; ".join(stale))
     return matched
 
 
 def _suggest_aliases(out: pd.DataFrame, edr_df: pd.DataFrame) -> None:
     """
-    Подсказать кандидатов для aliases.yaml по имени пользователя.
+    Suggest aliases.yaml candidates from the username.
 
-    АРМ часто назван по владельцу ('m-user-a', 'm-proj-c-00020'), а на агенте
-    остаётся lastuser ('a.user', 'proj-c-00020'). Это и есть связь, но она
-    гевристическая, поэтому автоматически не применяется: подсказка идёт в лог,
-    решение и запись в файл — за человеком. Показываем только однозначные пары.
+    A workstation is often named after the owner ('m-user-a', 'm-proj-c-00020'),
+    while the agent keeps lastuser ('a.user', 'proj-c-00020'). That is the link,
+    but it is heuristic, so it is not applied automatically: the hint goes to
+    the log, the decision and the file write stay with a human. Only unambiguous
+    pairs are shown.
     """
     if EDR_LASTUSER_COL not in edr_df.columns:
         return
@@ -692,22 +698,22 @@ def _suggest_aliases(out: pd.DataFrame, edr_df: pd.DataFrame) -> None:
         if login and taken[login] == 1 and len(by_login.get(login, [])) == 1
     ]
     if hints:
-        logger.info("  Кандидаты в aliases.yaml (совпал пользователь, проверить глазами): %s",
+        logger.info("  aliases.yaml candidates (user matched, check in the console): %s",
                     "; ".join(sorted(hints)))
 
 
 def _match_by_inventory_hostname(out: pd.DataFrame, edr_df: pd.DataFrame,
                                  has_online: bool, claimed: set[str]) -> int:
     """
-    Проход по имени, которое агент рапортует о себе сам (inventory.hostname).
+    Pass over the name the agent reports about itself (inventory.hostname).
 
-    Заполняется только у обогащённых записей — тех, чьё имя в списке агентов
-    ничего не идентифицирует. Именно здесь возвращаются доменные маки: агент с
-    именем '192' в inventory зовётся m-proj-c-00026, и этот хост есть в AD.
-    Ищем по полному набору записей, а не по схлопнутым: у трёх агентов с именем
-    '192' восстановленные имена разные, и дедуп по имени оставил бы одно.
+    Filled only on enriched records — those whose name in the agent list
+    identifies nothing. This is where domain-joined Macs come back: an agent
+    named '192' is called m-proj-c-00026 in inventory, and that host is in AD.
+    Search the full record set, not the collapsed one: three agents named
+    '192' have different restored names, and name-dedup would keep only one.
 
-    Меняет out на месте, возвращает число доматченных хостов.
+    Mutates out in place, returns the number of additionally matched hosts.
     """
     if EDR_INV_HOSTNAME_COL not in edr_df.columns:
         return 0
@@ -720,8 +726,8 @@ def _match_by_inventory_hostname(out: pd.DataFrame, edr_df: pd.DataFrame,
     if inv.empty:
         return 0
     inv["_inv"] = _norm_host(inv[EDR_INV_HOSTNAME_COL])
-    # имя из inventory совпадает с именем агента — новой информации нет;
-    # агент, уже занятый своим хостом, не переиспользуется
+    # inventory name equals the agent name — no new information;
+    # an agent already taken by its host is not reused
     taken = set(out.loc[out["has_edr"], "_host"])
     inv = inv[(inv["_inv"] != inv["_host"]) & ~inv["_host"].isin(taken)]
     lookup = inv.drop_duplicates(subset=["_inv"], keep="first").set_index("_inv")
@@ -739,18 +745,18 @@ def _match_by_inventory_hostname(out: pd.DataFrame, edr_df: pd.DataFrame,
 def _match_by_os_hostname(out: pd.DataFrame, edr_df: pd.DataFrame,
                           has_online: bool, claimed: set[str]) -> int:
     """
-    Промежуточный проход: по hostname внутри ОС (колонка os_hostname).
+    Intermediate pass: by in-guest hostname (os_hostname column).
 
-    Есть только у выгрузок SberCloud: у VK Cloud максимальная microversion Nova
-    2.42, а поле появляется с 2.90. Это **дополнительный** ключ, а не замена
-    имени ВМ: os_hostname фиксируется при создании и не следует за
-    переименованием инстанса, поэтому у части ВМ он указывает на чужое имя
-    (проверено 2026-08-12: 19 расхождений из 172, 13 из них — не про символы).
-    Отсюда защита: агент, уже занятый матчем по hostname, вторым ключом не
-    переиспользуется — иначе пары вроде proj-b-prod-lb-1 / proj-b-prod-vault-lb-1,
-    где в EDR есть агенты под обоими именами, дали бы ложный матч.
+    Present only in SberCloud exports: VK Cloud's highest Nova microversion is
+    2.42, and the field appears in 2.90. This is an **additional** key, not a
+    replacement of the VM name: os_hostname is fixed at create and does not
+    follow instance rename, so on some VMs it points at another name
+    (checked 2026-08-12: 19 mismatches of 172, 13 of them not about characters).
+    Hence the guard: an agent already taken by a hostname match is not reused
+    via the second key — otherwise pairs like proj-b-prod-lb-1 /
+    proj-b-prod-vault-lb-1, where EDR has agents under both names, would false-match.
 
-    Меняет out на месте, возвращает число доматченных хостов.
+    Mutates out in place, returns the number of additionally matched hosts.
     """
     if VM_OS_HOSTNAME_COL not in out.columns:
         return 0
@@ -774,15 +780,15 @@ def _match_by_os_hostname(out: pd.DataFrame, edr_df: pd.DataFrame,
 def _match_by_ip(out: pd.DataFrame, edr_df: pd.DataFrame,
                  has_online: bool, claimed: set[str]) -> int:
     """
-    Второй проход: сопоставление по IP для хостов, не найденных по имени.
+    Second pass: match by IP for hosts not found by name.
 
-    sourceip в выгрузке EDR — адрес, с которого подключился агент (NAT/VIP), а не
-    идентификатор машины: 36 адресов приходятся на 88 разных хостов. Поэтому
-    адрес годится как ключ, только если уникален с обеих сторон; неоднозначные
-    выбрасываем целиком, а не берём первый попавшийся. Проход только для
-    серверов: у АРМ адрес выдаёт DHCP, и в AD-выгрузке он протухает.
+    sourceip in the EDR export is the address the agent connected from (NAT/VIP),
+    not a machine identifier: 36 addresses cover 88 different hosts. So an
+    address is a usable key only if unique on both sides; ambiguous ones are
+    dropped entirely, not "first one wins". Servers only: workstations get
+    DHCP, and the address in the AD export goes stale.
 
-    Меняет out на месте, возвращает число доматченных хостов.
+    Mutates out in place, returns the number of additionally matched hosts.
     """
     if VM_SOURCEIP_COL not in out.columns or EDR_IP_COL not in edr_df.columns:
         return 0
@@ -791,15 +797,15 @@ def _match_by_ip(out: pd.DataFrame, edr_df: pd.DataFrame,
     if candidates.empty:
         return 0
 
-    # Уникальность на стороне ВМ считаем по всем строкам компании, а не только по
-    # кандидатам: адрес, поделённый с уже сматченным хостом, тоже неоднозначен.
+    # Uniqueness on the VM side is computed over all company rows, not just
+    # candidates: an address shared with an already-matched host is also ambiguous.
     vm_ips, vm_unique = _unique_ips(out[VM_SOURCEIP_COL])
     edr_ips, edr_unique = _unique_ips(edr_df[EDR_IP_COL])
     usable = vm_unique & edr_unique
     shared = set(vm_ips) & set(edr_ips)
     if shared:
         logger.info(
-            "  IP-проход: адресов, общих с EDR: %d, из них годных (уникальны с обеих сторон): %d",
+            "  IP pass: addresses shared with EDR: %d, of which usable (unique on both sides): %d",
             len(shared), len(shared & usable),
         )
     if not usable:
@@ -811,7 +817,7 @@ def _match_by_ip(out: pd.DataFrame, edr_df: pd.DataFrame,
         hits = {edr_by_ip[ip] for ip in _split_ips(out.at[vm_idx, VM_SOURCEIP_COL])
                 if ip in edr_by_ip}
         if len(hits) != 1:
-            continue  # ни одного годного адреса либо разные агенты — не гадаем
+            continue  # no usable address, or different agents — do not guess
         _claim_agent(out, vm_idx, edr_df.loc[hits.pop()], "ip", has_online, claimed)
         matched += 1
     return matched
@@ -822,10 +828,10 @@ def _merge_with_edr(vm_df: pd.DataFrame, edr_df: pd.DataFrame,
     """
     Join vm_df with edr_df in five passes, from the most reliable key down:
       1. hostname (case-insensitive, '_' == '-');
-      2. ручные соответствия из aliases.yaml;
-      3. inv_hostname — имя, которое агент рапортует о себе сам;
-      4. os_hostname из выгрузки облака (только SberCloud);
-      5. IP — только серверы и только адреса, уникальные с обеих сторон.
+      2. manual mappings from aliases.yaml;
+      3. inv_hostname — the name the agent reports about itself;
+      4. os_hostname from the cloud export (SberCloud only);
+      5. IP — servers only, and only addresses unique on both sides.
     Adds has_edr, edr_online, edr_last_seen and matched_by columns to vm_df.
     """
     has_online = EDR_ONLINE_COL in edr_df.columns
@@ -838,24 +844,23 @@ def _merge_with_edr(vm_df: pd.DataFrame, edr_df: pd.DataFrame,
     if has_seen:
         seen = pd.to_datetime(edr_df[EDR_LASTSEEN_COL], errors="coerce", utc=True)
         edr_df["_seen"] = seen
-        # unix-время последней связи агента (UTC) — для окна «молчит»
+        # unix time of last agent contact (UTC) — for the silence window
         edr_df["_seen_ts"] = seen.apply(lambda t: t.timestamp() if pd.notna(t) else float("nan"))
 
-    # Проходы по имени идут по схлопнутым записям с пригодным именем; для оценки
-    # однозначности адресов нужны все записи, включая отброшенные, иначе чужой
-    # адрес может показаться уникальным.
+    # Name passes use collapsed records with a usable name; address uniqueness
+    # needs every record, including dropped ones, or a foreign address can look unique.
     edr_df = _sort_agents(edr_df, has_online, has_seen)
-    # by_any — все записи, схлопнутые по имени: на них ссылается aliases.yaml,
-    # ради обрезанных имён вроде '192' он и нужен. by_name — то же за вычетом
-    # имён, которые машину не идентифицируют: только по ним матчим автоматически.
+    # by_any — all records collapsed by name: aliases.yaml refers to them, and
+    # that is why truncated names like '192' need it. by_name — the same minus
+    # names that do not identify a machine: only those are matched automatically.
     by_any = _dedup_agents(edr_df)
     by_name = _drop_unusable_agent_names(by_any)
 
     out = vm_df.copy()
     out["_host"] = _norm_host(out[VM_HOSTNAME_COL])
 
-    # Pass 1: hostname. Хосты, чьё имя занято машинами других компаний, пропускаем:
-    # имя перестало быть ключом, остаются IP, alias и os_hostname.
+    # Pass 1: hostname. Hosts whose name is used by other companies are skipped:
+    # the name is no longer a key; IP, alias, and os_hostname remain.
     out["has_edr"] = out["_host"].isin(set(by_name["_host"])) & _name_usable(out)
     out["edr_online"] = (
         out["_host"].map(dict(zip(by_name["_host"], by_name["_online"]))).fillna(False).astype(bool)
@@ -867,22 +872,22 @@ def _merge_with_edr(vm_df: pd.DataFrame, edr_df: pd.DataFrame,
     )
     out[MATCHED_BY_COL] = out["has_edr"].map({True: "hostname", False: ""})
     matched_by_host = int(out["has_edr"].sum())
-    # Агенты, которых забрал хоть какой-то хост. Нужны, чтобы отличить
-    # «агент есть, а инвентаря нет» от обычного непокрытия.
+    # Agents claimed by at least one host. Needed to tell
+    # "agent exists, inventory missing" from ordinary non-coverage.
     claimed: set[str] = set(out.loc[out["has_edr"], "_host"])
 
     _warn_ip_contradicts_name(out, edr_df)
 
-    # Pass 2: ручные соответствия (человек знает то, чего нет в данных)
+    # Pass 2: manual mappings (a human knows what the data does not show)
     matched_by_alias = _match_by_alias(out, by_any, aliases or {}, has_online, claimed)
 
-    # Pass 3: имя, которое агент рапортует о себе сам (обогащение из /agents/{id})
+    # Pass 3: name the agent reports about itself (enrichment from /agents/{id})
     matched_by_inv = _match_by_inventory_hostname(out, edr_df, has_online, claimed)
 
-    # Pass 4: hostname внутри ОС (есть только у SberCloud)
+    # Pass 4: in-guest hostname (SberCloud only)
     matched_by_os = _match_by_os_hostname(out, by_name, has_online, claimed)
 
-    # Pass 5: IP (только серверы, только однозначные адреса)
+    # Pass 5: IP (servers only, unambiguous addresses only)
     matched_by_ip = _match_by_ip(out, edr_df, has_online, claimed)
 
     out.loc[~out["has_edr"], "edr_last_seen"] = float("nan")
@@ -894,9 +899,9 @@ def _merge_with_edr(vm_df: pd.DataFrame, edr_df: pd.DataFrame,
     )
     _suggest_aliases(out, edr_df)
 
-    # Отдаём наружу пул агентов и тех из них, кто нашёл свой хост: по одной
-    # компании судить нельзя — компании общего тенанта делят один _edr.csv,
-    # и чужие агенты выглядели бы бесхозными. Сводит это build_report.
+    # Expose the agent pool and those of them that found their host: a single
+    # company cannot be judged — companies on a shared tenant share one _edr.csv,
+    # and foreign agents would look ownerless. build_report folds this.
     out.attrs["agent_keys"] = set(by_any["_host"])
     out.attrs["claimed_agents"] = claimed
 
@@ -935,10 +940,10 @@ def _in_pool(df: pd.DataFrame) -> pd.Series:
         else pd.Series(True, index=df.index)
     )
 
-    # Сервер попадает в пул, если у него есть адрес (облачная выгрузка) либо он
-    # доменный и учётка включена. Требовать адрес от всех было бы наследием тех
-    # времён, когда серверы приезжали только из облаков: AD адресов не хранит, и
-    # 104 доменных сервера молча не попали бы в знаменатель.
+    # A server enters the pool if it has an address (cloud export) or it is
+    # domain-joined and the account is enabled. Requiring an address from all
+    # would be a leftover from when servers came only from clouds: AD stores
+    # no addresses, and 104 domain servers would silently drop from the denominator.
     in_domain = df[IN_AD_COL].astype(bool) if IN_AD_COL in df.columns else pd.Series(False, index=df.index)
     server_ok = has_ip | (in_domain & is_enabled)
     return not_excluded & not_managed & not_temp & ((~is_ws & server_ok) | (is_ws & is_enabled))
@@ -995,21 +1000,21 @@ def process_company(
 
 def _resolve_cross_company(frames: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     """
-    Хост принадлежит ровно одной компании. Разбираем случаи, когда источники
-    сказали разное.
+    A host belongs to exactly one company. Resolve cases where sources disagreed.
 
-    Облачная выгрузка сильнее доменной: ВМ живёт в аккаунте конкретной компании,
-    это факт, тогда как в AD хост попадает к компании по OU, паттернам или
-    вовсе по `default_company`. Поэтому AD-строка переезжает к той компании, у
-    которой есть облачная строка того же хоста, и склеивается с ней (так
-    `dependencytrack` и `teleport-db` числились за project-a, хотя это ВМ project-c).
+    The cloud export beats the domain one: the VM lives in a specific company
+    account, that is a fact, while in AD a host is assigned by OU, patterns, or
+    even `default_company`. So the AD row moves to the company that has a cloud
+    row for the same host and is merged with it (that is how `dependencytrack`
+    and `teleport-db` were counted as project-a though they are project-c VMs).
 
-    Если облачных строк несколько и у разных компаний — это **разные машины с
-    одинаковым именем** (`lb-waf-prod-01` у project-b и project-c: разные адреса,
-    разные проекты). Склеивать их нельзя, и матчить по имени тоже: тенант EDR
-    общий, агент с таким именем один, и обе машины помечались покрытыми — одна
-    из них чужим агентом. Такие хосты помечаются `name_shared`, и проход по
-    имени их пропускает; остаются IP, alias и os_hostname.
+    If several cloud rows exist for different companies — these are **different
+    machines with the same name** (`lb-waf-prod-01` at project-b and project-c:
+    different addresses, different projects). They must not be merged, and must
+    not be matched by name either: the EDR tenant is shared, there is one agent
+    with that name, and both machines were marked covered — one of them by a
+    foreign agent. Such hosts are tagged `name_shared`, and the name pass skips
+    them; IP, alias, and os_hostname remain.
     """
     if len(frames) < 2:
         return frames
@@ -1045,11 +1050,11 @@ def _resolve_cross_company(frames: dict[str, pd.DataFrame]) -> dict[str, pd.Data
                 frames[company].loc[keys[company] == host, NAME_SHARED_COL] = True
 
     if moved:
-        logger.info("  Строк перенесено к владельцу облачной ВМ: %d", moved)
+        logger.info("  Rows moved to the cloud-VM owner: %d", moved)
     if shared:
         logger.warning(
-            "Одинаковое имя у машин разных компаний: %s — это разные хосты, "
-            "по имени их не матчим (агент с таким именем достался бы обоим)",
+            "Same name on machines of different companies: %s — these are different hosts, "
+            "not matched by name (the agent with that name would go to both)",
             ", ".join(sorted(shared)),
         )
     for company, df in frames.items():
@@ -1063,14 +1068,14 @@ def _resolve_cross_company(frames: dict[str, pd.DataFrame]) -> dict[str, pd.Data
 def _count_agents_without_inventory(tenants: dict[frozenset, dict],
                                     company_metrics: dict[str, dict]) -> None:
     """
-    Агенты, не сматченные ни с одним хостом, — сигнал о потерянном источнике.
+    Agents not matched to any host — a signal of a lost source.
 
-    Считается по тенанту, а не по компании: компании общего тенанта делят один
-    `_edr.csv`, и агент соседней компании иначе выглядел бы бесхозным (у project-b
-    «пропали» бы почти все 452 записи). Число само по себе ничего не чинит, но
-    только оно и видно снаружи, когда инвентарь целиком отсутствует: за ним
-    прячутся VDI-пул, чужой тенант облака, офисный сегмент и несобираемый
-    гипервизор.
+    Counted per tenant, not per company: companies on a shared tenant share one
+    `_edr.csv`, and a neighbour company's agent would otherwise look ownerless
+    (project-b would "lose" almost all 452 records). The number itself fixes
+    nothing, but it is the only outward signal when inventory is missing
+    entirely: behind it sit a VDI pool, another cloud tenant, an office
+    segment, and a hypervisor that cannot be collected.
     """
     for agents, tenant in tenants.items():
         orphans = sorted(agents - tenant["claimed"])
@@ -1078,7 +1083,7 @@ def _count_agents_without_inventory(tenants: dict[frozenset, dict],
             company_metrics[company]["AGENTS_WITHOUT_INVENTORY"] = len(orphans)
         if orphans:
             logger.warning(
-                "Агентов без хоста в инвентаре: %d из %d (компании: %s). Примеры: %s",
+                "Agents without a host in inventory: %d of %d (companies: %s). Examples: %s",
                 len(orphans), len(agents), ", ".join(sorted(tenant["companies"])),
                 ", ".join(orphans[:5]),
             )
@@ -1103,8 +1108,8 @@ def build_report() -> tuple[pd.DataFrame, dict]:
     company_metrics: dict[str, dict] = {}
     reports: list[pd.DataFrame] = []
 
-    # Инвентарь всех компаний читаем до анализа: кому принадлежит хост, видно
-    # только целиком — облачная выгрузка одной компании перебивает AD другой.
+    # Read every company's inventory before analysis: who owns a host is only
+    # visible as a whole — one company's cloud export overrides another's AD.
     inventory = _resolve_cross_company(
         {company: load_vm(company, paths) for company, paths in company_files.items()})
 
@@ -1117,8 +1122,8 @@ def build_report() -> tuple[pd.DataFrame, dict]:
             continue
         reports.append(df)
         company_metrics[company] = m
-        # Тенант опознаём по самому пулу агентов: компании одного тенанта тянут
-        # список одним запросом и получают побайтово одинаковый _edr.csv.
+        # Identify the tenant by the agent pool itself: companies of one tenant
+        # fetch the list in one request and get a byte-identical _edr.csv.
         agents = frozenset(df.attrs.get("agent_keys") or ())
         if agents:
             tenant = tenants.setdefault(agents, {"claimed": set(), "companies": []})
@@ -1139,8 +1144,8 @@ def build_report() -> tuple[pd.DataFrame, dict]:
     overall["WORKSTATIONS"] = ws_all
     overall["EXCLUDED"]     = int(final[EXCLUDED_COL].sum())
     overall["MANAGED"]      = int((final[MANAGED_COL] != "").sum())
-    # По тенантам, а не сумма по компаниям: у компаний общего тенанта это число
-    # одно и то же, и сложение посчитало бы одних и тех же агентов четырежды.
+    # Per tenant, not a sum over companies: companies on a shared tenant share
+    # this number, and adding would count the same agents four times.
     overall["AGENTS_WITHOUT_INVENTORY"] = sum(
         len(agents - tenant["claimed"]) for agents, tenant in tenants.items()
     )

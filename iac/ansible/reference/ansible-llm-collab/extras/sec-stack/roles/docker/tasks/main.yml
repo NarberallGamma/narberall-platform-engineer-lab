@@ -1,6 +1,6 @@
 ---
-# Ubuntu/Debian. Для других дистрибутивов — заменить на официальный репозиторий Docker.
-- name: Установить docker и compose-плагин
+# Ubuntu/Debian. For other distros, switch to the official Docker repository.
+- name: Install docker and the compose plugin
   ansible.builtin.apt:
     name:
       - docker.io
@@ -8,7 +8,7 @@
     state: present
     update_cache: true
 
-- name: Docker запущен и в автостарте
+- name: Docker is running and enabled on boot
   ansible.builtin.service:
     name: docker
     state: started

@@ -1,37 +1,37 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа clickhouse
+# This script is the primary ClickHouse backup method
 
-# Его можно применять если clickhouse-server запущен на том же узле на котором будет запущен этот скрипт.
+# It can be used when clickhouse-server runs on the same node as this script.
 
-# Принцип работы:
+# How it works:
 
-#   - создание локальной резервной копии с помощью утилиты clickhouse-backup
+#   - create a local backup with clickhouse-backup
 #     https://github.com/Altinity/clickhouse-backup
-#   - резервное копирование созданной копии с помощью скрипта borg_backup_files.sh
+#   - back up the created copy with borg_backup_files.sh
 
-# Поддерживаемые опции:
-# -n|--job-name               - имя задания, суффикс имени Borg-репозитория. Обязательный аргумент
-# -c|--config                 - путь к файлу с конфигурацией бэкапа. Необязательный аргумент
-# -d|--data-dir               - путь к каталогу с данными clickhouse-server, можно узнать
-#                               в файле '/etc/clickhouse-server/config.xml' по директиве <path>.
-# -k|--prune                  - строка с опциями алгоритма сохранения резервных копий в
-#                               формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                               Необязательный аргумент, без указания этой опции будет
-#                               использовано значение ${CUSTOMPRUNE_DEFAULT}
-# -o|--options                - дополнительныйе опции для clickhouse-backup create
+# Supported options:
+# -n|--job-name               - job name, Borg repository name suffix. Required argument
+# -c|--config                 - path to the backup configuration file. Optional argument
+# -d|--data-dir               - path to the clickhouse-server data directory; see
+#                               the <path> directive in '/etc/clickhouse-server/config.xml'.
+# -k|--prune                  - retention algorithm options string in
+#                               Borg format, for example '--keep-hourly 72 --keep-within=30d'
+#                               Optional argument; if omitted,
+#                               the value of ${CUSTOMPRUNE_DEFAULT} is used
+# -o|--options                - extra options for clickhouse-backup create
 
-# Примеры использования в schedule:
+# Usage examples in schedule:
 # borg_run_on.sh 10.0.0.1 borg_backup_clickhouse.sh '--job-name "CH" --data-dir "/var/lib/clickhouse/"'
 # borg_run_on.sh 10.0.0.1 borg_backup_clickhouse.sh '--job-name "CH" --data-dir "/var/lib/clickhouse/" --config "/etc/clickhouse-backup/config.yml"'
 # borg_run_on.sh 10.0.0.1 borg_backup_clickhouse.sh '--job-name "CH" --data-dir "/var/lib/clickhouse/" --config "/etc/clickhouse-backup/config.yml" --options "--tables=my_db.table1,my_db.table_nam?,other_db.*"'
 # borg_run_on.sh 10.0.0.1 borg_backup_clickhouse.sh '--job-name "CH" --data-dir "/var/lib/clickhouse/" --config "/etc/clickhouse-backup/config.yml" --options "--tables=single_db.*" --prune "--keep-hourly 3 --keep-within=30d"'
 
-# Также следует обязательно бэкапить конфигурационные файлы Clickhouse. Это удобно делать с помощью команды вида:
+# ClickHouse configuration files must also be backed up. A typical command:
 # borg_run_on.sh 10.0.0.1 borg_backup_files.sh 'SYSTEM /etc,/var/spool/cron,/etc/backup-agent/config.d ^\/etc\/\.git$'
 
-# Для задания параметров подключения к clickhouse-server необходимо создать файл /etc/clickhouse-backup/config.yml
-# Пример содержимого:
+# clickhouse-server connect parameters go in /etc/clickhouse-backup/config.yml
+# Example contents:
 # cat /etc/clickhouse-backup/config.yml
 # general:
 #   remote_storage: none
@@ -39,7 +39,7 @@
 #   backups_to_keep_local: 0
 #   log_level: info
 #   allow_empty_backups: false
-#   restore_schema_on_cluster: "your-cluster-name" # В случае восстановления в кластерсный clickhouse
+#   restore_schema_on_cluster: "your-cluster-name" # when restoring into a clustered ClickHouse
 # clickhouse:
 #   username: my-user-name
 #   password: "my-pass-word"
@@ -52,12 +52,12 @@
 #   config_dir:      "/etc/clickhouse-server"
 #   ignore_not_exists_error_during_freeze: true
 #   backup_mutations: true
-# Права на файл должны быть 400.
-# Если путь к этому файлу отличается, его можно передать через дополнительный ключ "--config", или переменную окружения $CLICKHOUSE_BACKUP_CONFIG пользователя root.
+# File mode must be 400.
+# If the path differs, pass it with "--config" or the $CLICKHOUSE_BACKUP_CONFIG environment variable for root.
 
 
-# Для выполнения запросов к clickhouse-server желательно создать отдельного пользователя
-# Для этого в файле '/etc/clickhouse-server/users.xml' можно в секции <users> вписать следующий текст:
+# A dedicated user for clickhouse-server queries is preferred.
+# In '/etc/clickhouse-server/users.xml', the following may be added under <users>:
 #        <backup>
 #            <password_sha256_hex>e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</password_sha256_hex>
 #            <networks incl="networks" replace="replace">
@@ -67,7 +67,7 @@
 #            <profile>default</profile>
 #            <quota>default</quota>
 #        </backup>
-# Хэш пароля для директивы 'password_sha256_hex' можно получить следующей командой:
+# The password hash for 'password_sha256_hex' can be obtained with:
 # printf "%s" "${PASSWORD}" | sha256sum | tr -d '-'
 
 ################################################################################
@@ -108,7 +108,7 @@ function clickhouse_backup_install {
     fi
 }
 
-#Разбор аргументов командной строки
+# Command-line argument parsing
 NORMALIZED_ARGS="$( getopt --options n:c:d:k:o: --longoptions ,job-name:,config:,data-dir:,prune:,options: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

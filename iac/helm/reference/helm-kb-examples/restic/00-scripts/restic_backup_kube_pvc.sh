@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - делает бэкап содержимого pvc у pod
+# Backs up PVC contents of a pod
 
-# Принцип работы:
-#   - создание tar бэкапа файлов и/или каталогов в restic-репозитории с помощью
+# How it works:
+#   - create a tar backup of files and/or directories in the restic repository with
 #     'restic backup'
-#   - удаление старых бэкапов в restic-репозитории с помощью 'restic forget'
+#   - delete old backups in the restic repository with 'restic forget'
 
-# Поддерживаемые опции:
-# -q|--add-quoted                - путь к файлу или каталогу который необходимо
-#                                  зарезервировать. Опция может быть указана несколько раз, в
-#                                  резервную копию попадут все указанные файлы и/или каталоги.
-#                                  Указанные пути будут помещены в одинарные кавычки - будут
-#                                  корректно обработаны пути с пробелами, но не будут работать
-#                                  wildcard-подстановки. Необязательный аргумент если не указан читаются все pvc в pod
-# -n|--namespace                 - namespace в кластере. Обязательный аргумент.
-# -p|--pod                       - префикc либо полное имя пода для подключения. Обязательный аргумент.
-# -c|--container                 - Имя контейнера в поде. Необязательный аргумент.
-#    --context                   - Контекст в конфиг файле kube. Необязательный аргумент.
-# -t|--tar-options               - Опции tar для формировании архива. Необязательный аргумент.
-# -k|--prune                     - строка с опциями алгоритма сохранения резервных копий в
-#                                  формате программы restic, например '--keep-hourly 72 --keep-within 30d'
-#                                  Необязательный аргумент, без указания этой опции будет
-#                                  использовано значение ${CUSTOMPRUNE_DEFAULT}
+# Supported options:
+# -q|--add-quoted                - path to a file or directory to
+#                                  back up. The option may be repeated; the
+#                                  backup will include all listed files and/or directories.
+#                                  Listed paths are wrapped in single quotes — paths
+#                                  with spaces are handled correctly, but wildcards
+#                                  will not expand. Optional; when omitted, all PVCs in the pod are read
+# -n|--namespace                 - cluster namespace. Required.
+# -p|--pod                       - pod name prefix or full name to connect to. Required.
+# -c|--container                 - Container name in the pod. Optional.
+#    --context                   - Context in the kube config file. Optional.
+# -t|--tar-options               - tar options for building the archive. Optional.
+# -k|--prune                     - retention-options string in
+#                                  restic format, e.g. '--keep-hourly 72 --keep-within 30d'
+#                                  Optional. When omitted,
+#                                  ${CUSTOMPRUNE_DEFAULT} is used
 
-# Позиционные аргументы:
-# ${1} - имя задания, тег restic-репозитория. Обязательный аргумент
+# Positional arguments:
+# ${1} - job name, restic repository tag. Required
 
-# Примеры использования в schedule:
+# Schedule examples:
 # restic_run_on.sh 10.0.0.1 <restic_bucket_from_values> restic_backup_kube_pvc.sh 'DATA  -q /app/data,/var -n production -p services-files-0 -c php --prune "--keep-hourly 3 --keep-within 30d"'
 # restic_run_on.sh 10.0.0.1 <restic_bucket_from_values> restic_backup_kube_pvc.sh 'DATA  -q /app/data,/var -n production -p services-files-0 -c php --tar-options "--exclude=temp-* --exclude=lost+found" --prune "--keep-hourly 3 --keep-within 30d"'
 
@@ -35,7 +35,7 @@
 
 CUSTOMPRUNE_DEFAULT='--keep-hourly 1 --keep-within 65d'
 
-# Путь до конфига kubectl
+# Path to the kubectl config
 KUBECONF_FILE="/root/.kube/config"
 export KUBECONFIG=${KUBECONF_FILE}
 KUBECTL="/opt/deckhouse/bin/kubectl"
@@ -63,7 +63,7 @@ POD_CONTAINER=""
 CONTEXT=""
 TAR_OPTIONS=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options q:n:p:c:t:k: --longoptions ,add-quoted:,namespace:,pod:,container:,context:,tar-options:,prune:,dont-ignore-missing-files -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

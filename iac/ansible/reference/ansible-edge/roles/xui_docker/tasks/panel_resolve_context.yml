@@ -1,6 +1,6 @@
 ---
-# URL и учётные данные панели, если panel_bootstrap не запускался (--tags xray без panel).
-# xui_panel_url_base задаётся последним: иначе when блока станет false и задачи ниже пропустятся.
+# Panel URL and credentials when panel_bootstrap did not run (--tags xray without panel).
+# xui_panel_url_base is set last: otherwise the block when becomes false and later tasks are skipped.
 
 - name: Resolve panel context when URL base is missing
   when: xui_panel_url_base is not defined
@@ -70,7 +70,7 @@
           }}
       no_log: true
 
-    - name: Build panel URL base (webBasePath; UI и API — …/panel/…)
+    - name: Build panel URL base (webBasePath; UI and API — …/panel/…)
       ansible.builtin.set_fact:
         xui_panel_web_base_path_normalized: "{{ xui_panel_web_base_path_effective }}"
         xui_panel_url_base: >-
@@ -111,6 +111,6 @@
           and (xui_panel_password_effective | default('') | length > 0)
         )
     fail_msg: >-
-      Не удалось определить URL/логин панели. webBasePath — из docker setting -show
-      (не путь …/panel/ в браузере). Задать xui_panel_username, xui_panel_password (-e)
-      или запустить с --tags panel.
+      Failed to resolve the panel URL/login. webBasePath comes from docker setting -show
+      (not the …/panel/ path in the browser). Set xui_panel_username, xui_panel_password (-e)
+      or run with --tags panel.

@@ -1,5 +1,5 @@
 variable "instances" {
-  description = "Карта индивидуальных конфигураций инстансов. Ключ  -  суффикс имени (напр. \"01\")."
+  description = "Map of per-instance configurations. The key is the name suffix (e.g. \"01\")."
   type = map(object({
     availability_zone  = optional(string)
     networks = list(object({
@@ -26,26 +26,26 @@ variable "instances" {
   default = null
 }
 
-# --- Общие параметры (используются, если instances не задана, или как fallback) ---
+# --- Shared parameters (used when instances is unset, or as fallback) ---
 variable "instance_count" {
-  description = "Количество инстансов (если instances не задана)"
+  description = "Number of instances (when instances is unset)"
   type        = number
   default     = 1
 }
 
 variable "instance_name" {
-  description = "Базовое имя инстанса"
+  description = "Base instance name"
   type        = string
 }
 
 variable "availability_zones" {
-  description = "Список зон доступности (общий fallback). 1 элемент  -  для всех; длина = instance_count  -  каждому своя."
+  description = "Availability zone list (shared fallback). One element applies to all; length = instance_count assigns one zone per instance."
   type        = list(string)
   default     = []
 }
 
 variable "networks" {
-  description = "Общий список сетей (без fixed_ip, если используется без instances)."
+  description = "Shared network list (without fixed_ip when used without instances)."
   type = list(object({
     uuid              = string
     fixed_ip          = optional(string, "")
@@ -57,24 +57,24 @@ variable "networks" {
 }
 
 variable "flavor_id" {
-  description = "ID флейвора (общий)"
+  description = "Flavor ID (shared)"
   type        = string
 }
 
 variable "image_id" {
-  description = "ID образа (общий, если не указан image_name)"
+  description = "Image ID (shared, when image_name is unset)"
   type        = string
   default     = null
 }
 
 variable "image_name" {
-  description = "Имя образа (общий, приоритетнее image_id)"
+  description = "Image name (shared, takes precedence over image_id)"
   type        = string
   default     = ""
 }
 
 variable "security_group_ids" {
-  description = "Общий список групп безопасности (если не переопределён в instances)"
+  description = "Shared security group list (unless overridden in instances)"
   type        = list(string)
   default     = []
 }
@@ -125,123 +125,123 @@ variable "bandwidth" {
   default = null
 }
 variable "eip_id" {
-  description = "ID существующего EIP"
+  description = "Existing EIP ID"
   type        = string
   default     = null
 }
 
 variable "key_pair" {
-  description = "Имя SSH-ключевой пары"
+  description = "SSH key pair name"
   type        = string
   default     = null
 }
 
 variable "admin_pass" {
-  description = "Пароль администратора (несовместим с cloud-init)"
+  description = "Administrator password (incompatible with cloud-init)"
   type        = string
   default     = null
   sensitive   = true
 }
 
 variable "private_key" {
-  description = "Приватный ключ для замены/отвязки key_pair"
+  description = "Private key used to replace or detach key_pair"
   type        = string
   default     = null
   sensitive   = true
 }
 
 variable "user_data" {
-  description = "Cloud-init данные"
+  description = "Cloud-init user data"
   type        = string
   default     = null
 }
 
 variable "tags" {
-  description = "Теги инстанса"
+  description = "Instance tags"
   type        = map(string)
   default     = {}
 }
 
 variable "description" {
-  description = "Описание инстанса"
+  description = "Instance description"
   type        = string
   default     = ""
 }
 
 variable "stop_before_destroy" {
-  description = "Останавливать ли инстанс перед удалением"
+  description = "Whether to stop the instance before destroy"
   type        = bool
   default     = true
 }
 
 variable "delete_disks_on_termination" {
-  description = "Удалять ли диски при удалении инстанса"
+  description = "Whether to delete disks when the instance is terminated"
   type        = bool
   default     = false
 }
 
 variable "delete_eip_on_termination" {
-  description = "Удалять ли EIP при удалении инстанса"
+  description = "Whether to delete the EIP when the instance is terminated"
   type        = bool
   default     = true
 }
 
 variable "enterprise_project_id" {
-  description = "ID проекта предприятия"
+  description = "Enterprise project ID"
   type        = string
   default     = null
 }
 
 variable "user_id" {
-  description = "ID пользователя (обязательно при key_pair в pre-paid)"
+  description = "User ID (required when key_pair is used with pre-paid)"
   type        = string
   default     = null
 }
 
 variable "agency_name" {
-  description = "Имя IAM агентства"
+  description = "IAM agency name"
   type        = string
   default     = null
 }
 
 variable "agent_list" {
-  description = "Список агентов через запятую"
+  description = "Comma-separated agent list"
   type        = string
   default     = null
 }
 
 variable "power_action" {
-  description = "Действие с питанием: ON, OFF, REBOOT, FORCE-OFF, FORCE-REBOOT"
+  description = "Power action: ON, OFF, REBOOT, FORCE-OFF, FORCE-REBOOT"
   type        = string
   default     = null
 }
 
 variable "charging_mode" {
-  description = "Режим оплаты: postPaid или prePaid"
+  description = "Charging mode: postPaid or prePaid"
   type        = string
   default     = "postPaid"
 }
 
 variable "period_unit" {
-  description = "Единица периода при prePaid"
+  description = "Period unit for prePaid"
   type        = string
   default     = null
 }
 
 variable "period" {
-  description = "Период при prePaid"
+  description = "Period for prePaid"
   type        = number
   default     = null
 }
 
 variable "auto_renew" {
-  description = "Автопродление при prePaid"
+  description = "Auto-renewal for prePaid"
   type        = string
   default     = null
 }
 
 variable "region" {
-  description = "Регион (если не указан на уровне провайдера)"
+  description = "Region (when not set at the provider level)"
   type        = string
   default     = null
 }

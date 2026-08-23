@@ -1,4 +1,4 @@
-"""Окно запуска renewal по конфигу и state."""
+"""Renewal run window from config and state."""
 
 from __future__ import annotations
 

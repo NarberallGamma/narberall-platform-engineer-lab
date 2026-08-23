@@ -52,10 +52,10 @@ class Application:
         )
     
     def test_connections(self):
-        """Test connections to external services (IAM; Telegram проверяется startup-уведомлением)."""
+        """Test connections to external services (IAM; Telegram is checked by the startup notification)."""
         logger.info("Testing connections...")
         if config.has_telegram_bot():
-            logger.info("Telegram: проверка при отправке startup-уведомления (getMe пропущен)")
+            logger.info("Telegram: checked when sending the startup notification (getMe skipped)")
         else:
             logger.info("Telegram bot not configured, skipping test")
         
@@ -156,7 +156,7 @@ class Application:
         logger.info(f"API enabled: {config.api_enabled}")
         logger.info(f"Telegram notifications: {config.has_telegram_bot()}")
 
-        # Startup Telegram до Flask/scheduler (VPS egress чувствителен к параллельному трафику)
+        # Startup Telegram before Flask/scheduler (VPS egress is sensitive to parallel traffic)
         if config.has_telegram_bot():
             try:
                 asyncio.run(telegram_notifier.send_cluster_operation_notification(

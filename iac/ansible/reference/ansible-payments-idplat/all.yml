@@ -14,11 +14,11 @@
         name: redis
       when:
         - "{{ (ig_caching_provider | string | lower) == 'redis' }}"
-      ### Вызов роли для деплоя IG
+      ### Include the IG deploy role
     - name: Deploy ig
       ansible.builtin.include_role:
         name: ig
-    ### Вызов роли для деплоя IgExt
+    ### Include the IgExt deploy role
     - name: Deploy IG EXT
       ansible.builtin.include_role:
         name: igext
@@ -26,7 +26,7 @@
         - "{{ ig_enable_ReverseAccess | bool }}"
 
     - block:
-    ### Вызов роли для деплоя postgres
+    ### Include the postgres deploy role
       - name: Include a role postgres
         ansible.builtin.include_role:
           name: idplat_postgres
@@ -34,7 +34,7 @@
           - "{{ idplat_postgres_install | bool }}"
           - "{{ not deploy_to_k8s | default(false) | bool }}"
 
-      ### Ожидание выполенных 
+      ### Wait until the service is ready 
       - name: Wait for service {{ docker_stack_name }}_idplat_postgres to reach running or failed state
         command: "docker service ps {{ docker_stack_name }}_idplat_postgres --format '{{ '{{.CurrentState}}' }}'"
         register: service_state
@@ -46,10 +46,10 @@
           - "{{ idplat_postgres_install | bool }}"
           - "{{ not deploy_to_k8s | default(false) | bool }}"
         
-      ### Вывод сообщение об ошибке и остановка Deploy
+      ### Print an error and stop the deploy
       - name: Error message
         fail:
-          msg: "Состояние сервиса не 'Running'. Проверь лог"
+          msg: "Service state is not 'Running'. Check the log"
         when:
           - "'Running' not in service_state.stdout"
           - "{{ idplat_postgres_install | bool }}"
@@ -58,7 +58,7 @@
 
 
     - block:
-      ### Вызов роли для деплоя AM в docker без первоначальной настройки
+      ### Include the AM Docker deploy role without first-run setup
       - name: Include a role am no first_deploy
         ansible.builtin.include_role:
           name: am
@@ -68,14 +68,14 @@
           - "{{ not am_update_migrations | bool }}"
 
       - block:
-        ### Вызов роли для деплоя в docker с первоначальной настройки
+        ### Include the Docker deploy role with first-run setup
         - name: Include a role am with first_deploy
           ansible.builtin.include_role:
             name: amcli
           when:
             - "{{ am_first_deploy | bool }} or {{ am_update_plugins | bool }} or {{ am_update_migrations | bool }}"
 
-        ### Ожидание выполенныя первоначальных настроек
+        ### Wait for first-run setup to finish
         - name: Wait for service {{ docker_stack_name }}_{{ amcli_name }} to reach complete or failed state
           command: "docker service ps {{ docker_stack_name }}_{{ amcli_name }} --format '{{ '{{.CurrentState}}' }}'"
           register: service_state
@@ -86,7 +86,7 @@
           when:
             - "{{ am_first_deploy | bool }} or {{ am_update_plugins | bool }} or {{ am_update_migrations | bool }}"
           
-        ### Вывод сообщение об ошибке и остановка Deploy
+        ### Print an error and stop the deploy
         - name: Error message
           fail:
             msg: "First deploy no Complete !"
@@ -94,7 +94,7 @@
             - "'Complete' not in service_state.stdout"
             - "{{ am_first_deploy | bool }} or {{ am_update_plugins | bool }} or {{ am_update_migrations | bool }}"
 
-        ### Удаление контейнера первоначальных настроек в docker после успешного выполнения (не удаляет при включенном debug)
+        ### Remove the first-run setup container after success (kept when debug is on)
         - name: "{{ amcli_name }} -> Docker service {{ docker_stack_name }}_{{ amcli_name }} remove"
           docker_swarm_service:
             name: "{{ docker_stack_name }}_{{ amcli_name }}"
@@ -104,7 +104,7 @@
             - "'Complete' in service_state.stdout"
             - "{{ not am_deploy_debug | bool }}"
 
-        ### Запуск сервиса после успешного выполнения первоначальных настроек
+        ### Start the service after first-run setup succeeds
         - name: Check if the first deploy was successful and run the second playbook
           ansible.builtin.include_role:
             name: am

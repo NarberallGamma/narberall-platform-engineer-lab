@@ -1,5 +1,5 @@
 ---
-# estate-prod-teleport-k8s-01: полный prepare, кроме GPU, постоянной смены hostname и ssh_pass_auth
+# estate-prod-teleport-k8s-01: full prepare except GPU, permanent hostname change, and ssh_pass_auth
 enable_timezone: true
 enable_apt_basics: true
 enable_apt_upgrade: true
@@ -14,7 +14,7 @@ enable_hardening: true
 harden_permissions: true
 enable_nvidia_gpu: false
 enable_docker: true
-# root уже настроен на первом прогоне
+# root was already configured on the first run
 enable_root_password_change: false
 root_password_auto_generate: false
 domain_join_hostname: "estateTLPRK8S01"

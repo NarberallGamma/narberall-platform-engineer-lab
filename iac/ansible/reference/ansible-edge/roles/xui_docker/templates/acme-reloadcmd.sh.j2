@@ -1,5 +1,5 @@
 #!/bin/sh
-# acme.sh --reloadcmd: применить обновлённый LE IP cert к панели 3X-UI
+# acme.sh --reloadcmd: apply the renewed LE IP cert to the 3X-UI panel
 set -eu
 docker exec {{ xui_container_name }} /app/x-ui cert \
   -webCert /root/cert/ip/fullchain.pem \

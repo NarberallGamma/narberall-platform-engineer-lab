@@ -1,5 +1,5 @@
 ---
-# Привести webBasePath к строке без []/'' (regex_search и setting -show иногда дают list-like вид)
+# Normalize webBasePath to a string without []/'' (regex_search and setting -show sometimes yield a list-like form)
 - name: Normalize panel web base path for URL and API
   ansible.builtin.set_fact:
     xui_panel_web_base_path_effective: >-

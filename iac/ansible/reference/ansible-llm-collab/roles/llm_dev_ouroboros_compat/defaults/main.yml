@@ -1,8 +1,8 @@
 ---
-# Ouroboros / OpenAI без role=system: patched official Qwen3.5-9B chat template.
-# Включение: llm_dev_ouroboros_compat_enabled: true в group_vars/llm_dev/main.yml.
-# Отключение: false — шаблон из GGUF (строгий Qwen: system обязан быть первым).
-# Источник шаблона: roles/llm_dev_ouroboros_compat/files/qwen35_9b_ouroboros_patched_chat_template.jinja
+# Ouroboros / OpenAI without role=system: patched official Qwen3.5-9B chat template.
+# Enable: llm_dev_ouroboros_compat_enabled: true in group_vars/llm_dev/main.yml.
+# Disable: false — template from the GGUF (strict Qwen: system must be first).
+# Template source: roles/llm_dev_ouroboros_compat/files/qwen35_9b_ouroboros_patched_chat_template.jinja
 
 llm_dev_ouroboros_compat_enabled: false
 

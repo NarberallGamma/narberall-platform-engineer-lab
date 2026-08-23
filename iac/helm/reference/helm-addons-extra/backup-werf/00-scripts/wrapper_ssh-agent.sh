@@ -5,7 +5,7 @@ SSH_OPTIONS="-o StrictHostKeyChecking=no ${SSH_DISABLE_CONTROL_OPTIONS}"
 
 ################################################################################
 
-# Отправляет алерт
+# Sends an alert
 # ${1} - if equal 'under_sudo' then try run alerting CLI under sudo, otherwise - without sudo
 alert()
 {

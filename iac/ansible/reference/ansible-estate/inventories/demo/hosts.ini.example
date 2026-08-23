@@ -6,6 +6,6 @@ ansible_ssh_common_args='-o IdentitiesOnly=yes'
 [gitlab]
 estate-demo-gitlab ansible_host=10.10.17.153
 
-# Combined group for server preparation (без нод CCE)
+# Combined group for server preparation (no CCE nodes)
 [prepare:children]
 gitlab

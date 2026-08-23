@@ -22,7 +22,7 @@ var configPath = flag.String("config", "/app/config.yml", "Path to config YAML")
 
 type Config struct {
 	Platform              string   `yaml:"platform"`
-	EmergencyPlatforms    []string `yaml:"emergency_platforms"` // для событий (actual/planned); если пусто — используется platform
+	EmergencyPlatforms    []string `yaml:"emergency_platforms"` // for events (actual/planned); if empty, platform is used
 	APIBaseURL            string   `yaml:"api_base_url"`
 	ScrapeIntervalSeconds int      `yaml:"scrape_interval_seconds"`
 }
@@ -171,8 +171,8 @@ func (c *collector) fetchEmergency() error {
 		platforms = []string{c.config.Platform}
 	}
 
-	// API при ?platform=evolution/vmware возвращает ответ БЕЗ ключа "data" (только success/lang/resultCode).
-	// Полные actual/planned приходят только без параметра platform — делаем один запрос и фильтруем сами.
+	// With ?platform=evolution/vmware the API returns a response WITHOUT a "data" key (only success/lang/resultCode).
+	// Full actual/planned lists arrive only without a platform parameter — one request, then filter locally.
 	url := strings.TrimSuffix(c.config.APIBaseURL, "/") + "/naumengateway/v1/emergency"
 	resp, err := c.client.Get(url)
 	if err != nil {
@@ -216,7 +216,7 @@ func (c *collector) fetchEmergency() error {
 		allActual = append(allActual, actual...)
 		allPlanned = append(allPlanned, planned...)
 	}
-	// Дедуп по ID (один и тот же event может попасть при нескольких платформах)
+	// Dedupe by ID (the same event can appear for multiple platforms)
 	allActual = dedupeEvents(allActual)
 	allPlanned = dedupeEvents(allPlanned)
 
@@ -267,7 +267,7 @@ func truncate(s string, max int) string {
 	if max <= 0 || s == "" {
 		return s
 	}
-	// Обрезка только по рунам, чтобы не резать многобайтовый символ (иначе в лейбл попадает невалидный UTF-8 и panic).
+	// Truncate by runes so a multibyte character is not split (invalid UTF-8 in a label would panic).
 	if !utf8.ValidString(s) {
 		s = strings.ToValidUTF8(s, "?")
 	}
@@ -278,7 +278,7 @@ func truncate(s string, max int) string {
 	return string(runes[:max])
 }
 
-// safeLabel гарантирует валидный UTF-8 и ограниченную длину для лейблов Prometheus.
+// safeLabel guarantees valid UTF-8 and a bounded length for Prometheus labels.
 func safeLabel(s string, maxLen int) string {
 	if s == "" {
 		return ""

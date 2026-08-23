@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Общая подготовка SSH для MCP run_script и диагностических скриптов.
-# Использование: source .../mcp_ssh_env.sh [host_alias]
+# Shared SSH setup for MCP run_script and diagnostic scripts.
+# Usage: source .../mcp_ssh_env.sh [host_alias]
 #
-# Выставляет: SSH_AUTH_SOCK (лучший agent с ключами), SSH_OPTS (массив),
+# Sets: SSH_AUTH_SOCK (best agent that has keys), SSH_OPTS (array),
 # SSH_IDENTITY_FILE, SSH_TARGET_USER, SSH_TARGET_HOST.
 
 _mcp_ssh_pick_agent_sock() {

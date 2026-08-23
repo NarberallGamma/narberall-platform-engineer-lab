@@ -3,11 +3,11 @@ ansible_user=root
 ansible_ssh_private_key_file=/root/.ssh/estate-preprod-ecs-key.pem
 ansible_ssh_common_args='-o IdentitiesOnly=yes'
 
-# Vault Cluster Groups (preprod: одна нода vault-1; vault-3 отсутствует)
+# Vault Cluster Groups (preprod: single vault-1 node; vault-3 is absent)
 [vault_cluster]
 estate-preprod-vault-1 ansible_host=10.10.18.59
 
-# Preprod: одна LB-нода (lb-2 отсутствует)
+# Preprod: single LB node (lb-2 is absent)
 [vault_lb]
 estate-preprod-lb-1 ansible_host=10.10.18.142
 
@@ -23,7 +23,7 @@ estate-preprod-cb-scanner ansible_host=10.10.18.115
 [gitlab]
 estate-preprod-gitlab ansible_host=10.10.18.189
 
-# Combined group for server preparation (без нод CCE)
+# Combined group for server preparation (no CCE nodes)
 [prepare:children]
 vault_cluster
 vault_lb

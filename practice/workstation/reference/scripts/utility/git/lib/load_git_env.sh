@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# GitLab PAT для estate (HTTPS clone/fetch/push). Без source всего .env-estate (там PostgreSQL и Keycloak).
+# GitLab PAT for the estate (HTTPS clone/fetch/push). Does not source the full .env-estate (PostgreSQL and Keycloak live there).
 #
-# Источник: ~/.config/ops/.env-cloud (legacy symlink ~/scripts/cr/.env)
-# Переопределение: GIT_ENV_FILE=/path/to/.env-estate
+# Source: ~/.config/ops/.env-cloud (legacy symlink ~/scripts/cr/.env)
+# Override: GIT_ENV_FILE=/path/to/.env-estate
 #
-# Ключи: PROD_GITLAB_TOKEN, PREPROD_GITLAB_TOKEN
+# Keys: PROD_GITLAB_TOKEN, PREPROD_GITLAB_TOKEN
 
 _git_read_env_var() {
   local file="$1"

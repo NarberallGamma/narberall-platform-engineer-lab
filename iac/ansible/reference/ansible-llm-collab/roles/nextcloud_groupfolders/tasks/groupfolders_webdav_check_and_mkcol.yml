@@ -1,8 +1,8 @@
 ---
-# Ожидается: nextcloud_folders_flat. WebDAV PROPFIND к корню групповой папки и MKCOL по списку.
-# MKCOL идемпотентен (HTTP 201 / 405 / 409): уже существующие каталоги не удаляются и не перезаписываются.
+# Expects: nextcloud_folders_flat. WebDAV PROPFIND against the group-folder root and MKCOL from the list.
+# MKCOL is idempotent (HTTP 201 / 405 / 409): existing directories are not deleted or overwritten.
 
-- name: Проверить доступ учётки WebDAV к групповой папке (PROPFIND)
+- name: Check that the WebDAV account can access the group folder (PROPFIND)
   ansible.builtin.uri:
     url: "{{ nextcloud_webdav_url }}/"
     method: PROPFIND
@@ -15,28 +15,28 @@
   failed_when: false
   when: nextcloud_folders_flat | length > 0
 
-- name: Остановить выполнение — у учётки WebDAV нет доступа к групповой папке
+- name: Fail — WebDAV account has no access to the group folder
   ansible.builtin.fail:
     msg: |
-      Учётная запись WebDAV ({{ nextcloud_webdav_user }}) не имеет доступа к групповой папке «{{ nextcloud_groupfolder_name }}» (HTTP {{ _webdav_access_check.status | default('?') }}).
-      Проверьте имя папки в Nextcloud и в nextcloud_profile_map (Regul clients и т.п.), URL WebDAV и что пользователь добавлен в группы с доступом к этой папке: Nextcloud → Пользователи → учётка → Участник групп.
+      WebDAV account ({{ nextcloud_webdav_user }}) has no access to group folder «{{ nextcloud_groupfolder_name }}» (HTTP {{ _webdav_access_check.status | default('?') }}).
+      Check the folder name in Nextcloud and in nextcloud_profile_map (Regul clients, etc.), the WebDAV URL, and that the user is in groups with access to this folder: Nextcloud → Users → account → Group membership.
   when:
     - nextcloud_folders_flat | length > 0
     - _webdav_access_check.status is not defined or _webdav_access_check.status not in [200, 207]
 
-# Порядок MKCOL: по возрастанию глубины пути (число сегментов), внутри волны — по path.
-# Параллелизм: батчи async (nextcloud_concurrency_mkcol > 1). throttle на одном хосте с loop часто не даёт реального параллелизма — не использовать.
-- name: Уникальные глубины путей для MKCOL (волны)
+# MKCOL order: by increasing path depth (segment count); within a wave — by path.
+# Parallelism: async batches (nextcloud_concurrency_mkcol > 1). throttle on a single host with loop often gives no real parallelism — do not use.
+- name: Unique path depths for MKCOL (waves)
   ansible.builtin.set_fact:
     _mkcol_depths_ordered: "{{ nextcloud_folders_flat | map(attribute='path') | map('split', '/') | map('length') | unique | sort | list }}"
   when: nextcloud_folders_flat | length > 0
 
-- name: Инициализировать очередь MKCOL
+- name: Initialize the MKCOL queue
   ansible.builtin.set_fact:
     _mkcol_ordered_flat: []
   when: nextcloud_folders_flat | length > 0
 
-- name: Добавить в очередь MKCOL папки очередной волны по глубине
+- name: Enqueue MKCOL folders for the next depth wave
   ansible.builtin.set_fact:
     _mkcol_ordered_flat: "{{ _mkcol_ordered_flat + _mkcol_wave_slice }}"
   vars:
@@ -44,10 +44,10 @@
   loop: "{{ _mkcol_depths_ordered }}"
   loop_control:
     loop_var: _mkcol_depth_val
-    label: "глубина={{ _mkcol_depth_val }}"
+    label: "depth={{ _mkcol_depth_val }}"
   when: nextcloud_folders_flat | length > 0
 
-- name: Размер батча MKCOL (1 — без параллельного async)
+- name: MKCOL batch size (1 — no parallel async)
   ansible.builtin.set_fact:
     _mkcol_run_n: "{{ [nextcloud_concurrency_mkcol | default(1) | int, 1] | max }}"
   when:
@@ -55,7 +55,7 @@
     - _mkcol_ordered_flat is defined
     - _mkcol_ordered_flat | length > 0
 
-- name: Создать папки в Nextcloud через WebDAV (MKCOL), идемпотентно (последовательно)
+- name: Create folders in Nextcloud via WebDAV (MKCOL), idempotent (sequential)
   ansible.builtin.uri:
     url: "{{ nextcloud_webdav_url }}/{{ _mkcol_folder.path | urlencode }}"
     method: MKCOL
@@ -74,12 +74,12 @@
     - _mkcol_ordered_flat | length > 0
     - (_mkcol_run_n | default(1) | int) <= 1
 
-- name: Создать папки в Nextcloud через WebDAV (MKCOL), батчи async
+- name: Create folders in Nextcloud via WebDAV (MKCOL), async batches
   ansible.builtin.include_tasks: groupfolders_mkcol_async_batch.yml
   loop: "{{ _mkcol_ordered_flat | batch(_mkcol_run_n | int) | list }}"
   loop_control:
     loop_var: _mkcol_batch
-    label: "MKCOL async, путей в батче={{ _mkcol_batch | length }}"
+    label: "MKCOL async, paths in batch={{ _mkcol_batch | length }}"
   when:
     - nextcloud_folders_flat | length > 0
     - _mkcol_ordered_flat is defined

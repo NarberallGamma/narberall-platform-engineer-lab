@@ -31,7 +31,7 @@ locals {
 
   keys = keys(local.instance_configs_raw)
 
-  # Зоны доступности
+  # Availability zones
   zones_raw = length(var.availability_zones) == 0 ? null : (
     length(var.availability_zones) == 1 ? [for _ in local.keys : var.availability_zones[0]] : (
       length(var.availability_zones) >= length(local.keys) ?
@@ -68,7 +68,7 @@ resource "sbercloud_compute_instance" "this" {
   flavor_id          = each.value.flavor_id
   availability_zone  = each.value.zone
 
-  # Образ: если задан image_name (не null и не ""), используем его, иначе image_id
+  # Image: use image_name when set (not null and not ""), otherwise image_id
   image_id   = (each.value.image_name != null && each.value.image_name != "") ? null : each.value.image_id
   image_name = (each.value.image_name != null && each.value.image_name != "") ? each.value.image_name : null
 

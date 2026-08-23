@@ -1,4 +1,4 @@
-# Ansible: запасной канал SSH-туннеля (socat localhost → main)
+# Ansible: fallback SSH-tunnel channel (socat localhost → main)
 [Unit]
 Description=SSH tunnel socat forward ({{ xui_ssh_tunnel_listen_bind }}:{{ xui_ssh_tunnel_listen_port }} → {{ xui_ssh_tunnel_target_host_effective }}:{{ xui_ssh_tunnel_target_port }})
 After=network-online.target

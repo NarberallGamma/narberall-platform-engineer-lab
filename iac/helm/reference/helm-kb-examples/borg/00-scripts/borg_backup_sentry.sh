@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 
-# Этот скрипт предназначен не для создания резервных копий Sentry, а для
-# разъяснения приниципа их создания
+# This script does not create Sentry backups; it
+# explains how they are created
 
-# Использовать отдельный скрипт для бэкапа Sentry не требуется по следующим причинам:
-#   - большинство данных Sentry, которые имеет смысл резервировать находятся в
+# A dedicated Sentry backup script is unnecessary because:
+#   - most Sentry data worth backing up lives in
 #     PostgreSQL ( https://github.com/getsentry/sentry/issues/2698#issuecomment-185287966 )
-#   - остальные данные - данные графиков и временных рядов -  находятся в Redis
+#   - remaining data — charts and time series — lives in Redis
 #     ( https://github.com/getsentry/sentry/issues/2698#issuecomment-185287966 )
-#   - встроенная команда Sentry - 'sentry export' экспортирует данные только
-#     из PostgreSQL ( https://github.com/getsentry/sentry/issues/2698#issuecomment-185287966 )
-#     и вместо нее рекомендуется использовать обычные способы резервного копирования PostgreSQL
+#   - the built-in Sentry command 'sentry export' exports data only
+#     from PostgreSQL ( https://github.com/getsentry/sentry/issues/2698#issuecomment-185287966 )
+#     and ordinary PostgreSQL backup methods are recommended instead
 #     ( https://github.com/getsentry/sentry/issues/2698#issuecomment-185290496
 
-# В итоге, резервное копирование Sentry состоит из:
-#   - резервного копирования баз PostgreSQL, с помощью уже имеющихся в этом
-#     репозитории скриптов 'borg_backup_postgres.sh' и 'borg_backup_postgres_stdout.sh'
-#   - и, при необходимости, резервного копирования баз Redis, которое можно
-#     осуществить с помощью скрипта 'borg_backup_redis.sh'
+# In the end, Sentry backup consists of:
+#   - backing up PostgreSQL databases with the existing
+#     repository scripts 'borg_backup_postgres.sh' and 'borg_backup_postgres_stdout.sh'
+#   - and, when needed, Redis database backup, which can
+#     be done with 'borg_backup_redis.sh'
 
 ################################################################################
 

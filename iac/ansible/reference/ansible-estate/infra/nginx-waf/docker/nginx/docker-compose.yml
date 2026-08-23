@@ -12,7 +12,7 @@ services:
         max-file: '1'
     environment:
       - WALLARM_API_HOST=wallarm.example.com
-      - WALLARM_API_TOKEN=[ключ на сервере] (выдается в консоли Wallarm)
+      - WALLARM_API_TOKEN=[key on the server] (issued in the Wallarm console)
       - DEPLOY_FORCE=True
       - TARANTOOL_MEMORY_GB=2
     volumes:

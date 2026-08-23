@@ -1,7 +1,7 @@
 ---
-# cryptopro: bind-mount data/cprocsp для CSP.
+# cryptopro: bind-mount data/cprocsp for CSP.
 
-- name: "{{ docker_app.slug }} | каталоги data (bind mounts)"
+- name: "{{ docker_app.slug }} | data directories (bind mounts)"
   ansible.builtin.file:
     path: "{{ docker_app_base_dir }}/cryptopro/{{ item.path }}"
     state: directory

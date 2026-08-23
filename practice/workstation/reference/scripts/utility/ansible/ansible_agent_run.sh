@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Agent-safe запуск ansible-playbook для любого ansible-репо (PROD/PREPROD и др.).
-# По умолчанию: native ansible в WSL (2.16.x), rsync в /tmp/ext4.
+# Agent-safe ansible-playbook launch for any ansible repo (PROD/PREPROD and others).
+# Default: native ansible in WSL (2.16.x), rsync into /tmp/ext4.
 # Fallback: --docker (${ANSIBLE_IMAGE:-example/ansible-runner:1.1}).
 #
 # Usage:
@@ -8,19 +8,19 @@
 #   ansible_agent_run.sh --ansible-root /path/to/ansible --inventory inventories/prod/hosts.ini ...
 #
 # Options:
-#   --ansible-root PATH    корень ansible-репо (вместо --env)
-#   --inventory PATH       inventory относительно ansible-root (default по --env)
+#   --ansible-root PATH    ansible repo root (instead of --env)
+#   --inventory PATH       inventory relative to ansible-root (default from --env)
 #   --native               native ansible-playbook (default)
-#   --docker               ansible в Docker (legacy)
-#   --all                  все хосты инвентаря
-#   --ssh-key PATH         приватный ключ (WSL path)
-#   --ssh-agent            проброс SSH_AUTH_SOCK (native/docker)
-#   --load-global-env      domain_admin_password из ~/.config/ops/.env-lab
-#   --mount-artifacts ro   docker: монтировать artifacts (default ro)
-#   --no-artifacts         docker: не монтировать artifacts
-#   --out PATH             tee лога (WSL path)
-#   --timeout-sec N        таймаут (default 7200)
-#   --                     аргументы ansible-playbook (-e, --tags, ...)
+#   --docker               ansible in Docker (legacy)
+#   --all                  all inventory hosts
+#   --ssh-key PATH         private key (WSL path)
+#   --ssh-agent            forward SSH_AUTH_SOCK (native/docker)
+#   --load-global-env      domain_admin_password from ~/.config/ops/.env-lab
+#   --mount-artifacts ro   docker: mount artifacts (default ro)
+#   --no-artifacts         docker: do not mount artifacts
+#   --out PATH             tee the log (WSL path)
+#   --timeout-sec N        timeout (default 7200)
+#   --                     ansible-playbook arguments (-e, --tags, ...)
 
 set -euo pipefail
 

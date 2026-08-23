@@ -1,8 +1,8 @@
 ---
-# Роль kafka_init: CLUSTER_ID и (при SASL) пароли Plain — из -e/group_vars или Vault.
-# VAULT_ADDR, VAULT_TOKEN на control node.
+# kafka_init role: CLUSTER_ID and (when SASL) Plain passwords — from -e/group_vars or Vault.
+# VAULT_ADDR, VAULT_TOKEN on the control node.
 
-- name: Загрузить CLUSTER_ID из Vault
+- name: Load CLUSTER_ID from Vault
   ansible.builtin.set_fact:
     kafka_cluster_id: "{{ _vault.secret[kafka_vault_key_cluster_id] }}"
   vars:
@@ -10,7 +10,7 @@
   no_log: true
   when: kafka_cluster_id is not defined or (kafka_cluster_id | string | length) == 0
 
-- name: Загрузить SASL admin из Vault
+- name: Load SASL admin from Vault
   ansible.builtin.set_fact:
     kafka_sasl_admin_password: "{{ _vault.secret[kafka_vault_key_sasl_admin_password] }}"
   vars:
@@ -20,7 +20,7 @@
     kafka_sasl_enabled | bool and
     (kafka_sasl_admin_password is not defined or (kafka_sasl_admin_password | default('') | string | length) == 0)
 
-- name: Загрузить SASL platform_kafka из Vault
+- name: Load SASL platform_kafka from Vault
   ansible.builtin.set_fact:
     kafka_sasl_platform_kafka_password: "{{ _vault.secret[kafka_vault_key_sasl_platform_kafka_password] }}"
   vars:
@@ -30,7 +30,7 @@
     kafka_sasl_enabled | bool and
     (kafka_sasl_platform_kafka_password is not defined or (kafka_sasl_platform_kafka_password | default('') | string | length) == 0)
 
-- name: Загрузить секрет Ubuntu_servers для доп. SASL пользователей
+- name: Load the Ubuntu_servers secret for extra SASL users
   ansible.builtin.set_fact:
     _kafka_vault_secret_all: "{{ lookup('community.hashi_vault.vault_kv2_get', kafka_vault_path, engine_mount_point=kafka_vault_mount_point).secret }}"
   no_log: true
@@ -38,20 +38,20 @@
     kafka_sasl_enabled | bool and
     (kafka_sasl_extra_users | default([]) | length) > 0
 
-- name: Проверить ключи Vault для доп. SASL пользователей
+- name: Check Vault keys for extra SASL users
   ansible.builtin.assert:
     that:
       - item.vault_key in _kafka_vault_secret_all
       - (_kafka_vault_secret_all[item.vault_key] | default('') | string | length) > 0
     fail_msg: >-
-      В Vault {{ kafka_vault_path }} (mount {{ kafka_vault_mount_point }}) задать ключ {{ item.vault_key }} — пароль для SASL пользователя {{ item.username }}.
+      Set key {{ item.vault_key }} in Vault {{ kafka_vault_path }} (mount {{ kafka_vault_mount_point }}) — password for SASL user {{ item.username }}.
   loop: "{{ kafka_sasl_extra_users | default([]) }}"
   when: >
     kafka_sasl_enabled | bool and
     (kafka_sasl_extra_users | default([]) | length) > 0
   no_log: true
 
-- name: Собрать пароли доп. SASL пользователей
+- name: Collect passwords for extra SASL users
   ansible.builtin.set_fact:
     kafka_sasl_extra_credentials: "{{ kafka_sasl_extra_credentials | default({}) | combine({ item.username: _kafka_vault_secret_all[item.vault_key] }) }}"
   loop: "{{ kafka_sasl_extra_users | default([]) }}"
@@ -60,7 +60,7 @@
     (kafka_sasl_extra_users | default([]) | length) > 0
   no_log: true
 
-- name: Загрузить пароль UI AKHQ из Vault
+- name: Load the AKHQ UI password from Vault
   ansible.builtin.set_fact:
     kafka_akhq_ui_password: "{{ _vault.secret[kafka_vault_key_akhq_ui_password] }}"
   vars:
@@ -70,15 +70,15 @@
     kafka_akhq_enabled | bool and
     (kafka_akhq_ui_password is not defined or (kafka_akhq_ui_password | default('') | string | length) == 0)
 
-- name: Проверить, что задан KRaft CLUSTER_ID
+- name: Check that KRaft CLUSTER_ID is set
   ansible.builtin.assert:
     that:
       - kafka_cluster_id is defined
       - (kafka_cluster_id | string | length) > 0
-    fail_msg: "Задать kafka_cluster_id (Vault или -e kafka_cluster_id=...)."
+    fail_msg: "Set kafka_cluster_id (Vault or -e kafka_cluster_id=...)."
   tags: always
 
-- name: Проверить SASL-пароли при включённом SASL
+- name: Check SASL passwords when SASL is enabled
   ansible.builtin.assert:
     that:
       - kafka_sasl_admin_password is defined
@@ -86,22 +86,22 @@
       - kafka_sasl_platform_kafka_password is defined
       - (kafka_sasl_platform_kafka_password | default('') | string | length) > 0
     fail_msg: >-
-      При kafka_sasl_enabled задать kafka_sasl_admin_password и kafka_sasl_platform_kafka_password
-      (Vault: ключи {{ kafka_vault_key_sasl_admin_password }}, {{ kafka_vault_key_sasl_platform_kafka_password }} в {{ kafka_vault_path }}) или через -e.
+      When kafka_sasl_enabled, set kafka_sasl_admin_password and kafka_sasl_platform_kafka_password
+      (Vault: keys {{ kafka_vault_key_sasl_admin_password }}, {{ kafka_vault_key_sasl_platform_kafka_password }} in {{ kafka_vault_path }}) or via -e.
   when: kafka_sasl_enabled | bool
   tags: always
 
-- name: Проверить пароль UI AKHQ при включённом AKHQ
+- name: Check the AKHQ UI password when AKHQ is enabled
   ansible.builtin.assert:
     that:
       - kafka_akhq_ui_password is defined
       - (kafka_akhq_ui_password | default('') | string | length) > 0
     fail_msg: >-
-      При kafka_akhq_enabled задать ключ {{ kafka_vault_key_akhq_ui_password }} в Vault {{ kafka_vault_path }} или через -e kafka_akhq_ui_password=...
+      When kafka_akhq_enabled, set key {{ kafka_vault_key_akhq_ui_password }} in Vault {{ kafka_vault_path }} or via -e kafka_akhq_ui_password=...
   when: kafka_akhq_enabled | bool
   tags: always
 
-- name: Секрет JWT Micronaut для AKHQ
+- name: Micronaut JWT secret for AKHQ
   ansible.builtin.set_fact:
     kafka_akhq_jwt_secret: "{{ kafka_akhq_ui_password | hash('sha512') }}"
   when: kafka_akhq_enabled | bool

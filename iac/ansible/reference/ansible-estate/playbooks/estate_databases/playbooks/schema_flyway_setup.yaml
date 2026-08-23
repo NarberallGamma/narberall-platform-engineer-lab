@@ -1,17 +1,17 @@
 ---
-# Плейбук настройки пользователя schema_flyway и разграничения прав (Flyway/DDL — schema_flyway, приложение/DML — treasury_user).
-# Без db_name / db_list в --extra-vars плейбук останавливается (пустой default_databases).
-# Примеры:
+# Playbook to set up the schema_flyway user and split privileges (Flyway/DDL — schema_flyway, application/DML — treasury_user).
+# Without db_name / db_list in --extra-vars the playbook stops (empty default_databases).
+# Examples:
 #   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_name=treasury_contract"
 #   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_name=treasury_api"
 #   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_name=treasury_csp"
 #   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_name=treasury_safe_deal_adapter"
 #   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_name=treasury_lp_adapter"
 #   ansible-playbook schema_flyway_setup.yaml --extra-vars "db_list=['treasury_safe_deal_adapter','cryptopro_service','nodes_btc']"
-# После первого успешного старта приложения (Flyway создал kafka_transactional_outbox):
-# повторить setup для treasury_* / сервисов с Debezium connector (outbox OWNER -> treasury_user).
-# Переменные pg_admin_password, treasury_password, schema_flyway_password — в vars или --extra-vars (или vault).
-- name: Настройка пользователя schema_flyway и разграничение прав (DDL vs DML)
+# After the first successful application start (Flyway created kafka_transactional_outbox):
+# repeat setup for treasury_* / services with a Debezium connector (outbox OWNER -> treasury_user).
+# Variables pg_admin_password, treasury_password, schema_flyway_password — in vars or --extra-vars (or vault).
+- name: Set up the schema_flyway user and split privileges (DDL vs DML)
   hosts: localhost
   connection: local
   become: no
@@ -28,38 +28,38 @@
     schema_flyway: schema_flyway
     schema_flyway_password: ""
 
-    # DML-права выдаются treasury_user (treasury и Treasury подключаются под treasury_user). При появлении treasury_user — добавить в additional_app_users.
+    # DML privileges are granted to treasury_user (treasury and Treasury connect as treasury_user). When another treasury_user appears, add it to additional_app_users.
     additional_app_users: []
     app_users: "{{ [treasury_user] + (additional_app_users | default([])) | unique }}"
 
-    # default_databases намеренно пуст: без явного db_name или db_list плейбук не трогает БД.
-    # Сводка (21 БД: прежние 18 + 3 новых), только для справки. keycloak в старом default не был — есть в restore.yaml.
-    #   (новые) treasury_safe_deal_adapter, treasury_lp_adapter, cryptopro_service, nodes_btc
-    #   (прежние) treasury_treasury_adapter, treasury_contract, treasury_audit, hsm, treasury_aml, treasury_api,
+    # default_databases is intentionally empty: without an explicit db_name or db_list the playbook does not touch databases.
+    # Summary (21 databases: previous 18 + 3 new), reference only. keycloak was not in the old default — it is in restore.yaml.
+    #   (new) treasury_safe_deal_adapter, treasury_lp_adapter, cryptopro_service, nodes_btc
+    #   (previous) treasury_treasury_adapter, treasury_contract, treasury_audit, hsm, treasury_aml, treasury_api,
     #   treasury_csp, nodes_eth, nodes_tron, treasury_aml, treasury_auth_provider, treasury_csp,
     #   treasury_notification, treasury_otp, treasury_rates, treasury_report, treasury_web, treasury_onboarding
-    # Переопределение: db_name=... или db_list=['a','b']
+    # Override: db_name=... or db_list=['a','b']
     default_databases: []
 
   pre_tasks:
-    - name: Определить список баз данных для обработки
+    - name: Resolve the database list to process
       ansible.builtin.set_fact:
         db_list: "{{ db_list | default(default_databases) }}"
       when: db_name is not defined or db_name == '' or db_name is none
 
-    - name: Определить список баз данных из db_name (если указана одна БД)
+    - name: Resolve the database list from db_name (when a single database is set)
       ansible.builtin.set_fact:
         db_list: "{{ [db_name] }}"
       when: db_name is defined and db_name != '' and db_name is not none
 
-    - name: Проверить, что список БД не пуст
+    - name: Fail when the database list is empty
       ansible.builtin.fail:
-        msg: "ОШИБКА: Список баз данных пуст. Укажите db_name или db_list через --extra-vars"
+        msg: "ERROR: database list is empty. Set db_name or db_list via --extra-vars"
       when: db_list is not defined or db_list | length == 0
 
-    - name: Показать список БД для обработки
+    - name: Show the database list to process
       ansible.builtin.debug:
-        msg: "Будет обработано {{ db_list | length }} баз данных: {{ db_list | join(', ') }}"
+        msg: "{{ db_list | length }} databases will be processed: {{ db_list | join(', ') }}"
 
   roles:
     - schema_flyway

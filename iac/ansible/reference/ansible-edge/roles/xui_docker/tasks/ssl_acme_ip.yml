@@ -114,10 +114,10 @@
     - name: Fail when ACME HTTP port is still busy
       ansible.builtin.fail:
         msg: >-
-          Port {{ xui_acme_http_port }} занят после остановки
+          Port {{ xui_acme_http_port }} is still in use after stop
           {{ xui_acme_stop_services_before_issue | join(', ') }}.
-          Вывод ss в stdout задачи «Check ACME HTTP port is free».
-          Добавить unit в xui_acme_stop_services_before_issue или освободить порт вручную.
+          ss output is in the stdout of task «Check ACME HTTP port is free».
+          Add the unit to xui_acme_stop_services_before_issue or free the port manually.
       when: xui_acme_port_check.rc != 0
 
     - name: Set acme.sh default CA
@@ -228,8 +228,8 @@
       - xui_acme_domain_conf.content | b64decode is search('acme-post-hook.sh')
       - xui_acme_domain_conf.content | b64decode is search('Le_ReloadCmd=')
     fail_msg: >-
-      acme.sh не зарегистрировал hooks для {{ xui_ssl_ipv4_effective }}.
-      Cron renew будет падать на занятом порте 80 (nginx).
+      acme.sh did not register hooks for {{ xui_ssl_ipv4_effective }}.
+      Cron renew will fail while port 80 is occupied (nginx).
   when: xui_ssl_certs_present | bool
 
 - name: Enable acme.sh auto-upgrade

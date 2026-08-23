@@ -1,9 +1,9 @@
 """
-Тесты раздачи хостов AD по компаниям.
+Tests for assigning AD hosts to companies.
 
-LDAP тут не нужен: проверяются чистые функции, которые решают, чей хост и какого
-он типа. Именно в этом месте раньше терялись машины — хост, не подошедший ни под
-чьи паттерны, молча не попадал никуда.
+LDAP is not needed here: the pure functions that decide whose host this is
+and of what type are tested. This is where machines used to be lost — a host
+that matched nobody's patterns silently went nowhere.
 """
 import importlib.util
 import logging
@@ -25,8 +25,8 @@ def _host(**over) -> dict:
            "os": "Windows 11 Pro", "os_version": "10.0", "dn": None,
            "enabled": True, "is_dc": False}
     row.update(over)
-    # DN выводим из имени: одинаковый DN у разных хостов — артефакт фикстуры,
-    # раздача теперь дедуплицирует именно по DN
+    # DN is derived from the name: the same DN on different hosts is a fixture
+    # artifact; assignment now deduplicates by DN
     if row["dn"] is None:
         row["dn"] = f"CN={row['hostname']},{LAPTOPS}"
     return row
@@ -40,7 +40,7 @@ def test_ou_entries_accepts_plain_dn_and_mapping():
 @pytest.mark.parametrize("os_name, expected", [
     ("Windows Server 2022 Standard", "server"),
     ("Linux", "server"),
-    ("pc-linux-gnu", "server"),      # часть Linux-машин рапортует так, префикс 'Linux*' их не ловит
+    ("pc-linux-gnu", "server"),      # some Linux machines report this way; prefix 'Linux*' would miss them
     ("Windows 11 Pro", "workstation"),
     ("macOS", "workstation"),
 ])
@@ -49,12 +49,12 @@ def test_auto_type_follows_os(os_name, expected):
 
 
 def test_domain_controller_is_always_a_server():
-    # единственный тип, который каталог отдаёт однозначно (primaryGroupID=516)
+    # the only type the directory reports unambiguously (primaryGroupID=516)
     assert ad.host_type(_host(is_dc=True), "workstation") == "server"
 
 
 def test_declared_type_wins_over_os():
-    # OU — административное решение; расхождение с ОС только логируется
+    # OU is an admin decision; mismatch with the OS is only logged
     assert ad.host_type(_host(os="Windows Server 2022"), "workstation") == "workstation"
 
 
@@ -76,7 +76,7 @@ def test_unclaimed_host_goes_to_the_default_company():
         {"name": "project-c", "workstation_ous": [LAPTOPS], "hostname_patterns": ["w-proj-c-*"]},
     ]
     claimed, unassigned = ad.assign_hosts({LAPTOPS: [_host(hostname="w-00000088")]}, companies)
-    assert not unassigned, "хост с чужим именем не должен пропадать"
+    assert not unassigned, "a host with a foreign name must not vanish"
     assert [r["hostname"] for r in claimed["project-a"]] == ["w-00000088"]
 
 
@@ -96,7 +96,7 @@ def test_server_ou_marks_rows_as_servers_and_keeps_linux():
 
 
 def test_service_accounts_without_os_are_dropped_from_server_ous():
-    # gMSA отсекаются фильтром поиска, но пустая ОС не должна доезжать и здесь
+    # gMSAs are cut by the search filter, but an empty OS must not get through here either
     companies = [{"name": "project-a", "server_ous": [SERVERS], "default_company": True}]
     claimed, unassigned = ad.assign_hosts({SERVERS: [_host(os="", dn=f"CN=svc,{SERVERS}")]}, companies)
     assert claimed["project-a"] == []
@@ -118,14 +118,14 @@ def test_gmsa_is_excluded_by_object_class_in_the_search_filter():
 
 
 # ---------------------------------------------------------------------------
-# Порядок раздачи и валидация конфига
+# Assignment order and config validation
 # ---------------------------------------------------------------------------
 
 def test_specific_patterns_win_over_a_greedy_company_listed_first():
     """
-    Авария 2026-08-17: project-a стоял первым и серверных паттернов не имел,
-    поэтому выгреб 30 серверов proj-b* из общих OU раньше project-b. Порядок в конфиге
-    решать не должен.
+    Incident 2026-08-17: project-a was listed first and had no server patterns,
+    so it scooped 30 proj-b* servers from shared OUs before project-b. Config
+    order must not decide.
     """
     companies = [
         {"name": "project-a", "server_ous": [SERVERS], "default_company": True},
@@ -168,15 +168,15 @@ def test_greedy_plus_specific_is_a_valid_config():
 def test_implicit_catch_all_is_reported(caplog):
     caplog.set_level(logging.WARNING)
     ad.validate_config([{"name": "project-a", "server_ous": [SERVERS]}])
-    assert "напишите это явно" in caplog.text.lower()
+    assert "write this explicitly" in caplog.text.lower()
 
 
 def test_company_with_server_ous_and_no_servers_warns(caplog):
-    # ровно тот сигнал, которого не было: 'saved 14 hosts {workstation: 14}'
+    # exactly the signal that was missing: 'saved 14 hosts {workstation: 14}'
     caplog.set_level(logging.WARNING)
     company = {"name": "project-b", "server_ous": [SERVERS], "workstation_ous": [LAPTOPS]}
     ad.check_empty_result(company, [{"source_type": "workstation"}])
-    assert "0 хостов типа 'server'" in caplog.text
+    assert "0 hosts of type 'server'" in caplog.text
 
 
 def test_company_that_got_both_types_is_quiet(caplog):
@@ -191,9 +191,9 @@ MACOS = "OU=MacOS,OU=Laptops,OU=Assets,DC=corp,DC=example,DC=ru"
 
 def test_nested_ou_gives_the_host_to_the_more_specific_owner():
     """
-    OU=MacOS вложен в OU=Laptops, поиск идёт SUBTREE — хост приходит дважды.
-    Раздав обе копии, мы отдали m-user-c и project-e (по паттерну m-*), и
-    project-a (как default_company), а в покрытии он посчитался дважды.
+    OU=MacOS is nested in OU=Laptops, the search is SUBTREE — the host arrives twice.
+    Assigning both copies gave m-user-c to project-e (pattern m-*) and to
+    project-a (as default_company), and coverage counted it twice.
     """
     companies = [
         {"name": "project-a", "workstation_ous": [LAPTOPS], "hostname_patterns": ["w-proj-a-*"],
@@ -205,7 +205,7 @@ def test_nested_ou_gives_the_host_to_the_more_specific_owner():
     claimed, unassigned = ad.assign_hosts({LAPTOPS: [host], MACOS: [host]}, companies)
 
     assert [r["hostname"] for r in claimed["project-e"]] == ["m-user-c"]
-    assert claimed["project-a"] == [], "хост не должен попасть в две компании сразу"
+    assert claimed["project-a"] == [], "the host must not land in two companies at once"
     assert not unassigned
 
 

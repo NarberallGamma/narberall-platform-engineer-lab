@@ -1,4 +1,4 @@
-"""Кастомный security manager: разбор JWT из ответа ADFS OIDC для маппинга пользователя и ролей."""
+"""Custom security manager: parse JWT from the ADFS OIDC response for user and role mapping."""
 
 from superset.security import SupersetSecurityManager
 

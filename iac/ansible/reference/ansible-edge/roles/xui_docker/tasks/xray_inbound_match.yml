@@ -1,5 +1,5 @@
 ---
-# Сопоставление inbound по remark + port (port в API бывает string/int).
+# Match inbound by remark + port (API port may be string/int).
 
 - name: Reset inbound match
   ansible.builtin.set_fact:

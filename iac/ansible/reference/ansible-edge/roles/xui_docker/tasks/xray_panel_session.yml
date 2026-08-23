@@ -1,5 +1,5 @@
 ---
-# Сессия 3X-UI: Bearer API token (предпочтительно) или cookie + CSRF на webBasePath.
+# 3X-UI session: Bearer API token (preferred) or cookie + CSRF on webBasePath.
 
 - name: Init panel auth flags
   ansible.builtin.set_fact:

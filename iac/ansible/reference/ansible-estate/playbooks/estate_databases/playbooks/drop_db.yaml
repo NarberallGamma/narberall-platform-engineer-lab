@@ -1,10 +1,10 @@
 ---
-# Удаление одной или нескольких БД PostgreSQL (без пересоздания).
-# Примеры:
+# Drop one or more PostgreSQL databases (no recreate).
+# Examples:
 #   ansible-playbook drop_db.yaml --extra-vars "db_name=treasury_lp_adapter"
 #   ansible-playbook drop_db.yaml --extra-vars "db_list=['treasury_lp_adapter','treasury_otp']"
-# pg_admin_password, treasury_password — в vars или --extra-vars.
-- name: Удаление баз данных PostgreSQL (drop only)
+# pg_admin_password, treasury_password — in vars or --extra-vars.
+- name: Drop PostgreSQL databases (drop only)
   hosts: localhost
   connection: local
   become: no
@@ -17,32 +17,32 @@
     default_databases: []
 
   pre_tasks:
-    - name: Определить список баз данных для удаления
+    - name: Resolve the database list to drop
       ansible.builtin.set_fact:
         db_list: "{{ db_list | default(default_databases) }}"
       when: db_name is not defined or db_name == '' or db_name is none
 
-    - name: Определить список баз данных из db_name
+    - name: Resolve the database list from db_name
       ansible.builtin.set_fact:
         db_list: "{{ [db_name] }}"
       when: db_name is defined and db_name != '' and db_name is not none
 
-    - name: Проверить, что список БД не пуст
+    - name: Fail when the database list is empty
       ansible.builtin.fail:
-        msg: "ОШИБКА: укажите db_name или db_list через --extra-vars"
+        msg: "ERROR: set db_name or db_list via --extra-vars"
       when: db_list is not defined or db_list | length == 0
 
-    - name: Показать список БД для удаления
+    - name: Show the database list to drop
       ansible.builtin.debug:
-        msg: "Будет удалено {{ db_list | length }} баз данных: {{ db_list | join(', ') }}"
+        msg: "{{ db_list | length }} databases will be dropped: {{ db_list | join(', ') }}"
 
   tasks:
-    - name: Установить py3-psycopg2
+    - name: Install py3-psycopg2
       community.general.apk:
         name: py3-psycopg2
         state: present
 
-    - name: Завершить подключения к базе данных
+    - name: Terminate connections to the database
       community.postgresql.postgresql_query:
         query: |
           SELECT pg_terminate_backend(pid)
@@ -57,7 +57,7 @@
       loop: "{{ db_list }}"
       ignore_errors: yes
 
-    - name: Удалить базы данных PostgreSQL
+    - name: Drop PostgreSQL databases
       community.general.postgresql_db:
         name: "{{ item }}"
         state: absent
@@ -67,6 +67,6 @@
         login_port: "{{ pg_port }}"
       loop: "{{ db_list }}"
 
-    - name: Итог удаления
+    - name: Drop summary
       ansible.builtin.debug:
-        msg: "Удалены БД: {{ db_list | join(', ') }}"
+        msg: "Dropped databases: {{ db_list | join(', ') }}"

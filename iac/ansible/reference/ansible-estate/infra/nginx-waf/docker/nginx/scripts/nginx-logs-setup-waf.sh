@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# WAF estate: каталоги логов по server_name + миграция compose со старого маунта ./logs:/var/log/nginx/static.
-# Формат записи access — wallarm (см. nginx.conf). Новые vhost в репозитории уже содержат блок директив после server {.
-# Запуск из корня nginx на сервере: ./scripts/nginx-logs-setup-waf.sh all
-# Или: NGINX_ROOT=/docker/nginx ./scripts/nginx-logs-setup-waf.sh create_dirs
+# WAF estate: per-server_name log directories + compose migration from the old ./logs:/var/log/nginx/static mount.
+# Access log format is wallarm (see nginx.conf). New vhosts in the repo already include the directive block after server {.
+# From the nginx root on the server: ./scripts/nginx-logs-setup-waf.sh all
+# Or: NGINX_ROOT=/docker/nginx ./scripts/nginx-logs-setup-waf.sh create_dirs
 
 set -e
 
@@ -35,7 +35,7 @@ fix_compose_volume() {
 create_dirs() {
     echo "[create_dirs] LOGS_DIR=$LOGS_DIR"
     mkdir -p "$LOGS_DIR"
-    # Файлы общего лога (не access.log/error.log — entrypoint образа часто делает на них symlinks на /dev/stdin/out).
+    # Aggregate log files (not access.log/error.log — the image entrypoint often symlinks those to /dev/stdin/out).
     for agg in access-aggregate.log error-aggregate.log; do
         p="$LOGS_DIR/$agg"
         if [[ -L "$p" ]] || [[ ! -e "$p" ]]; then
@@ -49,8 +49,8 @@ create_dirs() {
         mkdir -p "$LOGS_DIR/$h"
     done < <(grep -rhE '^[[:space:]]*server_name[[:space:]]+' --include='*.conf' --exclude='wallarm.conf' "$CONFIG_DIR" 2>/dev/null | sed -n 's/^[[:space:]]*server_name[[:space:]]*\([^;]*\).*/\1/p' | tr ' \t' '\n' | sed 's/;//g' | tr -d '\r' | grep -v '^$' | sort -u)
     mkdir -p "$LOGS_DIR/default"
-    # В каждом $LOGS_DIR/<server_name>/ nginx пишет access/error и при наличии в vhost — wallarm-security.log.
-    # Образ WAF обычно www-data (uid 33); при необходимости задать NGINX_UID из контейнера.
+    # Under each $LOGS_DIR/<server_name>/ nginx writes access/error and, when present in the vhost, wallarm-security.log.
+    # The WAF image is typically www-data (uid 33); set NGINX_UID from the container when needed.
     NGINX_UID="${NGINX_UID:-33}"
     chown -R "${NGINX_UID}:${NGINX_UID}" "$LOGS_DIR" 2>/dev/null || true
     chmod -R 755 "$LOGS_DIR" 2>/dev/null || true
@@ -60,7 +60,7 @@ create_dirs() {
 run_all() {
     fix_compose_volume
     create_dirs
-    echo "Done. Next: nginx -t (в контейнере), docker compose up -d; затем scripts/install-logrotate.sh от root."
+    echo "Done. Next: nginx -t (in the container), docker compose up -d; then scripts/install-logrotate.sh as root."
 }
 
 case "${1:-}" in

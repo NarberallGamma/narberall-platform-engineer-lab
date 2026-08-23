@@ -1,17 +1,17 @@
 ---
-# Kafka (apache/kafka, KRaft) в Docker Compose, каталог на хосте — kafka_app_root (по умолчанию /docker/apps/kafka).
-# Init: CLUSTER_ID из Vault (kafka_init) или -e kafka_cluster_id=...
-# Запуск: ./scripts/run/run_kafka.sh --limit kafka-prod.example.com
-# Теги: kafka (всё), kafka_install (каталоги + compose), kafka_manage | kafka_config (шаблон + compose), kafka_restart (пересоздание контейнеров).
+# Kafka (apache/kafka, KRaft) in Docker Compose; host directory — kafka_app_root (default /docker/apps/kafka).
+# Init: CLUSTER_ID from Vault (kafka_init) or -e kafka_cluster_id=...
+# Run: ./scripts/run/run_kafka.sh --limit kafka-prod.example.com
+# Tags: kafka (everything), kafka_install (directories + compose), kafka_manage | kafka_config (template + compose), kafka_restart (recreate containers).
 
-- name: Развёртывание Kafka (Docker Compose)
+- name: Deploy Kafka (Docker Compose)
   hosts: kafka
   gather_facts: true
   become: true
 
-  # Явная загрузка: один файл со всеми переменными группы kafka, без зависимости от того, как Ansible сопоставляет inventory и group_vars в Docker.
+  # Explicit load: one file with all kafka group variables, independent of how Ansible maps inventory and group_vars in Docker.
   pre_tasks:
-    - name: Параметры группы kafka (group_vars/kafka/main.yml)
+    - name: kafka group parameters (group_vars/kafka/main.yml)
       ansible.builtin.include_vars:
         file: "{{ playbook_dir }}/../group_vars/kafka/main.yml"
       tags: [always]

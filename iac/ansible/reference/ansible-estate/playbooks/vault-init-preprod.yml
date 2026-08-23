@@ -1,6 +1,6 @@
 ---
 # Vault Cluster Initialization and Unseal Playbook
-# Инициализация и разблокировка Vault кластера
+# Initialize and unseal the Vault cluster
 
 - name: Initialize Vault Cluster
   hosts: vault_cluster[0]

@@ -104,7 +104,7 @@ Sending to Sentry Production cashier:
       artifacts: true
     - !reference [.need_sentry_release]
 
-Sending to Sentry Demo сashier:
+Sending to Sentry Demo cashier:
   extends:
     - .sentry_release_cashier
     - .before_script_demo_send_sentry_release

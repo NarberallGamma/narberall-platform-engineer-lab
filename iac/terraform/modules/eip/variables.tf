@@ -1,114 +1,114 @@
 variable "create_eip" {
-  description = "Создавать ли EIP. Если false, ресурс не создаётся."
+  description = "Whether to create an EIP. When false, the resource is not created."
   type        = bool
   default     = true
 }
 
 variable "create_associate" {
-  description = "Создавать ли ассоциацию EIP с инстансом. Требует указания instance_id."
+  description = "Whether to create an EIP-to-instance association. Requires instance_id."
   type        = bool
   default     = false
 }
 
 variable "region" {
-  description = "Регион, в котором будет создан EIP. Если не указан, используется регион провайдера."
+  description = "Region where the EIP will be created. When unset, the provider region is used."
   type        = string
   default     = null
 }
 
 variable "publicip_type" {
-  description = "Тип EIP. Допустимое значение: \"5_bgp\"."
+  description = "EIP type. Allowed value: \"5_bgp\"."
   type        = string
   default     = "5_bgp"
 }
 
 variable "publicip_ip_address" {
-  description = "Желаемый IP-адрес. Должен находиться в доступном диапазоне."
+  description = "Desired IP address. Must fall within an available range."
   type        = string
   default     = null
 }
 
 variable "publicip_port_id" {
-  description = "ID порта, к которому привязывается EIP (например, порт VIP). Если указан, EIP будет сразу ассоциирован с этим портом."
+  description = "Port ID to bind the EIP to (for example a VIP port). When set, the EIP is associated with this port immediately."
   type        = string
   default     = null
 }
 
 variable "bandwidth_share_type" {
-  description = "Тип распределения пропускной способности: PER (выделенная) или WHOLE (общая)."
+  description = "Bandwidth share type: PER (dedicated) or WHOLE (shared)."
   type        = string
   default     = "PER"
 }
 
 variable "bandwidth_name" {
-  description = "Имя полосы пропускания."
+  description = "Bandwidth name."
   type        = string
   default     = null
 }
 
 variable "bandwidth_size" {
-  description = "Размер полосы пропускания в Мбит/с."
+  description = "Bandwidth size in Mbit/s."
   type        = number
   default     = 5
 }
 
 variable "bandwidth_charge_mode" {
-  description = "Режим оплаты полосы пропускания: traffic или bandwidth."
+  description = "Bandwidth charging mode: traffic or bandwidth."
   type        = string
   default     = "traffic"
 }
 
 variable "bandwidth_id" {
-  description = "ID существующей общей полосы пропускания. Если указан, share_type игнорируется."
+  description = "ID of an existing shared bandwidth. When set, share_type is ignored."
   type        = string
   default     = null
 }
 
 variable "charging_mode" {
-  description = "Режим оплаты EIP: prePaid или postPaid."
+  description = "EIP charging mode: prePaid or postPaid."
   type        = string
   default     = "postPaid"
 }
 
 variable "period" {
-  description = "Период оплаты (для prePaid)."
+  description = "Billing period (for prePaid)."
   type        = number
   default     = null
 }
 
 variable "period_unit" {
-  description = "Единица измерения периода: month или year."
+  description = "Period unit: month or year."
   type        = string
   default     = null
 }
 
 variable "auto_renew" {
-  description = "Автопродление (для prePaid)."
+  description = "Auto-renewal (for prePaid)."
   type        = string
   default     = null
 }
 
 variable "enterprise_project_id" {
-  description = "ID корпоративного проекта."
+  description = "Enterprise project ID."
   type        = string
   default     = null
 }
 
 variable "tags" {
-  description = "Теги для EIP."
+  description = "Tags for the EIP."
   type        = map(string)
   default     = {}
 }
 
-# Переменные для ассоциации через sbercloud_compute_eip_associate (альтернативный способ)
+# Variables for association via sbercloud_compute_eip_associate (alternative method)
 variable "instance_id" {
-  description = "ID инстанса ECS, к которому привязывается EIP (используется только если create_associate = true)."
+  description = "ECS instance ID to bind the EIP to (used only when create_associate = true)."
   type        = string
   default     = null
 }
 
 variable "fixed_ip" {
-  description = "Фиксированный IP-адрес на сетевом интерфейсе инстанса (используется только если create_associate = true)."
+  description = "Fixed IP address on the instance network interface (used only when create_associate = true)."
   type        = string
   default     = null
 }

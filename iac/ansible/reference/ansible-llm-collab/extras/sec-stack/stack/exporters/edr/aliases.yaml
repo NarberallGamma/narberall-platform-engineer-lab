@@ -1,31 +1,31 @@
-# Ручные соответствия «хост -> имя агента в EDR» для расчёта покрытия.
+# Manual "host -> EDR agent name" mappings for coverage calculation.
 #
-# Нужны там, где связь есть, но в данных её нет. Основной случай — маки в домене:
-# агент регистрируется под локальным именем (`MacBook-Air-admin.local`), а если
-# сетевое имя выглядит как IP-адрес, macOS режет его по первой точке и в EDR
-# приезжает `192`. Доменного имени нет ни в одном поле API — автоматически это
-# не сшивается ничем.
+# Needed where a link exists but is missing from the data. Main case — Macs
+# in the domain: the agent registers under the local name
+# (`MacBook-Air-admin.local`), and if the network name looks like an IP,
+# macOS truncates it at the first dot and EDR gets `192`. There is no
+# domain name in any API field — nothing can join this automatically.
 #
-# Сам по имени пользователя merge3 такие пары НЕ сопоставляет (второй ноутбук у
-# того же человека молча испортил бы метрику): он пишет кандидатов в лог строкой
-# «Кандидаты в aliases.yaml (совпал пользователь…)». Проверить глазами в панели
-# EDR и перенести сюда:
+# merge3 does NOT pair these by username (a second laptop of the same person
+# would silently ruin the metric): it writes candidates to the log as
+# "Candidates for aliases.yaml (matched user…)". Check visually in the EDR
+# console and add them here:
 #
-#   sudo docker logs sec-stack-edr-exporter-1 2>&1 | grep 'Кандидаты в aliases'
+#   sudo docker logs sec-stack-edr-exporter-1 2>&1 | grep 'Candidates for aliases'
 #
-# Имя агента — из колонки `name` файла `{company}_edr.csv` (регистр и подчёркивания
-# не важны). Для обрезанных имён ссылаться на `displayname`: под именем `192`
-# сидят несколько разных маков, и различает их только полное имя. Если агента с
-# таким именем в выгрузке нет, merge3 предупредит — обычно значит, что агент
-# переустановлен и соответствие протухло.
+# Agent name comes from the `name` column of `{company}_edr.csv` (case and
+# underscores do not matter). For truncated names, use `displayname`: several
+# different Macs sit under the name `192`, and only the full name tells them
+# apart. If no agent with that name is in the export, merge3 warns — usually
+# the agent was reinstalled and the mapping is stale.
 #
-# Файл необязательный: без него всё считается как раньше. Правки — через MR,
-# ansible выкладывает его на ВМ рядом с exclusions.yaml.
-# Формат:
+# File is optional: without it, coverage is calculated as before. Changes go
+# through an MR; ansible deploys it to the VM next to exclusions.yaml.
+# Format:
 #
 # companies:
 #   project-e:
 #     m-user-a: MAC              # Mac.loc, lastuser a.user
-#     m-user-b: 192.168.1.15     # name обрезан до '192', ссылаемся на displayname
+#     m-user-b: 192.168.1.15     # name truncated to '192', refer to displayname
 
 companies: {}

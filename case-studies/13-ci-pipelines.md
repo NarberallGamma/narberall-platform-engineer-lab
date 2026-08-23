@@ -24,7 +24,7 @@ See diagram: [`diagrams/case-studies/13-ci-pipelines.md`](../diagrams/case-studi
 5) review-stand + images-kaniko + shop-test-allure: preview NS, pin catalog, UI/API Allure
 6) werf-retail: multi-stage + Trivy/Grype/SAST + Sonar + cleanup (no OSV)
 7) werf-delivery: REVIEW-START/STOP, canary, notify, PHP gates
-8) werf-other: monorepo unit, PHP review quota, werf run builder, OpenTofu
+8) werf-other: monorepo unit, PHP review quota, werf run builder, OpenTofu; consumer next to charts in helm/apps/werf-monorepo-sample
 9) jenkins + github-actions: Jenkinsfile → AWX; three GHA workflows
 10) helmfile-dev + cluster-addons + kb-example-ci + security-gates consumer
 ```

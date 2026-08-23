@@ -1,51 +1,51 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа файлов
+# Primary way to back up files
 
-# Принцип работы:
-#   - создание бэкапа файлов и/или каталогов в borg-репозитории с помощью 
+# How it works:
+#   - create a backup of files and/or directories in a Borg repository with
 #     'borg create'
-#   - удаление старых бэкапов в borg-репозитории с помощью 'borg prune'
+#   - delete old backups in the Borg repository with 'borg prune'
 
-# Поддерживаемые опции:
-# -q|--add-quoted                - путь к файлу или каталогу который необходимо 
-#                                  зарезервировать. Опция может быть указана несколько раз, в 
-#                                  резервную копию попадут все указанные файлы и/или каталоги.
-#                                  Указанные пути будут помещены в одинарные кавычки - будут 
-#                                  корректно обработаны пути с пробелами, но не будут работать 
-#                                  wildcard-подстановки. Необязательный аргумент, пути к 
-#                                  файлам и/или каталогам должны быть указаны или с помощью 
-#                                  этой опции, или с помощью позиционного аргумента ${2}, 
-#                                  также они могут быть использованы совместно
-# -k|--prune                     - строка с опциями алгоритма сохранения резервных копий в 
-#                                  формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                                  Необязательный аргумент, без указания этой опции будет 
-#                                  использовано значение ${CUSTOMPRUNE_DEFAULT}
-#    --prefix                    - строка, помещаемая перед именем архива через знак '-', 
-#                                  например 'PG-', 'files-'. Необязательный аргумент, без указания 
-#                                  этой опции будет использовано значение ${TYPEOFBACKUP_DEFAULT}
-#    --dont-ignore-missing-files - по умолчанию скрипт не считает ошибками внезапное 
-#                                  исчезновение или потерю доступа к целевым файлам 
-#                                  или каталогам (и файлам и каталогам в этих 
-#                                  каталогах) т.е. игнорирует ошибки вида 
-#                                  '[Errno 2] No such file or directory' и '[Errno 13] Permission denied'.
-#                                  Эта опция позволяет отключить игнорирование 
-#                                  таких ошибок. При ее использовании скрипт 
-#                                  возвращает ненулевое значение и отправляет 
-#                                  алерт как и при возникновении других, более серьезных ошибок
+# Supported options:
+# -q|--add-quoted                - path to a file or directory to include in
+#                                  the backup. May be given more than once; all
+#                                  listed files and/or directories are included.
+#                                  Paths are wrapped in single quotes, so paths
+#                                  with spaces are handled correctly, but
+#                                  wildcard expansion does not work. Optional;
+#                                  file and/or directory paths must be given
+#                                  either with this option or via positional
+#                                  argument ${2}, or both together
+# -k|--prune                     - retention options in Borg format, for
+#                                  example '--keep-hourly 72 --keep-within=30d'
+#                                  Optional; if omitted,
+#                                  ${CUSTOMPRUNE_DEFAULT} is used
+#    --prefix                    - string placed before the archive name,
+#                                  separated by '-', e.g. 'PG-', 'files-'.
+#                                  Optional; if omitted, ${TYPEOFBACKUP_DEFAULT} is used
+#    --dont-ignore-missing-files - by default the script does not treat sudden
+#                                  disappearance of, or loss of access to, target
+#                                  files or directories (including files and
+#                                  directories inside them) as errors, i.e. it
+#                                  ignores '[Errno 2] No such file or directory'
+#                                  and '[Errno 13] Permission denied'.
+#                                  This option disables that ignore behavior.
+#                                  With it enabled the script exits non-zero and
+#                                  sends an alert, same as for other, more
+#                                  serious errors
 
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория. Обязательный аргумент
-# ${2} - разделенные запятыми, пути к файлам или каталогам которые необходимо 
-#        зарезервировать. Можно использовать wildcard-подстановки, пробелы в 
-#        путях будут обработаны НЕкорректно. Обязательный аргумент, если не 
-#        использована опция -q|--add-quoted или требуется указать исключения 
-#        из резервного копирования с помощью позиционного аргумента ${3}
-# ${3} - исключения из резервного копирования в формате регулярного выражения. 
-#        Несколько регулярных выражений могут быть указаны через запятую.
-#        Необязательный аргумент
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix. Required
+# ${2} - comma-separated paths to files or directories to back up.
+#        Wildcards may be used; spaces in paths are NOT handled correctly.
+#        Required if -q|--add-quoted is not used, or if exclusions
+#        must be given via positional argument ${3}
+# ${3} - backup exclusions as regular expressions.
+#        Multiple expressions may be comma-separated.
+#        Optional
 
-# Примеры использования в schedule:
+# Schedule usage examples:
 # borg_run_on.sh 10.0.0.1 borg_backup_files.sh 'SYSTEM /etc,/var/spool/cron,/etc/backup-agent/config.d ^\/etc\/\.git$'
 # borg_run_on.sh 10.0.0.1 borg_backup_files.sh 'DATA /var ^\/var\/.*\/lock$'
 # borg_run_on.sh 10.0.0.1 borg_backup_files.sh 'DATA /var ^\/var\/.*\/lock$,^\/var\/log/auth.log.*$'
@@ -80,7 +80,7 @@ CUSTOMPRUNE=""
 TYPEOFBACKUP=""
 DONT_IGNORE_MISSING_FILES=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options q:k: --longoptions ,add-quoted:,prune:,prefix:,dont-ignore-missing-files -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

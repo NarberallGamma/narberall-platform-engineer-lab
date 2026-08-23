@@ -1,5 +1,5 @@
 ---
-- name: Telegram VPS egress | каталог приложения
+- name: Telegram VPS egress | application directory
   ansible.builtin.file:
     path: "{{ telegram_vps_egress_base_dir }}"
     state: directory
@@ -43,7 +43,7 @@
   when: telegram_vps_egress_enabled | bool
   tags: [telegram_vps_egress, deploy]
 
-- name: Telegram VPS egress | контейнер запущен
+- name: Telegram VPS egress | container is running
   community.docker.docker_container_info:
     name: "{{ telegram_vps_egress_container_name }}"
   register: telegram_vps_egress_container
@@ -53,7 +53,7 @@
   when: telegram_vps_egress_enabled | bool
   tags: [telegram_vps_egress, deploy, health]
 
-- name: Telegram VPS egress | итог
+- name: Telegram VPS egress | summary
   ansible.builtin.debug:
     msg:
       - "Host: {{ inventory_hostname }}"

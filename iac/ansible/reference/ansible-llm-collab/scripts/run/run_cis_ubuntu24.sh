@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # CIS Ubuntu 24 hardening (playbooks/cis_ubuntu24.yml, group_vars/cis_ubuntu24.yml).
 #
-# SSH-ключ с passphrase (WSL): eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
+# SSH key with a passphrase (WSL): eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
 #   ./scripts/run/run_cis_ubuntu24.sh --remote --limit HOST --ssh-key ~/.ssh/your_key --ssh-agent
-# Подробнее: scripts/run/lib/docker_ssh.sh
+# Details: scripts/run/lib/docker_ssh.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/docker_ssh.sh
@@ -25,16 +25,16 @@ while [[ $# -gt 0 ]]; do
     --ask-pass)      ASK_PASS=1; shift ;;
     --help|-h)
       cat <<'EOF'
-Использование: run_cis_ubuntu24.sh [опции] [-- extra ansible-playbook args]
+Usage: run_cis_ubuntu24.sh [options] [-- extra ansible-playbook args]
 
   --local, -l     inventories/localhost/hosts.ini
-  --remote, -r    inventories/hosts.ini (по умолчанию)
-  --limit HOST    ограничить хост из группы prepare
-  --ssh-key PATH  монтировать ключ в контейнер
-  --ssh-agent     проброс SSH agent (ключ с passphrase)
-  --ask-pass      пароль SSH через Ansible
+  --remote, -r    inventories/hosts.ini (default)
+  --limit HOST    limit to a host from the prepare group
+  --ssh-key PATH  mount the key into the container
+  --ssh-agent     forward SSH agent (key with a passphrase)
+  --ask-pass      SSH password via Ansible
 
-Переменные CIS: group_vars/cis_ubuntu24.yml
+CIS variables: group_vars/cis_ubuntu24.yml
 EOF
       exit 0
       ;;

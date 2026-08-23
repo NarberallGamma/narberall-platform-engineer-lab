@@ -1,5 +1,5 @@
 # Vault Cluster Configuration for PREPROD Environment
-# Все переменные для развертывания HA Vault кластера в preprod окружении
+# All variables for deploying an HA Vault cluster in the preprod environment
 
 # ========== DOCKER REGISTRY ==========
 docker_registry: "registry.example.com"
@@ -22,7 +22,7 @@ vault_domain: "vault.preprod.example.com"
 vault_api_port: 8200
 vault_cluster_port: 8201
 vault_ui_port: 8202
-lb_port: 443  # Стандартный HTTPS порт
+lb_port: 443  # Standard HTTPS port
 
 # ========== CLOUD.RU VIRTUAL IP CONFIGURATION ==========
 # Cloud.ru Virtual IP for high availability
@@ -88,8 +88,8 @@ vault_tls_disable: false
 vault_ui_enabled: true
 vault_disable_mlock: true
 
-# ========== FUTURE SECRETS (не деплоить в GitLab) ==========
-# Эти переменные будут добавлены позже для секретов
+# ========== FUTURE SECRETS (do not deploy to GitLab) ==========
+# These variables will be added later for secrets
 # vault_secrets:
 #   - name: "secret1"
 #     path: "secret/data/app1"

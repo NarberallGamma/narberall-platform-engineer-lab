@@ -1,6 +1,6 @@
 ---
-# Дополнительные inbound'ы Xray рядом с основным VLESS Reality.
-# Secrets хранятся отдельно от clients-registry, потому что Trojan/Shadowsocks используют пароли.
+# Extra Xray inbounds next to the primary VLESS Reality inbound.
+# Secrets are stored separately from clients-registry because Trojan/Shadowsocks use passwords.
 
 - name: Ensure extra inbound artifacts directory exists
   ansible.builtin.file:

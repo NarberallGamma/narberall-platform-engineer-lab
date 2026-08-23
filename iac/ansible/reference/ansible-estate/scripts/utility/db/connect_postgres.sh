@@ -1,55 +1,55 @@
 #!/bin/bash
 
-# Скрипт для подключения к PostgreSQL через Docker
-# Использование: ./connect_postgres.sh [prod|preprod]
+# Connect to PostgreSQL through Docker
+# Usage: ./connect_postgres.sh [prod|preprod]
 #
-# Переменные окружения (опционально):
-#   PROD_HOST - хост PostgreSQL для PROD (по умолчанию: postgres.example.com)
-#   PROD_USER - пользователь для PROD (по умолчанию: postgres)
-#   PROD_PASSWORD - пароль для PROD (по умолчанию: your-password)
-#   PROD_DB - база данных для PROD (по умолчанию: postgres)
-#   PREPROD_HOST - хост PostgreSQL для PREPROD (по умолчанию: postgres.preprod.example.com)
-#   PREPROD_USER - пользователь для PREPROD (по умолчанию: postgres)
-#   PREPROD_PASSWORD - пароль для PREPROD (по умолчанию: your-password)
-#   PREPROD_DB - база данных для PREPROD (по умолчанию: postgres)
+# Environment variables (optional):
+#   PROD_HOST - PostgreSQL host for PROD (default: postgres.example.com)
+#   PROD_USER - user for PROD (default: postgres)
+#   PROD_PASSWORD - password for PROD (default: your-password)
+#   PROD_DB - database for PROD (default: postgres)
+#   PREPROD_HOST - PostgreSQL host for PREPROD (default: postgres.preprod.example.com)
+#   PREPROD_USER - user for PREPROD (default: postgres)
+#   PREPROD_PASSWORD - password for PREPROD (default: your-password)
+#   PREPROD_DB - database for PREPROD (default: postgres)
 
-# Конфигурация PROD
+# PROD configuration
 PROD_HOST="${PROD_HOST:-postgres.example.com}"
 PROD_USER="${PROD_USER:-postgres}"
 PROD_PASSWORD="${PROD_PASSWORD:-your-password}"
 PROD_DB="${PROD_DB:-postgres}"
 
-# Конфигурация PREPROD
+# PREPROD configuration
 PREPROD_HOST="${PREPROD_HOST:-postgres.preprod.example.com}"
 PREPROD_USER="${PREPROD_USER:-postgres}"
 PREPROD_PASSWORD="${PREPROD_PASSWORD:-your-password}"
 PREPROD_DB="${PREPROD_DB:-postgres}"
 
-# Функция для подключения к PROD
+# Connect to PROD
 connect_prod() {
-    echo "Подключение к PROD PostgreSQL (${PROD_HOST})..."
+    echo "Connecting to PROD PostgreSQL (${PROD_HOST})..."
     docker run -it --rm \
         postgres:15 \
         psql "postgresql://${PROD_USER}:${PROD_PASSWORD}@${PROD_HOST}:5432/${PROD_DB}?sslmode=require"
 }
 
-# Функция для подключения к PREPROD
+# Connect to PREPROD
 connect_preprod() {
-    echo "Подключение к PREPROD PostgreSQL (${PREPROD_HOST})..."
+    echo "Connecting to PREPROD PostgreSQL (${PREPROD_HOST})..."
     docker run -it --rm \
         postgres:15 \
         psql "postgresql://${PREPROD_USER}:${PREPROD_PASSWORD}@${PREPROD_HOST}:5432/${PREPROD_DB}?sslmode=require"
 }
 
-# Определение окружения
+# Resolve environment
 ENV="${1:-}"
 
 if [ -z "$ENV" ]; then
-    # Интерактивный выбор, если параметр не указан
-    echo "Выберите окружение:"
+    # Interactive choice when the argument is omitted
+    echo "Select environment:"
     echo "1) PROD (${PROD_HOST})"
     echo "2) PREPROD (${PREPROD_HOST})"
-    read -p "Введите номер (1 или 2): " choice
+    read -p "Enter number (1 or 2): " choice
     
     case $choice in
         1)
@@ -59,12 +59,12 @@ if [ -z "$ENV" ]; then
             connect_preprod
             ;;
         *)
-            echo "Неверный выбор. Используйте 1 или 2."
+            echo "Invalid choice. Use 1 or 2."
             exit 1
             ;;
     esac
 else
-    # Использование параметра командной строки
+    # Use the command-line argument
     case "$ENV" in
         prod|PROD|production)
             connect_prod
@@ -73,10 +73,9 @@ else
             connect_preprod
             ;;
         *)
-            echo "Неверный параметр. Используйте: prod или preprod"
-            echo "Использование: $0 [prod|preprod]"
+            echo "Invalid argument. Use: prod or preprod"
+            echo "Usage: $0 [prod|preprod]"
             exit 1
             ;;
     esac
 fi
-

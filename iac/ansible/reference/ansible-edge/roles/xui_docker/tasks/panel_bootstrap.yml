@@ -145,7 +145,7 @@
     xui_panel_has_default_credential | bool
     or xui_panel_bootstrap_on_existing | bool
 
-- name: Sync panel login in container from artifact or -e (CLI, без веб-логина)
+- name: Sync panel login in container from artifact or -e (CLI, no web login)
   ansible.builtin.import_tasks: panel_apply_credentials_cli.yml
   when:
     - xui_panel_sync_credentials_from_artifact | default(true) | bool

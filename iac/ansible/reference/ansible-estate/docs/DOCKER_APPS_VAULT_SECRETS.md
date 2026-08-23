@@ -1,13 +1,13 @@
-# Docker apps: секреты в Vault
+# Docker apps: secrets in Vault
 
-Секреты **не** в git. Роль `docker_app` читает KV через `vault_kv2_get` и записывает в **`/docker/apps/<slug>/.env`** (mode 0600). Compose подключает `env_file: .env`. Несекретные параметры: `config/*.conf` или `config/config.yaml`.
+Secrets are **not** in git. Role `docker_app` reads KV via `vault_kv2_get` and writes **`/docker/apps/<slug>/.env`** (mode 0600). Compose mounts `env_file: .env`. Non-secret parameters: `config/*.conf` or `config/config.yaml`.
 
-## Путь в Vault
+## Path in Vault
 
-| Параметр | Значение |
+| Parameter | Value |
 |----------|----------|
 | Mount (engine) | `ansible` (`docker_app_vault_mount_point`) |
-| Path | имя сервиса (`docker_app_vault_path`) |
+| Path | service name (`docker_app_vault_path`) |
 
 CLI (prod):
 
@@ -18,13 +18,13 @@ vault kv put ansible/cert-orchestrator TELEGRAM_BOT_TOKEN="..." TELEGRAM_CHAT_ID
 vault kv put ansible/cloud-hibernate-operator TELEGRAM_BOT_TOKEN="..." IAM_PASSWORD="..." API_KEYS="chk_..."
 ```
 
-Preprod: `VAULT_ADDR=https://vault.preprod.example.com`, те же path (`cert-monitoring`, `cert-orchestrator`, …).
+Preprod: `VAULT_ADDR=https://vault.preprod.example.com`, same paths (`cert-monitoring`, `cert-orchestrator`, …).
 
-## Имена ключей в group_vars
+## Key names in group_vars
 
-В `group_vars/<service>.yml` задаётся **`docker_app_vault_key_map`**: logical name (для templates) → имя поля в секрете Vault.
+`group_vars/<service>.yml` sets **`docker_app_vault_key_map`**: logical name (for templates) → field name in the Vault secret.
 
-Пример `group_vars/cert-monitoring.yml`:
+Example `group_vars/cert-monitoring.yml`:
 
 ```yaml
 docker_app_vault_mount_point: ansible
@@ -35,47 +35,47 @@ docker_app_vault_key_map:
 
 ### cert-monitoring
 
-| Vault key | Обязательно | В group_vars (не секрет) |
+| Vault key | Required | In group_vars (not a secret) |
 |-----------|-------------|--------------------------|
-| `TELEGRAM_BOT_TOKEN` | да | `telegram_chat_ids`, `monitored_hosts`, intervals, … |
+| `TELEGRAM_BOT_TOKEN` | yes | `telegram_chat_ids`, `monitored_hosts`, intervals, … |
 
 ### cert-orchestrator
 
-| Vault key | Обязательно |
+| Vault key | Required |
 |-----------|-------------|
-| `TELEGRAM_BOT_TOKEN` | да |
-| `TELEGRAM_CHAT_IDS` | да (пример: `-1000000000001`) |
-| `REG_RU_DNS_USERNAME` | да |
-| `REG_RU_DNS_PASSWORD` | да |
-| `ssh_private_key` | да → `/docker/apps/cert-orchestrator/.ssh/id_estate` (0600), mount в контейнер `/ssh/id_estate:ro` |
-| `K8S_TOKEN` | да → `.env` (ServiceAccount token для kubectl) |
-| `k8s_ca_cert` | да → `/docker/apps/cert-orchestrator/.k8s/ca.crt`, mount `/run/cert-orchestrator/k8s-ca.crt:ro` |
+| `TELEGRAM_BOT_TOKEN` | yes |
+| `TELEGRAM_CHAT_IDS` | yes (example: `-1000000000001`) |
+| `REG_RU_DNS_USERNAME` | yes |
+| `REG_RU_DNS_PASSWORD` | yes |
+| `ssh_private_key` | yes → `/docker/apps/cert-orchestrator/.ssh/id_estate` (0600), mount in the container `/ssh/id_estate:ro` |
+| `K8S_TOKEN` | yes → `.env` (ServiceAccount token for kubectl) |
+| `k8s_ca_cert` | yes → `/docker/apps/cert-orchestrator/.k8s/ca.crt`, mount `/run/cert-orchestrator/k8s-ca.crt:ro` |
 
-Секреты оркестратора в `.env`: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS`, `REG_RU_DNS_USERNAME`, `REG_RU_DNS_PASSWORD`, `K8S_TOKEN`.
+Orchestrator secrets in `.env`: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_IDS`, `REG_RU_DNS_USERNAME`, `REG_RU_DNS_PASSWORD`, `K8S_TOKEN`.
 
-K8s: `kubernetes.api_server` и `cert_orchestrator_k8s_namespace_secrets` в `group_vars/cert-orchestrator.yml` (без kubeconfig mount).
-SSH nginx targets (`target_nginx_hosts`): gitlab-nginx, **edge-lb** (`/docker/apps/edge-lb/certs`, vhost vault + hsm-adapter). VM hsm-adapter не в targets.
-RBAC и выпуск токена: **`CERT_ORCHESTRATOR_K8S_RBAC.md`**.
+K8s: `kubernetes.api_server` and `cert_orchestrator_k8s_namespace_secrets` in `group_vars/cert-orchestrator.yml` (no kubeconfig mount).
+SSH nginx targets (`target_nginx_hosts`): gitlab-nginx, **edge-lb** (`/docker/apps/edge-lb/certs`, vhost vault + hsm-adapter). The hsm-adapter VM is not in targets.
+RBAC and token issue: **`CERT_ORCHESTRATOR_K8S_RBAC.md`**.
 
 ### cloud-hibernate-operator
 
-| Vault key | Куда на хосте |
+| Vault key | Destination on the host |
 |-----------|---------------|
 | `TELEGRAM_BOT_TOKEN` | `.env` |
 | `IAM_PASSWORD` | `.env` |
-| `API_KEYS` | `.env` (при `api_auth_enabled: true`) |
+| `API_KEYS` | `.env` (when `api_auth_enabled: true`) |
 
-Остальное: `group_vars/cloud-hibernate-operator.yml` (IAM username, endpoints, clusters_config, …).
+The rest: `group_vars/cloud-hibernate-operator.yml` (IAM username, endpoints, clusters_config, …).
 
 ### hsm-adapter (treasury-hsm-adapter)
 
-Mount **`secret`** (не `ansible`), path **`treasury-hsm-adapter`**. Ключ в Vault UI: [secret/kv/treasury-hsm-adapter](https://vault.example.com/ui/vault/secrets/secret/kv/treasury-hsm-adapter).
+Mount **`secret`** (not `ansible`), path **`treasury-hsm-adapter`**. Key in Vault UI: [secret/kv/treasury-hsm-adapter](https://vault.example.com/ui/vault/secrets/secret/kv/treasury-hsm-adapter).
 
-| Vault key | Куда на хосте |
+| Vault key | Destination on the host |
 |-----------|---------------|
-| `external_csp_license` | `.env` → `EXTERNAL_CSP_LICENSE` в контейнере hsm-adapter |
+| `external_csp_license` | `.env` → `EXTERNAL_CSP_LICENSE` in the hsm-adapter container |
 
-Пример `group_vars/hsm-adapter.yml`:
+Example `group_vars/hsm-adapter.yml`:
 
 ```yaml
 docker_app_vault_mount_point: secret
@@ -91,34 +91,34 @@ export VAULT_ADDR=https://vault.example.com
 vault kv put secret/treasury-hsm-adapter external_csp_license="<license>"
 ```
 
-Preprod: `VAULT_ADDR=https://vault.preprod.example.com`, тот же path.
+Preprod: `VAULT_ADDR=https://vault.preprod.example.com`, same path.
 
-Остальное (образы, logging, data dirs): `group_vars/hsm-adapter.yml`. TLS: **edge-lb** vhost `hsm-adapter` (`group_vars/edge-lb.yml`).
+The rest (images, logging, data dirs): `group_vars/hsm-adapter.yml`. TLS: **edge-lb** vhost `hsm-adapter` (`group_vars/edge-lb.yml`).
 
 ### treasury-policy-gateway
 
-Mount **`secret`**, path **`treasury-policy-gateway-app`** (как ESO preprod).
+Mount **`secret`**, path **`treasury-policy-gateway-app`** (same as ESO preprod).
 
-| Vault key | Куда на хосте |
+| Vault key | Destination on the host |
 |-----------|---------------|
 | `kafkaClientPassword` | `.env` → `KAFKA_CLIENT_PASSWORD` |
 | `file-storage.s3.accessKey` | `FILE_STORAGE_S3_ACCESS_KEY` |
 | `file-storage.s3.secretKey` | `FILE_STORAGE_S3_SECRET_KEY` |
-| `treasury.policy-gateway.dgtry.pin` | literal в `docker-compose.yml`: **`treasury.policy-gateway.dgtry.pin`** (как ESO/k8s, lowercase; `$` → `$$`, yaml single quotes) |
+| `treasury.policy-gateway.dgtry.pin` | literal in `docker-compose.yml`: **`treasury.policy-gateway.dgtry.pin`** (same as ESO/k8s, lowercase; `$` → `$$`, yaml single quotes) |
 | `EXTERNAL_CSP_LICENSE` | `EXTERNAL_CSP_LICENSE` |
 | `spring.kafka.properties.ssl.truststore.password` | Kafka JKS truststore/keystore password (init + Spring SSL + `JAVA_TOOL_OPTIONS`) |
 
-Доп. path (как ESO preprod для `kafkaClientPassword`):
+Extra path (same as ESO preprod for `kafkaClientPassword`):
 
 | Path | Vault key | → `.env` |
 |------|-----------|----------|
 | `secret/treasury-kafka` | `kafkaClientPassword` | `KAFKA_CLIENT_PASSWORD` |
 
-Задаётся `docker_app_vault_extra_reads` в `group_vars/treasury-policy-gateway.yml`.
+Set via `docker_app_vault_extra_reads` in `group_vars/treasury-policy-gateway.yml`.
 
-Kafka CA (truststore init): файл `roles/docker_app/files/treasury-policy-gateway/kafka-ca-prod.crt` (цепочка из k8s Secret `kafka-ca-cert`, platform), не Vault. Обновление: `(local notes omitted)`.
+Kafka CA (truststore init): file `roles/docker_app/files/treasury-policy-gateway/kafka-ca-prod.crt` (chain from k8s Secret `kafka-ca-cert`, platform), not Vault. Update: `(local notes omitted)`.
 
-Пример `group_vars/treasury-policy-gateway.yml`: см. `docker_app_vault_key_map` в репозитории.
+Example `group_vars/treasury-policy-gateway.yml`: see `docker_app_vault_key_map` in the repository.
 
 CLI (prod):
 
@@ -129,23 +129,23 @@ vault kv put secret/treasury-policy-gateway-app \
   file-storage.s3.secretKey="..." \
   treasury.policy-gateway.dgtry.pin="..." \
   EXTERNAL_CSP_LICENSE="..."
-# KAFKA_CLIENT_PASSWORD: уже в secret/treasury-kafka (ansible подтягивает extra_reads)
+# KAFKA_CLIENT_PASSWORD: already in secret/treasury-kafka (ansible pulls extra_reads)
 ```
 
-Preprod: path тот же, `VAULT_ADDR=https://vault.preprod.example.com`. Keys **не** в Vault: каталог `data/cprocsp/keys` на VM (ручной перенос с hsm-adapter).
+Preprod: same path, `VAULT_ADDR=https://vault.preprod.example.com`. Keys are **not** in Vault: directory `data/cprocsp/keys` on the VM (manual copy from hsm-adapter).
 
 ### cryptopro
 
 Mount **`secret`**, path **`cryptopro-service-app`**.
 
-| Vault key | Куда на хосте |
+| Vault key | Destination on the host |
 |-----------|---------------|
 | `spring.datasource.username` | `SPRING_DATASOURCE_USERNAME` |
 | `spring.datasource.password` | `SPRING_DATASOURCE_PASSWORD` |
 | `spring.flyway.user` | `SPRING_FLYWAY_USER` |
 | `spring.flyway.password` | `SPRING_FLYWAY_PASSWORD` |
 
-Пример `group_vars/cryptopro.yml`: см. `docker_app_vault_key_map`.
+Example `group_vars/cryptopro.yml`: see `docker_app_vault_key_map`.
 
 CLI (prod):
 
@@ -158,9 +158,9 @@ vault kv put secret/cryptopro-service-app \
   spring.flyway.password="..."
 ```
 
-Сертификат подписи (escrow / CryptoPro): через Swagger **после** deploy (`importCertificate`), не через Vault в этом playbook.
+Signing certificate (escrow / CryptoPro): via Swagger **after** deploy (`importCertificate`), not via Vault in this playbook.
 
-## Запуск после записи секретов
+## Run after writing secrets
 
 ```bash
 ./scripts/run/run_docker_app.sh deploy cert-monitoring --prod --limit estate-prod-gitlab --ssh-agent
@@ -172,4 +172,4 @@ vault kv put secret/cryptopro-service-app \
 ./scripts/run/run_docker_app.sh deploy hsm-adapter --preprod --limit estate-preprod-hsm-adapter --ssh-agent
 ```
 
-См. также: `docs/DOCKER_APPS.md`, `docs/VAULT_INTEGRATION.md`
+See also: `docs/DOCKER_APPS.md`, `docs/VAULT_INTEGRATION.md`

@@ -55,9 +55,9 @@
       - xui_outbound_main_slurp.content is defined
       - xui_outbound_main_slurp.content | length > 0
     fail_msg: >-
-      Outbound «{{ xui_outbound_item.tag }}»: нет
+      Outbound «{{ xui_outbound_item.tag }}»: missing
       {{ xui_artifacts_dir }}/{{ xui_outbound_main_host }}/inbound-summary.json.
-      Сначала выполнить xui_main на этом хосте (--tags xray,autoconfigure).
+      Run xui_main on this host first (--tags xray,autoconfigure).
   delegate_to: localhost
   become: false
 
@@ -94,8 +94,8 @@
       - xui_outbound_extra_registry is defined
       - xui_outbound_extra_registry.get(xui_outbound_extra_registry_key, {}).password | default('') | length > 0
     fail_msg: >-
-      Outbound «{{ xui_outbound_item.tag }}»: нет клиента {{ xui_outbound_chain_email }}
-      в {{ xui_extra_inbounds_registry_filename }} для {{ xui_outbound_main_summary.remark }}.
+      Outbound «{{ xui_outbound_item.tag }}»: client {{ xui_outbound_chain_email }}
+      is missing in {{ xui_extra_inbounds_registry_filename }} for {{ xui_outbound_main_summary.remark }}.
   delegate_to: localhost
   become: false
   when: xui_outbound_protocol != 'vless'

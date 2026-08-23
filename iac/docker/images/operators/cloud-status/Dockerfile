@@ -1,4 +1,4 @@
-# Cloud.ru Status API → Prometheus exporter (по аналогии с cloudeye-exporter)
+# Cloud.ru Status API → Prometheus exporter (same pattern as cloudeye-exporter)
 # Build stage
 FROM golang:1.19-alpine AS builder
 
@@ -26,7 +26,7 @@ WORKDIR /app
 COPY --from=builder /build/cloud-status-exporter .
 COPY --from=builder /build/config.yml ./config.yml
 
-# Non-root user (как у cloudeye-exporter)
+# Non-root user (same as cloudeye-exporter)
 RUN addgroup -g 1000 -S appgroup && \
     adduser -u 1000 -S appuser -G appgroup && \
     chown -R appuser:appgroup /app

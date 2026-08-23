@@ -1,55 +1,54 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа архивов WAL-файлов
+# This script is the primary WAL archive backup method
 
-# Принцип работы:
-#   - резервное копирование архивов WAL-файлов с помощью borg_backup_files.sh
-#   - удаление старых архивов WAL-файлов с помощью find
+# How it works:
+#   - back up WAL file archives with borg_backup_files.sh
+#   - delete old WAL file archives with find
 
-# Перед настройкой бэкапа архивов WAL-файлов требуется собственно настроить 
-# архивацию WAL-файлов в специально выделенный для этого каталог
-# Для этого в файле postgresql.conf необходимо:
-#   - включить архивацию WAL-файлов, установив параметр 'archive_mode' в 'on'
-#   - указать комманду архивации WAL-файлов в параметре 'archive_command'
-#   - перезапустить сервис PostgreSQL (по согласованию с командой или клиентом)
-# Типичные значения параметров 'archive_mode' и 'archive_command':
+# Before WAL archive backup is configured, WAL archiving itself must be
+# pointed at a dedicated directory.
+# In postgresql.conf:
+#   - enable WAL archiving by setting 'archive_mode' to 'on'
+#   - set the WAL archive command in 'archive_command'
+#   - restart the PostgreSQL service (after agreement with the team or client)
+# Typical 'archive_mode' and 'archive_command' values:
 # archive_mode = on
 # archive_command = '/usr/bin/test ! -f /var/backups/pgsql/wal/%f.tgz && /bin/tar -zcf /var/backups/pgsql/wal/%f.tgz %p'
 
-# Если Borg-репозиторий с бэкапами оказывается слишком большим и коэффициент 
-# дедпуликации в нем оказывается не больше двух т.е. 'Deduplicated size' для всего 
-# Borg-репозитория меньше не больше чем в 2 раза по сравнению с 'Original size', то 
-# можно отключить сжатие архивов WAL-файлов использовав 'archive_command' без сжатия:
+# If the Borg repository grows too large and its deduplication ratio stays
+# at most two, i.e. 'Deduplicated size' for the whole Borg repository is
+# not more than 2x smaller than 'Original size', WAL archive compression
+# can be disabled by using 'archive_command' without compression:
 # archive_command = '/usr/bin/test ! -f /var/backups/pgsql/wal/%f.tar && /bin/tar -cf /var/backups/pgsql/wal/%f.tar %p'
-# Изменять archive_command можно только по согласованию с командой/клиентом
+# Change archive_command only after agreement with the team or client
 
-# Если WAL-файлы архивируются недостаточно часто и некоторые из бэкапов оказываются 
-# околонулевого размера можно указать PostgreSQL делать архивы WAL-файлов по истечении 
-# времени с помощью параметра archive_timeout. Хорошее значения этого параметра около 600 секунд
-# Использовать параметр archive_timeout можно только по согласованию с командой/клиентом
+# If WAL files are archived too rarely and some backups are near-zero size,
+# PostgreSQL can archive WAL files after a timeout via archive_timeout.
+# A reasonable value is about 600 seconds.
+# Use archive_timeout only after agreement with the team or client
 
-# Поддерживаемые опции:
-# -k|--prune      - строка с опциями алгоритма сохранения резервных копий в 
-#                   формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                   Необязательный аргумент, без указания этой опции будет 
-#                   использовано значение ${CUSTOMPRUNE_DEFAULT}
+# Supported options:
+# -k|--prune      - retention algorithm options string in
+#                   Borg format, for example '--keep-hourly 72 --keep-within=30d'
+#                   Optional argument; if omitted,
+#                   the value of ${CUSTOMPRUNE_DEFAULT} is used
 
-# Позиционные аргументы:
-# ${1} - путь к каталогу с архивами WAL-файлов. Обязательный аргумент
-# ${2} - максимальное время жизни WAL-файлов в днях, WAL-файлы с большим 
-#        временем жизни будут удалены, из-за округления фактическое время жизни
-#        WAL-файлов может быть больше на 1 день от указанного максимального. 
-#        Необязательный аргумент, без указания этого аргумента будет 
-#        использовано значение ${THRESHOLD_DEFAULT}
+# Positional arguments:
+# ${1} - path to the WAL archive directory. Required argument
+# ${2} - maximum WAL file lifetime in days; WAL files older than this are
+#        deleted. Because of rounding, the actual lifetime may be up to
+#        1 day longer than the stated maximum.
+#        Optional argument; if omitted,
+#        the value of ${THRESHOLD_DEFAULT} is used
 
-# Примеры использования в schedule:
+# Usage examples in schedule:
 # borg_run_on.sh 10.0.0.1 borg_backup_wals.sh '/var/backups/pgsql/wal'
 # borg_run_on.sh 10.0.0.1 borg_backup_wals.sh '/var/backups/pgsql/wal 7'
 # borg_run_on.sh 10.0.0.1 borg_backup_wals.sh '/var/backups/pgsql/wal 7 --prune "--keep-hourly 3 --keep-within=30d"'
 
-# Попытки указать в качестве каталога с архивами WAL-файлов каталоги уровня 
-# меньше чем 3 т.е. '/', '/etc', '/var' и т.п., а также каталоги перечисленные 
-# в ${PROTECTED_DIRS} приведут к аварийному завершению скрипта и отсутствию бэкапов
+# Using a WAL archive directory shallower than level 3 (for example '/', '/etc', '/var')
+# or a path listed in ${PROTECTED_DIRS} aborts the script and produces no backups
 
 ################################################################################
 
@@ -77,10 +76,10 @@ function alert {
   backup_notify --trigger backup --label backup_target="${BACKUP_TARGET}" --label backup_type="${BACKUP_TYPE}" --summary "${MESSAGE}" "${FULL_MESSAGE}"
 }
 
-# Корректно сравнивает пути VFS
-# uncertain - неопределенное состояние, один из аргументов не VFS-путь
-# equal     - пути равны
-# not_equal - пути не равны
+# Compare VFS paths correctly
+# uncertain - undefined state, one of the arguments is not a VFS path
+# equal     - paths are equal
+# not_equal - paths are not equal
 # ${1} - one path
 # ${2} - two path
 compare_vfs_paths()
@@ -130,10 +129,10 @@ compare_vfs_paths()
   return 0
 }
 
-# Определяет уровень (глубину) переданного пути относительно корня VFS
-# 0 - не VFS путь
+# Determine the depth of the given path relative to the VFS root
+# 0 - not a VFS path
 # 1 - '/'
-# 2 - '/etc', '/root', '/var' и т.п.
+# 2 - '/etc', '/root', '/var', and similar
 # ${1} - path
 get_vfs_path_level()
 {
@@ -160,7 +159,7 @@ get_vfs_path_level()
   return 0
 }
 
-#Проверяет входную строку на соответствие положительному числовому формату
+# Check that the input string is a positive number
 #${1} - string
 check_to_positive_number_format()
 {
@@ -181,7 +180,7 @@ check_to_positive_number_format()
 
 CUSTOMPRUNE=""
 
-#Разбор аргументов командной строки
+# Command-line argument parsing
 NORMALIZED_ARGS="$( getopt --options k: --longoptions ,prune: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

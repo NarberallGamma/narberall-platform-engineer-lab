@@ -1,5 +1,5 @@
 ---
-# Миграция: один inbound на xui_inbound_port с другим remark → sync (ключи Reality сохраняются).
+# Migration: one inbound on xui_inbound_port with a different remark → sync (Reality keys are kept).
 
 - name: Init inbounds on desired port list
   ansible.builtin.set_fact:
@@ -18,8 +18,8 @@
     that:
       - xui_inbounds_on_port | length <= 1
     fail_msg: >-
-      На порту {{ xui_inbound_port }} несколько inbound ({{ xui_inbounds_on_port | map(attribute='remark') | list }}).
-      Удалить лишние вручную в панели или задать xui_proxy_legacy_inbound_remarks_remove.
+      Port {{ xui_inbound_port }} has several inbounds ({{ xui_inbounds_on_port | map(attribute='remark') | list }}).
+      Remove extras manually in the panel or set xui_proxy_legacy_inbound_remarks_remove.
 
 - name: Select inbound occupant on target port
   ansible.builtin.set_fact:
@@ -37,8 +37,8 @@
 - name: Note inbound port migration via sync
   ansible.builtin.debug:
     msg: >-
-      Inbound «{{ xui_inbound_port_occupant.remark }}» на порту {{ xui_inbound_port }}
-      → «{{ xui_inbound_remark }}» (sync, без пересоздания).
+      Inbound «{{ xui_inbound_port_occupant.remark }}» on port {{ xui_inbound_port }}
+      → «{{ xui_inbound_remark }}» (sync, no recreate).
   when:
     - xui_inbound_port_occupant is defined
     - xui_inbound_port_occupant.remark | default('') != xui_inbound_remark

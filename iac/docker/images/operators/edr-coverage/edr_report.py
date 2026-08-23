@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Отчёт для IT по пробелам EDR: списки хостов на починку, сгруппированные по компаниям.
+"""IT report on EDR gaps: host lists to fix, grouped by company.
 
-Источник — edr_coverage_report.csv (его пишет merge3/экспортер в EDR_DATA_DIR).
-Два списка:
+Source is edr_coverage_report.csv (written by merge3/the exporter into EDR_DATA_DIR).
+Two lists:
 
-  1. «Нет агента EDR» — хост в пуле, агента нет. Донести агент. Без окна по
-     времени: состояние стабильное.
-  2. «Агент есть, но молчит» — агент установлен, но последняя связь старше окна,
-     ЗАВИСЯЩЕГО ОТ ТИПА ХОСТА:
-       workstation > 14 дней  (человек в отпуске/болеет — это НЕ инцидент),
-       server      > 24 часов (сервер обязан быть на связи).
-     Мгновенный офлайн не считаем: ночью выключенные АРМ и перезагрузки сервера
-     не должны плодить тикеты.
+  1. "No EDR agent" — host is in the pool, no agent. Deliver an agent. No
+     time window: the state is stable.
+  2. "Agent present but silent" — agent is installed, but last contact is older
+     than a window that DEPENDS ON HOST TYPE:
+       workstation > 14 days  (person on leave/sick — this is NOT an incident),
+       server      > 24 hours (a server must stay in contact).
+     Instant offline is not counted: workstations powered off at night and
+     server reboots must not spawn tickets.
 
-Выход: человекочитаемый текст (stdout) + CSV со всеми хостами. Доставка —
-сменный бэкенд (--to stdout|file|email); email/Jira подключим, когда известен
-конкретный intake. Запуск: python edr_report.py [--to ...].
+Output: human-readable text (stdout) + CSV with all hosts. Delivery is a
+swappable backend (--to stdout|file|email); email/Jira can be wired when a
+concrete intake is known. Run: python edr_report.py [--to ...].
 """
 
 import argparse
@@ -30,7 +30,7 @@ import pandas as pd
 DATA_DIR = Path(os.environ.get("EDR_DATA_DIR", "."))
 REPORT_CSV = DATA_DIR / "edr_coverage_report.csv"
 
-# Окна «молчания» до попадания в тикет, по типу хоста.
+# Silence windows before a ticket, by host type.
 WS_SILENT_DAYS = float(os.environ.get("EDR_SILENT_WS_DAYS", "14"))
 SRV_SILENT_HOURS = float(os.environ.get("EDR_SILENT_SRV_HOURS", "24"))
 
@@ -42,7 +42,7 @@ def _silent_window_seconds(host_type: str) -> float:
 
 
 def build_lists(now: float | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Вернуть (нет_агента, молчит) — оба уже отфильтрованы и по пулу."""
+    """Return (no_agent, silent) — both already filtered to the pool."""
     now = now if now is not None else time.time()
     df = pd.read_csv(REPORT_CSV)
     pool = df[df["in_pool"]].copy()
@@ -59,15 +59,15 @@ def build_lists(now: float | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def _fmt_group(df: pd.DataFrame, with_age: bool) -> str:
-    """Список хостов по компаниям для текста письма."""
+    """Host list by company for the email body."""
     if df.empty:
-        return "  (нет)\n"
+        return "  (none)\n"
     out = []
     for company, g in df.sort_values(["company", "hostname"]).groupby("company"):
         out.append("  %s (%d):" % (company, len(g)))
         for r in g.itertuples():
             if with_age:
-                out.append("    - %-40s %s (%.0f дн. без связи)"
+                out.append("    - %-40s %s (%.0f days without contact)"
                            % (r.hostname, r.source_type, r.days_silent))
             else:
                 out.append("    - %-40s %s" % (r.hostname, r.source_type))
@@ -75,16 +75,16 @@ def _fmt_group(df: pd.DataFrame, with_age: bool) -> str:
 
 
 def render_text(no_agent: pd.DataFrame, silent: pd.DataFrame) -> tuple[str, str]:
-    """Вернуть (subject, body)."""
-    subject = "EDR: %d хостов без агента, %d с молчащим агентом" % (len(no_agent), len(silent))
+    """Return (subject, body)."""
+    subject = "EDR: %d hosts without an agent, %d with a silent agent" % (len(no_agent), len(silent))
     body = [
-        "Отчёт по покрытию EDR — хосты, требующие действий IT.",
-        "Дашборд: %s" % DASHBOARD_URL,
+        "EDR coverage report — hosts that need IT action.",
+        "Dashboard: %s" % DASHBOARD_URL,
         "",
-        "=== Хосты без агента EDR — на них надо донести (%d) ===" % len(no_agent),
+        "=== Hosts without an EDR agent — agent must be delivered (%d) ===" % len(no_agent),
         _fmt_group(no_agent, with_age=False),
-        "=== Агент есть, но молчит — разбираться, а не переустанавливать (%d) ===" % len(silent),
-        "    (порог: АРМ > %.0f дн., сервер > %.0f ч. без связи)"
+        "=== Agent present but silent — investigate, do not reinstall (%d) ===" % len(silent),
+        "    (threshold: workstation > %.0f days, server > %.0f h without contact)"
         % (WS_SILENT_DAYS, SRV_SILENT_HOURS),
         _fmt_group(silent, with_age=True),
     ]
@@ -109,18 +109,18 @@ def deliver(target: str, subject: str, body: str, csv_path: Path) -> None:
     elif target == "file":
         out = DATA_DIR / "edr_report.txt"
         out.write_text(subject + "\n\n" + body, encoding="utf-8")
-        print("отчёт -> %s ; %s" % (out, csv_path))
+        print("report -> %s ; %s" % (out, csv_path))
     elif target == "email":
         send_email(subject, body, csv_path)
     else:
-        raise SystemExit("неизвестный --to: %s" % target)
+        raise SystemExit("unknown --to: %s" % target)
 
 
 def send_email(subject: str, body: str, csv_path: Path) -> None:
-    """Отправка на intake-адрес Jira. Настраивается через окружение:
-       EDR_SMTP_HOST[:PORT], EDR_SMTP_FROM, EDR_REPORT_TO (получатель),
-       опц. EDR_SMTP_USER/EDR_SMTP_PASSWORD, EDR_SMTP_STARTTLS=1.
-    Конкретный способ Jira уточняется — бэкенд готов, останется задать адреса."""
+    """Send to a Jira intake address. Configured via the environment:
+       EDR_SMTP_HOST[:PORT], EDR_SMTP_FROM, EDR_REPORT_TO (recipient),
+       optional EDR_SMTP_USER/EDR_SMTP_PASSWORD, EDR_SMTP_STARTTLS=1.
+    The exact Jira path is TBD — the backend is ready, remaining work is addresses."""
     import smtplib
     from email.message import EmailMessage
 
@@ -128,7 +128,7 @@ def send_email(subject: str, body: str, csv_path: Path) -> None:
     sender = os.environ.get("EDR_SMTP_FROM")
     rcpt = os.environ.get("EDR_REPORT_TO")
     if not (host and sender and rcpt):
-        raise SystemExit("для --to email задайте EDR_SMTP_HOST/EDR_SMTP_FROM/EDR_REPORT_TO")
+        raise SystemExit("for --to email set EDR_SMTP_HOST/EDR_SMTP_FROM/EDR_REPORT_TO")
     host, _, port = host.partition(":")
 
     msg = EmailMessage()
@@ -144,17 +144,17 @@ def send_email(subject: str, body: str, csv_path: Path) -> None:
         if user and pwd:
             s.login(user, pwd)
         s.send_message(msg)
-    print("письмо отправлено: %s -> %s" % (sender, rcpt))
+    print("mail sent: %s -> %s" % (sender, rcpt))
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--to", default="stdout", choices=["stdout", "file", "email"],
-                    help="куда доставить отчёт (по умолчанию stdout)")
+                    help="where to deliver the report (default stdout)")
     args = ap.parse_args()
 
     if not REPORT_CSV.exists():
-        raise SystemExit("нет %s — сначала должен отработать сбор" % REPORT_CSV)
+        raise SystemExit("missing %s — collection must run first" % REPORT_CSV)
 
     no_agent, silent = build_lists()
     subject, body = render_text(no_agent, silent)

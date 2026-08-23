@@ -1,21 +1,21 @@
 ---
 
-- name: Установить hvac при необходимости
+- name: Install hvac if needed
   ansible.builtin.pip:
     name: hvac 
     state: present
 
-- name: Инициализация словаря паролей
+- name: Initialize password dictionary
   set_fact:
     db_passwords: {}
 
-- name: Обработка списка из db (если задан)
+- name: Process db list (if set)
   include_tasks: process_user.yml 
   loop: "{{ db | default([]) }}"
   loop_control:
     loop_var: user_item
 
-- name: Обработка списка из db_users (если задан)
+- name: Process db_users list (if set)
   include_tasks: process_user.yml
   loop: "{{ db_users | default([]) }}"
   loop_control:

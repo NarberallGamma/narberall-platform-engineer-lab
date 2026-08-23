@@ -12,7 +12,7 @@ resource "sbercloud_vpc_eip" "this" {
   publicip {
     type       = var.publicip_type
     ip_address = var.publicip_ip_address
-    port_id    = var.publicip_port_id   # привязка к порту (например, VIP)
+    port_id    = var.publicip_port_id   # bind to a port (for example VIP)
   }
 
   bandwidth {
@@ -24,7 +24,7 @@ resource "sbercloud_vpc_eip" "this" {
   }
 }
 
-# Опциональная ассоциация через отдельный ресурс (если нужна привязка к инстансу, а не к порту)
+# Optional association via a separate resource (when binding to an instance rather than a port)
 resource "sbercloud_compute_eip_associate" "this" {
   count = var.create_associate && var.create_eip ? 1 : 0
 

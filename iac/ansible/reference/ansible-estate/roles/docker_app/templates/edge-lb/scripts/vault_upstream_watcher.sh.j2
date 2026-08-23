@@ -1,8 +1,8 @@
 #!/bin/sh
 # Managed by Ansible (docker_app edge-lb)
-# Sidecar: active Vault leader upstream для nginx OSS (без Plus).
-# Probe: GET /v1/sys/health?standbyok=false -> только HTTP 200 = active.
-# При смене набора active: nginx -t && nginx -s reload в контейнере {{ edge_lb_vault_upstream_sidecar_nginx_container }}.
+# Sidecar: active Vault leader upstream for nginx OSS (no Plus).
+# Probe: GET /v1/sys/health?standbyok=false -> HTTP 200 only = active.
+# On active set change: nginx -t && nginx -s reload in container {{ edge_lb_vault_upstream_sidecar_nginx_container }}.
 
 set -eu
 
@@ -16,7 +16,7 @@ LOG_FILE="/logs/vault-upstream.log"
 NGINX_CONTAINER="${NGINX_CONTAINER:-{{ edge_lb_vault_upstream_sidecar_nginx_container | default('edge-lb-nginx') }}}"
 
 log_msg() {
-  # ISO8601 UTC, формат близкий к nginx access/error log
+  # ISO8601 UTC, format close to nginx access/error log
   ts="$(date -u '+%Y/%m/%d:%H:%M:%S +0000')"
   printf '%s [vault-upstream] %s\n' "$ts" "$1" >> "$LOG_FILE"
   printf '%s [vault-upstream] %s\n' "$ts" "$1"

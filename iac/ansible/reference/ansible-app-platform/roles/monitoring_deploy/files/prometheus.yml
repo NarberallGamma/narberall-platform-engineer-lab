@@ -238,31 +238,31 @@ scrape_configs:
   - job_name: 'blackbox_http'
     metrics_path: /probe
     params:
-      module: [https_2xx]  # или https_2xx, если так называется в blackbox.yml
+      module: [https_2xx]  # or https_2xx if that is the module name in blackbox.yml
     static_configs:
       - targets:
         - jira.example.com
         - wiki.example.com
         - git.example.com
     relabel_configs:
-      # Превращаем host, который Prometheus видит, 
-      # в параметр __param_target для blackbox (?target=<host>)
+      # Map the host Prometheus sees
+      # to the blackbox __param_target (?target=<host>)
       - source_labels: [__address__]
         target_label: __param_target
 
-      # Чтобы в лейблах instance у нас писалось реальное имя хоста
+      # Keep the real hostname in the instance label
       - target_label: instance
         source_labels: [__address__]
 
-      # Заменяем __address__ на адрес самого Blackbox Exporter:
+      # Replace __address__ with the Blackbox Exporter address:
       - target_label: __address__
         replacement: "10.10.6.174:9115"
 
-      # Дальше – если нам нужен конкретный путь, например для JIRA:
+      # Optional path rewrite, e.g. for JIRA:
       - source_labels: [instance]
         regex: jira.example.com
         target_label: __param_path
-        replacement: /login.jsp  # <-- Так указываем путь для JIRA
+        replacement: /login.jsp  # <-- JIRA login path
 
       - source_labels: [instance]
         regex: wiki.example.com

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Удаление CRLF (Windows-окончаний строк) во всех текстовых файлах репо.
-# Запускать из корня каталога ansible: ./scripts/fix_crlf.sh
-# После импорта с CRLF выполнить один раз, чтобы скрипты не падали с «bash\\r: No such file or directory».
-# Исключены: .git, .collections (в т.ч. вложенные), artifacts.
+# Strip CRLF (Windows line endings) from all text files in the repo.
+# Run from the ansible directory root: ./scripts/fix_crlf.sh
+# After a CRLF import, run once so scripts do not fail with "bash\\r: No such file or directory".
+# Excluded: .git, .collections (including nested), artifacts.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"

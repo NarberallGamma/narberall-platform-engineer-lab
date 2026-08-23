@@ -1,7 +1,7 @@
-# cloud-hibernate-operator — prod (фактически на estate-prod-gitlab, управляет preprod CCE)
-# Плейбук: playbooks/docker_app_cloud_hibernate_operator.yml | inventory: [cloud-hibernate-operator]
+# cloud-hibernate-operator — prod (actually on estate-prod-gitlab, manages preprod CCE)
+# Playbook: playbooks/docker_app_cloud_hibernate_operator.yml | inventory: [cloud-hibernate-operator]
 #
-# Секреты: vault kv put ansible/cloud-hibernate-operator TELEGRAM_BOT_TOKEN=... IAM_PASSWORD=... API_KEYS=...
+# Secrets: vault kv put ansible/cloud-hibernate-operator TELEGRAM_BOT_TOKEN=... IAM_PASSWORD=... API_KEYS=...
 
 docker_app_vault_mount_point: ansible
 docker_app_vault_path: cloud-hibernate-operator

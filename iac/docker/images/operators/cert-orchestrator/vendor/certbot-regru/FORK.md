@@ -1,12 +1,12 @@
-# Встраивание certbot-regru в cert-orchestrator
+# Embedding certbot-regru into cert-orchestrator
 
-Исходный плагин: **certbot-regru** (Reg.ru DNS-01 для Certbot), MIT License, см. `LICENSE.txt`.
+Upstream plugin: **certbot-regru** (Reg.ru DNS-01 for Certbot), MIT License, see `LICENSE.txt`.
 
-В этом каталоге — **вендорная копия** для автономной сборки образа `cert-orchestrator` без внешнего репозитория.
+This directory is a **vendored copy** for building the `cert-orchestrator` image without an external repository.
 
-Отличия от апстрима:
+Differences from upstream:
 
-- В `setup.py` отключена установка `regru.ini` в `/etc/letsencrypt` при `pip install`. В рантайме cert-orchestrator может сформировать INI из основного YAML (`letsencrypt.regru`) или использовать смонтированный файл по `regru_ini_path`.
-- Пример учётных данных: `regru.ini.example`.
+- `setup.py` does not install `regru.ini` into `/etc/letsencrypt` on `pip install`. At runtime cert-orchestrator can build the INI from the main YAML (`letsencrypt.regru`) or use a mounted file via `regru_ini_path`.
+- Credentials example: `regru.ini.example`.
 
-Обновление из апстрима: заменить файлы пакета `certbot_regru/` и при необходимости `setup.py`, сохраняя правки выше.
+Updating from upstream: replace files under `certbot_regru/` and, if needed, `setup.py`, while keeping the changes above.

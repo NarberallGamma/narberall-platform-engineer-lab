@@ -1,22 +1,22 @@
 ---
-- name: Docker app | проверка Vault
+- name: Docker app | Vault check
   ansible.builtin.import_tasks: vault_check.yml
   when: docker_app_vault_enabled | default(true) | bool
 
-- name: Docker app | загрузка секретов из Vault
+- name: Docker app | load secrets from Vault
   ansible.builtin.import_tasks: load_vault_secrets.yml
   when: docker_app_vault_enabled | default(true) | bool
 
-- name: Docker app | подготовка app_item для templates
+- name: Docker app | prepare app_item for templates
   ansible.builtin.set_fact:
     app_item:
       key: "{{ docker_app.slug | replace('-', '_') }}"
       value: "{{ docker_app }}"
 
-- name: Docker app | деплой {{ docker_app.slug }}
+- name: Docker app | deploy {{ docker_app.slug }}
   ansible.builtin.import_tasks: deploy_app.yml
 
-- name: Docker app | итог
+- name: Docker app | summary
   ansible.builtin.debug:
     msg:
       - "Host: {{ inventory_hostname }}"
@@ -26,7 +26,7 @@
   when: docker_app_vault_enabled | default(true) | bool
   tags: [docker_app, always]
 
-- name: Docker app | итог (без Vault)
+- name: Docker app | summary (without Vault)
   ansible.builtin.debug:
     msg:
       - "Host: {{ inventory_hostname }}"

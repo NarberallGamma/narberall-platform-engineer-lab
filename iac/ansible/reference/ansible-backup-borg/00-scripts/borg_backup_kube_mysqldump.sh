@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 source vars
-# Путь до конфига kubectl
+# Path to the kubectl config
 KUBECONF_FILE="/root/.kube/config"
 export KUBECONFIG=${KUBECONF_FILE}
 DEFAULTS_FILE='--defaults-file=/etc/mysql/debian.cnf'

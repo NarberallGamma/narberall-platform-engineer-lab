@@ -1,7 +1,7 @@
 ---
-# edge-lb: каталоги, nginx/keepalived конфиги, vault-upstream sidecar, logrotate, legacy SSL (migrate)
+# edge-lb: directories, nginx/keepalived configs, vault-upstream sidecar, logrotate, legacy SSL (migrate)
 
-- name: "{{ docker_app.slug }} | keepalived auth_pass из существующего конфига (если не задан)"
+- name: "{{ docker_app.slug }} | keepalived auth_pass from the existing config (when not set)"
   ansible.builtin.shell: |
     set -euo pipefail
     f="{{ docker_app_base_dir }}/edge-lb/config/keepalived/keepalived.conf"
@@ -18,7 +18,7 @@
   when: edge_lb_keepalived_auth_pass | default('') | length == 0
   tags: [docker_app, deploy, edge_lb]
 
-- name: "{{ docker_app.slug }} | установить keepalived auth_pass из discovery"
+- name: "{{ docker_app.slug }} | set keepalived auth_pass from discovery"
   ansible.builtin.set_fact:
     edge_lb_keepalived_auth_pass: "{{ edge_lb_auth_pass_discovered.stdout | trim }}"
   when:
@@ -26,7 +26,7 @@
     - edge_lb_auth_pass_discovered.stdout | default('') | length > 0
   tags: [docker_app, deploy, edge_lb]
 
-- name: "{{ docker_app.slug }} | каталоги edge-lb"
+- name: "{{ docker_app.slug }} | edge-lb directories"
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
@@ -98,7 +98,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy, edge_lb]
 
-- name: "{{ docker_app.slug }} | удалить legacy vault_active_upstream из conf.d"
+- name: "{{ docker_app.slug }} | remove legacy vault_active_upstream from conf.d"
   ansible.builtin.file:
     path: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/vault_active_upstream.conf"
     state: absent
@@ -126,7 +126,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy, edge_lb]
 
-- name: "{{ docker_app.slug }} | удалить conf.d/hsm-adapter.conf (site отключён)"
+- name: "{{ docker_app.slug }} | remove conf.d/hsm-adapter.conf (site disabled)"
   ansible.builtin.file:
     path: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/hsm-adapter.conf"
     state: absent
@@ -143,7 +143,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy, edge_lb]
 
-- name: "{{ docker_app.slug }} | удалить conf.d/treasury-policy-gateway.conf (site отключён)"
+- name: "{{ docker_app.slug }} | remove conf.d/treasury-policy-gateway.conf (site disabled)"
   ansible.builtin.file:
     path: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/treasury-policy-gateway.conf"
     state: absent
@@ -160,7 +160,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy, edge_lb]
 
-- name: "{{ docker_app.slug }} | удалить conf.d/cryptopro.conf (site отключён)"
+- name: "{{ docker_app.slug }} | remove conf.d/cryptopro.conf (site disabled)"
   ansible.builtin.file:
     path: "{{ docker_app_base_dir }}/edge-lb/config/conf.d/cryptopro.conf"
     state: absent
@@ -217,7 +217,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy, edge_lb]
 
-- name: "{{ docker_app.slug }} | legacy SSL в certs (migrate)"
+- name: "{{ docker_app.slug }} | legacy SSL into certs (migrate)"
   ansible.builtin.copy:
     src: "{{ edge_lb_legacy_ssl_source_dir }}/{{ item.src }}"
     dest: "{{ docker_app_base_dir }}/edge-lb/certs/{{ item.dest }}"
@@ -234,7 +234,7 @@
     mode: "0644"
   tags: [docker_app, deploy, edge_lb]
 
-- name: "{{ docker_app.slug }} | проверка logrotate (dry-run)"
+- name: "{{ docker_app.slug }} | logrotate check (dry-run)"
   ansible.builtin.command:
     argv:
       - logrotate

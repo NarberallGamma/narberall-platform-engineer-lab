@@ -7,19 +7,19 @@
     - role: network
       tags: ["network"]
 
-### Задача для вызова роли
+### Task to include the role
   tasks:
-      ### Вызов роли для деплоя Redis
+      ### Include the Redis deploy role
     - name: Deploy redis
       ansible.builtin.include_role:
         name: redis
       when:
         - "{{ (ig_caching_provider | string | lower) == 'redis' }}"
-    ### Вызов роли для деплоя IG
+    ### Include the IG deploy role
     - name: Deploy ig
       ansible.builtin.include_role:
         name: ig
-    ### Вызов роли для деплоя IgExt
+    ### Include the IgExt deploy role
     - name: Deploy IG EXT
       ansible.builtin.include_role:
         name: igext

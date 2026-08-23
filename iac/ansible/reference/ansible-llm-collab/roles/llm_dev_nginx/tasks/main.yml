@@ -1,12 +1,12 @@
 ---
-- name: Установка (каталоги nginx и логов)
+- name: Install (nginx and log directories)
   ansible.builtin.import_tasks: install.yml
   tags: [llm_dev, llm_dev_nginx, llm_dev_install]
 
-- name: Развёртывание конфигурации и compose nginx
+- name: Deploy nginx configuration and compose
   ansible.builtin.import_tasks: deploy.yml
   tags: [llm_dev, llm_dev_nginx, llm_dev_install, llm_dev_manage, llm_dev_config]
 
-- name: Перезапуск nginx по тегу
+- name: Restart nginx by tag
   ansible.builtin.import_tasks: restart.yml
   tags: [never, llm_dev_restart, llm_dev_nginx]

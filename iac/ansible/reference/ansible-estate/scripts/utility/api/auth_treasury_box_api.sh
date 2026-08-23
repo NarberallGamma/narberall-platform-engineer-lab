@@ -1,33 +1,33 @@
 #!/bin/bash
 
-# Универсальный скрипт для автоматической OTP авторизации в treasury Box API
-# Использование: ./auth_treasury_box_api.sh [ENV] [LOGIN] [COMPANY_ID] [PASSWORD]
+# Generic script for automatic OTP authorization in treasury Box API
+# Usage: ./auth_treasury_box_api.sh [ENV] [LOGIN] [COMPANY_ID] [PASSWORD]
 #
-# Переменные окружения (опционально):
-#   AUTH_DOMAIN_PROD - домен auth сервиса для PROD (по умолчанию: auth.example.com)
-#   WEB_DOMAIN_PROD - домен web сервиса для PROD (по умолчанию: web.example.com)
-#   AUTH_DOMAIN_PREPROD - домен auth сервиса для PREPROD (по умолчанию: auth.preprod.example.com)
-#   WEB_DOMAIN_PREPROD - домен web сервиса для PREPROD (по умолчанию: web.preprod.example.com)
-#   AUTH_DOMAIN_DEMO - домен auth сервиса для DEMO (по умолчанию: auth.demo.example.com)
-#   WEB_DOMAIN_DEMO - домен web сервиса для DEMO (по умолчанию: web.demo.example.com)
-#   K8S_NAMESPACE - namespace Kubernetes для PROD (по умолчанию: your-namespace)
-#   treasury_BOX_LOGIN - логин/телефон (можно указать через параметр)
-#   treasury_BOX_COMPANY_ID - UUID компании (можно указать через параметр)
-#   treasury_BOX_PASSWORD - пароль для запроса нового OTP (можно указать через параметр, опционально)
-# Примеры:
+# Environment variables (optional):
+#   AUTH_DOMAIN_PROD - auth service domain for PROD (default: auth.example.com)
+#   WEB_DOMAIN_PROD - web service domain for PROD (default: web.example.com)
+#   AUTH_DOMAIN_PREPROD - auth service domain for PREPROD (default: auth.preprod.example.com)
+#   WEB_DOMAIN_PREPROD - web service domain for PREPROD (default: web.preprod.example.com)
+#   AUTH_DOMAIN_DEMO - auth service domain for DEMO (default: auth.demo.example.com)
+#   WEB_DOMAIN_DEMO - web service domain for DEMO (default: web.demo.example.com)
+#   K8S_NAMESPACE - Kubernetes namespace for PROD (default: your-namespace)
+#   treasury_BOX_LOGIN - login/phone (can be passed as an argument)
+#   treasury_BOX_COMPANY_ID - company UUID (can be passed as an argument)
+#   treasury_BOX_PASSWORD - password to request a new OTP (can be passed as an argument, optional)
+# Examples:
 #   export treasury_BOX_LOGIN=+79991234567
 #   export treasury_BOX_COMPANY_ID=company-uuid
-#   ./auth_treasury_box_api.sh prod                               # ENV=prod, параметры из переменных окружения
-#   ./auth_treasury_box_api.sh prod +79991234567 company-uuid     # Все параметры указаны
-# Параметры:
-#   - ENV: prod/preprod/demo (если не указан, будет запрошен интерактивно)
-#   - LOGIN: можно указать через параметр или переменную окружения treasury_BOX_LOGIN
-#   - COMPANY_ID: можно указать через параметр или переменную окружения treasury_BOX_COMPANY_ID
-#   - PASSWORD: можно указать через параметр или переменную окружения treasury_BOX_PASSWORD (опционально)
+#   ./auth_treasury_box_api.sh prod                               # ENV=prod, parameters from environment variables
+#   ./auth_treasury_box_api.sh prod +79991234567 company-uuid     # All parameters are set
+# Parameters:
+#   - ENV: prod/preprod/demo (if omitted, an interactive prompt is used)
+#   - LOGIN: can be passed as an argument or an environment variable treasury_BOX_LOGIN
+#   - COMPANY_ID: can be passed as an argument or an environment variable treasury_BOX_COMPANY_ID
+#   - PASSWORD: can be passed as an argument or an environment variable treasury_BOX_PASSWORD (optional)
 
-set -e  # Выход при ошибке
+set -e  # Exit on error
 
-# Цвета для красивого вывода
+# Colors for readable output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -35,137 +35,137 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Функция вывода справки
+# Help printer
 show_help() {
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}                      treasury Box API - Авторизация через OTP${NC}"
+    echo -e "${CYAN}                      treasury Box API - OTP authorization${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo -e "${BLUE}ОПИСАНИЕ:${NC}"
-    echo "  Скрипт для автоматической OTP авторизации в treasury Box API."
-    echo "  Получает список OTP кодов, находит самый новый валидный код или запрашивает новый,"
-    echo "  затем выполняет авторизацию и возвращает Bearer JWT токен."
+    echo -e "${BLUE}DESCRIPTION:${NC}"
+    echo "  Script for automatic OTP authorization in treasury Box API."
+    echo "  Fetches the OTP code list, finds the newest valid code or requests a new one,"
+    echo "  then signs in and returns a Bearer JWT token."
     echo ""
-    echo -e "${BLUE}СИНТАКСИС:${NC}"
+    echo -e "${BLUE}SYNOPSIS:${NC}"
     echo "  ./auth_treasury_box_api.sh [ENV] [LOGIN] [COMPANY_ID] [PASSWORD]"
     echo "  ./auth_treasury_box_api.sh [--help|-h]"
     echo ""
-    echo -e "${BLUE}ПАРАМЕТРЫ:${NC}"
-    echo -e "  ${GREEN}ENV${NC}           Окружение: prod, preprod или demo"
-    echo "                Если не указан, будет запрошен интерактивно"
+    echo -e "${BLUE}PARAMETERS:${NC}"
+    echo -e "  ${GREEN}ENV${NC}           Environment: prod, preprod or demo"
+    echo "                If omitted, an interactive prompt is used"
     echo ""
-    echo -e "  ${GREEN}LOGIN${NC}         Телефонный номер для авторизации"
-    echo "                Можно указать через параметр или переменную окружения treasury_BOX_LOGIN"
+    echo -e "  ${GREEN}LOGIN${NC}         Phone number for authorization"
+    echo "                Can be passed as an argument or an environment variable treasury_BOX_LOGIN"
     echo ""
-    echo -e "  ${GREEN}COMPANY_ID${NC}    UUID компании"
-    echo "                Можно указать через параметр или переменную окружения treasury_BOX_COMPANY_ID"
+    echo -e "  ${GREEN}COMPANY_ID${NC}    Company UUID"
+    echo "                Can be passed as an argument or an environment variable treasury_BOX_COMPANY_ID"
     echo ""
-    echo -e "  ${GREEN}PASSWORD${NC}      Пароль для автоматического запроса нового OTP"
-    echo "                Можно указать через параметр или переменную окружения treasury_BOX_PASSWORD"
-    echo "                Используется только если все существующие OTP коды использованы (опционально)"
+    echo -e "  ${GREEN}PASSWORD${NC}      Password for automatic new-OTP request"
+    echo "                Can be passed as an argument or an environment variable treasury_BOX_PASSWORD"
+    echo "                Used only when all existing OTP codes are spent (optional)"
     echo ""
-    echo -e "  ${GREEN}--help, -h${NC}    Показать эту справку"
+    echo -e "  ${GREEN}--help, -h${NC}    Show this help"
     echo ""
-    echo -e "${BLUE}ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ:${NC}"
+    echo -e "${BLUE}USAGE EXAMPLES:${NC}"
     echo ""
-    echo "  # Интерактивный выбор окружения, все параметры по умолчанию"
+    echo "  # Interactive environment choice, all parameters default"
     echo -e "  ${YELLOW}./auth_treasury_box_api.sh${NC}"
     echo ""
-    echo "  # Указано окружение PROD, параметры из переменных окружения"
+    echo "  # PROD environment set, parameters from environment variables"
     echo -e "  ${YELLOW}export treasury_BOX_LOGIN=+79991234567${NC}"
     echo -e "  ${YELLOW}export treasury_BOX_COMPANY_ID=company-uuid${NC}"
     echo -e "  ${YELLOW}./auth_treasury_box_api.sh prod${NC}"
     echo ""
-    echo "  # Указаны окружение и логин"
+    echo "  # Environment and login are set"
     echo -e "  ${YELLOW}./auth_treasury_box_api.sh prod +79991234567${NC}"
     echo ""
-    echo "  # Все параметры указаны"
+    echo "  # All parameters are set"
     echo -e "  ${YELLOW}./auth_treasury_box_api.sh prod +79991234567 company-uuid password${NC}"
     echo ""
-    echo "  # Использование переменных окружения"
+    echo "  # Using environment variables"
     echo -e "  ${YELLOW}export treasury_BOX_LOGIN=+79991234567${NC}"
     echo -e "  ${YELLOW}export treasury_BOX_COMPANY_ID=company-uuid${NC}"
     echo -e "  ${YELLOW}./auth_treasury_box_api.sh prod${NC}"
     echo ""
-    echo "  # Показать справку"
+    echo "  # Show help"
     echo -e "  ${YELLOW}./auth_treasury_box_api.sh --help${NC}"
     echo ""
-    echo -e "${BLUE}ОКРУЖЕНИЯ:${NC}"
-    echo -e "  ${GREEN}prod${NC}     Production окружение"
-    echo "          • Использует port-forward для обхода WAF"
-    echo "          • Автоматически настраивает kubectl port-forward к подам"
+    echo -e "${BLUE}ENVIRONMENTS:${NC}"
+    echo -e "  ${GREEN}prod${NC}     Production environment"
+    echo "          • Uses port-forward to bypass the WAF"
+    echo "          • Automatically sets up kubectl port-forward to the pods"
     echo "          • URL: localhost:8081 (auth), localhost:8082 (web)"
     echo ""
-    echo -e "  ${GREEN}preprod${NC}  Pre-production окружение"
-    echo "          • Прямое подключение через внешний URL"
-    echo "          • URL: настраивается через переменные AUTH_DOMAIN_PREPROD и WEB_DOMAIN_PREPROD"
+    echo -e "  ${GREEN}preprod${NC}  Pre-production environment"
+    echo "          • Direct connection via an external URL"
+    echo "          • URL: configured via AUTH_DOMAIN_PREPROD and WEB_DOMAIN_PREPROD"
     echo ""
-    echo -e "  ${GREEN}demo${NC}     Demo окружение"
-    echo "          • Прямое подключение через внешний URL"
-    echo "          • URL: настраивается через переменные AUTH_DOMAIN_DEMO и WEB_DOMAIN_DEMO"
+    echo -e "  ${GREEN}demo${NC}     Demo environment"
+    echo "          • Direct connection via an external URL"
+    echo "          • URL: configured via AUTH_DOMAIN_DEMO and WEB_DOMAIN_DEMO"
     echo ""
-    echo -e "${BLUE}ОСОБЕННОСТИ:${NC}"
-    echo "  • Автоматический поиск самого нового валидного OTP кода"
-    echo "  • Автоматический запрос нового OTP, если все коды использованы"
-    echo "  • Для PROD: автоматическая настройка port-forward (обход WAF)"
-    echo "  • Красивый вывод с цветами и форматированием"
-    echo "  • Автоматическая очистка port-forward процессов при завершении"
+    echo -e "${BLUE}FEATURES:${NC}"
+    echo "  • Automatic search for the newest valid OTP code"
+    echo "  • Automatic request of a new OTP when all codes are used"
+    echo "  • For PROD: automatic port-forward setup (WAF bypass)"
+    echo "  • Colorized formatted output"
+    echo "  • Automatic cleanup of port-forward processes on exit"
     echo ""
-    echo -e "${BLUE}ЗАВИСИМОСТИ:${NC}"
-    echo "  • curl - для HTTP запросов"
-    echo "  • jq - для парсинга JSON (рекомендуется, но не обязательно)"
-    echo "  • kubectl - только для PROD окружения с port-forward"
+    echo -e "${BLUE}DEPENDENCIES:${NC}"
+    echo "  • curl - for HTTP requests"
+    echo "  • jq - for JSON parsing (recommended, not required)"
+    echo "  • kubectl - only for the PROD environment with port-forward"
     echo ""
-    echo -e "${BLUE}НАСТРОЙКА В СКРИПТЕ:${NC}"
-    echo "  Вы можете настроить скрипт прямо в его коде:"
+    echo -e "${BLUE}IN-SCRIPT SETTINGS:${NC}"
+    echo "  The script can be configured in its source:"
     echo ""
     echo -e "  ${YELLOW}• Port-forward:${NC}"
-    echo "    Изменить USE_PORT_FORWARD для любого окружения:"
-    echo "    - Строки 156, 163, 169 (prod, preprod, demo)"
+    echo "    Change USE_PORT_FORWARD for any environment:"
+    echo "    - Lines 156, 163, 169 (prod, preprod, demo)"
     echo ""
-    echo -e "  ${YELLOW}• URL домены:${NC}"
-    echo "    Изменить домены для окружений:"
-    echo "    - Строки 154-155, 161-162, 167-168 (AUTH_DOMAIN, WEB_DOMAIN)"
+    echo -e "  ${YELLOW}• URL domains:${NC}"
+    echo "    Change domains for environments:"
+    echo "    - Lines 154-155, 161-162, 167-168 (AUTH_DOMAIN, WEB_DOMAIN)"
     echo ""
-    echo -e "  ${YELLOW}• URL пути:${NC}"
-    echo "    Изменить формирование URL в функции setup_urls():"
-    echo "    - Строки 406-413 (OTP_API_URL, AUTH_URL, REQUEST_OTP_URL)"
+    echo -e "  ${YELLOW}• URL paths:${NC}"
+    echo "    Change URL construction in setup_urls():"
+    echo "    - Lines 406-413 (OTP_API_URL, AUTH_URL, REQUEST_OTP_URL)"
     echo ""
-    echo -e "  ${YELLOW}• Параметры по умолчанию:${NC}"
-    echo "    Изменить значения по умолчанию можно в коде скрипта"
+    echo -e "  ${YELLOW}• Default parameters:${NC}"
+    echo "    Default values can be changed in the script source"
     echo ""
-    echo -e "${BLUE}ВОЗВРАЩАЕТ:${NC}"
-    echo "  Bearer JWT Access Token, который можно использовать для авторизации в API"
+    echo -e "${BLUE}RETURNS:${NC}"
+    echo "  Bearer JWT Access Token, that can be used to authorize against the API"
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
 }
 
-# Проверка параметров help
+# Check help arguments
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     show_help
     exit 0
 fi
 
-# Функция для выбора окружения
+# Environment picker
 select_environment() {
     local env_arg="$1"
     
     if [ -n "$env_arg" ]; then
         ENV=$(echo "$env_arg" | tr '[:upper:]' '[:lower:]')
     else
-        # Интерактивный выбор
+        # Interactive choice
         echo ""
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${CYAN}Выбор окружения${NC}"
+        echo -e "${CYAN}Environment selection${NC}"
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
         echo "  1) PROD    (production)"
         echo "  2) PREPROD (pre-production)"
         echo "  3) DEMO    (demo)"
         echo ""
-        read -p "Выберите окружение (1-3) [по умолчанию: 1]: " choice
+        read -p "Select environment (1-3) [default: 1]: " choice
         
         case "${choice:-1}" in
             1)
@@ -178,19 +178,19 @@ select_environment() {
                 ENV="demo"
                 ;;
             *)
-                echo -e "${YELLOW}Неверный выбор, используется PROD${NC}"
+                echo -e "${YELLOW}Invalid choice, PROD is used${NC}"
                 ENV="prod"
                 ;;
         esac
     fi
     
-    # Валидация окружения
+    # Validate environment
     case "$ENV" in
         prod|PROD|production)
             ENV="prod"
             AUTH_DOMAIN="${AUTH_DOMAIN_PROD:-auth.example.com}"
             WEB_DOMAIN="${WEB_DOMAIN_PROD:-web.example.com}"
-            USE_PORT_FORWARD=true  # Для PROD используем port-forward
+            USE_PORT_FORWARD=true  # PROD uses port-forward
             K8S_NAMESPACE="${K8S_NAMESPACE:-your-namespace}"
             ;;
         preprod|PREPROD|pre-production)
@@ -206,13 +206,13 @@ select_environment() {
             USE_PORT_FORWARD=false
             ;;
         *)
-            echo -e "${RED}Ошибка: Неверное окружение '$ENV'. Используйте: prod, preprod или demo${NC}"
+            echo -e "${RED}Error: Invalid environment '$ENV'. Use: prod, preprod or demo${NC}"
             exit 1
             ;;
     esac
 }
 
-# Функция для красивого вывода заголовков
+# Pretty header printer
 print_header() {
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -221,48 +221,48 @@ print_header() {
     echo ""
 }
 
-# Функция для вывода информации
+# Info printer
 print_info() {
     echo -e "${BLUE}ℹ${NC} $1"
 }
 
-# Функция для вывода успеха
+# Success printer
 print_success() {
     echo -e "${GREEN}✅${NC} $1"
 }
 
-# Функция для вывода ошибки
+# Error printer
 print_error() {
     echo -e "${RED}❌${NC} $1"
 }
 
-# Функция для вывода предупреждения
+# Warning printer
 print_warning() {
     echo -e "${YELLOW}⚠️${NC} $1"
 }
 
-# Переменные для хранения PID процессов port-forward
+# Variables that store port-forward process PIDs
 AUTH_PORT_FORWARD_PID=""
 WEB_PORT_FORWARD_PID=""
 AUTH_LOCAL_PORT=""
 WEB_LOCAL_PORT=""
 
-# Функция очистки port-forward процессов при выходе
+# Clean up port-forward processes on exit
 cleanup_port_forwards() {
     if [ -n "$AUTH_PORT_FORWARD_PID" ]; then
-        kill $AUTH_PORT_FORWARD_PID 2>/dev/null && print_info "Остановлен port-forward для auth сервиса (PID: $AUTH_PORT_FORWARD_PID)"
+        kill $AUTH_PORT_FORWARD_PID 2>/dev/null && print_info "Stopped port-forward for the auth service (PID: $AUTH_PORT_FORWARD_PID)"
         AUTH_PORT_FORWARD_PID=""
     fi
     if [ -n "$WEB_PORT_FORWARD_PID" ]; then
-        kill $WEB_PORT_FORWARD_PID 2>/dev/null && print_info "Остановлен port-forward для web сервиса (PID: $WEB_PORT_FORWARD_PID)"
+        kill $WEB_PORT_FORWARD_PID 2>/dev/null && print_info "Stopped port-forward for the web service (PID: $WEB_PORT_FORWARD_PID)"
         WEB_PORT_FORWARD_PID=""
     fi
 }
 
-# Регистрация trap для очистки при выходе
+# Register a trap for cleanup on exit
 trap cleanup_port_forwards EXIT INT TERM
 
-# Функция поиска сервиса в Kubernetes
+# Find a service in Kubernetes
 find_k8s_service() {
     local namespace="$1"
     local service_pattern="$2"
@@ -270,16 +270,16 @@ find_k8s_service() {
     kubectl -n "$namespace" get svc 2>/dev/null | grep "$service_pattern" | head -1 | awk '{print $1}'
 }
 
-# Функция получения порта сервиса из Kubernetes
+# Get the service port from Kubernetes
 get_k8s_service_port() {
     local namespace="$1"
     local service_name="$2"
-    local port_name="${3:-http}"  # По умолчанию ищем порт с именем http
+    local port_name="${3:-http}"  # By default look up a port named http
     
-    # Пытаемся получить порт по имени
+    # Try to get the port by name
     local port=$(kubectl -n "$namespace" get svc "$service_name" -o jsonpath="{.spec.ports[?(@.name==\"$port_name\")].port}" 2>/dev/null)
     
-    # Если не найден по имени, берем первый порт
+    # If not found by name, take the first port
     if [ -z "$port" ]; then
         port=$(kubectl -n "$namespace" get svc "$service_name" -o jsonpath="{.spec.ports[0].port}" 2>/dev/null)
     fi
@@ -287,8 +287,8 @@ get_k8s_service_port() {
     echo "$port"
 }
 
-# Функция создания port-forward для сервиса
-# Возвращает PID процесса или пустую строку при ошибке
+# Create a port-forward for the service
+# Returns the process PID or an empty string on error
 setup_port_forward() {
     local namespace="$1"
     local service_name="$2"
@@ -299,11 +299,11 @@ setup_port_forward() {
         return 1
     fi
     
-    # Запускаем port-forward в фоне
+    # Start port-forward in the background
     kubectl -n "$namespace" port-forward "svc/$service_name" "$local_port:$service_port" > /dev/null 2>&1 &
     local pid=$!
     
-    # Ждем немного, чтобы проверить, что процесс запустился
+    # Wait briefly to confirm the process started
     sleep 1
     if ps -p $pid > /dev/null 2>&1; then
         echo "$pid"
@@ -313,97 +313,97 @@ setup_port_forward() {
     fi
 }
 
-# Функция настройки port-forward для PROD окружения
+# Set up port-forward for the PROD environment
 setup_prod_port_forwards() {
     if [ "$USE_PORT_FORWARD" != "true" ]; then
         return 0
     fi
     
-    # Проверяем наличие kubectl
+    # Check that kubectl is present
     if ! command -v kubectl &> /dev/null; then
-        print_error "kubectl не найден. Установите kubectl для использования port-forward в PROD окружении."
+        print_error "kubectl not found. Install kubectl to use port-forward in the PROD environment."
         exit 1
     fi
     
-    # Проверяем доступность кластера
+    # Check cluster availability
     if ! kubectl cluster-info &> /dev/null; then
-        print_error "Не удается подключиться к Kubernetes кластеру. Проверьте контекст kubectl."
+        print_error "Cannot connect to the Kubernetes cluster. Check the kubectl context."
         exit 1
     fi
     
-    print_header "Настройка port-forward для PROD окружения"
-    print_info "Настраиваю два port-forward на разных портах: auth (8081) и web/otp (8082)"
+    print_header "Set up port-forward for the PROD environment"
+    print_info "Setting up two port-forwards on different ports: auth (8081) and web/otp (8082)"
     echo ""
     
-    # Ищем auth сервис
-    print_info "Ищу treasury-auth сервис в namespace $K8S_NAMESPACE..."
+    # Looking up the auth service
+    print_info "Looking up the treasury-auth service in namespace $K8S_NAMESPACE..."
     AUTH_SERVICE=$(find_k8s_service "$K8S_NAMESPACE" "treasury-auth")
     
     if [ -z "$AUTH_SERVICE" ]; then
-        print_error "Не найден treasury-auth сервис в namespace $K8S_NAMESPACE"
-        print_info "Доступные сервисы:"
-        kubectl -n "$K8S_NAMESPACE" get svc | grep -E "NAME|auth" || echo "  (нет сервисов с 'auth' в названии)"
+        print_error "treasury-auth service not found in namespace $K8S_NAMESPACE"
+        print_info "Available services:"
+        kubectl -n "$K8S_NAMESPACE" get svc | grep -E "NAME|auth" || echo "  (no services with 'auth' in the name)"
         exit 1
     fi
     
-    print_success "Найден сервис: $AUTH_SERVICE"
+    print_success "Found service: $AUTH_SERVICE"
     
-    # Получаем порт сервиса (по умолчанию 8080 для actuator)
+    # Read the service port (default 8080 for actuator)
     AUTH_SERVICE_PORT=$(get_k8s_service_port "$K8S_NAMESPACE" "$AUTH_SERVICE" "http")
     AUTH_SERVICE_PORT="${AUTH_SERVICE_PORT:-8080}"
     AUTH_LOCAL_PORT="8081"
     
-    print_info "Порт сервиса $AUTH_SERVICE: $AUTH_SERVICE_PORT"
+    print_info "Service port $AUTH_SERVICE: $AUTH_SERVICE_PORT"
     
-    # Создаем port-forward для auth
-    print_info "Создаю port-forward для $AUTH_SERVICE: localhost:$AUTH_LOCAL_PORT -> $K8S_NAMESPACE/$AUTH_SERVICE:$AUTH_SERVICE_PORT"
+    # Create port-forward for auth
+    print_info "Creating port-forward for $AUTH_SERVICE: localhost:$AUTH_LOCAL_PORT -> $K8S_NAMESPACE/$AUTH_SERVICE:$AUTH_SERVICE_PORT"
     AUTH_PORT_FORWARD_PID=$(setup_port_forward "$K8S_NAMESPACE" "$AUTH_SERVICE" "$AUTH_LOCAL_PORT" "$AUTH_SERVICE_PORT" 2>/dev/null)
     if [ -z "$AUTH_PORT_FORWARD_PID" ]; then
-        print_error "Не удалось создать port-forward для $AUTH_SERVICE"
+        print_error "Failed to create port-forward for $AUTH_SERVICE"
         exit 1
     fi
-    # Проверяем, что PID - это число
+    # Confirm the PID is a number
     if ! [[ "$AUTH_PORT_FORWARD_PID" =~ ^[0-9]+$ ]]; then
-        print_error "Получен некорректный PID для port-forward: $AUTH_PORT_FORWARD_PID"
+        print_error "Invalid PID for port-forward: $AUTH_PORT_FORWARD_PID"
         exit 1
     fi
-    print_success "Port-forward для auth создан (PID: $AUTH_PORT_FORWARD_PID)"
+    print_success "Port-forward for auth created (PID: $AUTH_PORT_FORWARD_PID)"
     
-    # Ищем web/otp сервис
-    print_info "Ищу treasury-otp/web сервис в namespace $K8S_NAMESPACE..."
+    # Looking up the web/otp service
+    print_info "Looking up the treasury-otp/web service in namespace $K8S_NAMESPACE..."
     WEB_SERVICE=$(find_k8s_service "$K8S_NAMESPACE" "treasury-otp")
     
     if [ -z "$WEB_SERVICE" ]; then
-        # Пробуем найти web сервис
+        # Try a web service
         WEB_SERVICE=$(find_k8s_service "$K8S_NAMESPACE" "web")
     fi
     
     if [ -z "$WEB_SERVICE" ]; then
-        # Если не нашли treasury-otp/web, используем тот же auth сервис
-        print_warning "Не найден отдельный treasury-otp/web сервис, используем $AUTH_SERVICE"
+        # If treasury-otp/web is not found, reuse the auth service
+        print_warning "No separate treasury-otp/web service found, using $AUTH_SERVICE"
         WEB_SERVICE="$AUTH_SERVICE"
         WEB_SERVICE_PORT="$AUTH_SERVICE_PORT"
         WEB_LOCAL_PORT="$AUTH_LOCAL_PORT"
         WEB_PORT_FORWARD_PID=""
     else
-        print_success "Найден сервис: $WEB_SERVICE"
+        print_success "Found service: $WEB_SERVICE"
         WEB_SERVICE_PORT=$(get_k8s_service_port "$K8S_NAMESPACE" "$WEB_SERVICE" "http")
         WEB_SERVICE_PORT="${WEB_SERVICE_PORT:-8080}"
         WEB_LOCAL_PORT="8082"
         
-        # Создаем port-forward для web
-        print_info "Создаю port-forward для $WEB_SERVICE: localhost:$WEB_LOCAL_PORT -> $K8S_NAMESPACE/$WEB_SERVICE:$WEB_SERVICE_PORT"
+        # Create port-forward for web
+        print_info "Creating port-forward for $WEB_SERVICE: localhost:$WEB_LOCAL_PORT -> $K8S_NAMESPACE/$WEB_SERVICE:$WEB_SERVICE_PORT"
         WEB_PORT_FORWARD_PID=$(setup_port_forward "$K8S_NAMESPACE" "$WEB_SERVICE" "$WEB_LOCAL_PORT" "$WEB_SERVICE_PORT" 2>/dev/null)
         if [ -z "$WEB_PORT_FORWARD_PID" ]; then
-            print_warning "Не удалось создать port-forward для $WEB_SERVICE, используем $AUTH_SERVICE"
+            print_warning "Failed to create port-forward for $WEB_SERVICE, use $AUTH_SERVICE"
             WEB_LOCAL_PORT="$AUTH_LOCAL_PORT"
             WEB_PORT_FORWARD_PID=""
         else
-            # Проверяем, что PID - это число
+            # Confirm the PID is a number
             if [[ "$WEB_PORT_FORWARD_PID" =~ ^[0-9]+$ ]]; then
-                print_success "Port-forward для web создан (PID: $WEB_PORT_FORWARD_PID)"
+                print_success "Port-forward for web created (PID: $WEB_PORT_FORWARD_PID)"
             else
-                print_warning "Получен некорректный PID для port-forward web, используем $AUTH_SERVICE"
+                print_warning "Invalid PID for web port-forward, using $AUTH_SERVICE"
                 WEB_LOCAL_PORT="$AUTH_LOCAL_PORT"
                 WEB_PORT_FORWARD_PID=""
             fi
@@ -411,65 +411,65 @@ setup_prod_port_forwards() {
     fi
     
     echo ""
-    print_info "Жду 2 секунды для стабилизации port-forward соединений..."
+    print_info "Waiting 2 seconds for port-forward connections to settle..."
     sleep 2
 }
 
-# Выбор окружения (может быть передан как первый параметр)
+# Environment selection (may be passed as the first argument)
 if [ -n "$1" ] && [[ "$1" =~ ^(prod|preprod|demo|PROD|PREPROD|DEMO|production|pre-production)$ ]]; then
-    # ENV передан как первый параметр
+    # ENV passed as the first argument
     select_environment "$1"
-    # Параметры смещены - используем переменные окружения или параметры
+    # Arguments are shifted — use environment variables or arguments
     LOGIN="${2:-${treasury_BOX_LOGIN:-}}"
     COMPANY_ID="${3:-${treasury_BOX_COMPANY_ID:-}}"
     PASSWORD="${4:-${treasury_BOX_PASSWORD:-}}"
 else
-    # ENV не передан, выберем интерактивно, параметры не смещены
+    # ENV not passed; pick interactively, arguments are not shifted
     select_environment ""
     LOGIN="${1:-${treasury_BOX_LOGIN:-}}"
     COMPANY_ID="${2:-${treasury_BOX_COMPANY_ID:-}}"
     PASSWORD="${3:-${treasury_BOX_PASSWORD:-}}"
 fi
 
-# Проверка обязательных параметров
+# Check required parameters
 if [ -z "$LOGIN" ] || [ "$LOGIN" = "YOUR_LOGIN_HERE" ]; then
-    print_error "LOGIN не указан. Укажите через параметр или переменную окружения treasury_BOX_LOGIN"
+    print_error "LOGIN is not set. Pass it as an argument or an environment variable treasury_BOX_LOGIN"
     exit 1
 fi
 
 if [ -z "$COMPANY_ID" ] || [ "$COMPANY_ID" = "YOUR_COMPANY_ID_HERE" ]; then
-    print_error "COMPANY_ID не указан. Укажите через параметр или переменную окружения treasury_BOX_COMPANY_ID"
+    print_error "COMPANY_ID is not set. Pass it as an argument or an environment variable treasury_BOX_COMPANY_ID"
     exit 1
 fi
 
-# PASSWORD опционален (используется только для автоматического запроса нового OTP)
+# PASSWORD is optional (used only to request a new OTP automatically)
 
-# Функция настройки URL (вызывается после настройки port-forward для PROD)
+# URL setup (called after port-forward is set up for PROD)
 setup_urls() {
     if [ "$USE_PORT_FORWARD" = "true" ] && [ -n "$AUTH_LOCAL_PORT" ]; then
-        # Для PROD с port-forward используем localhost
-        # ВАЖНО: При port-forward мы минуем ingress, поэтому убираем ingress-префиксы из путей
+        # For PROD with port-forward use localhost
+        # IMPORTANT: port-forward bypasses ingress, so ingress prefixes are stripped from paths
         WEB_PORT="${WEB_LOCAL_PORT:-$AUTH_LOCAL_PORT}"
         AUTH_PORT="$AUTH_LOCAL_PORT"
         
-        # Пути без ingress-префиксов (прямо к поду)
+        # Paths without ingress prefixes (straight to the pod)
         OTP_API_URL="http://localhost:${WEB_PORT}/otp/login/${LOGIN}?page=0&size=20"
         AUTH_URL="http://localhost:${AUTH_PORT}/oauth2/token"
         REQUEST_OTP_URL="http://localhost:${AUTH_PORT}/login/otp"
     else
-        # Для других окружений используем обычные URL через ingress
+        # Other environments use regular URLs through ingress
         OTP_API_URL="https://${WEB_DOMAIN}/api/v0/treasury-otp/otp/login/${LOGIN}?page=0&size=20"
         AUTH_URL="https://${AUTH_DOMAIN}/api/v0/treasury-auth-provider/oauth2/token"
         REQUEST_OTP_URL="https://${AUTH_DOMAIN}/api/v0/treasury-auth-provider/login/otp"
     fi
 }
 
-# Инициализация URL (будет переопределено после port-forward для PROD)
+# Initialize URLs (overridden after port-forward for PROD)
 OTP_API_URL=""
 AUTH_URL=""
 REQUEST_OTP_URL=""
 
-# Функция для запроса нового OTP кода
+# Request a new OTP code
 request_new_otp() {
     local login="$1"
     local password="$2"
@@ -478,8 +478,8 @@ request_new_otp() {
         return 1
     fi
     
-    print_header "Запрос нового OTP кода"
-    print_info "Отправляю запрос на генерацию нового OTP кода..."
+    print_header "Request a new OTP code"
+    print_info "Sending a request to generate a new OTP code..."
     
     REQUEST_RESPONSE=$(curl -s -X POST "$REQUEST_OTP_URL" \
         -H 'Content-Type: application/json' \
@@ -487,16 +487,16 @@ request_new_otp() {
         -d "{\"login\":\"$login\",\"password\":\"$password\"}")
     
     if [ -z "$REQUEST_RESPONSE" ]; then
-        print_error "Пустой ответ от сервера при запросе OTP"
+        print_error "Empty response from the server when requesting OTP"
         return 1
     fi
     
-    # Проверка на ошибку
+    # Error check
     if echo "$REQUEST_RESPONSE" | grep -q '"error"'; then
-        print_error "Ошибка при запросе нового OTP:"
+        print_error "Error requesting a new OTP:"
         if [ "$HAS_JQ" = true ]; then
             ERROR_DESC=$(echo "$REQUEST_RESPONSE" | jq -r '.error_description // .error // .message')
-            echo -e "  ${RED}Описание:${NC} $ERROR_DESC"
+            echo -e "  ${RED}Description:${NC} $ERROR_DESC"
             echo "$REQUEST_RESPONSE" | jq .
         else
             echo "$REQUEST_RESPONSE"
@@ -504,155 +504,155 @@ request_new_otp() {
         return 1
     fi
     
-    # Проверка успешности
+    # Check success
     if [ "$HAS_JQ" = true ]; then
-        # Проверяем, что ответ является объектом (не массивом), и пытаемся извлечь message
+        # Confirm the response is an object (not an array) and try to extract message
         if echo "$REQUEST_RESPONSE" | jq -e 'type == "object"' > /dev/null 2>&1; then
             SUCCESS_MESSAGE=$(echo "$REQUEST_RESPONSE" | jq -r 'if .message then .message else "OK" end' 2>/dev/null)
             if [ -n "$SUCCESS_MESSAGE" ] && [ "$SUCCESS_MESSAGE" != "null" ] && [ "$SUCCESS_MESSAGE" != "OK" ]; then
-                print_success "Новый OTP код запрошен: $SUCCESS_MESSAGE"
+                print_success "New OTP code requested: $SUCCESS_MESSAGE"
             else
-                print_success "Новый OTP код запрошен успешно"
+                print_success "New OTP code requested successfully"
             fi
         else
-            print_success "Новый OTP код запрошен успешно"
+            print_success "New OTP code requested successfully"
         fi
     else
-        print_success "Новый OTP код запрошен"
+        print_success "New OTP code requested"
     fi
     
-    # Небольшая задержка, чтобы OTP код успел появиться в базе
-    print_info "Ожидаю появления кода в системе (3 секунды)..."
+    # Short delay so the OTP code can appear in the database
+    print_info "Waiting for the code to appear in the system (3 seconds)..."
     sleep 3
     
     return 0
 }
 
-# Проверка наличия jq
+# Check that jq is available
 if ! command -v jq &> /dev/null; then
-    print_warning "jq не установлен. Установите для корректной работы: apt-get install jq"
+    print_warning "jq is not installed. Install for correct operation: apt-get install jq"
     HAS_JQ=false
 else
     HAS_JQ=true
 fi
 
-# Настройка port-forward для PROD (если нужно)
+# Set up port-forward for PROD (when needed)
 if [ "$USE_PORT_FORWARD" = "true" ]; then
     setup_prod_port_forwards
 fi
 
-# Настройка URL после port-forward
+# Set URLs after port-forward
 setup_urls
 
-# Начало работы
+# Start
 clear
-print_header "OTP Авторизация"
-echo -e "${BLUE}Окружение:${NC} ${ENV^^}"
+print_header "OTP authorization"
+echo -e "${BLUE}Environment:${NC} ${ENV^^}"
 if [ "$USE_PORT_FORWARD" = "true" ]; then
-    echo -e "${BLUE}Режим:${NC} Port-forward (localhost)"
-    echo -e "${BLUE}Логин:${NC} $LOGIN"
+    echo -e "${BLUE}Mode:${NC} Port-forward (localhost)"
+    echo -e "${BLUE}Login:${NC} $LOGIN"
     echo -e "${BLUE}Company ID:${NC} $COMPANY_ID"
-    echo -e "${BLUE}Пароль:${NC} ******** (будет использован для автоматического запроса нового OTP при необходимости)"
+    echo -e "${BLUE}Password:${NC} ******** (will be used to request a new OTP automatically when needed)"
     echo ""
-    echo -e "${CYAN}Используемые URL через port-forward:${NC}"
+    echo -e "${CYAN}URLs via port-forward:${NC}"
     echo -e "  • Auth: http://localhost:${AUTH_LOCAL_PORT}"
     if [ -n "$WEB_LOCAL_PORT" ] && [ "$WEB_LOCAL_PORT" != "$AUTH_LOCAL_PORT" ]; then
         echo -e "  • Web:  http://localhost:${WEB_LOCAL_PORT}"
     else
-        echo -e "  • Web:  http://localhost:${AUTH_LOCAL_PORT} (использует auth сервис)"
+        echo -e "  • Web:  http://localhost:${AUTH_LOCAL_PORT} (uses the auth service)"
     fi
 else
-    echo -e "${BLUE}Логин:${NC} $LOGIN"
+    echo -e "${BLUE}Login:${NC} $LOGIN"
     echo -e "${BLUE}Company ID:${NC} $COMPANY_ID"
-    echo -e "${BLUE}Пароль:${NC} ******** (будет использован для автоматического запроса нового OTP при необходимости)"
+    echo -e "${BLUE}Password:${NC} ******** (will be used to request a new OTP automatically when needed)"
     echo ""
-    echo -e "${CYAN}Используемые URL:${NC}"
+    echo -e "${CYAN}URLs in use:${NC}"
     echo -e "  • Auth: https://${AUTH_DOMAIN}"
     echo -e "  • Web:  https://${WEB_DOMAIN}"
 fi
 echo ""
 
-# Проверка, что URL установлены
+# Check that URLs are set
 if [ -z "$OTP_API_URL" ] || [ -z "$AUTH_URL" ] || [ -z "$REQUEST_OTP_URL" ]; then
-    print_error "URL не были настроены. Проверьте конфигурацию."
+    print_error "URLs were not configured. Check the configuration."
     exit 1
 fi
 
-# Шаг 1: Получение списка OTP кодов
-print_header "Шаг 1: Получение списка OTP кодов"
-print_info "Запрашиваю список OTP кодов..."
+# Step 1: Fetch the OTP code list
+print_header "Step 1: Fetch the OTP code list"
+print_info "Fetching the OTP code list..."
 
-# Отладочная информация перед запросом
-print_info "URL для запроса: $OTP_API_URL"
+# Debug info before the request
+print_info "URL for the request: $OTP_API_URL"
 
 if [ "$USE_PORT_FORWARD" = "true" ]; then
     echo ""
-    print_info "Проверяю статус port-forward процессов..."
+    print_info "Checking port-forward process status..."
     
-    # Проверяем auth port-forward
+    # Check auth port-forward
     if [ -n "$AUTH_PORT_FORWARD_PID" ] && [[ "$AUTH_PORT_FORWARD_PID" =~ ^[0-9]+$ ]]; then
         if ps -p $AUTH_PORT_FORWARD_PID > /dev/null 2>&1; then
-            print_success "Port-forward для auth активен (PID: $AUTH_PORT_FORWARD_PID, порт: $AUTH_LOCAL_PORT)"
+            print_success "Port-forward for auth is active (PID: $AUTH_PORT_FORWARD_PID, port: $AUTH_LOCAL_PORT)"
         else
-            print_error "Port-forward для auth НЕ работает (PID: $AUTH_PORT_FORWARD_PID не найден)"
+            print_error "Port-forward for auth is NOT working (PID: $AUTH_PORT_FORWARD_PID not found)"
         fi
     elif [ -n "$AUTH_PORT_FORWARD_PID" ]; then
-        print_warning "Port-forward для auth: некорректный PID (должен быть числом, получено: $AUTH_PORT_FORWARD_PID)"
+        print_warning "Port-forward for auth: invalid PID (must be a number, got: $AUTH_PORT_FORWARD_PID)"
     fi
     
-    # Проверяем web port-forward
+    # Check web port-forward
     if [ -n "$WEB_PORT_FORWARD_PID" ] && [[ "$WEB_PORT_FORWARD_PID" =~ ^[0-9]+$ ]]; then
         if ps -p $WEB_PORT_FORWARD_PID > /dev/null 2>&1; then
-            print_success "Port-forward для web активен (PID: $WEB_PORT_FORWARD_PID, порт: $WEB_LOCAL_PORT)"
+            print_success "Port-forward for web is active (PID: $WEB_PORT_FORWARD_PID, port: $WEB_LOCAL_PORT)"
         else
-            print_warning "Port-forward для web НЕ работает (PID: $WEB_PORT_FORWARD_PID не найден)"
+            print_warning "Port-forward for web is NOT working (PID: $WEB_PORT_FORWARD_PID not found)"
         fi
     elif [ -n "$WEB_PORT_FORWARD_PID" ]; then
-        print_warning "Port-forward для web: некорректный PID (должен быть числом, получено: $WEB_PORT_FORWARD_PID)"
+        print_warning "Port-forward for web: invalid PID (must be a number, got: $WEB_PORT_FORWARD_PID)"
     fi
     
-    # Тест доступности портов
-    print_info "Проверяю доступность портов..."
+    # Port availability test
+    print_info "Checking port availability..."
     if command -v nc &> /dev/null || command -v netcat &> /dev/null; then
         if nc -z localhost ${WEB_LOCAL_PORT:-8082} 2>/dev/null; then
-            print_success "Порт ${WEB_LOCAL_PORT:-8082} доступен"
+            print_success "Port ${WEB_LOCAL_PORT:-8082} is available"
         else
-            print_error "Порт ${WEB_LOCAL_PORT:-8082} НЕ доступен"
+            print_error "Port ${WEB_LOCAL_PORT:-8082} is NOT available"
         fi
     fi
     echo ""
 fi
 
-print_info "Отправляю запрос..."
+print_info "Sending the request..."
 OTP_LIST_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "$OTP_API_URL" -H 'accept: */*')
 
-# Извлекаем HTTP код и тело ответа
+# Extract the HTTP status and response body
 HTTP_CODE=$(echo "$OTP_LIST_RESPONSE" | tail -n 1)
 OTP_LIST_RESPONSE=$(echo "$OTP_LIST_RESPONSE" | sed '$d')
 
-print_info "HTTP статус код: $HTTP_CODE"
+print_info "HTTP status code: $HTTP_CODE"
 
 if [ -z "$OTP_LIST_RESPONSE" ]; then
-    print_error "Пустой ответ от OTP API"
-    print_info "HTTP код: $HTTP_CODE"
+    print_error "Empty response from the OTP API"
+    print_info "HTTP status: $HTTP_CODE"
     print_info "URL: $OTP_API_URL"
     if [ "$USE_PORT_FORWARD" = "true" ]; then
-        print_info "Проверьте port-forward процессы:"
+        print_info "Check port-forward processes:"
         print_info "  ps aux | grep 'port-forward'"
         print_info "  kubectl -n $K8S_NAMESPACE get svc | grep otp"
     fi
     exit 1
 fi
 
-# Выводим первые строки ответа для отладки
-print_info "=== Начало ответа от API ==="
+# Print the first response lines for debugging
+print_info "=== Start of the API response ==="
 echo "$OTP_LIST_RESPONSE" | head -5
 echo "..."
 echo ""
 
-# Проверка на ошибку в ответе
+# Check the response for an error
 if echo "$OTP_LIST_RESPONSE" | grep -q '"error"'; then
-    print_error "Ошибка при получении списка OTP кодов:"
+    print_error "Error fetching the OTP code list:"
     if [ "$HAS_JQ" = true ]; then
         echo "$OTP_LIST_RESPONSE" | jq .
     else
@@ -661,21 +661,21 @@ if echo "$OTP_LIST_RESPONSE" | grep -q '"error"'; then
     exit 1
 fi
 
-print_success "Список OTP кодов получен"
+print_success "OTP code list received"
 
-# Шаг 2: Извлечение самого нового валидного OTP кода
-print_header "Шаг 2: Определение самого нового валидного OTP кода"
+# Step 2: Extract the newest valid OTP code
+print_header "Step 2: Determine the newest valid OTP code"
 
 if [ "$HAS_JQ" = true ]; then
     TOTAL_CODES=$(echo "$OTP_LIST_RESPONSE" | jq -r '.totalElements // 0' 2>/dev/null || echo "0")
-    print_info "Найдено OTP кодов: $TOTAL_CODES"
+    print_info "OTP codes found: $TOTAL_CODES"
     echo ""
     
-    # Получаем текущее время в формате ISO 8601
+    # Get current time in ISO 8601 format
     CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
     
-    # Ищем самый новый НЕ VERIFIED код, который еще не истек
-    # Фильтруем: status != "VERIFIED" и expireAt > текущее время
+    # Look up the newest non-VERIFIED code that has not expired
+    # Filter: status != "VERIFIED" and expireAt > current time
     LATEST_VALID=$(echo "$OTP_LIST_RESPONSE" | jq -r --arg now "$CURRENT_TIME" '
         [.content[] | 
         select(.status != "VERIFIED") |
@@ -687,31 +687,31 @@ if [ "$HAS_JQ" = true ]; then
         LATEST_EXPIRE=$(echo "$LATEST_VALID" | jq -r '.expireAt')
         LATEST_STATUS=$(echo "$LATEST_VALID" | jq -r '.status')
         
-        print_success "Найден валидный OTP код"
-        echo -e "  ${BLUE}Код:${NC} $LATEST_CODE"
-        echo -e "  ${BLUE}Истекает:${NC} $LATEST_EXPIRE"
-        echo -e "  ${BLUE}Статус:${NC} $LATEST_STATUS"
+        print_success "Valid OTP code found"
+        echo -e "  ${BLUE}Code:${NC} $LATEST_CODE"
+        echo -e "  ${BLUE}Expires:${NC} $LATEST_EXPIRE"
+        echo -e "  ${BLUE}Status:${NC} $LATEST_STATUS"
     else
-        # Если не нашли неиспользованный код
-        print_warning "Валидных неиспользованных кодов не найдено."
+        # If no unused code is found
+        print_warning "No valid unused codes found."
         echo ""
         
-        # Показываем все коды для отладки
-        print_info "Все доступные OTP коды:"
-        echo "$OTP_LIST_RESPONSE" | jq -r '.content[] | "  • Код: \(.code | split(": ")[1]) | Статус: \(.status) | Истекает: \(.expireAt)"' 2>/dev/null || print_warning "Не удалось распарсить список кодов"
+        # Show all codes for debugging
+        print_info "All available OTP codes:"
+        echo "$OTP_LIST_RESPONSE" | jq -r '.content[] | "  • Code: \(.code | split(": ")[1]) | Status: \(.status) | Expires: \(.expireAt)"' 2>/dev/null || print_warning "Failed to parse the code list"
         echo ""
         
-        # Если пароль предоставлен, пытаемся запросить новый OTP
+        # If a password is provided, request a new OTP
         if [ -n "$PASSWORD" ]; then
-            print_info "Пароль предоставлен. Пытаюсь запросить новый OTP код..."
+            print_info "Password provided. Requesting a new OTP code..."
             echo ""
             
             if request_new_otp "$LOGIN" "$PASSWORD"; then
-                # Повторно получаем список OTP кодов
-                print_info "Получаю обновленный список OTP кодов..."
+                # Fetch the OTP code list again
+                print_info "Fetching the updated OTP code list..."
                 OTP_LIST_RESPONSE=$(curl -s -X GET "$OTP_API_URL" -H 'accept: */*')
                 
-                # Пытаемся найти новый код
+                # Try to find the new code
                 LATEST_VALID=$(echo "$OTP_LIST_RESPONSE" | jq -r --arg now "$CURRENT_TIME" '
                     [.content[] | 
                     select(.status != "VERIFIED") |
@@ -724,34 +724,34 @@ if [ "$HAS_JQ" = true ]; then
                     LATEST_EXPIRE=$(echo "$LATEST_VALID" | jq -r '.expireAt')
                     LATEST_STATUS=$(echo "$LATEST_VALID" | jq -r '.status')
                     
-                    print_success "Найден новый валидный OTP код!"
-                    echo -e "  ${BLUE}Код:${NC} $LATEST_CODE"
-                    echo -e "  ${BLUE}Истекает:${NC} $LATEST_EXPIRE"
-                    echo -e "  ${BLUE}Статус:${NC} $LATEST_STATUS"
+                    print_success "New valid OTP code found!"
+                    echo -e "  ${BLUE}Code:${NC} $LATEST_CODE"
+                    echo -e "  ${BLUE}Expires:${NC} $LATEST_EXPIRE"
+                    echo -e "  ${BLUE}Status:${NC} $LATEST_STATUS"
                 else
-                    # Если всё равно не нашли, берем самый новый
-                    print_warning "Новый код еще не появился в списке. Использую самый новый по времени..."
+                    # If still not found, take the newest
+                    print_warning "The new code is not in the list yet. Using the newest by time..."
                     LATEST_CODE=$(echo "$OTP_LIST_RESPONSE" | jq -r '[.content[]] | sort_by(.expireAt) | reverse | .[0] | .code | split(": ")[1]')
                     LATEST_EXPIRE=$(echo "$OTP_LIST_RESPONSE" | jq -r '[.content[]] | sort_by(.expireAt) | reverse | .[0] | .expireAt')
                     LATEST_STATUS=$(echo "$OTP_LIST_RESPONSE" | jq -r '[.content[]] | sort_by(.expireAt) | reverse | .[0] | .status')
                     
                     if [ "$LATEST_CODE" != "null" ] && [ -n "$LATEST_CODE" ]; then
-                        echo -e "  ${BLUE}Код:${NC} $LATEST_CODE"
-                        echo -e "  ${BLUE}Истекает:${NC} $LATEST_EXPIRE"
-                        echo -e "  ${BLUE}Статус:${NC} $LATEST_STATUS"
+                        echo -e "  ${BLUE}Code:${NC} $LATEST_CODE"
+                        echo -e "  ${BLUE}Expires:${NC} $LATEST_EXPIRE"
+                        echo -e "  ${BLUE}Status:${NC} $LATEST_STATUS"
                     fi
                 fi
             else
-                print_error "Не удалось запросить новый OTP код"
+                print_error "Failed to request a new OTP code"
                 echo ""
-                print_info "Попробуйте:"
-                echo "  1. Проверить правильность пароля"
-                echo "  2. Запросить новый OTP код через UI"
+                print_info "Try:"
+                echo "  1. Check that the password is correct"
+                echo "  2. Request a new OTP code via the UI"
                 exit 1
             fi
         else
-            # Если пароль не предоставлен, используем самый новый (даже если VERIFIED)
-            print_warning "Пароль не предоставлен. Пробую использовать самый новый код по времени..."
+            # If no password is provided, use the newest code (even if VERIFIED)
+            print_warning "No password provided. Trying the newest code by time..."
             echo ""
             
             LATEST_CODE=$(echo "$OTP_LIST_RESPONSE" | jq -r '[.content[]] | sort_by(.expireAt) | reverse | .[0] | .code | split(": ")[1]')
@@ -759,37 +759,37 @@ if [ "$HAS_JQ" = true ]; then
             LATEST_STATUS=$(echo "$OTP_LIST_RESPONSE" | jq -r '[.content[]] | sort_by(.expireAt) | reverse | .[0] | .status')
             
             if [ "$LATEST_CODE" != "null" ] && [ -n "$LATEST_CODE" ]; then
-                print_warning "Использую самый новый код (возможно уже использован):"
-                echo -e "  ${BLUE}Код:${NC} $LATEST_CODE"
-                echo -e "  ${BLUE}Истекает:${NC} $LATEST_EXPIRE"
-                echo -e "  ${YELLOW}Статус:${NC} $LATEST_STATUS"
+                print_warning "Using the newest code (it may already have been used):"
+                echo -e "  ${BLUE}Code:${NC} $LATEST_CODE"
+                echo -e "  ${BLUE}Expires:${NC} $LATEST_EXPIRE"
+                echo -e "  ${YELLOW}Status:${NC} $LATEST_STATUS"
                 echo ""
-                print_info "💡 Для автоматического запроса нового OTP укажите пароль третьим параметром:"
+                print_info "💡 To request a new OTP automatically, pass the password as the third argument:"
                 echo "   ./auth_treasury_box_api.sh $LOGIN $COMPANY_ID PASSWORD"
             else
-                print_error "Не удалось определить OTP код из ответа"
+                print_error "Failed to determine the OTP code from the response"
                 echo "$OTP_LIST_RESPONSE" | jq .
                 exit 1
             fi
         fi
     fi
 else
-    # Fallback без jq
-    print_warning "Использую упрощенный парсинг (рекомендуется установить jq)"
+    # Fallback without jq
+    print_warning "Using simplified parsing (installing jq is recommended)"
     LATEST_CODE=$(echo "$OTP_LIST_RESPONSE" | grep -o '"code":"[^"]*"' | tail -1 | sed 's/.*: //; s/"$//')
     
     if [ -z "$LATEST_CODE" ]; then
-        print_error "Не удалось извлечь OTP код"
+        print_error "Failed to extract the OTP code"
         exit 1
     fi
     
-    print_success "OTP код извлечен: $LATEST_CODE"
-    print_warning "Без jq невозможно проверить статус кода. Установите jq для точной проверки."
+    print_success "OTP code extracted: $LATEST_CODE"
+    print_warning "Without jq the code status cannot be checked. Install jq for an exact check."
 fi
 
-# Шаг 3: Авторизация с OTP кодом
-print_header "Шаг 3: Авторизация с OTP кодом"
-print_info "Отправляю запрос на получение токена..."
+# Step 3: Authorize with the OTP code
+print_header "Step 3: Authorize with the OTP code"
+print_info "Sending a token request..."
 
 TOKEN_RESPONSE=$(curl -s -X POST "$AUTH_URL" \
   -H 'Content-Type: application/x-www-form-urlencoded' \
@@ -799,52 +799,52 @@ TOKEN_RESPONSE=$(curl -s -X POST "$AUTH_URL" \
   --data-urlencode "companyId=$COMPANY_ID" \
   --data-urlencode "grant_type=otp")
 
-# Проверка ответа
+# Check the response
 if [ -z "$TOKEN_RESPONSE" ]; then
-    print_error "Пустой ответ от сервера авторизации"
+    print_error "Empty response from the auth server"
     exit 1
 fi
 
-# Проверка на ошибку
+# Error check
 if echo "$TOKEN_RESPONSE" | grep -q '"error"'; then
-    print_error "Ошибка авторизации:"
+    print_error "Authorization error:"
     if [ "$HAS_JQ" = true ]; then
         ERROR_DESC=$(echo "$TOKEN_RESPONSE" | jq -r '.error_description // .error')
         ERROR_CODE=$(echo "$TOKEN_RESPONSE" | jq -r '.error')
-        echo -e "  ${RED}Код ошибки:${NC} $ERROR_CODE"
-        echo -e "  ${RED}Описание:${NC} $ERROR_DESC"
+        echo -e "  ${RED}Error code:${NC} $ERROR_CODE"
+        echo -e "  ${RED}Description:${NC} $ERROR_DESC"
         echo ""
         
-        # Дополнительная информация об использованном коде
+        # Additional information about the used code
         if [ "$LATEST_STATUS" = "VERIFIED" ]; then
-            print_warning "Использованный OTP код имеет статус VERIFIED (уже использован)"
+            print_warning "The OTP code status is VERIFIED (already used)"
         fi
         
-        # Проверка времени истечения
+        # Check expiry time
         if [ -n "$LATEST_EXPIRE" ]; then
             CURRENT_TIME_EPOCH=$(date -u +%s)
             EXPIRE_TIME_EPOCH=$(date -u -d "$LATEST_EXPIRE" +%s 2>/dev/null || echo "0")
             if [ "$EXPIRE_TIME_EPOCH" -lt "$CURRENT_TIME_EPOCH" ]; then
-                print_warning "Время истечения OTP кода: $LATEST_EXPIRE (возможно истек)"
+                print_warning "OTP code expiry time: $LATEST_EXPIRE (may have expired)"
             fi
         fi
     else
         echo "$TOKEN_RESPONSE"
     fi
     echo ""
-    print_warning "Возможные причины:"
-    echo "  • OTP код уже использован (статус VERIFIED)"
-    echo "  • OTP код истек (время expireAt прошло)"
-    echo "  • Неверный логин или companyId"
+    print_warning "Possible causes:"
+    echo "  • OTP code already used (status VERIFIED)"
+    echo "  • OTP code expired (expireAt is in the past)"
+    echo "  • Invalid login or companyId"
     echo ""
-    print_info "💡 Решение: Запросите новый OTP код через UI/API"
-    print_info "   Затем повторите запуск скрипта для получения свежего кода"
+    print_info "💡 Fix: request a new OTP code via the UI/API"
+    print_info "   Then run the script again to obtain a fresh code"
     exit 1
 fi
 
-# Проверка наличия токена
+# Check that a token is present
 if ! echo "$TOKEN_RESPONSE" | grep -q '"access_token"'; then
-    print_error "В ответе отсутствует access_token"
+    print_error "The response has no access_token"
     if [ "$HAS_JQ" = true ]; then
         echo "$TOKEN_RESPONSE" | jq .
     else
@@ -853,7 +853,7 @@ if ! echo "$TOKEN_RESPONSE" | grep -q '"access_token"'; then
     exit 1
 fi
 
-# Извлечение токена
+# Extract the token
 if [ "$HAS_JQ" = true ]; then
     ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
     TOKEN_TYPE=$(echo "$TOKEN_RESPONSE" | jq -r '.token_type // "Bearer"')
@@ -865,15 +865,15 @@ else
     EXPIRES_IN="N/A"
 fi
 
-print_success "Авторизация успешна!"
+print_success "Authorization succeeded!"
 
-# Финальный вывод токена
-print_header "Результат авторизации"
+# Final token output
+print_header "Authorization result"
 
 if [ "$HAS_JQ" = true ]; then
-    echo -e "${BLUE}Тип токена:${NC} $TOKEN_TYPE"
+    echo -e "${BLUE}Token type:${NC} $TOKEN_TYPE"
     if [ "$EXPIRES_IN" != "N/A" ] && [ "$EXPIRES_IN" != "null" ]; then
-        echo -e "${BLUE}Истекает через:${NC} $EXPIRES_IN секунд"
+        echo -e "${BLUE}Expires in:${NC} $EXPIRES_IN seconds"
     fi
     echo ""
 fi
@@ -887,17 +887,17 @@ echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Дополнительная информация
+# Additional information
 if [ "$HAS_JQ" = true ] && [ -n "$REFRESH_TOKEN" ] && [ "$REFRESH_TOKEN" != "null" ]; then
     echo -e "${BLUE}Refresh Token:${NC}"
     echo -e "${CYAN}$REFRESH_TOKEN${NC}"
     echo ""
 fi
 
-# Пример использования токена
-echo -e "${BLUE}Пример использования токена в curl:${NC}"
+# Example token usage
+echo -e "${BLUE}Example token usage with curl:${NC}"
 echo -e "${YELLOW}curl -H \"Authorization: Bearer $ACCESS_TOKEN\" ...${NC}"
 echo ""
 
-print_success "Готово! Токен скопирован выше."
+print_success "Done! The token is copied above."
 

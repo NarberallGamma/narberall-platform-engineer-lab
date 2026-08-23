@@ -1,4 +1,4 @@
-"""Проверка HTTPS: stdlib ssl (TCP + TLS, notAfter)."""
+"""HTTPS check: stdlib ssl (TCP + TLS, notAfter)."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def check_one(
 ) -> HttpsCheckResult:
     host = host.strip()
     if not host:
-        return HttpsCheckResult(False, host, port, "пустой host")
+        return HttpsCheckResult(False, host, port, "empty host")
 
     server_name = (sni or host).strip() or host
     ctx = ssl.create_default_context()
@@ -57,10 +57,10 @@ def check_one(
                 fp = _fingerprint_sha256_colon(cert_der) if cert_der else None
                 cert = ssock.getpeercert()
                 if not cert:
-                    return HttpsCheckResult(False, host, port, "нет сертификата с peer", None, fp)
+                    return HttpsCheckResult(False, host, port, "no peer certificate", None, fp)
                 na = cert.get("notAfter")
                 if not na:
-                    return HttpsCheckResult(False, host, port, "нет notAfter в сертификате", None, fp)
+                    return HttpsCheckResult(False, host, port, "no notAfter in certificate", None, fp)
                 not_after = datetime.fromtimestamp(ssl.cert_time_to_seconds(na), tz=timezone.utc)
                 now = datetime.now(timezone.utc)
                 if not_after < now:
@@ -68,7 +68,7 @@ def check_one(
                         False,
                         host,
                         port,
-                        f"сертификат просрочен (notAfter={na})",
+                        f"certificate expired (notAfter={na})",
                         not_after,
                         fp,
                     )
@@ -76,7 +76,7 @@ def check_one(
                     True,
                     host,
                     port,
-                    f"OK, истекает {na}",
+                    f"OK, expires {na}",
                     not_after,
                     fp,
                 )
@@ -101,7 +101,7 @@ def run_all(cfg: OrchestratorConfig) -> List[HttpsCheckResult]:
                     False,
                     h.host,
                     h.port,
-                    "для подключения по IP задать sni (имя в сертификате/SNI)",
+                    "when connecting by IP, set sni (name in the certificate/SNI)",
                     None,
                     None,
                 )

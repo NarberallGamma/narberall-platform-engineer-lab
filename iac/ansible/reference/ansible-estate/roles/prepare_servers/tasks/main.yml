@@ -1,24 +1,24 @@
 ---
-- name: Установить часовой пояс
+- name: Set timezone
   community.general.timezone:
     name: "{{ timezone }}"
   when: enable_timezone | bool
 
-- name: Обновить apt-кеш
+- name: Update apt cache
   ansible.builtin.apt:
     update_cache: yes
   when: enable_apt_basics | bool
   ignore_errors: yes
 
-- name: Обновить установленные пакеты (dist-upgrade)
+- name: Upgrade installed packages (dist-upgrade)
   ansible.builtin.apt:
     upgrade: dist
     autoremove: yes
     lock_timeout: "{{ prepare_servers_apt_lock_timeout }}"
   when: enable_apt_upgrade | bool
 
-# Сначала пробуем установить пакеты для Ubuntu (software-properties-common доступен в Ubuntu)
-- name: Установить базовые пакеты (Ubuntu - software-properties-common)
+# Try Ubuntu packages first (software-properties-common is available on Ubuntu)
+- name: Install base packages (Ubuntu - software-properties-common)
   ansible.builtin.apt:
     name:
       - software-properties-common
@@ -28,8 +28,8 @@
   register: ubuntu_packages_install
   ignore_errors: yes
 
-# Если установка не удалась (например, на Debian где пакет может отсутствовать), используем альтернативные пакеты
-- name: Установить базовые пакеты (Debian - альтернатива для software-properties-common)
+# If install failed (e.g. on Debian where the package may be missing), use alternative packages
+- name: Install base packages (Debian - alternative to software-properties-common)
   ansible.builtin.apt:
     name:
       - apt-transport-https
@@ -39,22 +39,22 @@
     state: present
   when: enable_apt_basics | bool and ubuntu_packages_install.failed | default(false)
 
-- name: Переименовать хост (если задан host_hostname и отличается)
+- name: Rename host (if host_hostname is set and differs)
   ansible.builtin.hostname:
     name: "{{ host_hostname }}"
   when: enable_hostname_change | bool and host_hostname | length > 0 and host_hostname != ansible_facts['hostname']
 
-- name: Обновить /etc/hosts после смены hostname
+- name: Update /etc/hosts after hostname change
   ansible.builtin.include_tasks: hosts_file.yml
   vars:
     hosts_file_hostname: "{{ host_hostname }}"
   when: enable_hostname_change | bool and host_hostname | length > 0
 
-- name: Настроить DNS (systemd-resolved) при необходимости
+- name: Configure DNS (systemd-resolved) if needed
   ansible.builtin.include_tasks: dns.yml
   when: enable_dns | bool and dns_manage | bool
 
-- name: Подготовить пакеты для домена
+- name: Prepare packages for domain join
   ansible.builtin.apt:
     name:
       - sssd-ad
@@ -64,35 +64,35 @@
     state: present
   when: enable_realm | bool
 
-- name: Вступление в домен (realm)
+- name: Join domain (realm)
   ansible.builtin.include_tasks: realm.yml
   when: enable_realm | bool
 
-- name: Конфигурация SSSD и PAM
+- name: SSSD and PAM configuration
   ansible.builtin.include_tasks: sssd.yml
   when: enable_sssd | bool
 
-- name: Настройка SSH для парольной аутентификации доменных пользователей
+- name: Configure SSH for password authentication of domain users
   ansible.builtin.include_tasks: ssh_pass_auth.yml
   when: enable_ssh_pass_auth | bool
 
-- name: Установка EDR агента
+- name: Install EDR agent
   ansible.builtin.include_tasks: agent.yml
   when: enable_agent | bool and ((agent_deb_local | length > 0) or (agent_deb_url | length > 0))
 
-- name: Установка и настройка Docker
+- name: Install and configure Docker
   ansible.builtin.include_tasks: docker.yml
   when: enable_docker | bool
   tags: [docker]
 
-- name: Проверка enable_docker перед NVIDIA GPU
+- name: Check enable_docker before NVIDIA GPU
   ansible.builtin.assert:
     that:
       - enable_docker | bool
-    fail_msg: "enable_nvidia_gpu: true требует enable_docker: true (Docker ставится до Container Toolkit)."
+    fail_msg: "enable_nvidia_gpu: true requires enable_docker: true (Docker is installed before Container Toolkit)."
   when: enable_nvidia_gpu | bool
 
-- name: NVIDIA GPU — драйвер, Container Toolkit, CDI, проверка docker --gpus
+- name: NVIDIA GPU — driver, Container Toolkit, CDI, docker --gpus check
   ansible.builtin.include_role:
     name: prepare_nvidia_gpu
     apply:
@@ -104,10 +104,10 @@
     - prepare
   when: enable_nvidia_gpu | bool
 
-- name: Хардненинг прав
+- name: Permissions hardening
   ansible.builtin.include_tasks: permissions.yml
   when: enable_hardening | bool and harden_permissions | bool
 
-- name: Смена пароля root (ручной или автогенерация в artifacts)
+- name: Change root password (manual or auto-generated into artifacts)
   ansible.builtin.include_tasks: root_password.yml
   when: enable_root_password_change | bool

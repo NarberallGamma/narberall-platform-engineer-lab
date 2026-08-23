@@ -1,10 +1,10 @@
 ---
 hostname: lb-waf.example.local
-uuid: [ключ на сервере] (выдается в консоли Wallarm)
-secret: [ключ на сервере] (выдается в консоли Wallarm)  
+uuid: [key on the server] (issued in the Wallarm console)
+secret: [key on the server] (issued in the Wallarm console)  
 api:
   host: wallarm.example.com
   ca_verify: false
   port: 443
 sub_type: all
-regtoken: [ключ на сервере] (выдается в консоли Wallarm)
+regtoken: [key on the server] (issued in the Wallarm console)

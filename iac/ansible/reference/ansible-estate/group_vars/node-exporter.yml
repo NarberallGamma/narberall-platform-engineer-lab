@@ -1,6 +1,6 @@
 ---
-# Node Exporter — внешние серверы [monitoring_servers]
-# Плейбук: playbooks/node-exporter-deploy.yml | run: scripts/run/run_node_exporter.sh
+# Node Exporter — external servers [monitoring_servers]
+# Playbook: playbooks/node-exporter-deploy.yml | run: scripts/run/run_node_exporter.sh
 
 node_exporter_base_dir: /docker/apps/node-exporter
 node_exporter_image: quay.io/prometheus/node-exporter:latest

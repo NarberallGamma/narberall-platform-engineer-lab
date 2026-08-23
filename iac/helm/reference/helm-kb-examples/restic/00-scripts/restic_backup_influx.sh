@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Этот файл - черновик скрипта для бэкапа influxdb.
-# Скрипт рабочий, но не универсальный.
-# TODO: написать вокруг этой логики параметризацию/универсализацию.
+# Draft script for InfluxDB backup.
+# The script works but is not generic.
+# TODO: wrap this logic with parameterization/generalization.
 
 # Initialize things
 backup_name=$1

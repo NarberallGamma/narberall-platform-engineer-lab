@@ -1,5 +1,5 @@
 ---
-# Одна пара ключей для tunnel_user (вызывается из ssh_tunnel_users.yml)
+# One key pair for tunnel_user (included from ssh_tunnel_users.yml)
 
 - name: Stat tunnel private key
   ansible.builtin.stat:
@@ -15,7 +15,7 @@
   delegate_to: localhost
   become: false
 
-- name: Remove incomplete tunnel private key (без .pub после сбоя openssh_keypair)
+- name: Remove incomplete tunnel private key (no .pub after an openssh_keypair failure)
   ansible.builtin.file:
     path: "{{ xui_tunnel_key_private_path }}"
     state: absent

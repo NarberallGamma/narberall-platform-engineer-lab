@@ -3,16 +3,17 @@ Export domain hosts from Active Directory via LDAP/LDAPS.
 Reads ad_config.yaml and writes {company}-ad.csv for each company entry.
 Output is automatically picked up by merge3.py for EDR coverage analysis.
 
-Выгружаются и рабочие места, и серверы: OU перечисляются в `workstation_ous` и
-`server_ous`, тип попадает в колонку source_type. Отдельного атрибута «это
-сервер» в каталоге нет (проверено 2026-08-16: у рядового сервера и у ноутбука
-одинаковый userAccountControl=0x1000, SPN тоже совпадают), поэтому тип задаётся
-организационно — списком OU, а `operatingSystem` служит проверкой. Железно из
-каталога определяются только контроллеры домена: primaryGroupID=516.
+Both workstations and servers are exported: OUs are listed in `workstation_ous`
+and `server_ous`, and the type goes into the source_type column. The directory
+has no separate "this is a server" attribute (checked 2026-08-16: a regular
+server and a laptop share userAccountControl=0x1000 and the same SPNs), so the
+type is an organizational choice — the OU list — and `operatingSystem` is a
+check. Only domain controllers are identified from the directory alone:
+primaryGroupID=516.
 
-Каждый OU читается ровно один раз, даже если его указали несколько компаний, а
-хосты раздаются по компаниям после чтения — так хост, не подошедший ни под чьи
-паттерны, попадает к `default_company`, а не пропадает молча.
+Each OU is read exactly once, even if several companies list it, and hosts are
+assigned to companies after the read — so a host that matches nobody's patterns
+goes to `default_company` instead of vanishing silently.
 """
 import fnmatch
 import logging
@@ -33,28 +34,28 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Конфиг — из EDR_CONFIG_DIR (в контейнере это read-only каталог с секретами,
-# который рендерит ansible из SOPS); результат — в EDR_DATA_DIR. По умолчанию
-# оба указывают на текущий каталог — для ручного прогона с ноутбука.
+# Config from EDR_CONFIG_DIR (in the container a read-only secrets directory
+# rendered by ansible from SOPS); output goes to EDR_DATA_DIR. Both default
+# to the current directory for a manual laptop run.
 CONFIG_DIR = Path(os.environ.get("EDR_CONFIG_DIR", "."))
 DATA_DIR = Path(os.environ.get("EDR_DATA_DIR", "."))
 CONFIG_PATH = CONFIG_DIR / "ad_config.yaml"
 
 # userAccountControl bit 1 (0x2) — account is disabled
 UAC_DISABLED_BIT = 0x2
-# Контроллеры домена: единственный тип, который каталог отдаёт однозначно
+# Domain controllers: the only type the directory reports unambiguously
 DC_PRIMARY_GROUP = 516
 
-# Признак типа по operatingSystem. Используется, когда OU помечен source_type: auto,
-# и для сверки объявленного типа с фактическим — расхождение пишем в лог.
+# Type hint from operatingSystem. Used when the OU is marked source_type: auto,
+# and to compare declared type with the actual OS — mismatches go to the log.
 OS_MATCHERS = {
-    # клиентская Windows: Server в названии её исключает
+    # client Windows: "Server" in the name excludes it
     "windows": lambda os_name: os_name.lower().startswith("windows") and "server" not in os_name.lower(),
     "macos":   lambda os_name: os_name.lower().startswith("macos"),
-    # подстрока, а не префикс: часть Linux-машин рапортует 'pc-linux-gnu'
+    # substring, not prefix: some Linux machines report 'pc-linux-gnu'
     "linux":   lambda os_name: "linux" in os_name.lower(),
     "server":  lambda os_name: "server" in os_name.lower() or "linux" in os_name.lower(),
-    # любая непустая ОС: у сервисных учёток она пустая
+    # any non-empty OS: service accounts have it empty
     "any":     lambda os_name: bool(os_name.strip()),
     "all":     lambda os_name: True,
 }
@@ -72,7 +73,7 @@ COMPUTER_ATTRS = [
     "lastLogonTimestamp",
 ]
 
-# gMSA наследуются от класса computer и иначе попадают в выдачу как машины
+# gMSAs inherit from the computer class and would otherwise appear as machines
 BASE_FILTER = "(&(objectClass=computer)(!(objectClass=msDS-GroupManagedServiceAccount)){extra})"
 
 
@@ -86,8 +87,8 @@ def load_config(config_path: str = CONFIG_PATH) -> list[dict]:
 
 
 def build_ldap_filter(enabled_only: bool) -> str:
-    """Фильтр поиска. Отбор по ОС делается после чтения — один OU читается один
-    раз на всех, а os_filter у компаний разный."""
+    """Search filter. OS filtering happens after the read — one OU is read
+    once for everyone, and companies have different os_filter values."""
     extra = "(!(userAccountControl:1.2.840.113556.1.4.803:=2))" if enabled_only else ""
     return BASE_FILTER.format(extra=extra)
 
@@ -120,8 +121,9 @@ def entry_to_dict(entry) -> dict:
     uac      = val("userAccountControl") or 0
     dns_name = val("dNSHostName") or ""
     cn       = val("cn") or ""
-    # Имя из dNSHostName: у Linux-серверов cn обрезан до 15 символов (NetBIOS),
-    # и 'PROJ-B-DEMO-CERTM' не сматчился бы с 'proj-b-demo-certmanager' из облака.
+    # Name from dNSHostName: on Linux servers cn is truncated to 15 characters
+    # (NetBIOS), so 'PROJ-B-DEMO-CERTM' would not match 'proj-b-demo-certmanager'
+    # from the cloud.
     fqdn       = (dns_name or cn).lower()
     short_name = fqdn.split(".")[0]
 
@@ -138,13 +140,13 @@ def entry_to_dict(entry) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Раздача хостов по компаниям
+# Assign hosts to companies
 # ---------------------------------------------------------------------------
 
 def ou_entries(company: dict) -> list[tuple[str, str]]:
     """
-    OU компании как (dn, объявленный тип). Элемент списка — либо строка с DN,
-    либо {dn: ..., source_type: server|workstation|auto}.
+    Company OUs as (dn, declared type). A list item is either a DN string
+    or {dn: ..., source_type: server|workstation|auto}.
     """
     result = []
     for key, default_type in (("workstation_ous", "workstation"), ("server_ous", "server")):
@@ -158,8 +160,8 @@ def ou_entries(company: dict) -> list[tuple[str, str]]:
 
 def host_type(host: dict, declared: str) -> str:
     """
-    Тип хоста: объявленный в конфиге, кроме контроллеров домена — они серверы
-    всегда. 'auto' выводит тип из operatingSystem.
+    Host type: the type declared in the config, except domain controllers —
+    they are always servers. 'auto' derives the type from operatingSystem.
     """
     if host["is_dc"]:
         return "server"
@@ -169,8 +171,9 @@ def host_type(host: dict, declared: str) -> str:
 
 
 def os_allowed(host: dict, source_type: str, company: dict) -> bool:
-    """Проходит ли хост фильтр по ОС: для АРМ — os_filter компании, для серверов
-    любая непустая ОС (иначе в выгрузку попадут объекты без ОС)."""
+    """Whether the host passes the OS filter: workstations use the company
+    os_filter; servers accept any non-empty OS (otherwise objects without OS
+    would enter the export)."""
     key = company.get("os_filter", "windows") if source_type == "workstation" \
         else company.get("server_os_filter", "any")
     return OS_MATCHERS.get(key, OS_MATCHERS["all"])(host["os"])
@@ -185,11 +188,11 @@ CLAIMS_ALL = "all"
 
 def patterns_of(company: dict, source_type: str) -> list[str] | str:
     """
-    Паттерны компании для этого типа хостов: список либо CLAIMS_ALL.
+    Company patterns for this host type: a list or CLAIMS_ALL.
 
-    `all` — явная пометка «забираю всё, что осталось в моих OU». Пустой список
-    означает то же самое, но неявно, поэтому о нём предупреждаем: именно из-за
-    молчаливого «пусто = всё» project-a однажды выгреб 30 серверов project-b.
+    `all` is an explicit mark "take everything left in my OUs". An empty list
+    means the same implicitly, so it is warned about: the silent "empty = all"
+    once let project-a scoop 30 project-b servers.
     """
     key = "hostname_patterns" if source_type == "workstation" else "server_hostname_patterns"
     value = company.get(key)
@@ -199,7 +202,7 @@ def patterns_of(company: dict, source_type: str) -> list[str] | str:
 
 
 def company_claims(company: dict, host: dict, source_type: str) -> bool:
-    """Забирает ли компания этот хост (с учётом exclude-паттернов)."""
+    """Whether the company claims this host (honouring exclude patterns)."""
     name = host["hostname"].upper()
     include = patterns_of(company, source_type)
     exclude = [p.upper() for p in (company.get("hostname_exclude_patterns") or [])]
@@ -210,17 +213,17 @@ def company_claims(company: dict, host: dict, source_type: str) -> bool:
 
 def _deduplicate_nested_ous(hosts_by_ou: dict[str, list[dict]]) -> dict[str, list[dict]]:
     """
-    Один хост — один OU: самый специфичный из тех, что его вернули.
+    One host — one OU: the most specific of those that returned it.
 
-    OU вкладываются друг в друга (`OU=MacOS,OU=Laptops,OU=Assets` внутри
-    `OU=Laptops,OU=Assets`), а поиск идёт SUBTREE, поэтому одна и та же машина
-    приходит под двумя ключами. Раздавая их независимо, мы отдаём хост дважды:
-    по `OU=MacOS` его забирает project-e паттерном `m-*`, а по `OU=Laptops` он не
-    подходит никому и уходит к `default_company`. Так `m-user-c` оказался и в
-    project-a, и в project-e, а в покрытии — дважды.
+    OUs nest (`OU=MacOS,OU=Laptops,OU=Assets` inside `OU=Laptops,OU=Assets`),
+    and the search is SUBTREE, so the same machine arrives under two keys.
+    Assigning them independently would give the host twice: under `OU=MacOS`
+    project-e takes it with `m-*`, and under `OU=Laptops` it matches nobody
+    and goes to `default_company`. That is how `m-user-c` ended up in both
+    project-a and project-e, and twice in coverage.
 
-    Самый глубокий OU выбран потому, что это самое точное указание админа: если
-    он отдельно перечислил вложенный OU, значит имел в виду именно его.
+    The deepest OU is chosen because it is the most precise admin hint: if
+    a nested OU was listed separately, that is the intended one.
     """
     best: dict[str, tuple[str, dict]] = {}
     for ou, hosts in hosts_by_ou.items():
@@ -237,12 +240,12 @@ def _deduplicate_nested_ous(hosts_by_ou: dict[str, list[dict]]) -> dict[str, lis
 def assign_hosts(hosts_by_ou: dict[str, list[dict]],
                  companies: list[dict]) -> tuple[dict[str, list[dict]], list[dict]]:
     """
-    Раздать хосты по компаниям. Возвращает (компания -> строки, нераспределённые).
+    Assign hosts to companies. Returns (company -> rows, unassigned).
 
-    Претендуют только компании, у которых этот OU указан в конфиге. Если никто не
-    забрал — хост уходит к компании с `default_company: true`, а если и её нет,
-    попадает в список нераспределённых: молча пропасть он не должен, это уже
-    стоило нам четырёх компаний, полгода не попадавших в метрики.
+    Only companies that list this OU in the config may claim. If nobody takes
+    the host, it goes to the company with `default_company: true`; if that is
+    also missing, it enters the unassigned list: it must not vanish silently —
+    that already cost four companies half a year of missing metrics.
     """
     claimed: dict[str, list[dict]] = {c["name"]: [] for c in companies}
     unassigned: list[dict] = []
@@ -253,10 +256,10 @@ def assign_hosts(hosts_by_ou: dict[str, list[dict]],
                   for dn, declared in ou_entries(c) if dn.upper() == ou.upper()]
         for host in hosts:
             row, taken = None, None
-            # Сначала компании с явными паттернами, потом «всеядные»: порядок в
-            # конфиге ничего не решает. Иначе компания без паттернов, стоящая
-            # первой, выгребает из общего OU чужие хосты — так project-a забрал
-            # 30 серверов project-b, и суммарные метрики этого не показали.
+            # Companies with explicit patterns first, then "take-all": config
+            # order must not decide. Otherwise a pattern-less company listed
+            # first scoops other hosts from a shared OU — that is how project-a
+            # took 30 project-b servers, and totals never showed it.
             for specific_first in (True, False):
                 for company, declared in owners:
                     is_specific = patterns_of(company, host_type(host, declared)) != CLAIMS_ALL
@@ -285,12 +288,12 @@ def assign_hosts(hosts_by_ou: dict[str, list[dict]],
 
 def validate_config(companies: list[dict]) -> list[str]:
     """
-    Проверки, которые ловят неоднозначный конфиг до того, как он тихо разъедется.
+    Checks that catch an ambiguous config before it silently drifts.
 
-    Ошибка ровно одна: два «всеядных» претендента на один OU и один тип хостов.
-    Кому достанется хост в этом случае, из конфига не следует никак, и раньше
-    решал порядок строк. Остальное — предупреждения: неявное «пусто = всё»
-    работает, но должно быть написано словом (`claims`-паттерны: `all`).
+    There is exactly one error: two "take-all" claimants for one OU and one
+    host type. Who gets the host then cannot be inferred from the config, and
+    line order used to decide. The rest are warnings: implicit "empty = all"
+    works, but must be written as a word (`claims` patterns: `all`).
     """
     problems: list[str] = []
     for source_type, ou_key in (("workstation", "workstation_ous"), ("server", "server_ous")):
@@ -308,9 +311,9 @@ def validate_config(companies: list[dict]) -> list[str]:
                       and not (c.get("hostname_exclude_patterns") or [])]
             if len(greedy) > 1:
                 problems.append(
-                    f"OU {ou}: несколько компаний забирают всё ({', '.join(greedy)}) "
-                    f"для типа '{source_type}'. Задайте паттерны или exclude — из конфига "
-                    f"не следует, чей это хост"
+                    f"OU {ou}: several companies claim everything ({', '.join(greedy)}) "
+                    f"for type '{source_type}'. Set patterns or exclude — the config "
+                    f"does not say whose host this is"
                 )
     for company in companies:
         for source_type, ou_key in (("workstation", "workstation_ous"), ("server", "server_ous")):
@@ -319,8 +322,8 @@ def validate_config(companies: list[dict]) -> list[str]:
                         "hostname_patterns" if source_type == "workstation"
                         else "server_hostname_patterns"), str):
                 logger.warning(
-                    "Company '%s': паттерны для '%s' не заданы — забирает всё из своих OU. "
-                    "Напишите это явно: %s: all",
+                    "Company '%s': patterns for '%s' are not set — takes everything from its OUs. "
+                    "Write this explicitly: %s: all",
                     company["name"], source_type,
                     "hostname_patterns" if source_type == "workstation" else "server_hostname_patterns",
                 )
@@ -329,53 +332,53 @@ def validate_config(companies: list[dict]) -> list[str]:
 
 def check_empty_result(company: dict, rows: list[dict]) -> None:
     """
-    Компания объявила OU, но не получила оттуда ни одного хоста.
+    The company declared OUs but received no hosts from them.
 
-    Это и есть сигнал, которого не хватало: у project-b с пятью серверными OU в логе
-    стояло `saved 14 hosts {'workstation': 14}` — ноль серверов и ни одного
-    предупреждения, при том что суммарное покрытие выглядело здоровым.
+    That is the missing signal: project-b with five server OUs logged
+    `saved 14 hosts {'workstation': 14}` — zero servers and no warning,
+    while overall coverage looked healthy.
     """
     kinds = {row["source_type"] for row in rows}
     for source_type, ou_key in (("workstation", "workstation_ous"), ("server", "server_ous")):
         if company.get(ou_key) and source_type not in kinds:
             logger.warning(
-                "Company '%s': задано %d %s, но получено 0 хостов типа '%s' — "
-                "проверить паттерны: их мог перехватить кто-то другой",
+                "Company '%s': %d %s set, but 0 hosts of type '%s' received — "
+                "check patterns: another company may have claimed them",
                 company["name"], len(company[ou_key]), ou_key, source_type,
             )
 
 
 def check_declared_type(rows: list[dict], company: str) -> None:
-    """Сверка типа из конфига с фактической ОС — расхождение не исправляем молча,
-    а показываем: OU это административное решение, ОС — факт от машины."""
+    """Compare the config type with the actual OS — mismatches are shown, not
+    silently fixed: the OU is an admin decision, the OS is a fact from the machine."""
     for row in rows:
         if not row["os"]:
             continue
         looks_server = OS_MATCHERS["server"](row["os"])
         if looks_server and row["source_type"] == "workstation":
-            logger.warning("  %s: %s помечен как АРМ, а ОС серверная (%s)",
+            logger.warning("  %s: %s is marked as a workstation, but the OS is server (%s)",
                            company, row["hostname"], row["os"])
         elif not looks_server and row["source_type"] == "server" and not row["is_dc"]:
-            logger.warning("  %s: %s помечен как сервер, а ОС клиентская (%s)",
+            logger.warning("  %s: %s is marked as a server, but the OS is client (%s)",
                            company, row["hostname"], row["os"])
 
 
 def main() -> None:
     companies = load_config(CONFIG_PATH)
     if not companies:
-        logger.error("В конфиге нет компаний")
+        logger.error("No companies in the config")
         sys.exit(1)
 
     problems = validate_config(companies)
     for problem in problems:
-        logger.error("Конфиг: %s", problem)
+        logger.error("Config: %s", problem)
     if problems:
-        # Лучше не выгрузить ничего, чем выгрузить неправильно: прошлые CSV
-        # останутся на месте, а экспортер отметит секцию как упавшую.
+        # Better to export nothing than to export wrongly: previous CSVs
+        # stay in place, and the exporter marks the section as failed.
         sys.exit(1)
 
-    # Один OU читается один раз, даже если его указали несколько компаний:
-    # раньше общий OU=Laptops перечитывался по разу на компанию.
+    # Each OU is read once, even if several companies list it:
+    # the shared OU=Laptops used to be re-read once per company.
     wanted: dict[str, dict] = {}
     for company in companies:
         for dn, _ in ou_entries(company):
@@ -383,7 +386,7 @@ def main() -> None:
 
     first = companies[0]
     ldap_filter = build_ldap_filter(first.get("enabled_only", True))
-    logger.info("Читаю %d OU, фильтр: %s", len(wanted), ldap_filter)
+    logger.info("Reading %d OUs, filter: %s", len(wanted), ldap_filter)
     try:
         conn = connect(first["server"], first["bind_dn"],
                        first.get("bind_password", ""), first.get("tls_insecure", False))
@@ -407,8 +410,8 @@ def main() -> None:
     claimed, unassigned = assign_hosts(hosts_by_ou, companies)
     if unassigned:
         logger.warning(
-            "Хостов не забрала ни одна компания: %d — они не попадут в метрики. "
-            "Задайте паттерны или default_company. Примеры: %s",
+            "Hosts claimed by no company: %d — they will not appear in metrics. "
+            "Set patterns or default_company. Examples: %s",
             len(unassigned), ", ".join(h["hostname"] for h in unassigned[:10]),
         )
 
@@ -424,7 +427,7 @@ def main() -> None:
         before = len(df)
         df.drop_duplicates(subset=["hostname"], keep="first", inplace=True)
         if len(df) < before:
-            logger.info("  %s: схлопнуто дублей hostname: %d", company["name"], before - len(df))
+            logger.info("  %s: collapsed duplicate hostnames: %d", company["name"], before - len(df))
         df["company"] = company["name"]
         out_path = DATA_DIR / f"{company['name']}-ad.csv"
         df.to_csv(out_path, index=False, encoding="utf-8")

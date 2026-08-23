@@ -1,7 +1,7 @@
 ---
-# Ожидает _occ_allow_batch — список dict path, group, perms (allow). Накопление в _occ_perm_acc (инициализировать в вызывающем файле).
-# script не поддерживает async — тот же файл из roles/.../files через stdin (bash -s).
-- name: Запустить occ groupfolders:permissions allow (async) в батче
+# Expects _occ_allow_batch — list of dicts path, group, perms (allow). Accumulate into _occ_perm_acc (initialize in the caller).
+# script does not support async — same file from roles/.../files via stdin (bash -s).
+- name: Fire occ groupfolders:permissions allow (async) in a batch
   ansible.builtin.shell:
     cmd: /bin/bash -s
     stdin: "{{ lookup('file', role_path ~ '/files/nextcloud_occ_groupfolders_permissions.sh') }}"
@@ -23,7 +23,7 @@
   register: _occ_allow_fired
   failed_when: false
 
-- name: Дождаться occ allow батча
+- name: Wait for the occ allow batch
   ansible.builtin.async_status:
     jid: "{{ _occ_j.ansible_job_id }}"
   loop: "{{ _occ_allow_fired.results }}"
@@ -34,6 +34,6 @@
   retries: "{{ nextcloud_async_status_retries | default(300) | int }}"
   delay: "{{ nextcloud_async_status_delay | default(1) | int }}"
 
-- name: Накопить результаты occ allow
+- name: Accumulate occ allow results
   ansible.builtin.set_fact:
     _occ_perm_acc: "{{ _occ_perm_acc + (_occ_allow_wait.results | default([])) }}"

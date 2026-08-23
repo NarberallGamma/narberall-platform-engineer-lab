@@ -1,62 +1,62 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - запасной способ бэкапа PostgreSQL
+# Fallback backup method for PostgreSQL
 
-# Принцип работы:
-#   - вызов pg_basebackup с помещением на лету файлов данных PostgreSQL в tar-архив и сохранением его во временном каталоге ${TMP_DIR}
-#   - резервное копирование временного каталога с помощью borg
+# How it works:
+#   - run pg_basebackup, streaming PostgreSQL data files into a tar archive stored in ${TMP_DIR}
+#   - back up the temporary directory with Borg
 
-# Его можно применять если (должны выполняться все условия):
-#   1. размер дампа баз PostgreSQL меньше доступного места в файловой системе
-#      в которой располагается каталог ${TMP_DIR}
-#   2. основной скрипт бэкапа borg_backup_postgres_stdout.sh невозможно
-#      применять в данных условиях, например:
-#     2.1 скорость передачи данных по сети от узла с сервером PostgreSQL до
-#         хранилища borg-бэкапов низка настолько, что вызывает отключение
-#         pg_basebackup от PostgreSQL-сервера по таймауту
+# Applicable when (all of the following must hold):
+#   1. the PostgreSQL dump size is smaller than the free space on the filesystem
+#      that holds ${TMP_DIR}
+#   2. the primary backup script borg_backup_postgres_stdout.sh cannot
+#      be used in these conditions, for example:
+#     2.1 network throughput from the PostgreSQL server node to
+#         Borg backup storage is so low that it disconnects
+#         pg_basebackup from the PostgreSQL server on timeout
 
-# Поддерживаемые опции:
-# -h|--host                      - адрес подключения к PostgreSQL. Необязательный аргумент
-# -r|--port                      - порт подключения к PostgreSQL. Необязательный аргумент
-# -u|--user                      - имя пользователя, используемого для подключения
-#                                  к PostgreSQL или запуска pg_basebackup. Необязательный
-#                                  аргумент, без указания этой опции будет использовано
-#                                  значение ${USER_DEFAULT}
-# -p|--password                  - путь к файлу с паролем, используемым для
-#                                  подключения к PostgreSQL, или имя переменной
-#                                  окружения, содержащей этот пароль. Необязательный аргумент
-# -a|--add-pg_basebackup-option  - дополнительная опция которая будет передана
-#                                  pg_basebackup. Если опция pg_basebackup имеет
-#                                  значение, то его необходимо указать либо через
-#                                  знак равенства ( = ) (возможно только для
-#                                  длинных опций), либо через пробел, но в
-#                                  этом случае опцию pg_basebackup вместе с ее
-#                                  значением необходимо поместить в двойные или
-#                                  одинарные кавычки. Например:
+# Supported options:
+# -h|--host                      - PostgreSQL connection address. Optional
+# -r|--port                      - PostgreSQL connection port. Optional
+# -u|--user                      - username used to connect
+#                                  to PostgreSQL or to run pg_basebackup. Optional
+#                                  argument. When omitted,
+#                                  value ${USER_DEFAULT}
+# -p|--password                  - path to the password file used for
+#                                  connecting to PostgreSQL, or the name of an environment
+#                                  variable that holds this password. Optional
+# -a|--add-pg_basebackup-option  - extra option passed to
+#                                  pg_basebackup. When a pg_basebackup option has
+#                                  a value, pass it either with
+#                                  an equals sign ( = ) (long options only),
+#                                  long options), or as a space, but in
+#                                  that case the pg_basebackup option together with its
+#                                  the value must be wrapped in double or
+#                                  single quotes. For example:
 #                                   - --add-pg_basebackup-option --max-rate=1024
 #                                   - --add-pg_basebackup-option '--max-rate 1024'
 #                                   - --add-pg_basebackup-option "--max-rate 1024"
-#                                  Опция может быть указана несколько раз,
-#                                  pg_basebackup будут переданы все указанные опции.
-#                                  Необязательный аргумент
-# -k|--prune                     - строка с опциями алгоритма сохранения резервных копий в
-#                                  формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                                  Необязательный аргумент, без указания этой опции будет
-#                                  использовано значение ${CUSTOMPRUNE_DEFAULT}
-#    --do-su-under-user          - запустить pg_basebackup под пользователем, указанным
-#                                  опцией -u|--user или пользователем по умолчанию. Имеет
-#                                  смысл использовать в том случае, если по каким-либо
-#                                  причинам требуется вместо метода аутентификации 'trust'
-#                                  в pg_hba.conf использовать метод аутентификации 'peer'
-#    --tmp-dir                   - путь к временному каталогу в котором сохраняются
-#                                  данные PostgreSQL. Необязательный аргумент, без
-#                                  указания этой опции будет использовано значение ${TMP_DIR_DEFAULT}
+#                                  The option may be repeated,
+#                                  pg_basebackup will receive all listed options.
+#                                  Optional
+# -k|--prune                     - retention-options string in
+#                                  Borg format, e.g. '--keep-hourly 72 --keep-within=30d'
+#                                  Optional. When omitted,
+#                                  ${CUSTOMPRUNE_DEFAULT} is used
+#    --do-su-under-user          - run pg_basebackup as the user given
+#                                  via -u|--user or the default user. Useful
+#                                  when for some
+#                                  reason 'trust' cannot be used and
+#                                  use the 'peer' authentication method in pg_hba.conf
+#    --tmp-dir                   - path to the temporary directory where
+#                                  PostgreSQL data. Optional. When omitted,
+#                                  this option, ${TMP_DIR_DEFAULT} is used
 
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория, без указания будет
-#        использовано имя заданное в ${NAMEOFBACKUP_DEFAULT}
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix. When omitted,
+#        the name from ${NAMEOFBACKUP_DEFAULT} is used
 
-# Примеры использования в schedule:
+# Schedule examples:
 # borg_run_on.sh 10.0.0.1 borg_backup_postgres.sh
 # borg_run_on.sh 10.0.0.1 borg_backup_postgres.sh 'PG'
 # borg_run_on.sh 10.0.0.1 borg_backup_postgres.sh 'PG --user postgres'
@@ -65,47 +65,47 @@
 # borg_run_on.sh 10.0.0.1 borg_backup_postgres.sh 'PG --user postgres --do-su-under-user -a "--max-rate 1024" -a --progress --prune "--keep-hourly 3 --keep-within=30d"'
 # borg_run_on.sh 10.0.0.1 borg_backup_postgres.sh 'PG --host 127.0.0.1 --user pg_super --password "/etc/backup/pg-pass"'
 
-# Запрещается указывать в качестве значения опции [-p, --password]
-# непосредственно пароль. В качестве ее значения необходимо указать:
-#   - путь к файлу с паролем. Владельцем этого файл должен быть 'root:root' и
-#     для него должны быть установлены права '0400'
-#   - имя переменной окружения, содержащей этот пароль
+# The value of [-p, --password] must not be
+# the password itself. Pass one of:
+#   - path to a password file. Owner must be 'root:root' and
+#     mode must be '0400'
+#   - the name of an environment variable that holds this password
 
-# Попытки указать в качестве временного каталога каталоги уровня
-# меньше чем 3 т.е. '/', '/etc', '/var' и т.п., а также каталоги перечисленные
-# в ${PROTECTED_DIRS} приведут к аварийному завершению скрипта и отсутствию бэкапов
+# Using a temporary directory whose depth is
+# shallower than 3, i.e. '/', '/etc', '/var' and similar, and directories listed
+# in ${PROTECTED_DIRS} abort the script and produce no backups
 
-# Для работы этого скрипта необходимо чтобы в PostgreSQL:
-#   1. было настроено создание WAL-файлов (файл - postgresql.conf):
-#     1.1 значение опции wal_level должно быть >= archive (если ее значение уже
-#         >= archive - изменять не нужно)
-#     1.2 значение опции wal_keep_segments должно быть > 0 (если ее значение уже
-#         > 0 - изменять только в случае проблем и только по согласованию с командой/клиентом)
-#         При самостоятельном изменении этой опции необходимо выбрать ее значение
-#         таким, чтобы оно было больше на 20-40% количества WAL-файлов, создающихся
-#         за время бэкапа (при условии наличия в файловой системе достаточного
-#         количества доступного места):
-#        1.2.1 определить время выполения бэкапа
-#        1.2.2 определить количество генерирующихся за это время WAL-файлов
-#        1.2.3 установить wal_keep_segments равной (1.2 ~ 1.4) x (количество генерирующихся за время выполения бэкапа WAL-файлов)
-#        1.2.4 убедится что в файловой системе, в которой хранятся WAL-файлы,
-#              доступно места больше чем (wal_keep_segments x wal_segment_size)
-#     1.3 значение опции max_wal_senders должно быть > 0 (рекомендуемое значение - 5,
-#         если ее значение уже > 0 - изменять только в случае проблем и только по
-#         согласованию с командой/клиентом)
-#     1.4 для применения этих параметров требуется перезупуск сервиса PostgreSQL
-#   2. была разрешена репликация для системного пользователя postgres с адреса
-#      127.0.0.1/32 или с Unix-сокета (файл - pg_hba.conf):
-#     2.1 должна присутствовать незакомментированная строка
+# This script requires that PostgreSQL:
+#   1. WAL file creation was configured (file: postgresql.conf):
+#     1.1 wal_level must be >= archive (if it is already
+#         >= archive — no change needed)
+#     1.2 wal_keep_segments must be > 0 (if it is already
+#         > 0 — change only when there are problems and only after agreeing with the team/client)
+#         When changing this option independently, pick a value
+#         about 20-40% larger than the number of WAL files created
+#         during the backup (provided the filesystem has enough
+#         free space):
+#        1.2.1 measure backup duration
+#        1.2.2 count WAL files generated during that time
+#        1.2.3 set wal_keep_segments to (1.2 ~ 1.4) x (WAL files generated during the backup)
+#        1.2.4 confirm that the filesystem that stores WAL files
+#              free space is greater than (wal_keep_segments x wal_segment_size)
+#     1.3 max_wal_senders must be > 0 (recommended value: 5,
+#         if it is already > 0 — change only when there are problems and only after
+#         agreeing with the team/client)
+#     1.4 applying these settings requires a PostgreSQL service restart
+#   2. replication was allowed for the postgres system user from
+#      127.0.0.1/32 or a Unix socket (file: pg_hba.conf):
+#     2.1 an uncommented line must be present
 #         host    replication     postgres        127.0.0.1/32            trust
-#         или строка
+#         or the line
 #         local   replication     postgres                                trust
-#     2.2 для применения этих параметров необходимо послать PostgreSQL сигнал о
-#         необходимости перечитать конфигурационный файл с помощью комманды
+#     2.2 applying these settings requires sending PostgreSQL a signal about
+#         the need to reload the configuration file with
 #         pg_ctlcluster <version> <cluster> reload,
-#         где <version>, <cluster> - версия и имя PostgreSQL-кластера соответственно,
-#         которые можно узнать коммандой pg_lsclusters
-#   3. версия PostgreSQL была больше либо равна 9.1
+#         where <version>, <cluster> are the PostgreSQL cluster version and name,
+#         which can be obtained with pg_lsclusters
+#   3. PostgreSQL version was 9.1 or newer
 
 ################################################################################
 
@@ -174,10 +174,10 @@ get_major_version()
   printf "%s" "${1}" | sed --quiet "s/^\([0-9][0-9]*\)\..*/\1/;p"
 }
 
-# Корректно сравнивает пути VFS
-# uncertain - неопределенное состояние, один из аргументов не VFS-путь
-# equal     - пути равны
-# not_equal - пути не равны
+# Compare VFS paths correctly
+# uncertain - indeterminate: one argument is not a VFS path
+# equal     - paths are equal
+# not_equal - paths are not equal
 # ${1} - one path
 # ${2} - two path
 compare_vfs_paths()
@@ -227,10 +227,10 @@ compare_vfs_paths()
   return 0
 }
 
-# Определяет уровень (глубину) переданного пути относительно корня VFS
-# 0 - не VFS путь
+# Return the depth of the given path relative to the VFS root
+# 0 - not a VFS path
 # 1 - '/'
-# 2 - '/etc', '/root', '/var' и т.п.
+# 2 - '/etc', '/root', '/var' and similar
 # ${1} - path
 get_vfs_path_level()
 {
@@ -272,7 +272,7 @@ PASSWORD_EVOLVED=""
 EFFECTIVE_OPTIONS=""
 PG_BASEBACKUP_MAJOR_VERSION=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options h:r:u:p:a:k: --longoptions ,host:,port:,user:,password:,add-pg_basebackup-option:,prune:,do-su-under-user,tmp-dir: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

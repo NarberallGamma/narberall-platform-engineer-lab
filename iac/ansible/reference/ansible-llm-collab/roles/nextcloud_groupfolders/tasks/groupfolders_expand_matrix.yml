@@ -1,21 +1,21 @@
 ---
-# Развёртка nextcloud_matrix.folders в плоский список path/view/edit для WebDAV и occ.
-# client_name — имя клиента (в reapply задаётся из _current_client до включения этого файла).
+# Expand nextcloud_matrix.folders into a flat path/view/edit list for WebDAV and occ.
+# client_name — client name (in reapply it is set from _current_client before this file is included).
 #
-# Уровень 4 под узлом матрицы с children_mkcol (например {client}/{client}/Accounting):
-# - children_mkcol — имена подпапок (MKCOL); по умолчанию на каждую из них копируются view/edit родительской строки,
-#   occ_skip: false — occ и авто-deny применяются так же, как на уровень 3, чтобы в ACL было явно видно группы.
-# - children_mkcol_occ_path_fallback — тот же порядок и длина, что у children_mkcol: альтернативное имя сегмента L4 на диске;
-#   в nextcloud_folders_flat для строки L4 добавляется path_occ_fallback; occ сначала основной path, затем fallback.
-# - children — словарь { name, view?, edit? } для исключений (например «Договоры» — свои группы вместо копии родителя).
-# - deny_on_l4_children — дополнительные deny (напр. Assistant на всех L4 кроме except_child_name — см. env matrix).
-# - matrix_deny у строки folders — список { group: … [, perms: … ] }; попадает в nextcloud_folders_flat (явный occ deny на путь).
+# Level 4 under a matrix node with children_mkcol (e.g. {client}/{client}/Accounting):
+# - children_mkcol — subfolder names (MKCOL); by default each copies view/edit from the parent row,
+#   occ_skip: false — occ and auto-deny apply the same as at level 3, so ACL shows the groups explicitly.
+# - children_mkcol_occ_path_fallback — same order and length as children_mkcol: alternate L4 segment name on disk;
+#   nextcloud_folders_flat for the L4 row gets path_occ_fallback; occ tries the primary path first, then the fallback.
+# - children — dict { name, view?, edit? } for exceptions (e.g. "Contracts" — its own groups instead of copying the parent).
+# - deny_on_l4_children — extra denies (e.g. Assistant on all L4 except except_child_name — see env matrix).
+# - matrix_deny on a folders row — list { group: … [, perms: … ] }; copied into nextcloud_folders_flat (explicit occ deny on the path).
 #
-# Маркер __NC_MATRIX_RO_ALL__ во view см. defaults matrix — развёртка RO по всем группам матрицы выполняется в groupfolders_apply_permissions.yml.
+# Sentinel __NC_MATRIX_RO_ALL__ in view: see matrix defaults — RO expansion across all matrix groups happens in groupfolders_apply_permissions.yml.
 
-# Результат нужно сериализовать в JSON и распарсить (from_json): иначе YAML `>- ... {{ ns.lst }}`
-# даёт строку, не list → loop/nextcloud_folders_flat ломаются (Ansible 2.14+).
-- name: Развернуть матрицу в плоский список папок (path, view, edit; deny; L4 без entry в children — копия view/edit родителя)
+# The result must be serialized to JSON and parsed (from_json): otherwise YAML `>- ... {{ ns.lst }}`
+# yields a string, not a list → loop/nextcloud_folders_flat break (Ansible 2.14+).
+- name: Expand the matrix into a flat folder list (path, view, edit; deny; L4 without a children entry — copy parent view/edit)
   ansible.builtin.set_fact:
     _folders_out_expanded: "{{ _folders_out_json | from_json }}"
   vars:

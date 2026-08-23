@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Bootstrap пользователей ansible и gitlab-runner. Обязательно: окружение (--prod/--preprod) и scope (--all или --limit HOST).
+# Bootstrap ansible and gitlab-runner users. Required: environment (--prod/--preprod) and scope (--all or --limit HOST).
 #
-# SSH-ключ с passphrase: eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
+# SSH key with passphrase: eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
 #   ./scripts/run/run_setup_bootstrap_users.sh --prod --limit HOST --ssh-key ~/.ssh/your_key --ssh-agent
-# Подробнее: scripts/run/lib/docker_ssh.sh
+# Details: scripts/run/lib/docker_ssh.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/docker_ssh.sh
@@ -40,7 +40,7 @@ if [[ -z "$INVENTORY" ]]; then
   exit 1
 fi
 if [[ -z "$SCOPE_SPECIFIED" ]]; then
-  echo "ERROR: Specify scope: --all or --limit HOST (или --local для localhost)"
+  echo "ERROR: Specify scope: --all or --limit HOST (or --local for localhost)"
   exit 1
 fi
 if [[ ! -f "$INVENTORY" ]]; then

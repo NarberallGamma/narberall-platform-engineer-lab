@@ -139,12 +139,12 @@ class TelegramNotifier:
             
             emoji = "✅" if status == "healthy" else "🚨"
             message = f"{emoji} <b>API Health Check</b>\n"
-            message += f"🔧 <b>Сервис:</b> {service}\n"
-            message += f"📊 <b>Статус:</b> {status.upper()}\n"
-            message += f"🕐 <b>Время:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
+            message += f"🔧 <b>Service:</b> {service}\n"
+            message += f"📊 <b>Status:</b> {status.upper()}\n"
+            message += f"🕐 <b>Time:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
             
             if error:
-                message += f"\n❌ <b>Ошибка:</b>\n<code>{error}</code>"
+                message += f"\n❌ <b>Error:</b>\n<code>{error}</code>"
             
             message += f"\n\n🤖 <b>{config.app_name} v{config.app_version}</b>"
             
@@ -167,16 +167,16 @@ class TelegramNotifier:
             if not self.bot_token or not self.chat_ids:
                 return
             
-            message = f"🚨 <b>Ошибка: {error_type}</b>\n"
-            message += f"🕐 <b>Время:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
+            message = f"🚨 <b>Error: {error_type}</b>\n"
+            message += f"🕐 <b>Time:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
             
             if cluster_name:
-                message += f"🏗️ <b>Кластер:</b> {cluster_name}\n"
+                message += f"🏗️ <b>Cluster:</b> {cluster_name}\n"
             
-            message += f"\n❌ <b>Сообщение:</b>\n<code>{error_message}</code>"
+            message += f"\n❌ <b>Message:</b>\n<code>{error_message}</code>"
             
             if details:
-                message += f"\n\n📋 <b>Детали:</b>\n"
+                message += f"\n\n📋 <b>Details:</b>\n"
                 for key, value in details.items():
                     message += f"• <b>{key}:</b> {value}\n"
             
@@ -202,74 +202,74 @@ class TelegramNotifier:
         # Emoji and status based on operation and status
         if operation == "hibernate":
             emoji = "😴" if status == "success" else "⚠️"
-            operation_text = "Усыпление кластера"
+            operation_text = "Cluster hibernate"
         elif operation == "awake":
             emoji = "🌅" if status == "success" else "⚠️"
-            operation_text = "Пробуждение кластера"
+            operation_text = "Cluster wake"
         elif operation == "hibernate_verification" or operation == "awake_verification":
             emoji = "✅" if status == "success" else "⚠️"
-            operation_text = f"Проверка {'усыпления' if 'hibernate' in operation else 'пробуждения'} кластера"
+            operation_text = f"Cluster {'hibernate' if 'hibernate' in operation else 'wake'} check"
         elif operation == "hibernate_retry" or operation == "awake_retry":
             emoji = "🔄" if status == "in_progress" else ("✅" if status == "success" else "❌")
-            operation_text = f"Повторная попытка {'усыпления' if 'hibernate' in operation else 'пробуждения'} кластера"
+            operation_text = f"Cluster {'hibernate' if 'hibernate' in operation else 'wake'} retry"
         else:
             emoji = "ℹ️"
             operation_text = operation
         
         if status == "success":
             status_emoji = "✅"
-            status_text = "УСПЕШНО"
+            status_text = "SUCCESS"
         elif status == "failed":
             status_emoji = "❌"
-            status_text = "ОШИБКА"
+            status_text = "ERROR"
         elif status == "in_progress":
             status_emoji = "⏳"
-            status_text = "В ПРОЦЕССЕ"
+            status_text = "IN PROGRESS"
         else:
             status_emoji = "⚠️"
             status_text = status.upper()
         
         # Header
         message = f"{emoji} <b>{operation_text}</b>\n"
-        message += f"{status_emoji} <b>Статус:</b> {status_text}\n"
-        message += f"🏗️ <b>Кластер:</b> {cluster_name}\n"
+        message += f"{status_emoji} <b>Status:</b> {status_text}\n"
+        message += f"🏗️ <b>Cluster:</b> {cluster_name}\n"
         message += f"🆔 <b>ID:</b> <code>{cluster_id}</code>\n"
-        message += f"🕐 <b>Время:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
+        message += f"🕐 <b>Time:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
         
         # Details
         if details:
-            message += f"\n📋 <b>Детали:</b>\n"
+            message += f"\n📋 <b>Details:</b>\n"
             
             if 'worker_nodes_count' in details:
                 message += f"• Worker nodes: {details['worker_nodes_count']}\n"
             
             if 'worker_nodes_processed' in details:
-                message += f"• Обработано nodes: {details['worker_nodes_processed']}\n"
+                message += f"• Nodes processed: {details['worker_nodes_processed']}\n"
             
             if 'cluster_status' in details:
-                message += f"• Статус кластера: {details['cluster_status']}\n"
+                message += f"• Cluster status: {details['cluster_status']}\n"
             
             if 'current_status' in details:
-                message += f"• Текущий статус: {details['current_status']}\n"
+                message += f"• Current status: {details['current_status']}\n"
             
             if 'expected_status' in details:
-                message += f"• Ожидаемый статус: {details['expected_status']}\n"
+                message += f"• Expected status: {details['expected_status']}\n"
             
             if 'attempt' in details:
-                message += f"• Попытка: {details['attempt']}"
+                message += f"• Attempt: {details['attempt']}"
                 if 'max_attempts' in details:
-                    message += f" из {details['max_attempts']}"
+                    message += f" of {details['max_attempts']}"
                 message += "\n"
             
             if 'attempts' in details:
-                message += f"• Всего попыток: {details['attempts']}\n"
+                message += f"• Total attempts: {details['attempts']}\n"
             
             if 'duration_seconds' in details:
-                message += f"• Длительность: {details['duration_seconds']} сек\n"
+                message += f"• Duration: {details['duration_seconds']} s\n"
             
             if 'error' in details:
                 error_msg = str(details['error']).replace('<', '&lt;').replace('>', '&gt;').replace('&', '&amp;')
-                message += f"• Ошибка: <code>{error_msg}</code>\n"
+                message += f"• Error: <code>{error_msg}</code>\n"
         
         # Footer
         message += f"\n🤖 <b>{config.app_name} v{config.app_version}</b>"
@@ -287,65 +287,65 @@ class TelegramNotifier:
         # Emoji and status based on operation and status
         if operation == "stop":
             emoji = "🛑" if status == "success" else "⚠️"
-            operation_text = "Остановка ECS instance"
+            operation_text = "ECS instance stop"
         elif operation == "start":
             emoji = "▶️" if status == "success" else "⚠️"
-            operation_text = "Запуск ECS instance"
+            operation_text = "ECS instance start"
         elif operation == "stop_verification" or operation == "start_verification":
             emoji = "✅" if status == "success" else "⚠️"
-            operation_text = f"Проверка {'остановки' if 'stop' in operation else 'запуска'} ECS instance"
+            operation_text = f"ECS instance {'stop' if 'stop' in operation else 'start'} check"
         elif operation == "stop_retry" or operation == "start_retry":
             emoji = "🔄" if status == "in_progress" else ("✅" if status == "success" else "❌")
-            operation_text = f"Повторная попытка {'остановки' if 'stop' in operation else 'запуска'} ECS instance"
+            operation_text = f"ECS instance {'stop' if 'stop' in operation else 'start'} retry"
         else:
             emoji = "ℹ️"
             operation_text = operation
         
         if status == "success":
             status_emoji = "✅"
-            status_text = "УСПЕШНО"
+            status_text = "SUCCESS"
         elif status == "failed":
             status_emoji = "❌"
-            status_text = "ОШИБКА"
+            status_text = "ERROR"
         elif status == "in_progress":
             status_emoji = "⏳"
-            status_text = "В ПРОЦЕССЕ"
+            status_text = "IN PROGRESS"
         else:
             status_emoji = "⚠️"
             status_text = status.upper()
         
         # Header
         message = f"{emoji} <b>{operation_text}</b>\n"
-        message += f"{status_emoji} <b>Статус:</b> {status_text}\n"
+        message += f"{status_emoji} <b>Status:</b> {status_text}\n"
         message += f"💻 <b>Instance:</b> {instance_name}\n"
         message += f"🆔 <b>ID:</b> <code>{instance_id}</code>\n"
-        message += f"🕐 <b>Время:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
+        message += f"🕐 <b>Time:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
         
         # Details
         if details:
-            message += f"\n📋 <b>Детали:</b>\n"
+            message += f"\n📋 <b>Details:</b>\n"
             
             if 'current_status' in details:
-                message += f"• Текущий статус: {details['current_status']}\n"
+                message += f"• Current status: {details['current_status']}\n"
             
             if 'expected_status' in details:
-                message += f"• Ожидаемый статус: {details['expected_status']}\n"
+                message += f"• Expected status: {details['expected_status']}\n"
             
             if 'attempt' in details:
-                message += f"• Попытка: {details['attempt']}"
+                message += f"• Attempt: {details['attempt']}"
                 if 'max_attempts' in details:
-                    message += f" из {details['max_attempts']}"
+                    message += f" of {details['max_attempts']}"
                 message += "\n"
             
             if 'attempts' in details:
-                message += f"• Всего попыток: {details['attempts']}\n"
+                message += f"• Total attempts: {details['attempts']}\n"
             
             if 'duration_seconds' in details:
-                message += f"• Длительность: {details['duration_seconds']} сек\n"
+                message += f"• Duration: {details['duration_seconds']} s\n"
             
             if 'error' in details:
                 error_msg = str(details['error']).replace('<', '&lt;').replace('>', '&gt;').replace('&', '&amp;')
-                message += f"• Ошибка: <code>{error_msg}</code>\n"
+                message += f"• Error: <code>{error_msg}</code>\n"
         
         # Footer
         message += f"\n🤖 <b>{config.app_name} v{config.app_version}</b>"
@@ -361,7 +361,7 @@ class TelegramNotifier:
                 chunks = self._split_message(message, 4000)  # Leave some buffer
                 for i, chunk in enumerate(chunks):
                     if i > 0:
-                        chunk = f"*Продолжение {i+1}/{len(chunks)}:*\n\n{chunk}"
+                        chunk = f"*Continued {i+1}/{len(chunks)}:*\n\n{chunk}"
                     await self._send_single_message(chat_id, chunk)
                     await asyncio.sleep(0.5)  # Small delay between messages
             else:

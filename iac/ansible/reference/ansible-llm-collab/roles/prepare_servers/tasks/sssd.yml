@@ -1,10 +1,10 @@
 ---
-- name: Восстановить оригинальный hostname после присоединения к домену
+- name: Restore original hostname after domain join
   ansible.builtin.hostname:
     name: "{{ original_hostname }}"
   when: original_hostname is defined and original_hostname != ansible_facts['hostname'] and original_hostname != domain_join_hostname
 
-- name: Сконфигурировать /etc/sssd/sssd.conf (базовая конфигурация)
+- name: Configure /etc/sssd/sssd.conf (base configuration)
   ansible.builtin.copy:
     dest: /etc/sssd/sssd.conf
     owner: root
@@ -32,11 +32,11 @@
       simple_allow_groups = {{ ((simple_allow_groups | default([], true)) + [ (ad_computer_name | default(ansible_facts['hostname'])) ~ ' Administrators' ]) | join(', ') }}
   notify: Restart sssd
 
-- name: Дождаться запуска SSSD
+- name: Wait for SSSD to start
   ansible.builtin.pause:
     seconds: 10
 
-- name: Добавить simple_allow_users в конфигурацию SSSD
+- name: Add simple_allow_users to SSSD configuration
   ansible.builtin.lineinfile:
     path: /etc/sssd/sssd.conf
     line: "simple_allow_users = {{ simple_allow_users | default([], true) | join(', ') }}"
@@ -45,7 +45,7 @@
   when: (simple_allow_users | default([], true)) | length > 0
   notify: Restart sssd
 
-- name: Удалить simple_allow_users из конфигурации SSSD, если список пуст
+- name: Remove simple_allow_users from SSSD configuration when the list is empty
   ansible.builtin.lineinfile:
     path: /etc/sssd/sssd.conf
     regexp: '^simple_allow_users\s*='
@@ -53,28 +53,28 @@
   when: (simple_allow_users | default([], true)) | length == 0
   notify: Restart sssd
 
-- name: Включить pam_mkhomedir
+- name: Enable pam_mkhomedir
   ansible.builtin.lineinfile:
     path: /etc/pam.d/common-session
     line: 'session    required    pam_mkhomedir.so skel=/etc/skel/ umask=0022'
     state: present
     create: yes
 
-- name: Сформировать список строк для sudoers файла
+- name: Build sudoers file lines
   ansible.builtin.set_fact:
     sudoers_lines: "{{ sudoers_lines | default([]) + [ '%' + (ad_computer_name | default(ansible_facts['hostname'])) + '\\ Administrators ALL=(ALL:ALL) NOPASSWD:ALL' ] }}"
 
-- name: Добавить группы в список строк sudoers
+- name: Add groups to the sudoers line list
   ansible.builtin.set_fact:
     sudoers_lines: "{{ sudoers_lines | default([]) + [ '%' + (item | replace(' ', '\\ ')) + ' ALL=(ALL:ALL) NOPASSWD:ALL' ] }}"
   loop: "{{ simple_allow_groups | default([], true) }}"
 
-- name: Добавить пользователей в список строк sudoers
+- name: Add users to the sudoers line list
   ansible.builtin.set_fact:
     sudoers_lines: "{{ sudoers_lines | default([]) + [ item + ' ALL=(ALL:ALL) NOPASSWD:ALL' ] }}"
   loop: "{{ simple_allow_users | default([], true) }}"
 
-- name: Создать sudoers.d запись для доменной группы (NOPASSWD)
+- name: Create sudoers.d entry for the domain group (NOPASSWD)
   ansible.builtin.copy:
     dest: "/etc/sudoers.d/domain-admins"
     owner: root
@@ -83,17 +83,17 @@
     content: "{{ sudoers_lines | default([]) | join('\n') }}\n"
     validate: '/usr/sbin/visudo -cf %s'
 
-- name: Очистить кеш SSSD после изменений
+- name: Flush SSSD cache after changes
   ansible.builtin.command: sss_cache -E
   changed_when: false
   failed_when: false
 
-- name: Проверить статус sssd после применения конфигурации
+- name: Check sssd status after applying configuration
   ansible.builtin.command: systemctl is-active sssd
   register: sssd_status
   changed_when: false
   failed_when: sssd_status.rc != 0
 
-- name: Показать состояние sssd
+- name: Show sssd status
   ansible.builtin.debug:
     msg: "sssd status: {{ sssd_status.stdout }}"

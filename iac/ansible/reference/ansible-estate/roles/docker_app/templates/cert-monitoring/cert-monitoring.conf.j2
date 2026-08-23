@@ -1,5 +1,5 @@
 # SSL Certificate Monitoring — managed by Ansible (docker_app)
-# Секреты (TELEGRAM_BOT_TOKEN): Vault → .env
+# Secrets (TELEGRAM_BOT_TOKEN): Vault → .env
 TELEGRAM_CHAT_IDS="{{ app_item.value.telegram_chat_ids | default('') }}"
 
 TELEGRAM_CONNECT_TIMEOUT="{{ app_item.value.telegram_connect_timeout | default(docker_app_telegram_connect_timeout) }}"

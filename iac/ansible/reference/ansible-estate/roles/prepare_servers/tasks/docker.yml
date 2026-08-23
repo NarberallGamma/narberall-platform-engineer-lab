@@ -1,27 +1,27 @@
 ---
-# Установка Docker Engine из официального репозитория download.docker.com
-# (docker-ce, Compose V2 как плагин: docker compose).
-# Удаление пакетов дистрибутива (docker.io, docker-compose и т.д.) — см. docker_remove_distro_packages.
+# Install Docker Engine from the official download.docker.com repository
+# (docker-ce, Compose V2 as a plugin: docker compose).
+# Removal of distro packages (docker.io, docker-compose, etc.) — see docker_remove_distro_packages.
 #
-# Ручное удаление Docker из репозитория дистрибутива (как в документации Docker), если миграция без Ansible:
+# Manual removal of distro Docker (as in Docker docs), if migrating without Ansible:
 #   systemctl stop docker.socket docker 2>/dev/null || true
 #   apt-get purge -y docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc
 #   apt-get autoremove -y
-# Каталог data-root (например /docker/system) не удалять, если нужны сохранённые volumes/образы.
+# Do not remove the data-root directory (e.g. /docker/system) if saved volumes/images are needed.
 
-- name: Определить дистрибутив для репозитория Docker (ubuntu / debian)
+- name: Determine distro for Docker repository (ubuntu / debian)
   ansible.builtin.set_fact:
     docker_apt_dist: "{{ 'ubuntu' if ansible_facts['distribution'] == 'Ubuntu' else ('debian' if ansible_facts['distribution'] == 'Debian' else '') }}"
   tags: [docker]
 
-- name: Проверка поддерживаемого дистрибутива для официального Docker
+- name: Check supported distro for official Docker
   ansible.builtin.assert:
     that:
       - docker_apt_dist | length > 0
-    fail_msg: "Официальный репозиторий Docker поддерживается только для Ubuntu и Debian (текущий: {{ ansible_facts['distribution'] }})."
+    fail_msg: "Official Docker repository is supported only for Ubuntu and Debian (current: {{ ansible_facts['distribution'] }})."
   tags: [docker]
 
-- name: Архитектура пакетов Docker для apt (amd64 / arm64 / armhf)
+- name: Docker apt package architecture (amd64 / arm64 / armhf)
   ansible.builtin.set_fact:
     docker_apt_arch: >-
       {{
@@ -31,12 +31,12 @@
       }}
   tags: [docker]
 
-- name: Бэкап образов Docker перед purge/migrate
+- name: Backup Docker images before purge/migrate
   ansible.builtin.include_tasks: docker_images_backup.yml
   when: enable_docker | default(false) | bool
   tags: [docker]
 
-- name: Остановить сервис Docker перед снятием пакетов дистрибутива
+- name: Stop Docker service before removing distro packages
   ansible.builtin.systemd:
     name: "{{ item }}"
     state: stopped
@@ -47,7 +47,7 @@
   when: docker_remove_distro_packages | bool
   tags: [docker]
 
-- name: Удалить пакеты Docker из репозитория дистрибутива (docker.io, compose v1 и т.д.)
+- name: Remove distro Docker packages (docker.io, compose v1, etc.)
   ansible.builtin.apt:
     name: "{{ docker_distro_packages_remove }}"
     state: absent
@@ -57,7 +57,7 @@
   when: docker_remove_distro_packages | bool
   tags: [docker]
 
-- name: Установить зависимости для apt по HTTPS
+- name: Install dependencies for apt over HTTPS
   ansible.builtin.apt:
     name:
       - ca-certificates
@@ -68,7 +68,7 @@
   when: not (docker_skip_package_install | default(false) | bool)
   tags: [docker]
 
-- name: Каталог для keyring apt
+- name: Directory for apt keyring
   ansible.builtin.file:
     path: /etc/apt/keyrings
     state: directory
@@ -76,12 +76,12 @@
   when: not (docker_skip_package_install | default(false) | bool)
   tags: [docker]
 
-- name: Очистить legacy apt sources Docker (docker.gpg vs docker.asc)
+- name: Clean up legacy Docker apt sources (docker.gpg vs docker.asc)
   ansible.builtin.include_tasks: docker_apt_legacy_cleanup.yml
   when: not (docker_skip_package_install | default(false) | bool)
   tags: [docker]
 
-- name: GPG-ключ репозитория Docker
+- name: Docker repository GPG key
   ansible.builtin.get_url:
     url: "https://download.docker.com/linux/{{ docker_apt_dist }}/gpg"
     dest: /etc/apt/keyrings/docker.asc
@@ -89,7 +89,7 @@
   when: not (docker_skip_package_install | default(false) | bool)
   tags: [docker]
 
-- name: Репозиторий Docker (stable)
+- name: Docker repository (stable)
   ansible.builtin.deb822_repository:
     name: docker
     types: deb
@@ -102,14 +102,14 @@
   when: not (docker_skip_package_install | default(false) | bool)
   tags: [docker]
 
-- name: Обновить кеш apt после добавления репозитория Docker
+- name: Update apt cache after adding Docker repository
   ansible.builtin.apt:
     update_cache: true
     lock_timeout: "{{ prepare_servers_apt_lock_timeout }}"
   when: not (docker_skip_package_install | default(false) | bool)
   tags: [docker]
 
-- name: Установить Docker Engine и Compose V2 (плагин)
+- name: Install Docker Engine and Compose V2 (plugin)
   ansible.builtin.apt:
     name:
       - docker-ce
@@ -132,7 +132,7 @@
     containerd_data_dir: "{{ containerd_data_dir | default('/var/lib/containerd') }}"
   tags: [docker]
 
-- name: Перенос данных Docker и containerd в целевые каталоги
+- name: Migrate Docker and containerd data to target directories
   ansible.builtin.include_tasks: docker_migrate.yml
   when: docker_migrate_data | bool
   tags: [docker]
@@ -157,8 +157,8 @@
   notify: restart docker
   tags: [docker]
 
-# Миграция данных с /var/lib/containerd вынесена вручную (rsync + смена root + переименование старого каталога).
-# Здесь только каталог и строка root в config.toml пакета docker-ce/containerd.io (как data-root для docker).
+# Data migration from /var/lib/containerd is handled separately (rsync + root change + rename of the old directory).
+# Here only the directory and the root line in config.toml of the docker-ce/containerd.io package (same as data-root for docker).
 
 - name: Create containerd data directory if custom path specified
   ansible.builtin.file:
@@ -194,7 +194,7 @@
     append: true
   tags: [docker]
 
-- name: Восстановление образов Docker из tar после migrate/purge
+- name: Restore Docker images from tar after migrate/purge
   ansible.builtin.include_tasks: docker_images_restore.yml
   when: enable_docker | default(false) | bool
   tags: [docker]

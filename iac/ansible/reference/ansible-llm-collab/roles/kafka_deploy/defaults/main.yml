@@ -1,89 +1,89 @@
 ---
-# KRaft CLUSTER_ID задаётся ролью kafka_init или -e (для шаблона compose).
+# KRaft CLUSTER_ID is set by the kafka_init role or -e (for the compose template).
 kafka_cluster_id: ""
 
-# Каталог приложения на хосте (рядом с data/config)
+# Application directory on the host (next to data/config)
 kafka_app_root: "/docker/apps/kafka"
 kafka_data_dir: "{{ kafka_app_root }}/data"
 kafka_config_dir: "{{ kafka_app_root }}/config"
 
-# Путь log.dirs внутри контейнера — должен совпадать с правой частью bind mount ./data (образ по умолчанию пишет в /tmp/kafka-logs).
+# log.dirs path inside the container — must match the right-hand side of the ./data bind mount (the image writes to /tmp/kafka-logs by default).
 kafka_log_dirs_in_container: "/var/lib/kafka/data"
 
 kafka_image: "apache/kafka:3.9.2"
 kafka_compose_project_name: "kafka"
 
-# Скрытый .env рядом с docker-compose.yml (env_file).
+# Hidden .env next to docker-compose.yml (env_file).
 kafka_env_file_name: ".env"
 
-# Перезапуск контейнера: unless-stopped — при выходе с ошибкой и при старте dockerd;
-# после явного docker compose stop / docker stop контейнер не поднимается до следующего явного up/start.
-# Значение always — иное поведение после перезапуска демона Docker.
+# Container restart: unless-stopped — on error exit and when dockerd starts;
+# after an explicit docker compose stop / docker stop the container does not start until the next explicit up/start.
+# The always value behaves differently after a Docker daemon restart.
 kafka_compose_restart_policy: unless-stopped
 
-# Порт на хосте и в контейнере (PLAINTEXT)
+# Port on the host and in the container (PLAINTEXT)
 kafka_listener_port: 9092
 
-# Адрес для advertised.listeners (клиенты с других хостов должны достучаться до этого имени/IP)
+# Address for advertised.listeners (clients on other hosts must be able to reach this name/IP)
 kafka_advertised_host: "{{ ansible_host | default(inventory_hostname, true) }}"
 
-# Внутренний listener контроллера KRaft (один узел — localhost внутри контейнера)
+# Internal KRaft controller listener (single node — localhost inside the container)
 kafka_controller_quorum_voters: "1@127.0.0.1:9093"
 
-# --- Количество брокеров в кластере (для расчёта RF и min.insync.replicas) ---
-# Целевой RF=3 и min ISR=2 возможны только при kafka_broker_count >= 3.
+# --- Number of brokers in the cluster (for RF and min.insync.replicas calculation) ---
+# Target RF=3 and min ISR=2 are possible only when kafka_broker_count >= 3.
 kafka_broker_count: 1
 kafka_target_replication_factor: 3
 
-# Эффективный RF: не больше числа брокеров и не больше целевого.
+# Effective RF: no more than the broker count and no more than the target.
 kafka_effective_replication_factor: "{{ [kafka_target_replication_factor | int, kafka_broker_count | int] | min }}"
 
-# min.insync.replicas: при одном брокере только 1; при RF>=3 обычно 2 (синхронная репликация с acks=all).
+# min.insync.replicas: 1 with a single broker; usually 2 when RF>=3 (synchronous replication with acks=all).
 kafka_min_insync_replicas: "{{ 1 if (kafka_effective_replication_factor | int) < 3 else 2 }}"
 
-# --- Автосоздание топиков и значения по умолчанию ---
-# auto.create.topics.enable=true — топик создаётся при первом produce/consume; применяются num.partitions и default.replication.factor.
+# --- Topic auto-create and defaults ---
+# auto.create.topics.enable=true — the topic is created on the first produce/consume; num.partitions and default.replication.factor apply.
 kafka_auto_create_topics_enable: true
 kafka_default_num_partitions: 10
 
-# Хранение логов: retention 7d; «aging» / ролл сегментов 72h (log.roll.ms).
+# Log retention: 7d; segment “aging” / roll 72h (log.roll.ms).
 kafka_log_retention_hours: 168
 kafka_log_roll_ms: 259200000
 
-# «Synchronous flushing» — агрессивный flush на диск (нагрузка на I/O; для прод обычно ослабляют).
+# “Synchronous flushing” — aggressive flush to disk (I/O load; usually relaxed in prod).
 kafka_log_flush_interval_messages: 1
 kafka_log_flush_interval_ms: 1
 
-# Дополнительные пары KEY=VALUE для env контейнера (образ apache/kafka: свойства → KAFKA_ + подчёркивания).
+# Extra KEY=VALUE pairs for the container env (apache/kafka image: properties → KAFKA_ + underscores).
 kafka_broker_extra_env: {}
 
-# --- SASL + PLAIN (JAAS). kafka_sasl_enabled=false — PLAINTEXT без пароля.
-# kafka_sasl_tls_enabled=true — SASL_SSL + TLS (keystore); false — SASL_PLAINTEXT (пароль без SSL, трафик не шифруется на брокере).
+# --- SASL + PLAIN (JAAS). kafka_sasl_enabled=false — PLAINTEXT without a password.
+# kafka_sasl_tls_enabled=true — SASL_SSL + TLS (keystore); false — SASL_PLAINTEXT (password without SSL, traffic is not encrypted on the broker).
 kafka_sasl_enabled: true
 kafka_sasl_tls_enabled: false
 
-# Учётные записи в PlainLoginModule (JAAS). Пароли — из Vault (kafka_init) или -e.
-# Доп. пользователи: kafka_sasl_extra_users + kafka_sasl_extra_credentials (kafka_init, шаблон kafka_server_jaas.conf.j2).
+# Accounts in PlainLoginModule (JAAS). Passwords — from Vault (kafka_init) or -e.
+# Extra users: kafka_sasl_extra_users + kafka_sasl_extra_credentials (kafka_init, kafka_server_jaas.conf.j2 template).
 kafka_sasl_admin_username: admin
 kafka_sasl_platform_kafka_username: platform_kafka
 
-# Пароль PKCS12 (генерация tls.yml и env SSL). Должен совпадать с тем, что в keystore.
+# PKCS12 password (tls.yml generation and SSL env). Must match the one in the keystore.
 kafka_ssl_keystore_password: "changeit"
 
-# CN в самоподписанном сертификате (клиенты: ssl.endpoint.identification.algorithm="" или SAN).
+# CN in the self-signed certificate (clients: ssl.endpoint.identification.algorithm="" or SAN).
 kafka_ssl_cert_cn: "{{ kafka_advertised_host }}"
 
-# Образ apache/kafka: процесс в контейнере — appuser uid/gid 1000; bind mount читает те же uid/gid на хосте.
+# apache/kafka image: process in the container is appuser uid/gid 1000; the bind mount reads the same uid/gid on the host.
 kafka_container_user_uid: 1000
 kafka_container_user_gid: 1000
 
-# Путь к JAAS внутри контейнера (bind mount из ./config/kafka_server_jaas.conf).
+# JAAS path inside the container (bind mount from ./config/kafka_server_jaas.conf).
 kafka_jaas_path_in_container: /tmp/kafka_server_jaas.conf
 
 kafka_ssl_mount_path_in_container: /var/ssl
 kafka_ssl_keystore_location_in_container: "{{ kafka_ssl_mount_path_in_container }}/kafka.keystore.p12"
 
-# --- AKHQ (Web UI), образ tchiotludo/akhq; подключение к брокеру по имени сервиса compose: kafka:9092
+# --- AKHQ (Web UI), tchiotludo/akhq image; broker connection by compose service name: kafka:9092
 kafka_akhq_enabled: false
 kafka_akhq_image: "tchiotludo/akhq:0.27.0"
 kafka_akhq_host_port: 8080

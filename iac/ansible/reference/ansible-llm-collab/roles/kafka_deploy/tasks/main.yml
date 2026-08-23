@@ -1,12 +1,12 @@
 ---
-- name: Установка (каталоги)
+- name: Install (directories)
   ansible.builtin.import_tasks: install.yml
   tags: [kafka, kafka_install, kafka_deploy]
 
-- name: Развёртывание compose
+- name: Deploy compose
   ansible.builtin.import_tasks: deploy.yml
   tags: [kafka, kafka_install, kafka_manage, kafka_config, kafka_deploy]
 
-- name: Перезапуск по тегу
+- name: Restart by tag
   ansible.builtin.import_tasks: restart.yml
   tags: [never, kafka_restart, kafka_deploy]

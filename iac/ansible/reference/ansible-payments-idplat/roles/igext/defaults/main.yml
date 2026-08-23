@@ -3,9 +3,9 @@
 #igext_loglevel: "{{ default_loglevel | default('Information', true) }}"
 igext_loglevel: "Debug"
 
-  ## работает на версии => identity-gateway:5.4.0.0-master-240925.118700
+  ## works on identity-gateway:5.4.0.0-master-240925.118700 and later
 igext_UseHealthCheckEndpoint: true
-igext_HealthCheckEndpoint_RequestTracing: false ## false выключение логирования запросов на helth
+igext_HealthCheckEndpoint_RequestTracing: false ## false disables request logging on the health endpoint
 
 # parent role overrides:
 igext_port: 5000

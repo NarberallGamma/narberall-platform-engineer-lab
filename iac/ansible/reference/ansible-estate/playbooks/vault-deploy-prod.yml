@@ -1,6 +1,6 @@
 ---
 # Vault HA Cluster Deployment Playbook
-# Развертывание отказоустойчивого Vault кластера с Load Balancer
+# Deploy a highly available Vault cluster with a load balancer
 
 - name: Deploy Vault HA Cluster
   hosts: vault_cluster

@@ -1,7 +1,7 @@
 #!/bin/bash
-# Ansible: плановый перезапуск 3X-UI в Docker (mode={{ xui_scheduled_restart_mode }})
-# container — docker restart {{ xui_container_name }} (панель + xray)
-# xray — SIGUSR1 (legacy; hot reload, не полный рестарт)
+# Ansible: scheduled 3X-UI restart in Docker (mode={{ xui_scheduled_restart_mode }})
+# container — docker restart {{ xui_container_name }} (panel + xray)
+# xray — SIGUSR1 (legacy; hot reload, not a full restart)
 set -euo pipefail
 
 CONTAINER="{{ xui_container_name }}"

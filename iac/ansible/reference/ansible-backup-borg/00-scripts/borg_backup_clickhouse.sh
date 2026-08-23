@@ -1,59 +1,57 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа clickhouse
+# Primary way to back up ClickHouse
 
-# Его можно применять если (должны выполняться все условия):
-#   1. для работы с таблицами во всех целевых базах данных используются движки, 
-#      перечисленные в ${SUPPORTED_ENGINES}
-#   2. clickhouse-server должен быть запущен на том же узле на котором будет 
-#      запущен этот скрипт
+# Applicable when all of the following hold:
+#   1. tables in all target databases use engines
+#      listed in ${SUPPORTED_ENGINES}
+#   2. clickhouse-server is running on the same node where
+#      this script will run
 
-# Принцип работы:
-#   - создание локальных копий разделов таблиц с помощью запроса 
-#    'ALTER TABLE ... FREEZE PARTITION ...' в подкаталоге 'shadow' каталога с 
-#     данными clickhouse-server ( чаще всего каталог с данными - это каталог /var/lib/clickhouse) 
-#   - резервное копирование каталога /var/lib/clickhouse/shadow/ с помощью скрипта borg_backup_files.sh
+# How it works:
+#   - create local copies of table partitions with
+#    'ALTER TABLE ... FREEZE PARTITION ...' in the 'shadow' subdirectory of the
+#     clickhouse-server data directory (usually /var/lib/clickhouse)
+#   - back up /var/lib/clickhouse/shadow/ with borg_backup_files.sh
 
-# Поддерживаемые опции:
-# -n|--job-name               - имя задания, суффикс имени Borg-репозитория. Обязательный аргумент
-# -h|--host                   - адреса подключения к clickhouse-server. Необязательный аргумент
-# -r|--port                   - порт подключения к clickhouse-server. Необязательный аргумент
-# -u|--user                   - имя пользователя, используемого для подключения к clickhouse-server
-# -p|--password               - путь к файлу с паролем пользователя. Необязательный аргумент
-# -t|--data-dir               - путь к каталогу с данными clickhouse-server, можно узнать 
-#                               в файле '/etc/clickhouse-server/config.xml' по директиве <path>. 
-#                               Обязательный аргумент
-# -k|--prune                  - строка с опциями алгоритма сохранения резервных копий в 
-#                               формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                               Необязательный аргумент, без указания этой опции будет 
-#                               использовано значение ${CUSTOMPRUNE_DEFAULT}
-# -d|--db                     - имя целевой базы данных, можно указать несколько раз, 
-#                               резервному копированию будут подвержены все указанные базы. 
-#                               Необязательный аргумент, без указания этой опции резервному 
-#                               копированию будут подвержены все базы данных
-#    --only-supported-engines - при указании, в список таблиц подлежащих 
-#                               резервному копированию попадут только таблицы 
-#                               для работы с которыми используются движки, 
-#                               перечисленные в ${SUPPORTED_ENGINES}. Необязательный аргумент. 
-#                               ПОМНИТЕ, что при использовании этой опции резервная копия может 
-#                               оказаться неполной, но алертов об этом вы не получите
-#    --debug                  - при указании будет выведен список таблиц и partitions 
-#                               подлежащих резервному копированию. Необязательный аргумент
+# Supported options:
+# -n|--job-name               - job name, Borg repository name suffix. Required
+# -h|--host                   - clickhouse-server connection addresses. Optional
+# -r|--port                   - clickhouse-server connection port. Optional
+# -u|--user                   - username used to connect to clickhouse-server
+# -p|--password               - path to the user password file. Optional
+# -t|--data-dir               - clickhouse-server data directory; listed in
+#                               '/etc/clickhouse-server/config.xml' as <path>.
+#                               Required
+# -k|--prune                  - retention options in Borg format, for
+#                               example '--keep-hourly 72 --keep-within=30d'
+#                               Optional; if omitted,
+#                               ${CUSTOMPRUNE_DEFAULT} is used
+# -d|--db                     - target database name; may be given more than once;
+#                               all listed databases are backed up.
+#                               Optional; if omitted, all databases
+#                               are backed up
+#    --only-supported-engines - when set, only tables that use engines
+#                               listed in ${SUPPORTED_ENGINES} are
+#                               included. Optional.
+#                               With this option the backup may be incomplete
+#                               and no alert is sent about that
+#    --debug                  - when set, print the tables and partitions
+#                               that will be backed up. Optional
 
-# Примеры использования в schedule:
+# Schedule usage examples:
 # borg_run_on.sh 10.0.0.1 borg_backup_clickhouse.sh '--job-name "CLCKHS" --data-dir "/var/lib/clickhouse/"'
 # borg_run_on.sh 10.0.0.1 borg_backup_clickhouse.sh '--job-name "CLCKHS" --data-dir "/var/lib/clickhouse/" --host "127.0.0.1"'
 # borg_run_on.sh 10.0.0.1 borg_backup_clickhouse.sh '--job-name "CLCKHS" --data-dir "/var/lib/clickhouse/" --host "127.0.0.1" --user "backup" --password "/etc/backup/clickhouse-pass"'
 # borg_run_on.sh 10.0.0.1 borg_backup_clickhouse.sh '--job-name "CLCKHS" --data-dir "/var/lib/clickhouse/" --host "127.0.0.1" --user "backup" --password "/etc/backup/clickhouse-pass" --only-supported-engines'
 # borg_run_on.sh 10.0.0.1 borg_backup_clickhouse.sh '--job-name "CLCKHS" --data-dir "/var/lib/clickhouse/" --host "127.0.0.1" --user "backup" --password "/etc/backup/clickhouse-pass" --only-supported-engines --prune "--keep-hourly 3 --keep-within=30d"'
 
-# Запрещается указывать в качестве значения опции [-p, --password] 
-# непосредственно пароль. В качестве ее значения необходимо указать путь к 
-# файлу с паролем. Владельцем этого файл должен быть 'root:root' и для него 
-# должны быть установлены права '0400'
+# The [-p, --password] value must not be the password itself.
+# It must be a path to a password file. That file must be owned
+# by 'root:root' and have mode '0400'.
 
-# Для выполнения запросов к clickhouse-server желательно создать отдельного пользователя
-# Для этого в файле '/etc/clickhouse-server/users.xml' можно в секции <users> вписать следующий текст:
+# A dedicated user is preferred for clickhouse-server queries.
+# The following may be added under <users> in '/etc/clickhouse-server/users.xml':
 #        <backup>
 #            <password_sha256_hex>e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</password_sha256_hex>
 #            <networks incl="networks" replace="replace">
@@ -63,7 +61,7 @@
 #            <profile>default</profile>
 #            <quota>default</quota>
 #        </backup>
-# Хэш пароля для директивы 'password_sha256_hex' можно получить следующей командой:
+# Password hash for the 'password_sha256_hex' directive:
 # printf "%s" "${PASSWORD}" | sha256sum | tr -d '-'
 
 ################################################################################
@@ -95,7 +93,7 @@ function alert {
   backup_notify --trigger backup --label backup_target="${BACKUP_TARGET}" --label backup_type="${BACKUP_TYPE}" --summary "${MESSAGE}" "${FULL_MESSAGE}"
 }
 
-# Удаляет все вхождения строки из текста
+# Remove all occurrences of a string from text
 # ${1} - input text
 # ${2} - match string
 delete_string_exactly()
@@ -119,14 +117,14 @@ delete_string_exactly()
   printf "%s" "${out_text}"
 }
 
-#Удаляет избыточные символы '/' в строке
+# Collapse redundant '/' characters in a path string
 # ${1} - string
 remove_repeating_vfs_divider()
 {
   printf "%s" "${1}" | sed --quiet "s/\/\/*/\//g;p;"
 }
 
-# Корректно сравнивает пути VFS
+# Compare VFS paths correctly
 # ${1} - one path
 # ${2} - two path
 compare_vfs_paths()
@@ -164,7 +162,7 @@ DBS=""
 SHADOW_DIR=""
 BACKUP_TARGET_STRING=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options n:h:r:u:p:t:k:d: --longoptions ,job-name:,host:,port:,user:,password:,data-dir:,prune:,db:,only-supported-engines,debug -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

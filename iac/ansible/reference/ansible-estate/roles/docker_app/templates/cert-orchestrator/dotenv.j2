@@ -1,4 +1,4 @@
-{# docker compose подставляет $VAR из .env; секреты с $ экранировать как $$ #}
+{# docker compose substitutes $VAR from .env; secrets containing $ must be escaped as $$ #}
 REG_RU_DNS_USERNAME={{ app_vault.REG_RU_DNS_USERNAME | default('') | replace('$', '$$') }}
 REG_RU_DNS_PASSWORD={{ app_vault.REG_RU_DNS_PASSWORD | default('') | replace('$', '$$') }}
 TELEGRAM_BOT_TOKEN={{ app_vault.TELEGRAM_BOT_TOKEN | default('') | replace('$', '$$') }}

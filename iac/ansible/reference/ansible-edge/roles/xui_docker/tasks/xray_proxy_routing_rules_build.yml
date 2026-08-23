@@ -1,5 +1,5 @@
 ---
-# Сбор routing rules для proxy: per-inbound (протокол → outbound) или legacy (все inbound → один outbound).
+# Build routing rules for proxy: per-inbound (protocol → outbound) or legacy (all inbounds → one outbound).
 
 - name: Init proxy routing inbound tags
   ansible.builtin.set_fact:
@@ -61,8 +61,8 @@
       - xui_proxy_routing_rules | default([]) | length > 0
       - xui_outbound_routing_rules | length > 0
     fail_msg: >-
-      xui_routing_per_inbound: true — задать xui_proxy_routing_rules[]
-      (inbound_tag → outbound_tag для каждого протокола на Jump).
+      xui_routing_per_inbound: true — set xui_proxy_routing_rules[]
+      (inbound_tag → outbound_tag for each protocol on Jump).
   when: xui_routing_per_inbound | default(false) | bool
 
 - name: Build legacy single routing rule for all proxy inbounds

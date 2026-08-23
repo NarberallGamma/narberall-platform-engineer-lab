@@ -143,10 +143,10 @@ dynamic_shared_memory_type = posix	# the default is the first option
 #max_files_per_process = 1000		# min 25
 					# (change requires restart)
 shared_preload_libraries = 'pg_stat_statements'		# (change requires restart)
-pg_stat_statements.max = 500 # сколько сэмплов хранить
-pg_stat_statements.track = top # формат хранения - top или все подряд
-pg_stat_statements.track_utility = true # сохранять ли статистику по использованию диска и процессора
-pg_stat_statements.save = false # не сохранять запросы как есть. Чтобы не проскользнули приватные данные
+pg_stat_statements.max = 500 # how many samples to keep
+pg_stat_statements.track = top # storage format - top or every statement
+pg_stat_statements.track_utility = true # whether to keep disk and CPU usage stats
+pg_stat_statements.save = false # do not persist queries as-is, so private data does not leak
 
 # - Cost-Based Vacuum Delay -
 
@@ -416,7 +416,7 @@ effective_cache_size = {{ effective_cache_size }}
 					#   fatal
 					#   panic (effectively off)
 
-log_min_duration_statement = 100 # активируем slowlog. Туда попадёт всё, что выполняется дольше 100мс. Собственно тут и задаём порог
+log_min_duration_statement = 100 # enable the slowlog. Everything slower than 100ms is recorded. This is the threshold.
 					# and their durations, > 0 logs only
 					# statements running at least this number
 					# of milliseconds
@@ -428,13 +428,13 @@ log_min_duration_statement = 100 # активируем slowlog. Туда поп
 #debug_print_rewritten = off
 #debug_print_plan = off
 #debug_pretty_print = on
-log_checkpoints = on # Сохраняем момент checkpoint. В этот момент может быть просадка производительности
-log_connections = off # коннекты обычно не нужны, мусор
-log_disconnections = off  # коннекты обычно не нужны, мусор
-log_duration = off  # все запросы не нужны
-log_error_verbosity = default  # больший уровень только для debug нужен
-log_hostname = off  # экономим на запросах в DNS.
-log_line_prefix = '%m  %p %u@%d from %h [vxid:%v txid:%x] [%i] ' # формат лога такой понимаю я, dataegret и парсер от них. Можно клиенту строить отчёты
+log_checkpoints = on # log the checkpoint moment; performance can dip at that time
+log_connections = off # connects are usually noise
+log_disconnections = off  # connects are usually noise
+log_duration = off  # every statement is not needed
+log_error_verbosity = default  # a higher level is only needed for debug
+log_hostname = off  # skip DNS lookups
+log_line_prefix = '%m  %p %u@%d from %h [vxid:%v txid:%x] [%i] ' # log format understood here, by dataegret, and by their parser. Reports can be built for the client
 					#   %a = application name
 					#   %u = user name
 					#   %d = database name
@@ -455,10 +455,10 @@ log_line_prefix = '%m  %p %u@%d from %h [vxid:%v txid:%x] [%i] ' # формат 
 					#        processes
 					#   %% = '%'
 					# e.g. '<%u%%%d> '
-log_lock_waits = on # отображаем в логах deadlock и долгие транзакции, которые другим мешают
-log_statement = 'ddl' # сохраняем принудительно все ALTER TABLE
-log_replication_commands = on # лог репликации на мастере. Нужен
-log_temp_files = 0 # логируем запросы, которые не помещаются в work_mem. Самый простой способ в случае запроса клиента - увеличить workmem, чтобы снизить нагрузку на диск.
+log_lock_waits = on # log deadlocks and long transactions that block others
+log_statement = 'ddl' # always log every ALTER TABLE
+log_replication_commands = on # replication log on the master. Needed
+log_temp_files = 0 # log queries that do not fit in work_mem. The simplest client-side fix is to raise work_mem to reduce disk load.
 					# than the specified size in kilobytes;
 					# -1 disables, 0 logs all temp files
 log_timezone = 'UTC'
@@ -499,7 +499,7 @@ stats_temp_directory = '/mnt/tmpstat'
 
 #autovacuum = on			# Enable autovacuum subprocess?  'on'
 					# requires track_counts to also be on.
-log_autovacuum_min_duration = 1000 # надо сохранять в логе отпечатки работы автовакуума дольше 1 секунды
+log_autovacuum_min_duration = 1000 # log autovacuum traces that run longer than 1 second
 					# their durations, > 0 logs only
 					# actions running at least this number
 					# of milliseconds.

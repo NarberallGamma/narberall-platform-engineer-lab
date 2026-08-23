@@ -1,35 +1,35 @@
-# Роль n8n_workflows
+# Role n8n_workflows
 
-Синхронизация воркфлоу n8n из репозитория (GitOps): загрузка JSON из `files/workflows/*.json` и создание/обновление воркфлоу в n8n через REST API.
+Sync n8n workflows from the repository (GitOps): load JSON from `files/workflows/*.json` and create/update workflows in n8n via REST API.
 
-## Nextcloud Groupfolders: два воркфлоу (form + webhook)
+## Nextcloud Groupfolders: two workflows (form + webhook)
 
-- **Форма** (`nextcloud_groupfolders_form.json`): `formPath` → URL вида `{n8n_base}/form/nextcloud-groupfolders`. Поля: **Profile** (обязательно: `nextcloud-dev` или `regul`), **Client name** (для режимов по одному клиенту), чекбоксы **переиграть всем клиентам** (`--all-clients`) и **только ACL одному без MKCOL** (`--permissions-only`). Если отмечены оба чекбокса, режим трактуется как «всем клиентам» (как более широкий сценарий); лучше оставить один режим или оба выключены = стандартный прогон с MKCOL одному клиенту.
-- **API** (`nextcloud_groupfolders_webhook.json`): в ноде Webhook задано `path: nextcloud-groupfolders-api` → POST на `{n8n_base}/webhook/.../nextcloud-groupfolders-api` с JSON-телом. Те же поля, что в форме (`profile`, необязательно `host`/`limit` если без `profile` — как `--limit`), `client_name`, опционально `reapply_all_clients` и `permissions_only` (логические). Команда на контрол-ноду строится в ноде **Execute a command**: `sudo -u ansible /ansible/scripts/run/run_nextcloud_groupfolders.sh …` см. скрипт `ansible/scripts/run/run_nextcloud_groupfolders.sh`. Значение `path` **не** должно совпадать с `formPath`: иначе при активации второго воркфлоу n8n выдаёт **Conflicting Webhook Path** (оба триггера бронируют один сегмент под `/webhook/`).
-- В **(Form)** в JSON только **On form submission** и **Execute a command**; нод Webhook / Respond to Webhook там нет (они в воркфлоу **(Webhook)**). Если в UI остались старые ноды — выполнить синхронизацию плейбука ещё раз; граф в n8n должен совпадать с репозиторием после PUT.
+- **Form** (`nextcloud_groupfolders_form.json`): `formPath` → URL of the form `{n8n_base}/form/nextcloud-groupfolders`. Fields: **Profile** (required: `nextcloud-dev` or `regul`), **Client name** (for single-client modes), checkboxes **reapply for all clients** (`--all-clients`) and **ACL only for one client without MKCOL** (`--permissions-only`). If both checkboxes are set, the mode is treated as "all clients" (the broader scenario); keep one mode, or leave both off for the standard MKCOL run for one client.
+- **API** (`nextcloud_groupfolders_webhook.json`): the Webhook node has `path: nextcloud-groupfolders-api` → POST to `{n8n_base}/webhook/.../nextcloud-groupfolders-api` with a JSON body. Same fields as the form (`profile`, optional `host`/`limit` when `profile` is omitted — same as `--limit`), `client_name`, optionally `reapply_all_clients` and `permissions_only` (booleans). The command for the control node is built in the **Execute a command** node: `sudo -u ansible /ansible/scripts/run/run_nextcloud_groupfolders.sh …` — see script `ansible/scripts/run/run_nextcloud_groupfolders.sh`. The `path` value must **not** match `formPath`: otherwise activating the second workflow makes n8n return **Conflicting Webhook Path** (both triggers reserve the same segment under `/webhook/`).
+- In **(Form)** the JSON has only **On form submission** and **Execute a command**; there are no Webhook / Respond to Webhook nodes there (those are in the **(Webhook)** workflow). If stale nodes remain in the UI — run playbook sync again; the graph in n8n must match the repository after PUT.
 
-## Требования
+## Requirements
 
-- Роль **n8n_init** выполняется до этой (API key из Vault).
-- В `group_vars/n8n_workflows.yml`: `n8n_base_url`, `n8n_workflows_to_sync`.
-- В n8n после первого деплоя при необходимости привязать credentials вручную:
-  - **SSH Ansible Host** — в ноде «Execute a command» (подключение к контрол-ноде Ansible).
-  - **Аутентификация Webhook** — в JSON репозитория задано `headerAuth`; при желании можно переключить на JWT/other в UI n8n и привязать credential к ноде Webhook.
+- Role **n8n_init** runs before this one (API key from Vault).
+- In `group_vars/n8n_workflows.yml`: `n8n_base_url`, `n8n_workflows_to_sync`.
+- In n8n after the first deploy, bind credentials manually if needed:
+  - **SSH Ansible Host** — on the "Execute a command" node (connection to the Ansible control node).
+  - **Webhook authentication** — the repository JSON sets `headerAuth`; JWT/other can be selected in the n8n UI and the credential bound to the Webhook node.
 
-## Webhook: ответ (stdout/stderr)
+## Webhook: response (stdout/stderr)
 
-- В воркфлоу webhook в репозитории нода **Respond to Webhook** возвращает HTML с результатом.
-- Ответ webhook и формы формирует нода **Respond to Webhook**: в браузер возвращается HTML с полем вывода команды (stdout), ошибками (stderr), кодом выхода и подсказкой, где смотреть полный лог: на контрол-ноде Ansible в `/ansible/artifacts/logs` и в интерфейсе n8n (Executions).
-- Вывод доступен **после завершения** команды: нода Execute Command в n8n не отдаёт stdout/stderr по мере выполнения (стриминг в реальном времени средствами n8n недоступен). Для «живого» просмотра лога во время выполнения: на контрол-ноде выполнить `tail -f /ansible/artifacts/logs/<файл_лога>.log` или открыть выполнение в n8n → Executions после старта и смотреть вывод по мере появления (если интерфейс обновляет данные).
+- In the webhook workflow in the repository the **Respond to Webhook** node returns HTML with the result.
+- The webhook and form response is built by **Respond to Webhook**: the browser gets HTML with the command output (stdout), errors (stderr), exit code, and a hint where to find the full log: on the Ansible control node under `/ansible/artifacts/logs` and in the n8n UI (Executions).
+- Output is available **after the command finishes**: the Execute Command node in n8n does not stream stdout/stderr as it runs (real-time streaming is not available through n8n). For a live log during the run: on the control node run `tail -f /ansible/artifacts/logs/<log_file>.log` or open the run in n8n → Executions after start and watch output as it appears (if the UI refreshes).
 
-## Форма: аутентификация
+## Form: authentication
 
-Form Trigger поддерживает Basic Authentication. В JSON по умолчанию аутентификация не включена. Чтобы включить: в n8n в ноде «On form submission» выбрать Authentication → Basic Auth и привязать созданный credential. Либо добавить в форму скрытое поле (например секретный ключ) и проверять его в отдельной ноде перед Execute command.
+Form Trigger supports Basic Authentication. In the JSON, authentication is off by default. To enable: in n8n on the "On form submission" node select Authentication → Basic Auth and bind the created credential. Alternatively add a hidden field to the form (e.g. a secret key) and check it in a separate node before Execute command.
 
-## Добавление новых воркфлоу
+## Adding new workflows
 
-1. Положить JSON в `roles/n8n_workflows/files/workflows/<имя>.json` (без полей `id`, `createdAt`, `updatedAt` в корне).
-2. Добавить `<имя>` в список `n8n_workflows_to_sync` в `group_vars/n8n_workflows.yml`.
-3. Запустить плейбук `playbooks/n8n_workflows.yml`.
+1. Place the JSON in `roles/n8n_workflows/files/workflows/<name>.json` (without `id`, `createdAt`, `updatedAt` at the root).
+2. Add `<name>` to `n8n_workflows_to_sync` in `group_vars/n8n_workflows.yml`.
+3. Run playbook `playbooks/n8n_workflows.yml`.
 
-Воркфлоу в n8n ищется по полю `name` в JSON; при совпадении: GET полного воркфлоу, merge с репо (`name`, `nodes`, `connections`, `settings`, при наличии `meta`), затем PUT. Иначе — POST. Тело в `uri` не передавать как `| to_json` при `body_format: json` (риск 400).
+A workflow in n8n is looked up by the `name` field in the JSON; on a match: GET the full workflow, merge with the repo (`name`, `nodes`, `connections`, `settings`, and `meta` if present), then PUT. Otherwise — POST. Do not pass the body in `uri` as `| to_json` together with `body_format: json` (risk of 400).

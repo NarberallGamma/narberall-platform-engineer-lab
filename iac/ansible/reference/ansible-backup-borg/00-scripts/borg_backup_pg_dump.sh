@@ -1,98 +1,93 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - запасной способ бэкапа PostgreSQL
+# Fallback way to back up PostgreSQL
 
-# Его можно применять если (должны выполняться все условия):
-#   1. Версия PostgreSQL >= 8.3
+# Applicable when all of the following hold:
+#   1. PostgreSQL version >= 8.3
 
-# Помните, что восстановление данных из резервной копии, полученной с помощью pg_dump, 
-# занимает значительно больше времени чем при использовании pg_basebackup и 
-# на больших данных ( ~300 ГБ ) может занимать сутки
+# Restoring data from a backup produced by pg_dump
+# takes significantly longer than with pg_basebackup and
+# on large datasets (~300 GB) may take a full day
 
-# Принцип работы:
-#   - если создается резервная копия одной базы данных или не указана опция --one-archive:
-#     - вызов pg_dump с передачей дампа в stdout
-#     - резервное копирование дампа с помощью borg с получением дампа из stdin
-#   - иначе:
-#     - создание и сохранение дампов баз данных во временном каталоге ${TMP_DIR} с помощью pg_dump
-#     - резервное копирование каталога ${TMP_DIR} с помощью скрипта borg_backup_files.sh
+# How it works:
+#   - if a single database is backed up or --one-archive is not set:
+#     - run pg_dump and send the dump to stdout
+#     - back up the dump with Borg reading from stdin
+#   - otherwise:
+#     - create and store database dumps in temporary directory ${TMP_DIR} with pg_dump
+#     - back up ${TMP_DIR} with borg_backup_files.sh
 
-# Поддерживаемые опции:
-# -h|--host                - адрес подключения к PostgreSQL. Необязательный аргумент
-# -r|--port                - порт подключения к PostgreSQL. Необязательный аргумент
-# -u|--user                - имя пользователя, используемого для подключения 
-#                            к PostgreSQL или запуска pg_dump. Необязательный 
-#                            аргумент, без указания этой опции будет использовано 
-#                            значение ${USER_DEFAULT}
-# -p|--password            - путь к файлу с паролем, используемым для 
-#                            подключения к PostgreSQL, или имя переменной 
-#                            окружения, содержащей этот пароль. Необязательный аргумент
-# -d|--db                  - имя базы данных которую необходимо бэкапить, 
-#                            опция может быть указана несколько раз, в 
-#                            резервную копию попадут все указанные базы. Если будет 
-#                            указано несколько баз данных, то резервная копия каждой 
-#                            из них будет помещена в отдельный borg-репозиторий, чье 
-#                            имя будет дополнено помимо имени задания также именем базы 
-#                            данных т.е. вместо $(hostname)-${NAMEOFBACKUP} будет 
-#                            использовано $(hostname)-${db}-${NAMEOFBACKUP}. Можно 
-#                            поместить все резервные копии баз в один архив с помощью 
-#                            опции --one-archive. Необходимо указать хотя бы одну базу 
-#                            или опцию --all-db
-#    --all-db              - указание этой опции позволяет выполнить резервное 
-#                            копирование всех баз данных, обслуживаемых текущим 
-#                            экземпляром PostgreSQL. При ее использовании список 
-#                            баз будет сформирован из списка баз в PostgreSQL и 
-#                            далее резервное копирование будет выполнено по тому 
-#                            же алгоритму что и в случае ручного формирования 
-#                            списка баз с помощью опции -d|--db т.е. для каждой 
-#                            базы будет создан отдельный Borg-репозиторий. Смотри 
-#                            опции -d|--db и --one-archive
-# -e|--exclude-db          - имя базы которую необходимо исключить из резервного 
-#                            копирования, опция может быть указана несколько раз, из 
-#                            резервной копии будут исключены все указанные базы
-# -a|--add-pg_dump-option  - дополнительная опция которая будет передана 
-#                            pg_dump. Если опция pg_dump имеет 
-#                            значение, то его необходимо указать либо через 
-#                            знак равенства ( = ) (возможно только для 
-#                            длинных опций), либо через пробел, но в 
-#                            этом случае опцию pg_dump вместе с ее 
-#                            значением необходимо поместить в двойные или 
-#                            одинарные кавычки. Например:
+# Supported options:
+# -h|--host                - PostgreSQL connection address. Optional
+# -r|--port                - PostgreSQL connection port. Optional
+# -u|--user                - username used to connect
+#                            to PostgreSQL or to run pg_dump. Optional;
+#                            if omitted,
+#                            ${USER_DEFAULT} is used
+# -p|--password            - path to the password file used to
+#                            connect to PostgreSQL, or the name of an
+#                            environment variable that holds that password. Optional
+# -d|--db                  - database name to back up;
+#                            may be given more than once; all listed
+#                            databases are included. If several databases
+#                            are given, each backup is stored in a separate
+#                            Borg repository whose name includes the job name
+#                            and the database name, i.e. $(hostname)-${db}-${NAMEOFBACKUP}
+#                            is used instead of $(hostname)-${NAMEOFBACKUP}.
+#                            All database backups may be placed in one archive
+#                            with --one-archive. At least one database
+#                            or --all-db is required
+#    --all-db              - back up all databases served by the current
+#                            PostgreSQL instance. The database list is taken
+#                            from PostgreSQL and then the same algorithm is
+#                            used as when the list is built manually
+#                            with -d|--db, i.e. each database gets a separate
+#                            Borg repository. See
+#                            -d|--db and --one-archive
+# -e|--exclude-db          - database name to exclude from the backup;
+#                            may be given more than once; all listed
+#                            databases are excluded
+# -a|--add-pg_dump-option  - extra option passed to
+#                            pg_dump. If the pg_dump option has a
+#                            value, pass it either with an equals sign
+#                            ( = ) (long options only) or with a space,
+#                            in which case the pg_dump option and its
+#                            value must be wrapped in double or
+#                            single quotes. For example:
 #                             - --add-pg_dump-option --jobs=4
 #                             - --add-pg_dump-option '--jobs 4'
 #                             - --add-pg_dump-option "--jobs 4"
-#                            Опция может быть указана несколько раз, pg_dump будут
-#                            переданы все указанные опции. Необязательный аргумент
-# -k|--prune               - строка с опциями алгоритма сохранения резервных копий в 
-#                            формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                            Необязательный аргумент, без указания этой опции будет 
-#                            использовано значение ${CUSTOMPRUNE_DEFAULT}
-#    --do-su-under-user    - запустить pg_dump под пользователем, указанным 
-#                            опцией -u|--user или пользователем по умолчанию. Имеет 
-#                            смысл использовать в том случае, если по каким-либо 
-#                            причинам требуется вместо метода аутентификации 'trust' 
-#                            в pg_hba.conf использовать метод аутентификации 'peer'
-#    --one-archive         - опция позволяет включить сохранение резервных копий 
-#                            разных баз в одном архиве. Для этого резервные копии баз 
-#                            сохраняются во временном каталоге. Помните, что в файловой 
-#                            системе должно быть достаточно свободного места для их хранения. 
-#                            В случае наличия в списке баз только одной базы, временный каталог 
-#                            использоваться не будет
-#    --tmp-dir             - путь к временному каталогу в котором сохраняются 
-#                            резервные копии баз. Необязательный аргумент, без указания 
-#                            этой опции будет использовано значение ${TMP_DIR_DEFAULT}
+#                            May be given more than once; all listed options
+#                            are passed to pg_dump. Optional
+# -k|--prune               - retention options in Borg format, for
+#                            example '--keep-hourly 72 --keep-within=30d'
+#                            Optional; if omitted,
+#                            ${CUSTOMPRUNE_DEFAULT} is used
+#    --do-su-under-user    - run pg_dump as the user given by
+#                            -u|--user or the default user. Useful when
+#                            the 'peer' authentication method in pg_hba.conf
+#                            must be used instead of 'trust'
+#    --one-archive         - store backups of different databases in one
+#                            archive. Database backups are written to a
+#                            temporary directory. The filesystem must have
+#                            enough free space to hold them.
+#                            If the list contains only one database, the
+#                            temporary directory is not used
+#    --tmp-dir             - temporary directory used to store
+#                            database backups. Optional; if omitted,
+#                            ${TMP_DIR_DEFAULT} is used
 
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория, без указания будет 
-#        использовано имя заданное в ${NAMEOFBACKUP_DEFAULT}
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix; if omitted,
+#        ${NAMEOFBACKUP_DEFAULT} is used
 
-# Запрещается указывать в качестве значения опции [-p, --password] 
-# непосредственно пароль. В качестве ее значения необходимо указать:
-#   - путь к файлу с паролем. Владельцем этого файл должен быть 'root:root' и 
-#     для него должны быть установлены права '0400'
-#   - имя переменной окружения, содержащей этот пароль
+# The [-p, --password] value must not be the password itself.
+# Use one of:
+#   - a path to a password file. The file must be owned by 'root:root' and
+#     have mode '0400'
+#   - the name of an environment variable that holds the password
 
-# Пример использования в schedule:
+# Schedule usage example:
 # borg_run_on.sh 10.0.0.1 borg_backup_pg_dump.sh '--db db1'
 # borg_run_on.sh 10.0.0.1 borg_backup_pg_dump.sh 'PGDUMP --db db1 --db db2'
 # borg_run_on.sh 10.0.0.1 borg_backup_pg_dump.sh 'PGDUMP --db db1 --db db2 --user postgres'
@@ -163,10 +158,10 @@ get_env_var_value()
   fi
 }
 
-# Корректно сравнивает пути VFS
-# uncertain - неопределенное состояние, один из аргументов не VFS-путь
-# equal     - пути равны
-# not_equal - пути не равны
+# Compare VFS paths correctly
+# uncertain - undefined state; one argument is not a VFS path
+# equal     - paths are equal
+# not_equal - paths are not equal
 # ${1} - one path
 # ${2} - two path
 compare_vfs_paths()
@@ -216,10 +211,10 @@ compare_vfs_paths()
   return 0
 }
 
-# Определяет уровень (глубину) переданного пути относительно корня VFS
-# 0 - не VFS путь
+# Determine the depth of the given path relative to the VFS root
+# 0 - not a VFS path
 # 1 - '/'
-# 2 - '/etc', '/root', '/var' и т.п.
+# 2 - '/etc', '/root', '/var', and similar
 # ${1} - path
 get_vfs_path_level()
 {
@@ -268,7 +263,7 @@ REPOSITORY=""
 EFFECTIVE_OPTIONS=""
 PSQL_OPTIONS=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options h:r:u:p:d:e:a:k: --longoptions ,host:,port:,user:,password:,db:,all-db,exclude-db:,add-pg_dump-option:,prune:,do-su-under-user,one-archive,tmp-dir: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

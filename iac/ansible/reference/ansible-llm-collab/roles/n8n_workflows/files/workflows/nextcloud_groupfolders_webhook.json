@@ -45,7 +45,7 @@
       "position": [940, 300],
       "parameters": {
         "respondWith": "text",
-        "responseBody": "=<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Результат Ansible</title><style>body{font-family:monospace;margin:1rem;background:#1e1e1e;color:#d4d4d4;} pre{white-space:pre-wrap;} .log-hint{margin-top:1.5rem;color:#888;font-size:0.9em;}</style></head><body><h2>Результат запуска Nextcloud Groupfolders</h2><p><strong>Exit code:</strong> {{ $json.code ?? 'N/A' }}</p><h3>Вывод (stdout)</h3><pre>{{ ($json.stdout ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}</pre><h3>Ошибки (stderr)</h3><pre>{{ ($json.stderr ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}</pre><p class=\"log-hint\">Full log on control Ansible node: <code>/ansible/artifacts/logs</code>. Job log: n8n → Executions.</p></body></html>",
+        "responseBody": "=<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Ansible result</title><style>body{font-family:monospace;margin:1rem;background:#1e1e1e;color:#d4d4d4;} pre{white-space:pre-wrap;} .log-hint{margin-top:1.5rem;color:#888;font-size:0.9em;}</style></head><body><h2>Nextcloud Groupfolders run result</h2><p><strong>Exit code:</strong> {{ $json.code ?? 'N/A' }}</p><h3>Output (stdout)</h3><pre>{{ ($json.stdout ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}</pre><h3>Errors (stderr)</h3><pre>{{ ($json.stderr ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}</pre><p class=\"log-hint\">Full log on control Ansible node: <code>/ansible/artifacts/logs</code>. Job log: n8n → Executions.</p></body></html>",
         "options": {}
       }
     }

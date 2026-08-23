@@ -1,5 +1,5 @@
 ---
-- name: Файл окружения с секретами для compose (env_file llama)
+- name: Environment file with secrets for compose (env_file llama)
   ansible.builtin.template:
     src: dotenv.j2
     dest: "{{ llm_dev_app_root }}/{{ llm_dev_env_file_name }}"
@@ -8,7 +8,7 @@
     group: "{{ ansible_user }}"
   no_log: true
 
-- name: Файл окружения Open WebUI
+- name: Open WebUI environment file
   ansible.builtin.template:
     src: open-webui.env.j2
     dest: "{{ llm_dev_app_root }}/{{ llm_dev_open_webui_env_file_name }}"
@@ -18,7 +18,7 @@
   no_log: true
   when: llm_dev_open_webui_enabled | bool
 
-- name: docker-compose.yml для LLM dev
+- name: docker-compose.yml for LLM dev
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ llm_dev_app_root }}/docker-compose.yml"
@@ -26,7 +26,7 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
 
-- name: Поднять или обновить стек LLM dev
+- name: Bring up or update the LLM dev stack
   community.docker.docker_compose_v2:
     project_src: "{{ llm_dev_app_root }}"
     project_name: "{{ llm_dev_compose_project_name }}"

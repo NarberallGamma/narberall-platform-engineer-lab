@@ -2,8 +2,8 @@ services:
   cryptopro:
     image: {{ docker_app.app_image }}
     container_name: cryptopro
-    # Без user: как k8s preprod (securityContext {}). entrypoint образа инициализирует
-    # /var/opt/cprocsp из /opt/cprocsp/defaults — только от root.
+    # Without user: same as k8s preprod (securityContext {}). Image entrypoint initializes
+    # /var/opt/cprocsp from /opt/cprocsp/defaults — root only.
     ports:
       - "{{ docker_app.host_port }}:8080"
     env_file:

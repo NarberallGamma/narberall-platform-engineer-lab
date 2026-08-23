@@ -1,4 +1,4 @@
-- name: Установить psycopg2 при необходимости
+- name: Install psycopg2 if needed
   ansible.builtin.pip:
     name: psycopg2-binary
     state: present
@@ -15,7 +15,7 @@
     login_port: "{{ pg_port }}"
   loop: "{{ db }}"
 
-- name: "Создание баз данных PostgreSQL"
+- name: "Create PostgreSQL databases"
   community.general.postgresql_db:
     name: "{{ item.name }}"
     encoding: "{{ default_encoding }}"
@@ -157,7 +157,7 @@
       DECLARE
         r RECORD;
       BEGIN
-        -- Сначала изменяем владельца схем (кроме системных)
+        -- Change schema owners first (except system schemas)
         FOR r IN
           SELECT nspname
           FROM pg_namespace
@@ -166,7 +166,7 @@
           EXECUTE format('ALTER SCHEMA %I OWNER TO {{ item.name }}_owner_role;', r.nspname);
         END LOOP;
 
-        -- Изменяем владельца таблиц
+        -- Change table owners
         FOR r IN
           SELECT nspname, relname
           FROM pg_class c
@@ -177,7 +177,7 @@
           EXECUTE format('ALTER TABLE %I.%I OWNER TO {{ item.name }}_owner_role;', r.nspname, r.relname);
         END LOOP;
 
-        -- Изменяем владельца независимых последовательностей (не связанных с таблицами)
+        -- Change owners of standalone sequences (not bound to tables)
         FOR r IN
           SELECT nspname, relname
           FROM pg_class c
@@ -193,7 +193,7 @@
           EXECUTE format('ALTER SEQUENCE %I.%I OWNER TO {{ item.name }}_owner_role;', r.nspname, r.relname);
         END LOOP;
 
-        -- Изменяем владельца представлений
+        -- Change view owners
         FOR r IN
           SELECT nspname, relname
           FROM pg_class c

@@ -1,11 +1,11 @@
-# hsm-adapter — LEGACY docker app (prod). Хост estate-prod-cryptopro-01; после миграции keys в policy-gateway — выключить.
-# На той же VM: treasury-policy-gateway, cryptopro (playbooks docker_app_treasury_policy_gateway / docker_app_cryptopro).
-# CryptoPro data: bind mounts ./data/{keys,users,dsrf,tmp} (не docker named volumes).
-# Плейбук: playbooks/docker_app_hsm_adapter.yml | inventory: [hsm_adapter]
-# Legacy-миграция: playbooks/migrate_hsm_adapter_legacy.yml (копия из hsm_adapter_hsm_* volumes).
+# hsm-adapter — LEGACY docker app (prod). Host estate-prod-cryptopro-01; disable after keys migrate to policy-gateway.
+# On the same VM: treasury-policy-gateway, cryptopro (playbooks docker_app_treasury_policy_gateway / docker_app_cryptopro).
+# CryptoPro data: bind mounts ./data/{keys,users,dsrf,tmp} (not docker named volumes).
+# Playbook: playbooks/docker_app_hsm_adapter.yml | inventory: [hsm_adapter]
+# Legacy migration: playbooks/migrate_hsm_adapter_legacy.yml (copy from hsm_adapter_hsm_* volumes).
 #
-# Секреты в Vault: mount secret, path treasury-hsm-adapter (см. DOCKER_APPS_VAULT_SECRETS.md).
-# Порты (как preprod): API + actuator + healthcheck на 8080, management_port_enabled: false.
+# Secrets in Vault: mount secret, path treasury-hsm-adapter (see DOCKER_APPS_VAULT_SECRETS.md).
+# Ports (same as preprod): API + actuator + healthcheck on 8080, management_port_enabled: false.
 
 docker_app_vault_mount_point: secret
 docker_app_vault_path: treasury-hsm-adapter
@@ -25,7 +25,7 @@ docker_app:
   logging_level_waves: DEBUG
   management_endpoints: "*"
 
-# Каталоги относительно {{ docker_app_base_dir }}/hsm-adapter/
+# Directories relative to {{ docker_app_base_dir }}/hsm-adapter/
 hsm_adapter_data_uid: "10001"
 hsm_adapter_data_gid: "10001"
 hsm_adapter_data_dirs:
@@ -34,7 +34,7 @@ hsm_adapter_data_dirs:
   - { path: data/dsrf, mode: "0750" }
   - { path: data/tmp, mode: "0750" }
 
-# Legacy docker compose (/docker/hsm_adapter) -> named volumes для one-time copy при migrate
+# Legacy docker compose (/docker/hsm_adapter) -> named volumes for one-time copy during migrate
 hsm_adapter_legacy_compose_dir: /docker/hsm_adapter
 hsm_adapter_legacy_volume_copy:
   - { src_volume: hsm_adapter_hsm_keys, dest: data/keys }
@@ -62,6 +62,6 @@ hsm_adapter_nginx_remove_paths:
   - /var/log/nginx
   - /var/lib/nginx
 
-# Публичный URL (TLS на edge-lb, не на этом хосте)
+# Public URL (TLS on edge-lb, not on this host)
 hsm_adapter_public_domain: hsm-adapter.example.com
 hsm_adapter_public_path_prefix: /hsm-adapter/

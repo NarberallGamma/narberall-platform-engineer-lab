@@ -1,9 +1,9 @@
 ---
-# Плейбук read-write дополнительной учётки: GRANT DML на данные (без OWNER, без CREATE на схеме).
-# Запуск: ansible-playbook rw_user_setup.yaml --extra-vars "rw_user=... rw_password=..."
+# Extra read-write account playbook: GRANT DML on data (no OWNER, no CREATE on the schema).
+# Run: ansible-playbook rw_user_setup.yaml --extra-vars "rw_user=... rw_password=..."
 #         ansible-playbook rw_user_setup.yaml --extra-vars "rw_user=... rw_password=... db_name=...|db_list=[...]"
-# Без db_name / db_list используется default_databases из vars ниже.
-- name: Создание RW-пользователя PostgreSQL (GRANT DML на данные, без OWNER)
+# Without db_name / db_list, default_databases from vars below is used.
+- name: Create a PostgreSQL RW user (GRANT DML on data, no OWNER)
   hosts: localhost
   connection: local
   become: false
@@ -16,15 +16,15 @@
 
     rw_user: "app_rw_power"
     rw_password: ""
-    # false: только GRANT, пароль не менять (учётка уже создана в облаке)
+    # false: GRANTs only, do not change the password (account already created in the cloud)
     manage_password: true
 
-    # Роль-создатель объектов для ALTER DEFAULT PRIVILEGES FOR ROLE (не OWNER доп. учётки).
+    # Object-creator role for ALTER DEFAULT PRIVILEGES FOR ROLE (not the extra account OWNER).
     default_privileges_for_role: schema_flyway
 
-    # Полный список прикладных БД estate (снимок RDS prod, 2026-07). openobserve не включена.
-    # Переопределение: db_name или db_list.
-    # treasury_contract_restored_3: временная/восстановленная БД, может отсутствовать на preprod.
+    # Full list of estate application databases (RDS prod snapshot, 2026-07). openobserve is not included.
+    # Override: db_name or db_list.
+    # treasury_contract_restored_3: temporary/restored database, may be absent on preprod.
     default_databases:
       - cryptopro_service
       - hsm
@@ -52,9 +52,9 @@
       - treasury_web
 
   pre_tasks:
-    - name: Проверить rw_user и rw_password
+    - name: Check rw_user and rw_password
       ansible.builtin.fail:
-        msg: "Задать rw_user; rw_password обязателен при manage_password=true (по умолчанию)"
+        msg: "Set rw_user; rw_password is required when manage_password=true (default)"
       when: >
         rw_user is not defined or (rw_user | default('') | trim | length) == 0
         or (
@@ -62,26 +62,26 @@
           and (rw_password is not defined or (rw_password | default('') | length) == 0)
         )
 
-    - name: Определить список баз данных для обработки
+    - name: Resolve the database list to process
       ansible.builtin.set_fact:
         db_list: "{{ db_list | default(default_databases) }}"
       when: db_name is not defined or db_name == '' or db_name is none
 
-    - name: Определить список баз данных из db_name
+    - name: Resolve the database list from db_name
       ansible.builtin.set_fact:
         db_list: "{{ [db_name] }}"
       when: db_name is defined and db_name != '' and db_name is not none
 
-    - name: Проверить, что список БД не пуст
+    - name: Fail when the database list is empty
       ansible.builtin.fail:
-        msg: "ОШИБКА: список баз данных пуст. Указать db_name или db_list"
+        msg: "ERROR: database list is empty. Set db_name or db_list"
       when: db_list is not defined or db_list | length == 0
 
-    - name: Показать параметры
+    - name: Show parameters
       ansible.builtin.debug:
         msg:
-          - "RW-пользователь: {{ rw_user }}"
-          - "Базы ({{ db_list | length }}): {{ db_list | join(', ') }}"
+          - "RW user: {{ rw_user }}"
+          - "Databases ({{ db_list | length }}): {{ db_list | join(', ') }}"
 
   roles:
     - rw_user

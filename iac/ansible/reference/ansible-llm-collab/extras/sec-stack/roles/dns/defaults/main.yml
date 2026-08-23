@@ -1,4 +1,4 @@
 ---
-# Корпоративные резолверы; переопределяются в group_vars.
-# Интерим до включения ВМ в prepare_servers IT (их dns.yml делает то же самое).
+# Corporate resolvers; overridden in group_vars.
+# Interim until VMs are enrolled in IT prepare_servers (their dns.yml does the same).
 dns_servers: []

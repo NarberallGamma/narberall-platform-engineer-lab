@@ -1,13 +1,13 @@
-# enterprise_project_id (опционально, на компанию) — по какому scope SberCloud
-# проверяет права на чтение ECS:
-#   не указан        — по IAM-проекту (региональному). Права надо выдать учётке
-#                      на IAM-проект (Authorization model: IAM project).
-#   "all_granted_eps" — по всем enterprise-проектам, где у учётки есть роли.
-#                      указать это, если права в IAM раздаются через enterprise
-#                      projects (частый случай при одном проекте).
-#   "0" или "<id>"   — по конкретному enterprise-проекту ("0" — default EP.)
-# Если ECS отдаёт 403 Pdp.0001 при выданных enterprise-ролях — добавить
-# "enterprise_project_id": "all_granted_eps".
+# enterprise_project_id (optional, per company) — which SberCloud scope is used
+# to check ECS read rights:
+#   omitted          — IAM project (regional). Grant the account rights on the
+#                      IAM project (Authorization model: IAM project).
+#   "all_granted_eps" — all enterprise projects where the account has roles.
+#                      Set this when IAM rights are granted via enterprise
+#                      projects (common with a single project).
+#   "0" or "<id>"    — a specific enterprise project ("0" is the default EP).
+# If ECS returns 403 Pdp.0001 while enterprise roles are already granted —
+# add "enterprise_project_id": "all_granted_eps".
 companies: [
   {
     "name": "project-e",

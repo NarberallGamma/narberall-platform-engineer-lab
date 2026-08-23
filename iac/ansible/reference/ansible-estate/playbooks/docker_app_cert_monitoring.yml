@@ -1,7 +1,7 @@
 ---
-# Deploy cert-monitoring (docker compose в /docker/apps/cert-monitoring)
-# Хосты: inventory group [cert-monitoring] (любая VM)
-# Переменные: group_vars/cert-monitoring.yml (vars_files — не зависит от пути inventory)
+# Deploy cert-monitoring (docker compose under /docker/apps/cert-monitoring)
+# Hosts: inventory group [cert-monitoring] (any VM)
+# Variables: group_vars/cert-monitoring.yml (vars_files — independent of the inventory path)
 
 - name: Deploy cert-monitoring
   hosts: cert_monitoring

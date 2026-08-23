@@ -1,21 +1,21 @@
 #!/bin/bash
 # unblock_databases.sh
-# Скрипт для разблокировки баз данных PostgreSQL
-# Подключение через peer authentication (как postgres пользователь на localhost)
+# Script to unlock PostgreSQL databases
+# Connect via peer authentication (as the postgres user on localhost)
 # Usage: ./unblock_databases.sh [read_only|full] [dblist_file.txt]
-#   read_only - разблокировать write операции (убрать read-only режим)
-#   full - разрешить подключения (убрать полную блокировку)
-#   Если указан файл со списком БД - будет разблокировать только указанные БД из списка
+#   read_only - allow writes (clear read-only mode)
+#   full - allow connections (clear the full lock)
+#   When a list file is passed, only listed databases are unlocked
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-UNBLOCK_MODE="$1"  # read_only или full
+UNBLOCK_MODE="$1"  # read_only or full
 DB_LIST_FILE="$2"
 
-# Проверка параметров
+# Parameter check
 if [ "$UNBLOCK_MODE" != "read_only" ] && [ "$UNBLOCK_MODE" != "full" ]; then
     echo "Usage: $0 [read_only|full] [dblist_file.txt]"
     echo ""
@@ -32,7 +32,7 @@ if [ "$UNBLOCK_MODE" != "read_only" ] && [ "$UNBLOCK_MODE" != "full" ]; then
 fi
 
 # ============================================
-# ПРОВЕРКА ПОДКЛЮЧЕНИЯ
+# CONNECTION CHECK
 # ============================================
 
 echo "=== Database Unblocking Tool ==="
@@ -49,21 +49,21 @@ else
 fi
 echo ""
 
-# Проверка подключения к PostgreSQL
+# Check PostgreSQL connection
 if ! psql -d postgres -c "SELECT 1" >/dev/null 2>&1; then
     echo -e "${RED}Error: Cannot connect to PostgreSQL!${NC}"
     echo "Make sure you are running as postgres user with peer authentication enabled."
     exit 1
 fi
 
-# Получить версию PostgreSQL
+# Get PostgreSQL version
 pg_version=$(psql -d postgres -tAc "SELECT version();" 2>/dev/null | head -n1)
 echo -e "${GREEN}✓ Connected to PostgreSQL${NC}"
 echo "  Version: $pg_version"
 echo ""
 
 # ============================================
-# ПОЛУЧЕНИЕ СПИСКА БАЗ ДАННЫХ
+# GET DATABASE LIST
 # ============================================
 
 if [ -n "$DB_LIST_FILE" ]; then
@@ -78,16 +78,16 @@ if [ -n "$DB_LIST_FILE" ]; then
     found_count=0
     not_found_count=0
     
-    # Проверить каждую БД из списка
+    # Check each database from the list
     while IFS= read -r requested_db || [ -n "$requested_db" ]; do
-        # Пропускаем пустые строки и комментарии, очищаем от пробелов и невидимых символов
+        # Skip empty lines and comments; strip spaces and invisible characters
         requested_db=$(echo "$requested_db" | sed 's/#.*$//' | tr -d '\r\n' | xargs)
         if [ -z "$requested_db" ]; then continue; fi
         
-        # Экранируем одинарные кавычки в имени БД для SQL (удваиваем их)
+        # Escape single quotes in the database name for SQL (double them)
         escaped_db=$(printf '%s' "$requested_db" | sed "s/'/''/g")
         
-        # Проверить существование БД через SQL запрос
+        # Check that the database exists via SQL
         db_exists=$(psql -d postgres -tAc \
             "SELECT 1 FROM pg_database WHERE datname = '$escaped_db'" 2>/dev/null | tr -d '[:space:]')
         
@@ -112,7 +112,7 @@ if [ -n "$DB_LIST_FILE" ]; then
         echo ""
     fi
 else
-    # Получить все БД (кроме системных)
+    # Get all databases (except system ones)
     echo "Fetching database list from server..."
     psql -d postgres -tAc \
       "SELECT datname
@@ -132,7 +132,7 @@ if [ "$db_count" -eq 0 ]; then
 fi
 
 # ============================================
-# ФУНКЦИИ
+# FUNCTIONS
 # ============================================
 
 get_db_current_state() {
@@ -140,7 +140,7 @@ get_db_current_state() {
     local mode=$2
     
     if [ "$mode" = "read_only" ]; then
-        # Проверить read-only статус
+        # Check read-only status
         local state=$(psql -d postgres -tAc \
             "SELECT CASE WHEN datconfig IS NULL THEN 'writable'
                         WHEN datconfig::text LIKE '%default_transaction_read_only%' THEN 'read_only'
@@ -148,7 +148,7 @@ get_db_current_state() {
              FROM pg_database WHERE datname = '$dbname'" 2>/dev/null)
         echo "$state"
     else
-        # Проверить allow_connections
+        # Check allow_connections
         local state=$(psql -d postgres -tAc \
             "SELECT CASE WHEN datallowconn = true THEN 'allowed'
                         ELSE 'blocked' END
@@ -174,7 +174,7 @@ unblock_database_full() {
 }
 
 # ============================================
-# ПРЕДВАРИТЕЛЬНЫЙ ПРОСМОТР
+# PREVIEW
 # ============================================
 
 echo ""
@@ -227,7 +227,7 @@ if [ $need_unblock -eq 0 ]; then
 fi
 
 # ============================================
-# ПОДТВЕРЖДЕНИЕ
+# CONFIRMATION
 # ============================================
 
 read -p "Unblock $need_unblock database(s)? (yes/no): " confirm
@@ -238,7 +238,7 @@ if [ "$confirm" != "yes" ]; then
 fi
 
 # ============================================
-# РАЗБЛОКИРОВКА
+# UNLOCK
 # ============================================
 
 echo ""
@@ -273,7 +273,7 @@ while IFS= read -r dbname; do
 done < databases_need_unblock.txt
 
 # ============================================
-# РЕЗУЛЬТАТЫ
+# RESULTS
 # ============================================
 
 echo ""

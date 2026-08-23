@@ -1,6 +1,6 @@
 ---
-# Роль: драйвер NVIDIA (если нет), NVIDIA Container Toolkit, CDI, проверка docker --gpus.
-# Официальный гид: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+# Role: NVIDIA driver (if missing), NVIDIA Container Toolkit, CDI, docker --gpus check.
+# Official guide: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 
 prepare_nvidia_install_driver_if_missing: true
 prepare_nvidia_driver_packages:
@@ -17,7 +17,7 @@ prepare_nvidia_docker_test_image: "nvidia/cuda:12.2.0-base-ubuntu22.04"
 prepare_nvidia_verify_docker_gpu: true
 prepare_nvidia_verify_docker_gpu_timeout: 300
 
-# Опционально: минимальная версия драйвера (пусто — не проверять). Пример: "535.247.01"
+# Optional: minimum driver version (empty — skip the check). Example: "535.247.01"
 prepare_nvidia_min_driver_version: ""
 
 prepare_nvidia_toolkit_gpg_keyring: "/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg"

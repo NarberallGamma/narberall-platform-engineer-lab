@@ -1,4 +1,4 @@
-# Managed by Ansible (docker_app). Секреты: Vault + .env
+# Managed by Ansible (docker_app). Secrets: Vault + .env
 meta:
   environment: {{ app_item.value.meta_environment | default('preprod') }}
   timezone: {{ app_item.value.timezone | default('Europe/Moscow') }}

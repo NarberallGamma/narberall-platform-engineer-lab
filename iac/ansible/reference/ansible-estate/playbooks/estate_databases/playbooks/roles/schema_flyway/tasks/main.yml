@@ -1,15 +1,15 @@
 ---
-# Роль: создание schema_flyway, выдача прав на схемы и разграничение schema_flyway (DDL) / treasury_user (DML).
-# Требует: community.postgresql, community.general.
+# Role: create schema_flyway, grant schema privileges, and split schema_flyway (DDL) / treasury_user (DML).
+# Requires: community.postgresql, community.general.
 
-# community.postgresql требует psycopg2 в Python; в Alpine — пакет py3-psycopg2 (apk), не pip (PEP 668).
-# Образ registry.../base-images/ansible: также см. Dockerfile (py3-psycopg2 в RUN apk).
-- name: Установить py3-psycopg2 для модулей community.postgresql
+# community.postgresql needs psycopg2 in Python; on Alpine use the py3-psycopg2 package (apk), not pip (PEP 668).
+# Image registry.../base-images/ansible: see also the Dockerfile (py3-psycopg2 in RUN apk).
+- name: Install py3-psycopg2 for community.postgresql modules
   community.general.apk:
     name: py3-psycopg2
     state: present
 
-- name: Создать пользователя schema_flyway
+- name: Create the schema_flyway user
   community.postgresql.postgresql_user:
     name: "{{ schema_flyway }}"
     password: "{{ schema_flyway_password }}"
@@ -20,7 +20,7 @@
     login_port: "{{ pg_port }}"
     login_db: postgres
 
-- name: Выдать право репликации всем app-пользователям (для Debezium / logical replication)
+- name: Grant REPLICATION to all app users (for Debezium / logical replication)
   community.postgresql.postgresql_query:
     query: "ALTER ROLE {{ item }} WITH REPLICATION;"
     login_host: "{{ pg_host }}"
@@ -31,7 +31,7 @@
   loop: "{{ app_users }}"
   ignore_errors: true
 
-- name: Выдать schema_flyway право подключения к каждой БД
+- name: Grant schema_flyway CONNECT on each database
   community.postgresql.postgresql_query:
     query: "GRANT CONNECT ON DATABASE {{ item }} TO {{ schema_flyway }};"
     login_host: "{{ pg_host }}"
@@ -41,9 +41,9 @@
     login_db: postgres
   loop: "{{ db_list }}"
 
-# Flyway 2.13 (treasury_csp, treasury_api и др.): CREATE SCHEMA kafka_idempotent_consumer /
-# kafka_transactional_outbox требует CREATE на уровне базы, не только USAGE/CREATE в public.
-- name: Выдать schema_flyway право CREATE на каждую БД (создание новых схем Flyway)
+# Flyway 2.13 (treasury_csp, treasury_api, and others): CREATE SCHEMA kafka_idempotent_consumer /
+# kafka_transactional_outbox requires CREATE at the database level, not only USAGE/CREATE in public.
+- name: Grant schema_flyway CREATE on each database (new Flyway schemas)
   community.postgresql.postgresql_query:
     query: "GRANT CREATE ON DATABASE {{ item }} TO {{ schema_flyway }};"
     login_host: "{{ pg_host }}"
@@ -53,7 +53,7 @@
     login_db: postgres
   loop: "{{ db_list }}"
 
-- name: Передать владение пользовательскими схемами (root) пользователю schema_flyway
+- name: Transfer ownership of user schemas (root) to schema_flyway
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -77,7 +77,7 @@
     login_db: "{{ item }}"
   loop: "{{ db_list }}"
 
-- name: Выдать schema_flyway права на схему public и сменить владельца схемы
+- name: Grant schema_flyway privileges on public and change schema owner
   community.postgresql.postgresql_query:
     query: |
       GRANT USAGE, CREATE ON SCHEMA public TO {{ schema_flyway }};
@@ -89,7 +89,7 @@
     login_db: "{{ item }}"
   loop: "{{ db_list }}"
 
-- name: Передать владение таблицами в public пользователю schema_flyway
+- name: Transfer ownership of tables in public to schema_flyway
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -107,7 +107,7 @@
     login_db: "{{ item }}"
   loop: "{{ db_list }}"
 
-- name: Передать владение последовательностями в public пользователю schema_flyway
+- name: Transfer ownership of sequences in public to schema_flyway
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -125,8 +125,8 @@
     login_db: "{{ item }}"
   loop: "{{ db_list }}"
 
-# Flyway 2.13 (treasury_api): ALTER TYPE network_name ADD VALUE требует владельца enum-типа.
-- name: Передать владение enum/domain-типами в public пользователю schema_flyway (типы root)
+# Flyway 2.13 (treasury_api): ALTER TYPE network_name ADD VALUE requires ownership of the enum type.
+- name: Transfer ownership of enum/domain types in public to schema_flyway (root types)
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -155,9 +155,9 @@
     login_db: "{{ item }}"
   loop: "{{ db_list }}"
 
-# afterMigrate.sql вызывают CREATE/ALTER FUNCTION — владелец должен быть schema_flyway.
-# Root может передать только функции, которыми владеет сам (root). Остальные — нет.
-- name: Передать владение функциями в public пользователю schema_flyway (только функции root)
+# afterMigrate.sql runs CREATE/ALTER FUNCTION — the owner must be schema_flyway.
+# Root can transfer only functions it owns (root). The rest cannot be transferred by root.
+- name: Transfer ownership of functions in public to schema_flyway (root-owned functions only)
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -185,8 +185,8 @@
   loop: "{{ db_list }}"
   ignore_errors: true
 
-# Чтобы treasury_user мог сделать ALTER FUNCTION ... OWNER TO schema_flyway, он должен быть членом роли schema_flyway (требование PostgreSQL). Членство — на уровне кластера.
-- name: Временно выдать treasury_user членство в роли schema_flyway (для передачи владения функциями)
+# For treasury_user to run ALTER FUNCTION ... OWNER TO schema_flyway, it must be a member of the schema_flyway role (PostgreSQL requirement). Membership is cluster-level.
+- name: Temporarily grant treasury_user membership in schema_flyway (to transfer function ownership)
   community.postgresql.postgresql_query:
     query: "GRANT {{ schema_flyway }} TO {{ treasury_user }}"
     login_host: "{{ pg_host }}"
@@ -195,8 +195,8 @@
     login_port: "{{ pg_port }}"
     login_db: postgres
 
-# Функции, принадлежащие treasury_user (create_new_partition, set_tx_report_sequence и т.д.), root передать не может. Выполняем от имени treasury_user — treasury_user отдаёт свои функции schema_flyway.
-- name: Передать владение функциями treasury_user в public пользователю schema_flyway (от имени treasury_user)
+# Functions owned by treasury_user (create_new_partition, set_tx_report_sequence, and similar) cannot be transferred by root. Run as treasury_user so treasury_user hands its functions to schema_flyway.
+- name: Transfer ownership of treasury_user functions in public to schema_flyway (as treasury_user)
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -219,7 +219,7 @@
     login_db: "{{ item }}"
   loop: "{{ db_list }}"
 
-- name: Передать владение enum/domain-типами treasury_user в public пользователю schema_flyway (от имени treasury_user)
+- name: Transfer ownership of treasury_user enum/domain types in public to schema_flyway (as treasury_user)
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -244,8 +244,8 @@
     login_db: "{{ item }}"
   loop: "{{ db_list }}"
 
-# Убираем членство treasury_user в schema_flyway после передачи функций и типов.
-- name: Отозвать у treasury_user членство в роли schema_flyway
+# Revoke treasury_user membership in schema_flyway after transferring functions and types.
+- name: Revoke treasury_user membership in the schema_flyway role
   community.postgresql.postgresql_query:
     query: "REVOKE {{ schema_flyway }} FROM {{ treasury_user }}"
     login_host: "{{ pg_host }}"
@@ -254,7 +254,7 @@
     login_port: "{{ pg_port }}"
     login_db: postgres
 
-- name: Выдать app-пользователям права на схему public и DML
+- name: Grant app users privileges on the public schema and DML
   community.postgresql.postgresql_query:
     query: |
       GRANT USAGE ON SCHEMA public TO {{ item[1] }};
@@ -268,7 +268,7 @@
     login_db: "{{ item[0] }}"
   loop: "{{ db_list | product(app_users) | list }}"
 
-- name: Права по умолчанию для будущих объектов schema_flyway (на каждого app-пользователя)
+- name: Default privileges for future schema_flyway objects (per app user)
   community.postgresql.postgresql_query:
     query: |
       ALTER DEFAULT PRIVILEGES FOR ROLE {{ schema_flyway }} IN SCHEMA public
@@ -284,8 +284,8 @@
     login_db: "{{ item[0] }}"
   loop: "{{ db_list | product(app_users) | list }}"
 
-# Все пользовательские схемы: права для schema_flyway и для каждого app-пользователя (treasury_user, treasury_user, ...)
-- name: Выдать schema_flyway и app-пользователям права на все пользовательские схемы в каждой БД
+# All user schemas: privileges for schema_flyway and for each app user (treasury_user, ...)
+- name: Grant schema_flyway and app users privileges on all user schemas in each database
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -317,8 +317,8 @@
     login_db: "{{ item[0] }}"
   loop: "{{ db_list | product(app_users) | list }}"
 
-# В пользовательских схемах (kafka_transactional_outbox и др.) Flyway запускается под schema_flyway — нужны владение или права на flyway_schema_history.
-- name: Передать владение flyway_schema_history в пользовательских схемах пользователю schema_flyway
+# In user schemas (kafka_transactional_outbox and others) Flyway runs as schema_flyway — ownership or privileges on flyway_schema_history are required.
+- name: Transfer ownership of flyway_schema_history in user schemas to schema_flyway
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -346,8 +346,8 @@
     login_db: "{{ item }}"
   loop: "{{ db_list }}"
 
-# Явно выдать права на flyway_schema_history во всех пользовательских схемах (таблица могла появиться после GRANT ON ALL TABLES или принадлежать другому владельцу)
-- name: Выдать treasury_user права на flyway_schema_history во всех пользовательских схемах
+# Explicitly grant privileges on flyway_schema_history in all user schemas (the table may appear after GRANT ON ALL TABLES or belong to another owner)
+- name: Grant treasury_user privileges on flyway_schema_history in all user schemas
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -375,8 +375,8 @@
     login_db: "{{ item }}"
   loop: "{{ db_list }}"
 
-# Повторная выдача прав на все объекты в пользовательских схемах каждому app-пользователю
-- name: Повторно выдать app-пользователям права на все объекты во всех пользовательских схемах
+# Re-grant privileges on all objects in user schemas to each app user
+- name: Re-grant app users privileges on all objects in all user schemas
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -402,10 +402,10 @@
     login_db: "{{ item[0] }}"
   loop: "{{ db_list | product(app_users) | list }}"
 
-# Debezium подключается под app-пользователем (treasury_user). Для filtered publication pgoutput
-# нужен OWNER таблиц heartbeat и outbox_message у этого пользователя, не у schema_flyway.
-# Запускать повторно schema_flyway_setup после первого успешного старта приложения (Flyway создал outbox).
-- name: Передать владение outbox-таблиц kafka_transactional_outbox app-пользователю (Debezium)
+# Debezium connects as the app user (treasury_user). For a filtered pgoutput publication
+# heartbeat and outbox_message must be owned by that user, not schema_flyway.
+# Re-run schema_flyway_setup after the first successful application start (Flyway created the outbox).
+- name: Transfer ownership of kafka_transactional_outbox tables to the app user (Debezium)
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -434,6 +434,6 @@
     login_db: "{{ item[0] }}"
   loop: "{{ db_list | product(app_users) | list }}"
 
-- name: Итог
+- name: Summary
   ansible.builtin.debug:
-    msg: "schema_flyway и права разграничены для БД: {{ db_list | join(', ') }}"
+    msg: "schema_flyway and privilege split applied for databases: {{ db_list | join(', ') }}"

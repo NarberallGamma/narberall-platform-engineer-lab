@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
 
-# Скрипт для бэкапа d8-stronghold
+# Backup script for d8-stronghold
 
-# Принцип работы:
-#   - создание резервной копии vault с помощью команды 'vault operator raft snapshot save raft.snap' При этом снимается снап с активного мастера, он определяется через сервис stronghold-active.d8-stronghold.svc.cluster.local
-#   - востановление из бэкапа 'vault operator raft snapshot restore -force raft.snap' + нужно восстановить занчение токенов в секрете ( после восстановления из снапшота) в stronghold-keys. Так как ключи в stronghold-keys не меняются - их можно донести в пульт.
-# Безопастность:
-#   - политика, настраивается в ui/stronghold/policies/acl
-#     имя: backup, path "/sys/storage/raft/snapshot" { capabilities = ["read"]}
-#   - роль, настраивается в Authentication Methods (kubernetes)
+# How it works:
+#   - create a Vault backup with 'vault operator raft snapshot save raft.snap'. The snapshot is taken from the active master, resolved via stronghold-active.d8-stronghold.svc.cluster.local
+#   - restore from backup: 'vault operator raft snapshot restore -force raft.snap' + restore token values in the secret (after snapshot restore) in stronghold-keys. Keys in stronghold-keys do not change and can be copied into the panel.
+# Safety:
+#   - policy, configured in ui/stronghold/policies/acl
+#     name: backup, path "/sys/storage/raft/snapshot" { capabilities = ["read"]}
+#   - role, configured in Authentication Methods (kubernetes)
 #     Name: backup
 #     Alias name source: serviceaccount_name
 #     Bound service account names: backup
 #     Bound service account namespaces: backup
 #     Generated Token's Policies: backup
-# Поддерживаемые опции:
-# -b|--name               - имя бэкапа
-# -p|--path               - путь к каталогу в vault
-# -k|--prune              - строка с опциями алгоритма сохранения резервных копий в
-#                           формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-# --skip-hostname-prefix  - позволяет исключить из имени Borg-репозитория
-#                           префикс '$(hostname)-'. Необязательный аргумент. Но так как мы выполяем команды из пода бэкапа, лучше всегда его использовать.
+# Supported options:
+# -b|--name               - backup name
+# -p|--path               - path to a directory in Vault
+# -k|--prune              - retention-options string in
+#                           Borg format, e.g. '--keep-hourly 72 --keep-within=30d'
+# --skip-hostname-prefix  - omit from the Borg repository name
+#                           the '$(hostname)-' prefix. Optional. Because commands run from the backup pod, it is better to always use it.
 #
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория, без указания будет
-#        использовано имя заданное в ${NAMEOFBACKUP_DEFAULT}
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix. When omitted,
+#        the name from ${NAMEOFBACKUP_DEFAULT} is used
 
-# Примеры использования в schedule:
+# Schedule examples:
 # /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_vault_stronghold.sh '--name VAULT-PROD --path "kubernetes_local" --prune "--keep-hourly 3 --keep-within=30d" --skip-hostname-prefix'
 
 ################################################################################
@@ -68,7 +68,7 @@ get_env_var_value()
 CUSTOMPRUNE=""
 ERRLOG=`mktemp`
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options b:k:p: --longoptions ,name:,prune:,path:,skip-hostname-prefix -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

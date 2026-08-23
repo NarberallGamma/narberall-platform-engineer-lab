@@ -97,8 +97,8 @@
       - xui_inbound_decryption_effective | length > 0
       - xui_inbound_encryption_effective | length > 0
     fail_msg: >-
-      xray vlessenc: не удалось разобрать decryption/encryption.
-      Проверить вывод «docker exec {{ xui_container_name }} {{ xui_xray_bin }} vlessenc».
+      xray vlessenc: failed to parse decryption/encryption.
+      Check the output of «docker exec {{ xui_container_name }} {{ xui_xray_bin }} vlessenc».
   when: xui_inbound_ml_kem_enabled | bool
 
 - name: Apply VLESS encryption facts
@@ -112,7 +112,7 @@
   ansible.builtin.assert:
     that:
       - xui_reality_mldsa65_seed | default('') | length > 0
-    fail_msg: "mldsa65: не удалось получить Seed (xray mldsa65)."
+    fail_msg: "mldsa65: failed to obtain Seed (xray mldsa65)."
   when: xui_inbound_mldsa65_enabled | bool
 
 - name: Assert Reality keys generated

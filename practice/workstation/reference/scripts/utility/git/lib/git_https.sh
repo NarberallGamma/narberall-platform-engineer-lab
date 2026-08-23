@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HTTPS auth и URL для GitLab estate (gitlab.example.invalid / gitlab.preprod.example.invalid).
+# HTTPS auth and URLs for the GitLab estate (gitlab.example.invalid / gitlab.preprod.example.invalid).
 
 set -euo pipefail
 
@@ -45,7 +45,7 @@ git_https_cleanup_askpass() {
   unset _git_askpass_token 2>/dev/null || true
 }
 
-# Подготовить GIT_ASKPASS (oauth2 + PAT). Вызвать git_https_cleanup_askpass после git.
+# Prepare GIT_ASKPASS (oauth2 + PAT). Call git_https_cleanup_askpass after git.
 git_https_prepare_auth() {
   local env="$1"
   local token
@@ -64,7 +64,7 @@ git_https_prepare_auth() {
   export GIT_TERMINAL_PROMPT=0
 }
 
-# SSH remote -> canonical HTTPS без токена в URL
+# SSH remote -> canonical HTTPS without a token in the URL
 git_ssh_remote_to_https() {
   local url="$1"
   local host path

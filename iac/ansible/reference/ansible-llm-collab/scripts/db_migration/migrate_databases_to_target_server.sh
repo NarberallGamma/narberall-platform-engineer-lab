@@ -1,15 +1,15 @@
 #!/bin/bash
 # migrate_databases_to_target_server.sh
 # Usage: ./migrate_databases_to_target_server.sh [dblist_file.txt]
-#   Если указан файл со списком БД - будет мигрировать только указанные БД из списка
+#   When a list file is passed, only listed databases are migrated
 
 # ============================================
-# НАСТРОЙКИ (измените под ваши нужды)
+# SETTINGS (adjust as needed)
 # ============================================
-MAX_PARALLEL=6  # ДЛЯ МИГРАЦИИ С БОЛЬШИМИ БД: 6 (меньше нагрузка на WAL), ДЛЯ ПРОДАКШЕНА: 12
+MAX_PARALLEL=6  # FOR LARGE-DB MIGRATION: 6 (less WAL load), FOR PRODUCTION: 12
 TARGET_HOST="10.10.2.251"
 TARGET_USER="svc_postgres_1c"
-TARGET_PASSWORD=""  # ⚠️ УДАЛИТЬ ПОСЛЕ ЗАВЕРШЕНИЯ!
+TARGET_PASSWORD=""  # ⚠️ REMOVE AFTER THE RUN!
 DUMP_DIR="/tmp/pg_dumps"
 
 export PGPASSWORD="$TARGET_PASSWORD"
@@ -25,12 +25,12 @@ mkdir -p migration_logs
 mkdir -p "$DUMP_DIR"
 
 # ============================================
-# ПРОВЕРКА ПОДКЛЮЧЕНИЙ И ВЫВОД ИНФОРМАЦИИ
+# CONNECTION CHECK AND INFO
 # ============================================
 
 echo "=== Connection Check ==="
 
-# Проверка подключения к исходной СУБД (локальной)
+# Check connection to the source (local) instance
 echo "Checking connection to SOURCE server (localhost)..."
 if psql -d postgres -c "SELECT version();" >/dev/null 2>&1; then
     echo -e "${GREEN}✓ Connected to source server${NC}"
@@ -54,7 +54,7 @@ fi
 
 echo ""
 
-# Проверка подключения к целевой СУБД
+# Check connection to the target instance
 echo "Checking connection to TARGET server ($TARGET_HOST)..."
 if psql -h $TARGET_HOST -U $TARGET_USER -d postgres -c "SELECT version();" >/dev/null 2>&1; then
     echo -e "${GREEN}✓ Connected to target server${NC}"
@@ -83,7 +83,7 @@ echo ""
 echo "========================================"
 echo ""
 
-# Проверка места
+# Disk space check
 available_space=$(df -BG "$DUMP_DIR" | tail -1 | awk '{print $4}' | sed 's/G//')
 echo "Available space for dumps: ${available_space}GB"
 if [ "$available_space" -lt 50 ]; then
@@ -94,7 +94,7 @@ fi
 echo ""
 
 # ============================================
-# ФУНКЦИИ
+# FUNCTIONS
 # ============================================
 
 check_db_exists() {
@@ -128,7 +128,7 @@ get_db_size_remote() {
 }
 
 # ============================================
-# ПОЛУЧЕНИЕ СПИСКА БАЗ
+# GET DATABASE LIST
 # ============================================
 
 echo "=== PostgreSQL Database Migration Tool ==="
@@ -141,7 +141,7 @@ if [ -n "$DB_LIST_FILE" ]; then
 fi
 echo ""
 
-# Если передан файл со списком БД
+# When a list file is passed
 if [ -n "$DB_LIST_FILE" ]; then
     if [ ! -f "$DB_LIST_FILE" ]; then
         echo -e "${RED}Error: File '$DB_LIST_FILE' not found!${NC}"
@@ -151,7 +151,7 @@ if [ -n "$DB_LIST_FILE" ]; then
     echo "Reading database list from file: $DB_LIST_FILE"
     echo "Validating databases exist in source server..."
     
-    # Получить все доступные БД из исходной СУБД с размерами
+    # Get all available databases from the source instance with sizes
     psql -t -A -F'|' -c \
       "SELECT datname, pg_database_size(datname)
        FROM pg_database
@@ -159,7 +159,7 @@ if [ -n "$DB_LIST_FILE" ]; then
        AND datname != 'postgres'
        ORDER BY pg_database_size(datname) ASC" > databases_with_sizes.txt
     
-    # Создать временный файл для проверки
+    # Create a temporary file for the check
     psql -t -A -c \
       "SELECT datname
        FROM pg_database
@@ -171,21 +171,21 @@ if [ -n "$DB_LIST_FILE" ]; then
     not_found_count=0
     > /tmp/missing_dbs.txt
     
-    # Проверить каждую БД из списка
+    # Check each database from the list
     while IFS= read -r requested_db || [ -n "$requested_db" ]; do
-        # Пропускаем пустые строки и комментарии, очищаем от пробелов и невидимых символов
+        # Skip empty lines and comments; strip spaces and invisible characters
         requested_db=$(echo "$requested_db" | sed 's/#.*$//' | tr -d '\r\n' | xargs)
         if [ -z "$requested_db" ]; then continue; fi
         
-        # Экранируем одинарные кавычки в имени БД для SQL (удваиваем их)
+        # Escape single quotes in the database name for SQL (double them)
         escaped_db=$(printf '%s' "$requested_db" | sed "s/'/''/g")
         
-        # Проверить существование БД через SQL запрос
+        # Check that the database exists via SQL
         db_exists=$(psql -t -A -c \
             "SELECT 1 FROM pg_database WHERE datname = '$escaped_db'" 2>/dev/null | tr -d '[:space:]')
         
         if [ "$db_exists" = "1" ]; then
-            # БД существует, найти её размер из databases_with_sizes.txt
+            # Database exists; look up size from databases_with_sizes.txt
             db_info=$(grep "^${requested_db}|" databases_with_sizes.txt)
             if [ -n "$db_info" ]; then
                 echo "$db_info" >> databases_filtered.txt
@@ -222,7 +222,7 @@ if [ -n "$DB_LIST_FILE" ]; then
     
     rm -f /tmp/all_available_dbs.txt /tmp/missing_dbs.txt
 else
-    # Получить список баз с правильным форматированием (старая логика)
+    # Get the database list with the original formatting (legacy logic)
     echo "Fetching database list from local server..."
     psql -t -A -F'|' -c \
       "SELECT datname, pg_database_size(datname)
@@ -233,7 +233,7 @@ else
        AND datname NOT LIKE '?%'
        ORDER BY pg_database_size(datname) ASC" > databases_with_sizes.txt
     
-    # Фильтрация (старая логика)
+    # Filtering (legacy logic)
     > databases_filtered.txt
     while IFS='|' read -r dbname size_bytes; do
         if [ -z "$dbname" ]; then continue; fi
@@ -246,7 +246,7 @@ else
 fi
 
 # ============================================
-# ПРОВЕРКА СТАТУСА МИГРАЦИИ
+# MIGRATION STATUS CHECK
 # ============================================
 
 echo ""
@@ -259,7 +259,7 @@ echo "Checking migration status (comparing table counts)..."
 while IFS='|' read -r dbname size_bytes; do
     if [ -z "$dbname" ]; then continue; fi
     
-    # Убираем пробелы из size_bytes и проверяем что это число
+    # Strip spaces from size_bytes and check it is a number
     size_bytes=$(echo "$size_bytes" | tr -d ' ')
     if [[ ! "$size_bytes" =~ ^[0-9]+$ ]]; then
         size_bytes=0
@@ -274,22 +274,22 @@ while IFS='|' read -r dbname size_bytes; do
         continue
     fi
 
-    # Получить количество таблиц (основной критерий проверки)
+    # Get table count (primary check)
     source_tables=$(get_table_count_local "$dbname")
     target_tables=$(get_table_count_remote "$dbname")
 
     if [ "$target_tables" = "0" ]; then
-        # База пустая - переносим
+        # Empty database - migrate it
         echo -e "${GREEN}→ Will migrate: $dbname (${size_mb} MB, $source_tables tables)${NC}"
         echo "$dbname|$size_bytes|$source_tables" >> databases_to_migrate.txt
 
     elif [ "$source_tables" = "$target_tables" ]; then
-        # Количество таблиц совпадает - считаем полностью перенесенной
+        # Table counts match - treat as fully migrated
         echo -e "${YELLOW}⊙ Already migrated: $dbname (${size_mb} MB, $source_tables tables ✓)${NC}"
         echo "$dbname|$size_bytes" >> databases_already_migrated.txt
 
     else
-        # Таблицы есть, но количество не совпадает - неполный перенос
+        # Tables exist but counts differ - incomplete migration
         echo -e "${RED}⚠ Incomplete migration: $dbname (${size_mb} MB, source: $source_tables tables, target: $target_tables tables)${NC}"
         echo -e "  ${YELLOW}Database needs to be recreated manually${NC}"
         echo "$dbname|$size_bytes|$source_tables|$target_tables" >> databases_incomplete.txt
@@ -303,7 +303,7 @@ not_exist=$(wc -l < databases_not_exist.txt 2>/dev/null || echo 0)
 incomplete=$(wc -l < databases_incomplete.txt 2>/dev/null || echo 0)
 
 # ============================================
-# SUMMARY И ПОДТВЕРЖДЕНИЕ
+# SUMMARY AND CONFIRMATION
 # ============================================
 
 echo ""
@@ -321,7 +321,7 @@ fi
 echo "Parallel jobs: $MAX_PARALLEL"
 echo ""
 
-# Показать детали неполных миграций
+# Show incomplete-migration details
 if [ $incomplete -gt 0 ]; then
     echo "=== Incomplete Databases (need manual fix) ==="
     while IFS='|' read -r dbname size_bytes source_tables target_tables; do
@@ -352,7 +352,7 @@ if [ "$confirm" != "yes" ]; then
 fi
 
 # ============================================
-# МИГРАЦИЯ
+# MIGRATION
 # ============================================
 
 echo ""
@@ -364,8 +364,8 @@ current=0
 while IFS='|' read -r dbname size_bytes source_tables; do
     if [ -z "$dbname" ]; then continue; fi
 
-    # Динамическая очередь: ждем освобождения слота
-    # Проверяем и pg_dump и pg_restore процессы (оба могут работать параллельно)
+    # Dynamic queue: wait for a free slot
+    # Check both pg_dump and pg_restore processes (both may run in parallel)
     while true; do
         running_dumps=$(ps aux 2>/dev/null | grep -E "pg_dump -Fd|pg_restore" | grep -v grep | wc -l)
         if [ "$running_dumps" -lt "$MAX_PARALLEL" ]; then
@@ -376,14 +376,14 @@ while IFS='|' read -r dbname size_bytes source_tables; do
 
     ((current++))
     
-    # Убираем пробелы и проверяем число
+    # Strip spaces and check it is a number
     size_bytes=$(echo "$size_bytes" | tr -d ' ')
     if [[ ! "$size_bytes" =~ ^[0-9]+$ ]]; then
         size_bytes=0
     fi
     size_mb=$((size_bytes / 1024 / 1024))
 
-    # Определяем количество параллельных jobs для pg_dump/restore
+    # Decide parallel jobs for pg_dump/restore
     if [ $size_mb -gt 10000 ]; then
         jobs=4
     elif [ $size_mb -gt 5000 ]; then
@@ -394,7 +394,7 @@ while IFS='|' read -r dbname size_bytes source_tables; do
         jobs=1
     fi
 
-    # Запуск в фоне (динамическая очередь)
+    # Start in the background (dynamic queue)
     (
         start_time=$(date +%s)
         log_file="migration_logs/${dbname}.log"
@@ -403,7 +403,7 @@ while IFS='|' read -r dbname size_bytes source_tables; do
         echo "[$current/$total] Starting: $dbname (${size_mb} MB, $source_tables tables, jobs=$jobs) at $(date)" | tee -a "$log_file"
 
         # ============================================
-        # ШАГ 1: DUMP (локально, без -h и -U)
+        # STEP 1: DUMP (local, no -h or -U)
         # ============================================
         echo "  [1/2] Creating dump..." | tee -a "$log_file"
         if pg_dump -Fd \
@@ -422,7 +422,7 @@ while IFS='|' read -r dbname size_bytes source_tables; do
         fi
 
         # ============================================
-        # ШАГ 2: RESTORE (удаленно, с -h и -U)
+        # STEP 2: RESTORE (remote, with -h and -U)
         # ============================================
         echo "  [2/2] Restoring to target..." | tee -a "$log_file"
         if pg_restore -h $TARGET_HOST -U $TARGET_USER -d "$dbname" \
@@ -436,20 +436,20 @@ while IFS='|' read -r dbname size_bytes source_tables; do
             minutes=$((duration / 60))
             seconds=$((duration % 60))
 
-            # Получить размеры (только для информации, не для проверки)
+            # Get sizes (informational only, not a check)
             source_size=$(get_db_size_local "$dbname")
             target_size=$(get_db_size_remote "$dbname")
             source_mb=$((source_size / 1024 / 1024))
             target_mb=$((target_size / 1024 / 1024))
 
-            # Проверка количества таблиц (основной критерий успеха)
+            # Check table count (primary success criterion)
             restored_tables=$(get_table_count_remote "$dbname")
 
             if [ "$source_tables" = "$restored_tables" ]; then
                 echo "[$current/$total] ✓ SUCCESS: $dbname in ${minutes}m ${seconds}s" | tee -a "$log_file" migration_logs/SUCCESS.log
                 echo "  Tables: $restored_tables/$source_tables ✓, Size: ${source_mb}MB → ${target_mb}MB" | tee -a "$log_file"
                 
-                # Принудительный CHECKPOINT на целевом сервере для очистки WAL
+                # Force CHECKPOINT on the target to flush WAL
                 echo "  [CHECKPOINT] Cleaning WAL on target server..." | tee -a "$log_file"
                 psql -h $TARGET_HOST -U $TARGET_USER -d postgres -c "CHECKPOINT;" >> "$log_file" 2>&1 || echo "  [CHECKPOINT] Warning: checkpoint may have failed" | tee -a "$log_file"
             else
@@ -466,12 +466,12 @@ while IFS='|' read -r dbname size_bytes source_tables; do
             exit 1
         fi
 
-    ) &  # Запуск в фоне
+    ) &  # start in the background
 
 done < databases_to_migrate.txt
 
 # ============================================
-# ОЖИДАНИЕ ЗАВЕРШЕНИЯ И РЕЗУЛЬТАТЫ
+# WAIT FOR COMPLETION AND RESULTS
 # ============================================
 
 echo ""

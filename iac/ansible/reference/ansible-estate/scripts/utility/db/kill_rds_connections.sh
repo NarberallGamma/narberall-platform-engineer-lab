@@ -1,50 +1,50 @@
 #!/bin/bash
 
 # =============================================================================
-# Скрипт принудительного закрытия всех соединений к RDS PostgreSQL
+# Force-close all connections to RDS PostgreSQL
 # =============================================================================
 # 
-# Назначение:
-# - Закрытие всех активных соединений к базам данных PostgreSQL
-# - Полезно перед пересозданием RDS инстанса через Terraform
-# - Закрывает соединения всех пользователей (кроме системных)
+# Purpose:
+# - Close all active connections to PostgreSQL databases
+# - Useful before recreating the RDS instance via Terraform
+# - Closes connections of all users (except system ones)
 #
-# Использование:
-# 1. Заполнить переменные DB_HOST, DB_PASSWORD и PG_IMAGE ниже
-# 2. Запустить: chmod +x kill_rds_connections.sh && ./kill_rds_connections.sh
+# Usage:
+# 1. Fill DB_HOST, DB_PASSWORD and PG_IMAGE below
+# 2. Run: chmod +x kill_rds_connections.sh && ./kill_rds_connections.sh
 #
-# Опции:
-# - Можно указать конкретную базу данных через переменную TARGET_DATABASE
-# - Если TARGET_DATABASE не указана, закрываются соединения ко всем базам
+# Options:
+# - A specific database can be set via TARGET_DATABASE
+# - If TARGET_DATABASE is empty, connections to all databases are closed
 #
 # =============================================================================
 
-# Параметры подключения к RDS
-DB_HOST="10.10.18.204"  # TODO: Указать IP адрес RDS 
+# RDS connection parameters
+DB_HOST="10.10.18.204"  # TODO: set the RDS IP address 
 DB_PORT="5432"
 DB_USER="root"
-DB_PASSWORD=""  # TODO: Указать пароль root пользователя RDS
+DB_PASSWORD=""  # TODO: set the RDS root password
 
-# Версия PostgreSQL (Docker образ)
-PG_IMAGE="postgres:15-alpine"  # Можно изменить на postgres:14-alpine, postgres:13-alpine и т.д.
+# PostgreSQL version (Docker image)
+PG_IMAGE="postgres:15-alpine"  # Can be changed to postgres:14-alpine, postgres:13-alpine, etc.
 
-# Опционально: указать конкретную базу данных для закрытия соединений
-# Если пусто, закрываются соединения ко всем базам
-TARGET_DATABASE=""  # Например: "treasury_contract" или оставить пустым для всех
+# Optional: set a specific database whose connections should be closed
+# If empty, connections to all databases are closed
+TARGET_DATABASE=""  # Example: "treasury_contract" or leave empty for all
 
-# Удалять ли replication slots (для Debezium)
-# Если true, удаляет все replication slots перед закрытием соединений
-KILL_REPLICATION_SLOTS="true"  # true или false
+# Whether to drop replication slots (for Debezium)
+# If true, drops all replication slots before closing connections
+KILL_REPLICATION_SLOTS="true"  # true or false
 
-# Проверка заполнения обязательных параметров
+# Check that required parameters are set
 if [ -z "$DB_HOST" ] || [ -z "$DB_PASSWORD" ]; then
-    echo "❌ Ошибка: Необходимо заполнить DB_HOST и DB_PASSWORD в начале скрипта"
-    echo "   DB_HOST - IP адрес RDS PostgreSQL"
-    echo "   DB_PASSWORD - пароль root пользователя"
+    echo "❌ Error: DB_HOST and DB_PASSWORD must be set at the top of the script"
+    echo "   DB_HOST - RDS PostgreSQL IP address"
+    echo "   DB_PASSWORD - root user password"
     exit 1
 fi
 
-echo "🔌 Принудительное закрытие соединений к RDS PostgreSQL..."
+echo "🔌 Force-closing connections to RDS PostgreSQL..."
 echo "   Host: $DB_HOST"
 echo "   Port: $DB_PORT"
 echo "   User: $DB_USER"
@@ -56,14 +56,14 @@ else
 fi
 echo ""
 
-# Функция для закрытия соединений
-# Всегда подключается к базе postgres, но работает с указанной базой через SQL
+# Close connections
+# Always connects to the postgres database, but targets the given DB via SQL
 kill_connections() {
     local db_name=$1
     
-    echo "📊 Обработка базы данных: $db_name"
+    echo "📊 Processing database: $db_name"
     
-    # Получаем список активных соединений и закрываем их (подключаемся к postgres)
+    # List active connections and close them (connect to postgres)
     docker run --rm --network host \
       -e PGPASSWORD="$DB_PASSWORD" \
       "$PG_IMAGE" \
@@ -76,7 +76,7 @@ kill_connections() {
           AND state != 'idle';
     " >/dev/null 2>&1
     
-    # Также закрываем idle соединения (если нужно)
+    # Also close idle connections (when needed)
     docker run --rm --network host \
       -e PGPASSWORD="$DB_PASSWORD" \
       "$PG_IMAGE" \
@@ -89,7 +89,7 @@ kill_connections() {
           AND state = 'idle';
     " >/dev/null 2>&1
     
-    # Проверяем оставшиеся соединения (подключаемся к postgres)
+    # Check remaining connections (connect to postgres)
     local remaining=$(docker run --rm --network host \
       -e PGPASSWORD="$DB_PASSWORD" \
       "$PG_IMAGE" \
@@ -102,14 +102,14 @@ kill_connections() {
     " 2>/dev/null | grep -v "^$" | tr -d ' \t\r\n')
     
     if [ "$remaining" = "0" ]; then
-        echo "   ✅ Все соединения к $db_name закрыты"
+        echo "   ✅ All connections to $db_name are closed"
     else
-        echo "   ⚠️  Осталось $remaining активных соединений к $db_name"
+        echo "   ⚠️  Remaining $remaining active connections to $db_name"
     fi
 }
 
-# Показываем текущие активные соединения перед закрытием
-echo "📋 Текущие активные соединения:"
+# Show current active connections before closing
+echo "📋 Current active connections:"
 docker run --rm --network host \
   -e PGPASSWORD="$DB_PASSWORD" \
   "$PG_IMAGE" \
@@ -128,24 +128,24 @@ docker run --rm --network host \
 
 echo ""
 
-# Если указана конкретная база данных
+# When a specific database is set
 if [ -n "$TARGET_DATABASE" ]; then
     kill_connections "$TARGET_DATABASE"
 else
-    # Получаем список всех баз данных (кроме системных)
-    echo "🔍 Получение списка баз данных..."
+    # List all databases (except system ones)
+    echo "🔍 Fetching the database list..."
     
-    # Проверяем подключение к базе postgres
+    # Check the connection to the postgres database
     if ! docker run --rm --network host \
       -e PGPASSWORD="$DB_PASSWORD" \
       "$PG_IMAGE" \
       psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "SELECT 1;" >/dev/null 2>&1; then
-        echo "❌ Ошибка: Не удалось подключиться к базе данных postgres"
-        echo "   Проверьте параметры подключения: DB_HOST, DB_PORT, DB_USER, DB_PASSWORD"
+        echo "❌ Error: Failed to connect to the postgres database"
+        echo "   Check connection parameters: DB_HOST, DB_PORT, DB_USER, DB_PASSWORD"
         exit 1
     fi
     
-    # Получаем список баз данных
+    # Get the database list
     DATABASES_OUTPUT=$(docker run --rm --network host \
       -e PGPASSWORD="$DB_PASSWORD" \
       "$PG_IMAGE" \
@@ -157,14 +157,14 @@ else
         ORDER BY datname;
     " 2>&1)
     
-    # Проверяем наличие ошибок
+    # Check for errors
     if echo "$DATABASES_OUTPUT" | grep -qi "error\|fatal\|could not connect"; then
-        echo "❌ Ошибка при получении списка баз данных:"
+        echo "❌ Error fetching the database list:"
         echo "$DATABASES_OUTPUT"
         exit 1
     fi
     
-    # Очищаем вывод от лишних символов и создаем массив
+    # Strip noise from the output and build an array
     DATABASES_ARRAY=()
     while IFS= read -r line; do
         line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
@@ -174,15 +174,15 @@ else
     done <<< "$DATABASES_OUTPUT"
     
     if [ ${#DATABASES_ARRAY[@]} -eq 0 ]; then
-        echo "❌ Не удалось получить список баз данных"
-        echo "   Вывод команды:"
+        echo "❌ Failed to get the database list"
+        echo "   Command output:"
         echo "$DATABASES_OUTPUT"
         exit 1
     fi
     
-    echo "   Найдено баз данных: ${#DATABASES_ARRAY[@]}"
+    echo "   Databases found: ${#DATABASES_ARRAY[@]}"
     
-    # Закрываем соединения для каждой базы данных
+    # Close connections for each database
     for DB_NAME in "${DATABASES_ARRAY[@]}"; do
         if [ -n "$DB_NAME" ]; then
             kill_connections "$DB_NAME"
@@ -190,14 +190,14 @@ else
     done
 fi
 
-# Удаление replication slots (если включено)
+# Drop replication slots (when enabled)
 if [ "$KILL_REPLICATION_SLOTS" = "true" ]; then
     echo ""
-    echo "🗑️  Удаление replication slots..."
+    echo "🗑️  Dropping replication slots..."
     
-    # Всегда подключаемся к postgres для удаления replication slots
+    # Always connect to postgres to drop replication slots
     if [ -n "$TARGET_DATABASE" ]; then
-        # Удаляем slots для конкретной базы
+        # Drop slots for the specific database
         docker run --rm --network host \
           -e PGPASSWORD="$DB_PASSWORD" \
           "$PG_IMAGE" \
@@ -207,7 +207,7 @@ if [ "$KILL_REPLICATION_SLOTS" = "true" ]; then
             WHERE database = '$TARGET_DATABASE';
         " 2>/dev/null
     else
-        # Удаляем все replication slots
+        # Drop all replication slots
         docker run --rm --network host \
           -e PGPASSWORD="$DB_PASSWORD" \
           "$PG_IMAGE" \
@@ -219,11 +219,11 @@ if [ "$KILL_REPLICATION_SLOTS" = "true" ]; then
         " 2>/dev/null
     fi
     
-    echo "   ✅ Replication slots удалены"
+    echo "   ✅ Replication slots dropped"
 fi
 
 echo ""
-echo "📋 Проверка оставшихся соединений:"
+echo "📋 Check remaining connections:"
 docker run --rm --network host \
   -e PGPASSWORD="$DB_PASSWORD" \
   "$PG_IMAGE" \
@@ -241,7 +241,7 @@ docker run --rm --network host \
 
 echo ""
 if [ "$KILL_REPLICATION_SLOTS" = "true" ]; then
-    echo "📋 Проверка оставшихся replication slots:"
+    echo "📋 Check remaining replication slots:"
     docker run --rm --network host \
       -e PGPASSWORD="$DB_PASSWORD" \
       "$PG_IMAGE" \
@@ -258,9 +258,9 @@ if [ "$KILL_REPLICATION_SLOTS" = "true" ]; then
     echo ""
 fi
 
-echo "✅ Готово! Все соединения закрыты (кроме системных)"
+echo "✅ Done! All connections are closed (except system ones)"
 if [ "$KILL_REPLICATION_SLOTS" = "true" ]; then
-    echo "✅ Replication slots удалены"
+    echo "✅ Replication slots dropped"
 fi
-echo "💡 Теперь можно безопасно пересоздавать RDS через Terraform"
+echo "💡 The RDS instance can now be safely recreated via Terraform"
 

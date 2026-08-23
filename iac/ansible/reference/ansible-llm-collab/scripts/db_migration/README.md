@@ -1,69 +1,69 @@
-# Скрипты миграции баз данных PostgreSQL
+# PostgreSQL database migration scripts
 
-Набор скриптов для миграции баз данных PostgreSQL с локального сервера на целевой сервер в VK Cloud.
+Scripts to migrate PostgreSQL databases from a local server to a target server in VK Cloud.
 
-## Структура миграции
+## Migration layout
 
-Миграция выполняется в два этапа:
+Migration runs in two stages:
 
-1. **Создание баз данных** (`create_databases_on_target_server.sh`) - подготовка пустых баз на целевом сервере
-2. **Миграция данных** (`migrate_databases_to_target_server.sh`) - перенос данных из локальных баз в целевые
+1. **Create databases** (`create_databases_on_target_server.sh`) — prepare empty databases on the target server
+2. **Migrate data** (`migrate_databases_to_target_server.sh`) — copy data from local databases into the target ones
 
-## Дополнительные скрипты
+## Extra scripts
 
-3. **Смена владельца БД** (`change_databases_owner.sh`) - изменение owner у баз данных на целевом сервере (после миграции)
+3. **Change database owner** (`change_databases_owner.sh`) — change the owner of databases on the target server (after migration)
 
-## Скрипты
+## Scripts
 
 ### 1. create_databases_on_target_server.sh
 
-**Назначение:** Создает пустые базы данных на целевом сервере перед миграцией данных.
+**Purpose:** Create empty databases on the target server before data migration.
 
-**Как работает:**
-1. Получает список баз данных с локального PostgreSQL сервера
-2. Исключает системные и тестовые базы (postgres, шаблоны, базы с "Test" в названии)
-3. Проверяет, какие базы уже существуют на целевом сервере
-4. Запрашивает подтверждение для создания недостающих баз
-5. Создает базы данных с указанным владельцем на целевом сервере
+**How it works:**
+1. Reads the database list from the local PostgreSQL server
+2. Excludes system and test databases (postgres, templates, names containing "Test")
+3. Checks which databases already exist on the target server
+4. Asks for confirmation before creating the missing databases
+5. Creates databases with the configured owner on the target server
 
-**Настраиваемые переменные:**
+**Configurable variables:**
 
 ```bash
-TARGET_HOST="10.10.2.251"              # IP адрес или хост целевого сервера
-TARGET_USER="svc_postgres_1c"         # Пользователь PostgreSQL на целевом сервере
-TARGET_PASSWORD="some_pass"           # Пароль пользователя (⚠️ УДАЛИТЬ ПОСЛЕ ЗАВЕРШЕНИЯ!)
-DB_OWNER="svc_postgres_1c"            # Владелец для всех создаваемых баз данных
+TARGET_HOST="10.10.2.251"              # target host or IP
+TARGET_USER="svc_postgres_1c"         # PostgreSQL user on the target server
+TARGET_PASSWORD="some_pass"           # user password (⚠️ REMOVE AFTER THE RUN!)
+DB_OWNER="svc_postgres_1c"            # owner for all created databases
 ```
 
-**Использование:**
+**Usage:**
 
 ```bash
-# Создать все доступные базы (по умолчанию)
+# Create all available databases (default)
 ./create_databases_on_target_server.sh
 
-# Создать только указанные базы из списка
+# Create only databases listed in a file
 ./create_databases_on_target_server.sh dblist.txt
 ```
 
-**Работа со списком БД:**
-- Если передан файл со списком БД, скрипт **обрабатывает ТОЛЬКО БД из списка**
-- Например, если на исходной СУБД 50 БД, а в списке указаны 3 - будут обработаны только эти 3
-- Скрипт проверяет существование каждой БД из списка в исходной СУБД
-- Выводит отчет о найденных и отсутствующих БД из списка
-- Создает только те БД, которые существуют в исходной СУБД
-- Формат файла: одна БД на строку, пустые строки и строки начинающиеся с `#` игнорируются
+**Working with a database list:**
+- When a list file is passed, the script **processes ONLY databases from that list**
+- Example: 50 databases on the source, 3 names in the list — only those 3 are processed
+- Each listed name is checked against the source instance
+- A report of found and missing names is printed
+- Only databases that exist on the source are created
+- File format: one database per line; empty lines and lines starting with `#` are ignored
 
-**⚠️ ВАЖНО - Точность имен БД:**
-- Имена БД в файле должны **полностью совпадать** с именами в исходной СУБД
-- Учитывается **регистр букв** (например, `Database1` ≠ `database1`)
-- Учитываются **все символы** (пробелы, спецсимволы и т.д.)
-- Рекомендуется скопировать точное имя БД из исходной СУБД
+**⚠️ IMPORTANT — exact database names:**
+- Names in the file must **match the source names exactly**
+- **Case** is significant (`Database1` ≠ `database1`)
+- **All characters** count (spaces, special characters, and so on)
+- Copy the exact name from the source instance
 
-Пример файла `dblist.txt`:
+Example `dblist.txt`:
 ```
 database1
 database2
-# database3  # эта строка будет проигнорирована как комментарий
+# database3  # this line is ignored as a comment
 database4
 ```
 
@@ -71,114 +71,114 @@ database4
 
 ### 2. migrate_databases_to_target_server.sh
 
-**Назначение:** Мигрирует данные из локальных баз данных PostgreSQL на целевой сервер.
+**Purpose:** Migrate data from local PostgreSQL databases to the target server.
 
-**Как работает:**
-1. Получает список баз данных с локального сервера (с размерами)
-2. Проверяет статус миграции для каждой базы:
-   - **Базы, которых нет на целевом сервере → требуется предварительное создание** (скрипт выдаст ошибку и остановится)
-   - Базы с одинаковым количеством таблиц → уже мигрированы
-   - Базы с разным количеством таблиц → неполная миграция (требуется ручное исправление)
-   - Пустые базы → подлежат миграции
+**How it works:**
+1. Reads the database list from the local server (with sizes)
+2. Checks migration status for each database:
+   - **Missing on the target → create first** (the script errors and stops)
+   - Same table count → already migrated
+   - Different table count → incomplete migration (needs a manual fix)
+   - Empty databases → eligible for migration
 
-**⚠️ Важно:** Скрипт мигрирует БД с **таким же именем** (`pg_restore -d "$dbname"`). Поэтому перед миграцией необходимо создать пустые БД с правильными именами через `create_databases_on_target_server.sh`.
-3. Параллельно выполняет миграцию баз (с ограничением на количество одновременных процессов):
-   - **Этап 1:** Создает дамп базы данных локально (pg_dump в формате directory с сжатием)
-   - **Этап 2:** Восстанавливает дамп на целевом сервере (pg_restore)
-4. Проверяет успешность миграции по количеству таблиц
-5. Генерирует отчеты и логи
+**⚠️ Note:** The script restores into a database **with the same name** (`pg_restore -d "$dbname"`). Empty databases with the correct names must exist first (`create_databases_on_target_server.sh`).
+3. Migrates databases in parallel (capped concurrent processes):
+   - **Stage 1:** Local dump (pg_dump directory format with compression)
+   - **Stage 2:** Restore on the target (pg_restore)
+4. Checks success by table count
+5. Writes reports and logs
 
-**Особенности:**
-- Параллельная миграция нескольких баз одновременно (до 12 параллельных процессов)
-- Адаптивное количество jobs для pg_dump/restore в зависимости от размера базы
-- Проверка свободного места на диске перед началом миграции
-- Детальное логирование в папку `migration_logs/`
-- Автоматическая очистка временных дампов после успешной миграции
+**Notes:**
+- Several databases migrate at once (up to 12 parallel processes)
+- Adaptive pg_dump/restore jobs based on database size
+- Free-disk check before migration starts
+- Detailed logs in `migration_logs/`
+- Temporary dumps are removed after a successful migration
 
-**Настраиваемые переменные:**
+**Configurable variables:**
 
 ```bash
-MAX_PARALLEL=12                       # Максимальное количество параллельных миграций
-                                      # ДЛЯ ТЕСТА: 2
-                                      # ДЛЯ ПРОДАКШЕНА: 12
+MAX_PARALLEL=12                       # max concurrent migrations
+                                      # FOR A TEST: 2
+                                      # FOR PRODUCTION: 12
 
-TARGET_HOST="10.10.2.251"              # IP адрес или хост целевого сервера
-TARGET_USER="svc_postgres_1c"         # Пользователь PostgreSQL на целевом сервере
-TARGET_PASSWORD="some_pass"           # Пароль пользователя (⚠️ УДАЛИТЬ ПОСЛЕ ЗАВЕРШЕНИЯ!)
-DUMP_DIR="/tmp/pg_dumps"              # Временная директория для хранения дампов
+TARGET_HOST="10.10.2.251"              # target host or IP
+TARGET_USER="svc_postgres_1c"         # PostgreSQL user on the target server
+TARGET_PASSWORD="some_pass"           # user password (⚠️ REMOVE AFTER THE RUN!)
+DUMP_DIR="/tmp/pg_dumps"              # temporary dump directory
 ```
 
-**Использование:**
+**Usage:**
 
 ```bash
-# Мигрировать все доступные базы (по умолчанию)
+# Migrate all available databases (default)
 ./migrate_databases_to_target_server.sh
 
-# Мигрировать только указанные базы из списка
+# Migrate only databases listed in a file
 ./migrate_databases_to_target_server.sh dblist.txt
 ```
 
-**Работа со списком БД:**
-- Если передан файл со списком БД, скрипт **мигрирует ТОЛЬКО БД из списка**
-- Например, если на исходной СУБД 50 БД, а в списке указаны 3 - будут мигрированы только эти 3
-- Скрипт проверяет существование каждой БД из списка в исходной СУБД
-- Выводит отчет о найденных и отсутствующих БД из списка
-- Мигрирует только те БД, которые существуют в исходной СУБД **и уже созданы на целевом сервере**
-- Формат файла: одна БД на строку, пустые строки и строки начинающиеся с `#` игнорируются
+**Working with a database list:**
+- When a list file is passed, the script **migrates ONLY databases from that list**
+- Example: 50 databases on the source, 3 names in the list — only those 3 are migrated
+- Each listed name is checked against the source instance
+- A report of found and missing names is printed
+- Only databases that exist on the source **and already exist on the target** are migrated
+- File format: one database per line; empty lines and lines starting with `#` are ignored
 
-**⚠️ ВАЖНО - Точность имен БД:**
-- Имена БД в файле должны **полностью совпадать** с именами в исходной СУБД
-- Учитывается **регистр букв** (например, `Database1` ≠ `database1`)
-- Учитываются **все символы** (пробелы, спецсимволы и т.д.)
-- Рекомендуется скопировать точное имя БД из исходной СУБД
+**⚠️ IMPORTANT — exact database names:**
+- Names in the file must **match the source names exactly**
+- **Case** is significant (`Database1` ≠ `database1`)
+- **All characters** count (spaces, special characters, and so on)
+- Copy the exact name from the source instance
 
-**Логи и отчеты:**
-- `migration_logs/[dbname].log` - детальный лог миграции каждой базы
-- `migration_logs/SUCCESS.log` - список успешно мигрированных баз
-- `migration_logs/WARNING.log` - базы с предупреждениями (несоответствие количества таблиц)
-- `migration_logs/FAILED.log` - список неудачных миграций
+**Logs and reports:**
+- `migration_logs/[dbname].log` — detailed log per database
+- `migration_logs/SUCCESS.log` — successfully migrated databases
+- `migration_logs/WARNING.log` — warnings (table-count mismatch)
+- `migration_logs/FAILED.log` — failed migrations
 
 ---
 
 ### 3. change_databases_owner.sh
 
-**Назначение:** Изменяет владельца (owner) баз данных на целевом сервере. Используется после миграции для установки правильного владельца.
+**Purpose:** Change the owner of databases on the target server. Used after migration to set the correct owner.
 
-**Как работает:**
-1. Подключается к локальной PostgreSQL через peer authentication (как пользователь postgres)
-2. Проверяет существование указанного пользователя (нового владельца)
-3. Если пользователь не существует - предлагает создать его с паролем
-4. Получает список всех баз данных (или из файла со списком)
-5. Показывает текущего владельца каждой БД
-6. Запрашивает подтверждение для смены owner
-7. Меняет owner у всех указанных БД
+**How it works:**
+1. Connects to local PostgreSQL via peer authentication (as the postgres user)
+2. Checks that the new owner role exists
+3. If the role is missing — offers to create it with a password
+4. Reads all databases (or names from a list file)
+5. Shows the current owner of each database
+6. Asks for confirmation before changing the owner
+7. Changes the owner on the listed databases
 
-**Настраиваемые переменные:**
+**Configurable variables:**
 
 ```bash
-NEW_OWNER="svc_postgres_1c"        # Новый владелец для БД
-NEW_OWNER_PASSWORD=""               # Пароль для нового пользователя (если пуст - запросит интерактивно)
-AUTO_CREATE_USER=false              # true - создавать пользователя автоматически, false - спрашивать
+NEW_OWNER="svc_postgres_1c"        # new database owner
+NEW_OWNER_PASSWORD=""               # password for a new role (empty = prompt interactively)
+AUTO_CREATE_USER=false              # true — create the role automatically, false — ask
 ```
 
-**Использование:**
+**Usage:**
 
 ```bash
-# Сменить owner у всех доступных БД
+# Change owner on all available databases
 ./change_databases_owner.sh
 
-# Сменить owner только у указанных БД из списка
+# Change owner only on databases listed in a file
 ./change_databases_owner.sh dblist.txt
 ```
 
-**Особенности:**
-- Работает на целевом сервере (локальное подключение через peer auth)
-- Автоматически пропускает БД, у которых уже правильный owner
-- Показывает предварительный список изменений перед подтверждением
-- Поддерживает работу со списком БД из файла (как и другие скрипты)
-- Если пользователь не существует - может создать его автоматически или запросить подтверждение
+**Notes:**
+- Runs on the target server (local connection via peer auth)
+- Skips databases that already have the correct owner
+- Shows a preview of changes before confirmation
+- Supports a list file like the other scripts
+- If the role is missing — can create it automatically or ask for confirmation
 
-**Пример вывода:**
+**Sample output:**
 ```
 === Databases to change owner ===
 New owner: svc_postgres_1c
@@ -197,161 +197,160 @@ Need to change owner: 2
 
 ### 4. block_databases.sh
 
-**Назначение:** Блокирует базы данных для чтения/записи или только для записи. Используется для защиты БД во время миграции или обслуживания.
+**Purpose:** Block databases for read/write or write-only. Used to protect databases during migration or maintenance.
 
-**Как работает:**
-1. Подключается к локальной PostgreSQL через peer authentication (как пользователь postgres)
-2. Получает список всех баз данных (или из файла со списком)
-3. Показывает текущий статус каждой БД (заблокирована/не заблокирована)
-4. Запрашивает подтверждение для блокировки
-5. Блокирует указанные БД выбранным способом
+**How it works:**
+1. Connects to local PostgreSQL via peer authentication (as the postgres user)
+2. Reads all databases (or names from a list file)
+3. Shows the current status of each database (blocked / not blocked)
+4. Asks for confirmation before blocking
+5. Blocks the listed databases in the chosen mode
 
-**Режимы блокировки:**
+**Block modes:**
 
-- `read_only` - Блокировка только на запись:
-  - Устанавливает `default_transaction_read_only = true`
-  - Пользователи могут читать данные, но не могут писать
-  - Используется для безопасной блокировки во время миграции
+- `read_only` — write lock:
+  - Sets `default_transaction_read_only = true`
+  - Clients can read but cannot write
+  - Used as a safe lock during migration
 
-- `full` - Полная блокировка:
-  - Устанавливает `allow_connections = false`
-  - Блокирует все подключения к БД
-  - Используется для полной изоляции БД
+- `full` — full lock:
+  - Sets `allow_connections = false`
+  - Blocks all connections to the database
+  - Used for full isolation
 
-**Использование:**
+**Usage:**
 
 ```bash
-# Заблокировать все БД только на запись
+# Write-lock all databases
 ./block_databases.sh read_only
 
-# Заблокировать конкретные БД только на запись
+# Write-lock specific databases
 ./block_databases.sh read_only dblist.txt
 
-# Полностью заблокировать все БД
+# Fully lock all databases
 ./block_databases.sh full
 
-# Полностью заблокировать конкретные БД
+# Fully lock specific databases
 ./block_databases.sh full dblist.txt
 ```
 
-**Особенности:**
-- Работает на локальном сервере (peer auth)
-- Поддерживает работу со списком БД из файла
-- Показывает предварительный список изменений перед подтверждением
-- Автоматически пропускает уже заблокированные БД
+**Notes:**
+- Runs on the local server (peer auth)
+- Supports a list file
+- Shows a preview of changes before confirmation
+- Skips databases that are already blocked
 
 ---
 
 ### 5. unblock_databases.sh
 
-**Назначение:** Разблокирует базы данных (обратная операция к block_databases.sh).
+**Purpose:** Unblock databases (inverse of block_databases.sh).
 
-**Использование:**
+**Usage:**
 
 ```bash
-# Разблокировать все БД (убрать read-only)
+# Unblock all databases (clear read-only)
 ./unblock_databases.sh read_only
 
-# Разблокировать конкретные БД
+# Unblock specific databases
 ./unblock_databases.sh read_only dblist.txt
 
-# Разблокировать все полностью заблокированные БД
+# Unblock all fully locked databases
 ./unblock_databases.sh full
 ```
 
-**Особенности:**
-- Работает аналогично block_databases.sh
-- Разблокирует только те БД, которые были заблокированы соответствующим режимом
+**Notes:**
+- Same flow as block_databases.sh
+- Unblocks only databases locked in the matching mode
 
-## Порядок выполнения
+## Run order
 
-### Стандартная миграция (все базы)
+### Standard migration (all databases)
 
-1. **Настройте переменные** в обоих скриптах (хост, пользователь, пароль)
-2. **Выполните первый скрипт** для создания баз на целевом сервере:
+1. **Set variables** in both scripts (host, user, password)
+2. **Run the first script** to create databases on the target:
    ```bash
    ./create_databases_on_target_server.sh
    ```
-3. **Выполните второй скрипт** для миграции данных:
+3. **Run the second script** to migrate data:
    ```bash
    ./migrate_databases_to_target_server.sh
    ```
-4. **Проверьте логи** в папке `migration_logs/`
-5. **(Опционально) Измените owner БД** на целевом сервере:
+4. **Review logs** in `migration_logs/`
+5. **(Optional) Change database owners** on the target:
    ```bash
    ./change_databases_owner.sh
    ```
-   Или с конкретным списком:
+   Or with a list file:
    ```bash
    ./change_databases_owner.sh dblist.txt
    ```
-6. **Удалите пароли** из скриптов после завершения миграции
+6. **Remove passwords** from the scripts after migration finishes
 
-### Миграция конкретных баз из списка
+### Migration of specific databases from a list
 
-1. **Получите точные имена БД из исходной СУБД:**
+1. **Get exact names from the source instance:**
    ```sql
-   -- Получить список всех БД (кроме системных)
+   -- All databases except system ones
    SELECT datname FROM pg_database 
    WHERE datistemplate = false AND datname != 'postgres' 
    ORDER BY datname;
    ```
 
-2. **Создайте файл со списком БД** (например, `dblist.txt`):
+2. **Create a list file** (for example `dblist.txt`):
    ```
    database1
    database2
    database3
    ```
-   **Важно:** Скопируйте имена БД точно, как они выводятся в запросе выше!
-2. **Настройте переменные** в обоих скриптах
-3. **Создайте базы на целевом сервере:**
+   **Note:** Copy names exactly as the query prints them.
+2. **Set variables** in both scripts
+3. **Create databases on the target:**
    ```bash
    ./create_databases_on_target_server.sh dblist.txt
    ```
-   Скрипт проверит существование всех БД из списка в исходной СУБД и выведет отчет
-4. **Мигрируйте данные:**
+   The script checks that each listed name exists on the source and prints a report
+4. **Migrate data:**
    ```bash
    ./migrate_databases_to_target_server.sh dblist.txt
    ```
-5. **Проверьте логи** в папке `migration_logs/`
-6. **(Опционально) Измените owner БД** на целевом сервере:
+5. **Review logs** in `migration_logs/`
+6. **(Optional) Change database owners** on the target:
    ```bash
    ./change_databases_owner.sh dblist.txt
    ```
 
-## Требования
+## Requirements
 
-### Для скриптов миграции (create_databases, migrate_databases):
-- Доступ к локальному PostgreSQL серверу
-- Доступ к целевому PostgreSQL серверу по сети
-- Утилиты PostgreSQL: `psql`, `pg_dump`, `pg_restore`
-- Достаточное свободное место на диске (рекомендуется > 50GB)
-- Права пользователя на создание баз данных на целевом сервере
+### For migration scripts (create_databases, migrate_databases):
+- Access to the local PostgreSQL server
+- Network access to the target PostgreSQL server
+- PostgreSQL tools: `psql`, `pg_dump`, `pg_restore`
+- Enough free disk space (recommended > 50GB)
+- Rights to create databases on the target server
 
-### Для скриптов управления БД (change_databases_owner, block/unblock_databases, check_databases_size):
-- Скрипты должны запускаться **на локальном сервере**
-- Доступ к локальной PostgreSQL через peer authentication
-- Запуск от пользователя `postgres` (или другого пользователя с правами superuser)
-- Утилиты PostgreSQL: `psql`
+### For management scripts (change_databases_owner, block/unblock_databases, check_databases_size):
+- Scripts run **on the local server**
+- Access to local PostgreSQL via peer authentication
+- Run as `postgres` (or another superuser)
+- PostgreSQL tools: `psql`
 
-## Фильтрация баз данных
+## Database filtering
 
-### При работе без файла со списком (по умолчанию)
+### Without a list file (default)
 
-Оба скрипта автоматически исключают:
-- Системные базы (`postgres`, шаблоны)
-- Базы с "Test" в названии
-- Базы, названия которых начинаются с "?"
+Both scripts automatically exclude:
+- System databases (`postgres`, templates)
+- Names containing "Test"
+- Names starting with "?"
 
-### При работе с файлом со списком
+### With a list file
 
-- Скрипты обрабатывают только БД из указанного файла
-- Проверяется существование каждой БД в исходной СУБД
-- Выводится отчет о найденных и отсутствующих БД
-- Обрабатываются только валидные БД, существующие в исходной СУБД
+- Only databases from the file are processed
+- Each name is checked against the source instance
+- A report of found and missing names is printed
+- Only valid databases that exist on the source are processed
 
-## Безопасность
+## Security
 
-⚠️ **ВАЖНО:** После завершения миграции обязательно удалите пароли из переменных `TARGET_PASSWORD` в обоих скриптах!
-
+⚠️ **IMPORTANT:** After migration finishes, remove passwords from the `TARGET_PASSWORD` variables in both scripts.

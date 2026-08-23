@@ -1,52 +1,52 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа Mongo
+# Primary backup method for Mongo
 
-# Принцип работы:
-#   - вызов mongodump с передачей дампа в stdout
-#   - резервное копирование дампа с помощью restic с получением дампа из stdin
+# How it works:
+#   - run mongodump and send the dump to stdout
+#   - back up the dump with restic, reading the dump from stdin
 
-# Поддерживаемые опции:
-# -h|--host                      - адрес подключения к Mongo. Обязательный аргумент,
-#                                  для обратной совместимости осталась возможность
-#                                  указать адрес подключения через второй (${2})
-#                                  позиционный аргумент. Эта опция имеет более
-#                                  высокий приоритет чем позиционный аргумент
-# -r|--port                      - порт подключения к Mongo. Необязательный аргумент
-# -u|--user                      - имя пользователя, используемого для подключения
-#                                  к Mongo. Необязательный аргумент, без указания
-#                                  этой опции будет использовано значение ${USER_DEFAULT}
-# -p|--password                  - путь к файлу с паролем, используемым для
-#                                  подключения к Mongo, или имя переменной
-#                                  окружения, содержащей этот пароль. Необязательный аргумент
-#    --authenticationDatabase    - имя базы данных, используемой для хранения параметров
-#                                  аутентификации. Необязательный аргумент, без указания этой
-#                                  опции будет использовано значение ${AUTH_DATABASE_DEFAULT}
-# -a|--add-mongodump-option      - дополнительная опция которая будет передана
-#                                  mongodump. Если опция mongodump имеет
-#                                  значение, то его необходимо указать либо через
-#                                  знак равенства ( = ) (возможно только для
-#                                  длинных опций), либо через пробел, но в
-#                                  этом случае опцию mongodump вместе с ее
-#                                  значением необходимо поместить в двойные или
-#                                  одинарные кавычки. Например:
+# Supported options:
+# -h|--host                      - Mongo connection address. Required
+#                                  for backward compatibility it is still possible to
+#                                  pass the connection address as the second (${2})
+#                                  positional argument. This option has
+#                                  higher priority than the positional argument
+# -r|--port                      - Mongo connection port. Optional
+# -u|--user                      - username used to connect
+#                                  to Mongo. Optional. When omitted,
+#                                  this option, ${USER_DEFAULT} is used
+# -p|--password                  - path to the password file used for
+#                                  connecting to Mongo, or the name of an environment
+#                                  variable that holds this password. Optional
+#    --authenticationDatabase    - database that stores
+#                                  authentication. Optional. When omitted,
+#                                  this option, ${AUTH_DATABASE_DEFAULT} is used
+# -a|--add-mongodump-option      - extra option passed to
+#                                  mongodump. When a mongodump option has
+#                                  a value, pass it either with
+#                                  an equals sign ( = ) (long options only),
+#                                  long options), or as a space, but in
+#                                  that case the mongodump option together with its
+#                                  the value must be wrapped in double or
+#                                  single quotes. For example:
 #                                   - --add-mongodump-option --db=db1
 #                                   - --add-mongodump-option '--db db1'
 #                                   - --add-mongodump-option "--db db1"
-#                                  Опция может быть указана несколько раз,
-#                                  mongodump будут переданы все указанные опции.
-#                                  Необязательный аргумент
-# -k|--prune                     - строка с опциями алгоритма сохранения резервных копий в
-#                                  формате программы restic, например '--keep-hourly 72 --keep-within 30d'
-#                                  Необязательный аргумент, без указания этой опции будет
-#                                  использовано значение ${CUSTOMPRUNE_DEFAULT}
+#                                  The option may be repeated,
+#                                  mongodump will receive all listed options.
+#                                  Optional
+# -k|--prune                     - retention-options string in
+#                                  restic format, e.g. '--keep-hourly 72 --keep-within 30d'
+#                                  Optional. When omitted,
+#                                  ${CUSTOMPRUNE_DEFAULT} is used
 
-# Позиционные аргументы:
-# ${1} - имя задания, тег restic-репозитория. Обязательный аргумент
-# ${2} - адрес подключения к Mongo. Обязательный аргумент, если НЕ использована
-#        опция -h|--host
+# Positional arguments:
+# ${1} - job name, restic repository tag. Required
+# ${2} - Mongo connection address. Required when
+#        option -h|--host
 
-# Примеры использования в schedule:
+# Schedule examples:
 # restic_run_on.sh 10.0.0.1 restic_backup_mongo_ext.sh 'MONGO --bucket <restic_bucket_from_values> 127.0.0.1'
 # restic_run_on.sh 10.0.0.1 restic_backup_mongo_ext.sh 'MONGO --bucket <restic_bucket_from_values> --host 127.0.0.1'
 # restic_run_on.sh 10.0.0.1 restic_backup_mongo_ext.sh 'MONGO --bucket <restic_bucket_from_values> --host 127.0.0.1 --port 27017'
@@ -57,11 +57,11 @@
 # restic_run_on.sh 10.0.0.1 restic_backup_mongo_ext.sh 'MONGO --bucket <restic_bucket_from_values> --host 127.0.0.1 --port 27017 --password "/etc/backup/mongo-pass" --prune "--keep-hourly 3 --keep-within 2y5m7d3h"'
 # /app/00-scripts/restic_backup_mongo_ext.sh MONGODB-PRODUCTION --bucket <restic_bucket_from_values> --host "rs0/mongo-mongodb-0.mongo-mongodb-headless.mongo-production.svc.cluster.local:27017,mongo-mongodb-1.mongo-mongodb-headless.mongo-production.svc.cluster.local:27017" --add-mongodump-option="--readPreference secondary"
 
-# Запрещается указывать в качестве значения опции [-p, --password]
-# непосредственно пароль. В качестве ее значения необходимо указать:
-#   - путь к файлу с паролем. Владельцем этого файл должен быть 'root:root' и
-#     для него должны быть установлены права '0400'
-#   - имя переменной окружения, содержащей этот пароль
+# The value of [-p, --password] must not be
+# the password itself. Pass one of:
+#   - path to a password file. Owner must be 'root:root' and
+#     mode must be '0400'
+#   - the name of an environment variable that holds this password
 
 ################################################################################
 
@@ -113,7 +113,7 @@ CUSTOMPRUNE=""
 PASSWORD_EVOLVED=""
 EFFECTIVE_OPTIONS=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options b:h:r:u:p:a:k: --longoptions ,bucket:,host:,port:,user:,password:,authenticationDatabase:,add-mongodump-option:,prune: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

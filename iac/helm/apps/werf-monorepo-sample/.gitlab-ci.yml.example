@@ -1,0 +1,45 @@
+# App-repo consumer. This file sits next to .werf/ (the charts).
+# Job bodies are not copied here. They live in the CI catalog:
+#   iac/ci/pipelines/werf-other/monorepo-unit/
+#
+# Live GitLab (two projects): the app repo root is this folder.
+# The catalog repo holds the factory. include: project/file is the
+# button; spec:inputs bind this unit (s3-cache-proxy) to the hidden
+# jobs in common.yml.example (werf build / converge / cleanup).
+#
+# Lab flatten: open the catalog copies under
+#   ../../../ci/pipelines/werf-other/monorepo-unit/
+# Those files use include: local relative to that mini-root, so they
+# are not include: local from this path. Copy the mini-root, or keep
+# the split-repo include below.
+#
+# Sibling factory example (portal-api inputs):
+#   ../../../ci/pipelines/werf-other/monorepo-unit/unit.gitlab-ci.yml.example
+
+include:
+  - project: platform/ci-catalog
+    file: /werf-other/monorepo-unit/common.yml.example
+  - project: platform/ci-catalog
+    file: /werf-other/monorepo-unit/services-template.yml.example
+    inputs:
+      service_release_name: "s3-cache-proxy"
+      service_directory: .werf/s3-cache-proxy
+      service_helm_directory: ".werf/s3-cache-proxy"
+      service_test_image_name: "$WERF_S3_CACHE_PROXY_DOCKER_IMAGE_NAME"
+      service_test_before_script:
+        - export CURRENT=$(pwd)
+        - echo "no unit test tree in this sample; factory still wires coverage inputs"
+      service_cov_variable: "RELOAD_COV_SERVICE_S3_CACHE_PROXY"
+      service_changes_paths:
+        - ".werf/s3-cache-proxy/*"
+        - ".werf/s3-cache-proxy/**/*"
+        - ".werf/common-templates/*"
+        - ".werf/common-templates/**/*"
+
+.base_test_service/s3-cache-proxy:
+  image:
+    name: "$WERF_S3_CACHE_PROXY_DOCKER_IMAGE_NAME"
+    docker:
+      user: root
+    entrypoint:
+      - ""

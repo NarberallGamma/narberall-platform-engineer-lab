@@ -1,10 +1,10 @@
-# В образе registry.../base-images/ansible (Alpine) pip в системный Python заблокирован (PEP 668); модуль community.postgresql — через py3-psycopg2 из apk (как в роли schema_flyway).
-- name: Установить py3-psycopg2 для модулей community.postgresql
+# In the registry.../base-images/ansible image (Alpine) pip into system Python is blocked (PEP 668); community.postgresql goes through py3-psycopg2 from apk (same as the schema_flyway role).
+- name: Install py3-psycopg2 for community.postgresql modules
   community.general.apk:
     name: py3-psycopg2
     state: present
 
-- name: Завершить все подключения к базе данных
+- name: Terminate all connections to the database
   community.postgresql.postgresql_query:
     query: |
       SELECT pg_terminate_backend(pid)
@@ -19,7 +19,7 @@
   loop: "{{ db }}"
   ignore_errors: yes
 
-- name: Удалить базы данных PostgreSQL
+- name: Drop PostgreSQL databases
   community.general.postgresql_db:
     name: "{{ item.name }}"
     state: absent
@@ -30,7 +30,7 @@
     login_port: "{{ pg_port }}"
   loop: "{{ db }}"
 
-- name: "Создание баз данных PostgreSQL"
+- name: "Create PostgreSQL databases"
   community.general.postgresql_db:
     name: "{{ item.name }}"
     encoding: "{{ default_encoding }}"
@@ -44,7 +44,7 @@
     login_port: "{{ pg_port }}"
   loop: "{{ db }}"
 
-- name: Удалить схему public из базы
+- name: Drop the public schema from the database
   community.postgresql.postgresql_schema:
     name: public
     login_db: "{{ item.name }}"
@@ -52,17 +52,17 @@
     login_user: "{{ treasury_user }}"
     login_password: "{{ treasury_password }}"
     login_port: "{{ pg_port }}"
-    state: absent                   # удаляем схему
-    cascade_drop: yes                    # удаляем все объекты внутри схемы
+    state: absent                   # drop the schema
+    cascade_drop: yes                    # drop all objects inside the schema
   loop: "{{ db }}"
 
-- name: Создать схему public с новым владельцем
+- name: Create the public schema with a new owner
   community.postgresql.postgresql_schema:
     name: public
     owner: treasury_user
     login_db: "{{ item.name }}"
     login_host: "{{ pg_host }}"
-    login_user: "{{ treasury_user }}"          # суперпользователь PostgreSQL
+    login_user: "{{ treasury_user }}"          # PostgreSQL superuser
     login_password: "{{ treasury_password }}"
     login_port: "{{ pg_port }}"
     state: present

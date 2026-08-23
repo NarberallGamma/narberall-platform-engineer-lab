@@ -1,5 +1,5 @@
 ---
-# Один inbound на хост (proxy: vless-proxy-ru :443) + outbounds/routing из xui_proxy_routes или xui_outbounds.
+# One inbound per host (proxy: vless-proxy-ru :443) + outbounds/routing from xui_proxy_routes or xui_outbounds.
 
 - name: Refresh inbound list when panel session was skipped
   ansible.builtin.import_tasks: xray_panel_inbounds_list.yml

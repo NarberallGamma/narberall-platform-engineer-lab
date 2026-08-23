@@ -1,6 +1,6 @@
 ---
-# Сессия панели по cookie + CSRF (legacy /panel/xray/*; на 3.3+ Xray template — /panel/api/xray/*).
-# API token не проходит checkLogin на группе /panel — только checkAPIAuth на /panel/api.
+# Panel session via cookie + CSRF (legacy /panel/xray/*; on 3.3+ the Xray template is /panel/api/xray/*).
+# An API token does not pass checkLogin on the /panel group — only checkAPIAuth on /panel/api.
 
 - name: Init panel cookie session variables
   ansible.builtin.set_fact:
@@ -23,7 +23,7 @@
     - xui_panel_http_root['cookies_string'] is defined
     - xui_panel_http_root['cookies_string'] | length > 0
 
-- name: Fetch CSRF token (webBasePath, не …/panel/)
+- name: Fetch CSRF token (webBasePath, not …/panel/)
   ansible.builtin.uri:
     url: "{{ xui_panel_url_base }}csrf-token"
     method: GET
@@ -57,8 +57,8 @@
         (xui_panel_http_csrf['json']['obj'] | default(xui_panel_http_csrf_json.obj | default('')))
         | length > 0
     fail_msg: >-
-      CSRF: ожидался JSON от {{ xui_panel_url_base }}csrf-token
-      (не {{ xui_panel_url_base }}panel/csrf-token), status={{ xui_panel_http_csrf['status'] | default('?') }}.
+      CSRF: expected JSON from {{ xui_panel_url_base }}csrf-token
+      (not {{ xui_panel_url_base }}panel/csrf-token), status={{ xui_panel_http_csrf['status'] | default('?') }}.
       webBasePath={{ xui_panel_web_base_path_effective | default('?') }}.
 
 - name: Parse CSRF token
@@ -100,7 +100,7 @@
       - xui_panel_http_login['json']['success'] | default(false) | bool
     fail_msg: >-
       3X-UI login failed ({{ xui_panel_url_base }}login).
-      Проверить xui_panel_username и xui_panel_password (-e) или panel-access.json.
+      Check xui_panel_username and xui_panel_password (-e) or panel-access.json.
 
 - name: Refresh CSRF token after login
   ansible.builtin.uri:

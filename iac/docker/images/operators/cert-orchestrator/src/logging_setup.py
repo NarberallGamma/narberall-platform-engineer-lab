@@ -1,5 +1,5 @@
 """
-Настройка логирования (stdout, уровень из конфига).
+Logging setup (stdout, level from config).
 """
 
 from __future__ import annotations

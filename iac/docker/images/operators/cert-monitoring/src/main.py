@@ -51,7 +51,7 @@ class Application:
         """Test connections to external services"""
         logger.info("Testing connections...")
         if config.has_telegram_bot():
-            logger.info("Telegram: проверка при отправке startup-уведомления (getMe пропущен)")
+            logger.info("Telegram: checked when sending the startup notification (getMe skipped)")
         else:
             logger.info("Telegram bot not configured, skipping")
     
@@ -122,7 +122,7 @@ class Application:
         if config.excluded_hosts_from_alerts:
             logger.info(f"Excluded hosts from alerts: {', '.join(config.excluded_hosts_from_alerts)}")
 
-        # Startup notification до фонового SSL-цикла (как cloud-hibernate-operator)
+        # Startup notification before the background SSL loop (same as cloud-hibernate-operator)
         if config.has_telegram_bot():
             try:
                 asyncio.run(telegram_notifier.send_startup_notification({
@@ -134,7 +134,7 @@ class Application:
             except Exception as e:
                 logger.warning(f"Failed to send startup notification: {e}")
 
-        # Фоновый цикл SSL-проверок после Telegram startup
+        # Background SSL-check loop after the Telegram startup notification
         self.start_monitoring_loop()
         
         # Keep main thread alive

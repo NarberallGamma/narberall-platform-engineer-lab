@@ -1,7 +1,7 @@
 ---
 
 #####################################################################
-# 0. Установка psycopg2
+# 0. Install psycopg2
 #####################################################################
 - name: Ensure psycopg2 is installed
   ansible.builtin.pip:
@@ -9,7 +9,7 @@
     state: present
 
 #####################################################################
-# 1. Получаем пароли из Vault (если указаны)
+# 1. Fetch passwords from Vault (when set)
 #####################################################################
 - name: Fetch passwords from Vault for readonly users
   set_fact:
@@ -29,7 +29,7 @@
   no_log: true
 
 #####################################################################
-# 2. Создаём пользователей (не трогаем пароль, если его нет)
+# 2. Create users (leave password unchanged when not provided)
 #####################################################################
 - name: Ensure readonly users exist
   community.postgresql.postgresql_user:
@@ -46,7 +46,7 @@
   no_log: true
 
 #####################################################################
-# 3. Grant CONNECT на базы
+# 3. Grant CONNECT on databases
 #####################################################################
 - name: Grant CONNECT on databases
   community.postgresql.postgresql_privs:
@@ -62,7 +62,7 @@
   loop: "{{ db | product(db_users_readonly) | list }}"
 
 #####################################################################
-# 4. Grant USAGE на схему public
+# 4. Grant USAGE on public schema
 #####################################################################
 - name: Grant USAGE on public schema
   community.postgresql.postgresql_privs:
@@ -79,7 +79,7 @@
   loop: "{{ db | product(db_users_readonly) | list }}"
 
 #####################################################################
-# 5. Grant SELECT на все существующие таблицы
+# 5. Grant SELECT on all existing tables
 #####################################################################
 - name: Grant SELECT on all existing tables
   community.postgresql.postgresql_privs:
@@ -97,7 +97,7 @@
   loop: "{{ db | product(db_users_readonly) | list }}"
 
 #####################################################################
-# 6. Grant default SELECT на будущие таблицы
+# 6. Grant default SELECT on future tables
 #####################################################################
 - name: Grant default SELECT on future tables created by owner role
   community.postgresql.postgresql_privs:

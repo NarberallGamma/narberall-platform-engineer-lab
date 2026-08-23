@@ -1,17 +1,17 @@
 ---
-- name: "Создание баз данных PostgreSQL из списка"
-  hosts: localhost  # Или укажите целевой хост с PostgreSQL
+- name: "Create PostgreSQL databases from the list"
+  hosts: localhost  # Target host that runs PostgreSQL
   become: false
   gather_facts: no
   vars:
-    postgresql_user: "root"  # Пользователь PostgreSQL с правами на создание БД
-    postgresql_password: "CHANGE_ME"  # Пароль пользователя
-    postgresql_host: "10.10.6.188"  # Хост PostgreSQL
-    postgresql_port: 5432  # Порт PostgreSQL
-    default_encoding: "UTF8"  # Кодировка по умолчанию
-    default_lc_collate: "en_US.UTF-8"  # Локаль для сортировки по умолчанию
-    default_lc_ctype: "en_US.UTF-8"  # Локаль для классификации символов по умолчанию
-    databases:  # Список баз данных для создания
+    postgresql_user: "root"  # PostgreSQL user with CREATE DATABASE privilege
+    postgresql_password: "CHANGE_ME"  # User password
+    postgresql_host: "10.10.6.188"  # PostgreSQL host
+    postgresql_port: 5432  # PostgreSQL port
+    default_encoding: "UTF8"  # Default encoding
+    default_lc_collate: "en_US.UTF-8"  # Default collation locale
+    default_lc_ctype: "en_US.UTF-8"  # Default character classification locale
+    databases:  # Databases to create
       - "demo_dictionaries"
       - "demo_notification"
       - "demo_monolith"
@@ -55,7 +55,7 @@
       - "dev2_currencyrate"
       - "dev3_currencyrate"
   tasks:
-    - name: "Создание баз данных PostgreSQL"
+    - name: "Create PostgreSQL databases"
       community.general.postgresql_db:
         name: "{{ item }}"
         encoding: "{{ default_encoding }}"
@@ -69,6 +69,6 @@
       tags:
         - create_db
 
-    - name: "Проверка успешного создания баз данных"
+    - name: "Confirm databases were created"
       debug:
-        msg: "Базы данных успешно созданы: {{ databases }}"
+        msg: "Databases created: {{ databases }}"

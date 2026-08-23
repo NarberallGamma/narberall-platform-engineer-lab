@@ -1,5 +1,5 @@
-# Bootstrap SSH для playbooks/setup_cert_orchestrator_ssh_user.yml
-# Плейбук подключает этот файл через vars_files (не cert-orchestrator.yml).
+# Bootstrap SSH for playbooks/setup_cert_orchestrator_ssh_user.yml
+# The playbook includes this file via vars_files (not cert-orchestrator.yml).
 
 cert_orchestrator_ssh_user: estate-cert-orchestrator
 cert_orchestrator_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA admin@example.com"

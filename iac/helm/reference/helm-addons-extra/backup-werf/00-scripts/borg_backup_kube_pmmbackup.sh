@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 source vars
-# Путь до конфига kubectl
+# Path to the kubectl config
 KUBECONF_FILE="/home/borg/.kube/config"
 export KUBECONFIG=${KUBECONF_FILE}
 NAMEOFNAMESPACE=${1}

@@ -1,50 +1,48 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа PostgreSQL
+# Primary way to back up PostgreSQL
 
-# Принцип работы:
-#   - вызов pg_basebackup с помещением на лету файлов данных PostgreSQL в tar-архив и передачей его в stdout
-#   - резервное копирование tar-архива с помощью borg с получением его из stdin
+# How it works:
+#   - run pg_basebackup, pack PostgreSQL data files into a tar archive on the fly, and send it to stdout
+#   - back up the tar archive with Borg reading from stdin
 
-# Поддерживаемые опции:
-# -h|--host                      - адрес подключения к PostgreSQL. Необязательный аргумент
-# -r|--port                      - порт подключения к PostgreSQL. Необязательный аргумент
-# -u|--user                      - имя пользователя, используемого для подключения 
-#                                  к PostgreSQL или запуска pg_basebackup. Необязательный 
-#                                  аргумент, без указания этой опции будет использовано 
-#                                  значение ${USER_DEFAULT}
-# -p|--password                  - путь к файлу с паролем, используемым для 
-#                                  подключения к PostgreSQL, или имя переменной 
-#                                  окружения, содержащей этот пароль. Необязательный аргумент
-# -a|--add-pg_basebackup-option  - дополнительная опция которая будет передана 
-#                                  pg_basebackup. Если опция pg_basebackup имеет 
-#                                  значение, то его необходимо указать либо через 
-#                                  знак равенства ( = ) (возможно только для 
-#                                  длинных опций), либо через пробел, но в 
-#                                  этом случае опцию pg_basebackup вместе с ее 
-#                                  значением необходимо поместить в двойные или 
-#                                  одинарные кавычки. Например:
+# Supported options:
+# -h|--host                      - PostgreSQL connection address. Optional
+# -r|--port                      - PostgreSQL connection port. Optional
+# -u|--user                      - username used to connect
+#                                  to PostgreSQL or to run pg_basebackup. Optional;
+#                                  if omitted,
+#                                  ${USER_DEFAULT} is used
+# -p|--password                  - path to the password file used to
+#                                  connect to PostgreSQL, or the name of an
+#                                  environment variable that holds that password. Optional
+# -a|--add-pg_basebackup-option  - extra option passed to
+#                                  pg_basebackup. If the pg_basebackup option has a
+#                                  value, pass it either with an equals sign
+#                                  ( = ) (long options only) or with a space,
+#                                  in which case the pg_basebackup option and its
+#                                  value must be wrapped in double or
+#                                  single quotes. For example:
 #                                   - --add-pg_basebackup-option --max-rate=1024
 #                                   - --add-pg_basebackup-option '--max-rate 1024'
 #                                   - --add-pg_basebackup-option "--max-rate 1024"
-#                                  Опция может быть указана несколько раз, 
-#                                  pg_basebackup будут переданы все указанные опции. 
-#                                  Необязательный аргумент
-# -k|--prune                     - строка с опциями алгоритма сохранения резервных копий в 
-#                                  формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                                  Необязательный аргумент, без указания этой опции будет 
-#                                  использовано значение ${CUSTOMPRUNE_DEFAULT}
-#    --do-su-under-user          - запустить pg_basebackup под пользователем, указанным 
-#                                  опцией -u|--user или пользователем по умолчанию. Имеет 
-#                                  смысл использовать в том случае, если по каким-либо 
-#                                  причинам требуется вместо метода аутентификации 'trust' 
-#                                  в pg_hba.conf использовать метод аутентификации 'peer'
+#                                  May be given more than once;
+#                                  all listed options are passed to pg_basebackup.
+#                                  Optional
+# -k|--prune                     - retention options in Borg format, for
+#                                  example '--keep-hourly 72 --keep-within=30d'
+#                                  Optional; if omitted,
+#                                  ${CUSTOMPRUNE_DEFAULT} is used
+#    --do-su-under-user          - run pg_basebackup as the user given by
+#                                  -u|--user or the default user. Useful when
+#                                  the 'peer' authentication method in pg_hba.conf
+#                                  must be used instead of 'trust'
 
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория, без указания будет 
-#        использовано имя заданное в ${NAMEOFBACKUP_DEFAULT}
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix; if omitted,
+#        ${NAMEOFBACKUP_DEFAULT} is used
 
-# Примеры использования в schedule:
+# Schedule usage examples:
 # borg_run_on.sh 10.0.0.1 borg_backup_postgres_stdout.sh
 # borg_run_on.sh 10.0.0.1 borg_backup_postgres_stdout.sh 'PG'
 # borg_run_on.sh 10.0.0.1 borg_backup_postgres_stdout.sh 'PG --user postgres'
@@ -53,43 +51,43 @@
 # borg_run_on.sh 10.0.0.1 borg_backup_postgres_stdout.sh 'PG --user postgres --do-su-under-user -a "--max-rate 1024" -a --progress --prune "--keep-hourly 3 --keep-within=30d"'
 # borg_run_on.sh 10.0.0.1 borg_backup_postgres_stdout.sh 'PG --host 127.0.0.1 --user pg_super --password "/etc/backup/pg-pass"'
 
-# Запрещается указывать в качестве значения опции [-p, --password] 
-# непосредственно пароль. В качестве ее значения необходимо указать:
-#   - путь к файлу с паролем. Владельцем этого файл должен быть 'root:root' и 
-#     для него должны быть установлены права '0400'
-#   - имя переменной окружения, содержащей этот пароль
+# The [-p, --password] value must not be the password itself.
+# Use one of:
+#   - a path to a password file. The file must be owned by 'root:root' and
+#     have mode '0400'
+#   - the name of an environment variable that holds the password
 
-# Для работы этого скрипта необходимо чтобы в PostgreSQL:
-#   1. было настроено создание WAL-файлов (файл - postgresql.conf):
-#     1.1 значение опции wal_level должно быть >= archive (если ее значение уже 
-#         >= archive - изменять не нужно)
-#     1.2 значение опции wal_keep_segments должно быть > 0 (если ее значение уже 
-#         > 0 - изменять только в случае проблем и только по согласованию с командой/клиентом)
-#         При самостоятельном изменении этой опции необходимо выбрать ее значение 
-#         таким, чтобы оно было больше на 20-40% количества WAL-файлов, создающихся 
-#         за время бэкапа (при условии наличия в файловой системе достаточного 
-#         количества доступного места):
-#        1.2.1 определить время выполения бэкапа
-#        1.2.2 определить количество генерирующихся за это время WAL-файлов
-#        1.2.3 установить wal_keep_segments равной (1.2 ~ 1.4) x (количество генерирующихся за время выполения бэкапа WAL-файлов)
-#        1.2.4 убедится что в файловой системе, в которой хранятся WAL-файлы, 
-#              доступно места больше чем (wal_keep_segments x wal_segment_size)
-#     1.3 значение опции max_wal_senders должно быть > 0 (рекомендуемое значение - 5,
-#         если ее значение уже > 0 - изменять только в случае проблем и только по 
-#         согласованию с командой/клиентом)
-#     1.4 для применения этих параметров требуется перезупуск сервиса PostgreSQL
-#   2. была разрешена репликация для системного пользователя postgres с адреса 
-#      127.0.0.1/32 или с Unix-сокета (файл - pg_hba.conf):
-#     2.1 должна присутствовать незакомментированная строка
+# This script requires PostgreSQL to be configured as follows:
+#   1. WAL generation is configured (file - postgresql.conf):
+#     1.1 wal_level must be >= archive (leave it unchanged if it is already
+#         >= archive)
+#     1.2 wal_keep_segments must be > 0 (if it is already
+#         > 0, change it only when there is a problem and only after agreeing with the team/client)
+#         If this option is changed independently, pick a value
+#         20-40% higher than the number of WAL files created
+#         during the backup (provided the filesystem has enough
+#         free space):
+#        1.2.1 measure how long the backup takes
+#        1.2.2 measure how many WAL files are generated in that time
+#        1.2.3 set wal_keep_segments to (1.2 ~ 1.4) x (WAL files generated during the backup)
+#        1.2.4 confirm that the filesystem that stores WAL files
+#              has more free space than (wal_keep_segments x wal_segment_size)
+#     1.3 max_wal_senders must be > 0 (recommended value is 5;
+#         if it is already > 0, change it only when there is a problem and only
+#         after agreeing with the team/client)
+#     1.4 applying these parameters requires a PostgreSQL service restart
+#   2. replication is allowed for the postgres system user from
+#      127.0.0.1/32 or a Unix socket (file - pg_hba.conf):
+#     2.1 an uncommented line must be present
 #         host    replication     postgres        127.0.0.1/32            trust
-#         или строка
+#         or the line
 #         local   replication     postgres                                trust
-#     2.2 для применения этих параметров необходимо послать PostgreSQL сигнал о 
-#         необходимости перечитать конфигурационный файл с помощью комманды 
-#         pg_ctlcluster <version> <cluster> reload, 
-#         где <version>, <cluster> - версия и имя PostgreSQL-кластера соответственно, 
-#         которые можно узнать коммандой pg_lsclusters
-#   3. версия PostgreSQL была больше либо равна 9.1
+#     2.2 to apply these parameters, send PostgreSQL a signal to
+#         reread the configuration file with
+#         pg_ctlcluster <version> <cluster> reload,
+#         where <version>, <cluster> are the PostgreSQL cluster version and name,
+#         which can be listed with pg_lsclusters
+#   3. PostgreSQL version is greater than or equal to 9.1
 
 ################################################################################
 
@@ -162,7 +160,7 @@ REPOSITORY=""
 EFFECTIVE_OPTIONS=""
 PG_BASEBACKUP_MAJOR_VERSION=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options h:r:u:p:a:k: --longoptions ,host:,port:,user:,password:,add-pg_basebackup-option:,prune:,do-su-under-user -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

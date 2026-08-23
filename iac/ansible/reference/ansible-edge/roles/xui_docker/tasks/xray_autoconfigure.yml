@@ -24,7 +24,7 @@
     - xray
     - autoconfigure
 
-- name: Set main inbound naming from route suffix (до panel session / match)
+- name: Set main inbound naming from route suffix (before panel session / match)
   ansible.builtin.set_fact:
     xui_inbound_remark: "vless-{{ xui_profile }}-{{ xui_route_suffix }}"
     xui_inbound_tag: "inbound-vless-{{ xui_profile }}-{{ xui_route_suffix }}"

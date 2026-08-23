@@ -1,52 +1,52 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа Prometheus
+# Primary backup method for Prometheus
 
-# Его можно применять если (должны выполняться все условия):
-#   1. Версия Prometheus >= 2.1
-#   2. Prometheus должен быть запущен на том же узле на котором будет
-#      запущен этот скрипт
-#   3. Prometheus должен быть запущен с опцией --web.enable-admin-api
+# Applicable when (all of the following must hold):
+#   1. Prometheus version >= 2.1
+#   2. Prometheus must be running on the same node where
+#      this script will run
+#   3. Prometheus must be started with --web.enable-admin-api
 
-# Принцип работы:
-#   - создание снимка, с помощью запроса к '/api/v1/admin/tsdb/snapshot', в подкаталоге 'snapshots'
-#     каталога с данными Prometheus ( чаще всего каталог с данными - это каталог /var/prometheus/data/ )
-#   - резервное копирование каталога /var/prometheus/data/snapshots/ с помощью скрипта borg_backup_files.sh
-#   - удаление каталога /var/prometheus/data/snapshots/
+# How it works:
+#   - create a snapshot via '/api/v1/admin/tsdb/snapshot' under the 'snapshots' subdirectory
+#     Prometheus data directory (usually /var/prometheus/data/ )
+#   - back up /var/prometheus/data/snapshots/ with borg_backup_files.sh
+#   - delete /var/prometheus/data/snapshots/
 
-# Поддерживаемые опции:
-# -n|--job-name               - имя задания, суффикс имени Borg-репозитория. Необязательный
-#                               аргумент, без указания будет использовано имя заданное в ${NAMEOFBACKUP_DEFAULT}
-# -h|--host                   - адрес подключения к Prometheus. Необязательный аргумент,
-#                               без указания будет использован адрес указанный в ${HOST_DEFAULT}
-# -r|--port                   - порт подключения к Prometheus. Необязательный аргумент,
-#                               без указания будет использован порт указанный в ${PORT_DEFAULT}
-# -u|--user                   - имя пользователя, используемого для подключения
-#                               к Prometheus. Необязательный аргумент
-# -p|--password               - путь к файлу с паролем, используемым для
-#                               подключения к Prometheus, или имя переменной
-#                               окружения, содержащей этот пароль. Необязательный аргумент
-# -t|--data-dir               - путь к каталогу с данными Prometheus. Необязательный аргумент,
-#                               без указания будет использован путь указанный в ${DATA_DIR_DEFAULT}
-# -l|--location               - location в HTTP-запросе к Prometheus выполняемого для создания снимка. Необязательный
-#                               аргумент, без указания будет использован путь указанный в ${LOCATION_DEFAULT}
-# -k|--prune                  - строка с опциями алгоритма сохранения резервных копий в
-#                               формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                               Необязательный аргумент, без указания этой опции будет
-#                               использовано значение ${CUSTOMPRUNE_DEFAULT}
+# Supported options:
+# -n|--job-name               - job name, Borg repository name suffix. Optional
+#                               argument. When omitted, the name from ${NAMEOFBACKUP_DEFAULT} is used
+# -h|--host                   - Prometheus connection address. Optional.
+#                               when omitted, the address from ${HOST_DEFAULT} is used
+# -r|--port                   - Prometheus connection port. Optional.
+#                               when omitted, the port from ${PORT_DEFAULT} is used
+# -u|--user                   - username used to connect
+#                               to Prometheus. Optional
+# -p|--password               - path to the password file used for
+#                               connecting to Prometheus, or the name of an environment
+#                               variable that holds this password. Optional
+# -t|--data-dir               - path to the Prometheus data directory. Optional.
+#                               when omitted, the path from ${DATA_DIR_DEFAULT} is used
+# -l|--location               - location in the Prometheus HTTP request used to create a snapshot. Optional
+#                               argument. When omitted, the path from ${LOCATION_DEFAULT} is used
+# -k|--prune                  - retention-options string in
+#                               Borg format, e.g. '--keep-hourly 72 --keep-within=30d'
+#                               Optional. When omitted,
+#                               ${CUSTOMPRUNE_DEFAULT} is used
 
-# Примеры использования в schedule:
+# Schedule examples:
 # borg_run_on.sh 10.0.0.1 borg_backup_prometheus.sh
 # borg_run_on.sh 10.0.0.1 borg_backup_prometheus.sh '--job-name "PRMTHS"'
 # borg_run_on.sh 10.0.0.1 borg_backup_prometheus.sh '--job-name "PRMTHS" --data-dir "/var/prometheus/data/"'
 # borg_run_on.sh 10.0.0.1 borg_backup_prometheus.sh '--job-name "PRMTHS" --data-dir "/var/prometheus/data/" --host "127.0.0.1" --port 9090'
 # borg_run_on.sh 10.0.0.1 borg_backup_prometheus.sh '--job-name "PRMTHS" --data-dir "/var/prometheus/data/" --host "127.0.0.1" --port 9090 --prune "--keep-hourly 3 --keep-within=30d"'
 
-# Запрещается указывать в качестве значения опции [-p, --password]
-# непосредственно пароль. В качестве ее значения необходимо указать:
-#   - путь к файлу с паролем. Владельцем этого файл должен быть 'root:root' и
-#     для него должны быть установлены права '0400'
-#   - имя переменной окружения, содержащей этот пароль
+# The value of [-p, --password] must not be
+# the password itself. Pass one of:
+#   - path to a password file. Owner must be 'root:root' and
+#     mode must be '0400'
+#   - the name of an environment variable that holds this password
 
 ################################################################################
 
@@ -90,17 +90,17 @@ trim_trailing_spaces()
   printf "%s" "${1}" | sed --quiet "s/^[ \t][ \t]*//;s/[ \t][ \t]*$//;p"
 }
 
-#Удаляет избыточные символы '/' в строке
+# Remove redundant '/' characters from the string
 # ${1} - string
 remove_repeating_vfs_divider()
 {
   printf "%s" "${1}" | sed --quiet "s/\/\/*/\//g;p;"
 }
 
-# Корректно сравнивает пути VFS
-# uncertain - неопределенное состояние, один из аргументов не VFS-путь
-# equal     - пути равны
-# not_equal - пути не равны
+# Compare VFS paths correctly
+# uncertain - indeterminate: one argument is not a VFS path
+# equal     - paths are equal
+# not_equal - paths are not equal
 # ${1} - one path
 # ${2} - two path
 compare_vfs_paths()
@@ -150,10 +150,10 @@ compare_vfs_paths()
   return 0
 }
 
-# Определяет уровень (глубину) переданного пути относительно корня VFS
-# 0 - не VFS путь
+# Return the depth of the given path relative to the VFS root
+# 0 - not a VFS path
 # 1 - '/'
-# 2 - '/etc', '/root', '/var' и т.п.
+# 2 - '/etc', '/root', '/var' and similar
 # ${1} - path
 get_vfs_path_level()
 {
@@ -200,7 +200,7 @@ QUERY_URL=""
 SNAPSHOTS_DIR=""
 PASSWORD_EVOLVED=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options n:h:r:u:p:t:l:k: --longoptions ,job-name:,host:,port:,user:,password:,data-dir:,location:,prune: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

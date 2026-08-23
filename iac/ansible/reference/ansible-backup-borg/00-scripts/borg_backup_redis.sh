@@ -1,53 +1,53 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - ЗАПАСНОЙ способ бэкапа Redis, чаще всего применяемый при 
-# резервном копировании Sentry
+# FALLBACK way to back up Redis, most often used when
+# backing up Sentry
 
-# Основной способ бэкапа Redis - это вызов скрипта 'borg_backup_files.sh' с 
-# указанием пути к каталогу с данными Redis, как правило вот так:
+# The primary Redis backup is 'borg_backup_files.sh' with
+# the Redis data directory, typically:
 # borg_backup_files.sh 'REDIS /var/lib/redis'
 
-# Причина по которой этот скрипт не следует применять в большинстве случаев - 
-# двукратное потребление ОЗУ процессом Redis во время операции 'BGSAVE'
-# Как правило, периодическое выполнение этой операции уже настроено в 
-# установках Redis и, соответственно, резервное копирование Redis сводится 
-# к копированию содержимого каталога с данными Redis в репозиторий бэкапов
+# This script should not be used in most cases because
+# Redis doubles its RAM use during 'BGSAVE'.
+# Periodic BGSAVE is usually already configured in Redis,
+# so Redis backup reduces to copying the Redis data
+# directory into the backup repository
 
-# Его можно применять если (должны выполняться все условия):
-#   1. его применение явно разрешено командой
-#   2. redis-server запущен на том же узле на котором будет запущен этот скрипт
+# Applicable when all of the following hold:
+#   1. the team has explicitly allowed this method
+#   2. redis-server is running on the same node where this script will run
 
-# Принцип работы:
-#   - создание снимка с помощью 'redis-cli BGSAVE'
-#   - резервное копирование снимка с помощью borg_backup_files.sh '/var/lib/redis'
+# How it works:
+#   - create a snapshot with 'redis-cli BGSAVE'
+#   - back up the snapshot with borg_backup_files.sh '/var/lib/redis'
 
-# Поддерживаемые опции:
-# -n|--job-name - имя задания, суффикс имени Borg-репозитория
-# -h|--host     - адрес подключения к redis-server
-# -r|--port     - порт подключения к redis-server
-# -s|--socket   - сокет подключения к redis-server, если указан имеет более 
-#                 высокий приоритет чем -h|--host и -r|--port
-# -p|--password - путь к файлу с паролем, используемым для подключения к 
-#                 redis-server, или имя переменной окружения, содержащей этот пароль
-# -t|--timeout  - предел времени ожидания завершения операции BGSAVE в секундах, 
-#                 по умолчанию 7200 секунд - 2 часа
-# -k|--prune    - строка с опциями алгоритма сохранения резервных копий в 
-#                 формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                 Необязательный аргумент, без указания этой опции будет 
-#                 использовано значение ${CUSTOMPRUNE_DEFAULT}
+# Supported options:
+# -n|--job-name - job name, Borg repository name suffix
+# -h|--host     - redis-server connection address
+# -r|--port     - redis-server connection port
+# -s|--socket   - redis-server connection socket; if set, takes
+#                 precedence over -h|--host and -r|--port
+# -p|--password - path to the password file used to connect to
+#                 redis-server, or the name of an environment variable that holds that password
+# -t|--timeout  - BGSAVE wait timeout in seconds;
+#                 default 7200 seconds - 2 hours
+# -k|--prune    - retention options in Borg format, for
+#                 example '--keep-hourly 72 --keep-within=30d'
+#                 Optional; if omitted,
+#                 ${CUSTOMPRUNE_DEFAULT} is used
 
-# Примеры использования в schedule:
+# Schedule usage examples:
 # borg_run_on.sh 10.0.0.1 borg_backup_redis.sh '--job-name REDIS'
 # borg_run_on.sh 10.0.0.1 borg_backup_redis.sh '--job-name REDIS --host 127.0.0.1 --port 6379'
 # borg_run_on.sh 10.0.0.1 borg_backup_redis.sh '--job-name REDIS --host 127.0.0.1 --port 6379 --password REDIS_PASS_VAR'
 # borg_run_on.sh 10.0.0.1 borg_backup_redis.sh '--job-name REDIS --host 127.0.0.1 --port 6379 --password REDIS_PASS_VAR --timeout 1800'
 # borg_run_on.sh 10.0.0.1 borg_backup_redis.sh '--job-name REDIS --host 127.0.0.1 --port 6379 --password REDIS_PASS_VAR --timeout 1800 --prune "--keep-hourly 3 --keep-within=30d"'
 
-# Запрещается указывать в качестве значения опции [-p, --password] 
-# непосредственно пароль. В качестве ее значения необходимо указать:
-#   - путь к файлу с паролем. Владельцем этого файл должен быть 'root:root' и 
-#     для него должны быть установлены права '0400'
-#   - имя переменной окружения, содержащей этот пароль
+# The [-p, --password] value must not be the password itself.
+# Use one of:
+#   - a path to a password file. The file must be owned by 'root:root' and
+#     have mode '0400'
+#   - the name of an environment variable that holds the password
 
 ################################################################################
 
@@ -128,7 +128,7 @@ CONNECTION_STRING=""
 PASSWORD_EVOLVED=""
 DATA_DIR=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options n:h:r:s:p:t:k: --longoptions ,job-name:,host:,port:,socket:,password:,timeout:,prune: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

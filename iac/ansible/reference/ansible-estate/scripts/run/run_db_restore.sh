@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Пересоздание БД PostgreSQL через плейбук управления базами estate (estate_databases/restore).
-# Выполнять из корня каталога ansible: ./scripts/run/run_db_restore.sh <db_name|all> [--check] [-v] ...
-# ВНИМАНИЕ: удаляет указанные базы и все данные в них!
-# SSH не используется (inventory localhost). Для удалённых хостов см. scripts/run/lib/docker_ssh.sh
+# Recreate a PostgreSQL database via the estate database playbook (estate_databases/restore).
+# Run from the ansible directory root: ./scripts/run/run_db_restore.sh <db_name|all> [--check] [-v] ...
+# WARNING: drops the named databases and all data in them.
+# SSH is not used (inventory localhost). For remote hosts see scripts/run/lib/docker_ssh.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 

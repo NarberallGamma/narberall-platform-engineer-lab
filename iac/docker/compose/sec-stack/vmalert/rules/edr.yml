@@ -1,19 +1,19 @@
 groups:
   - name: edr-coverage
     rules:
-      # Порогового алерта на сам процент покрытия сознательно нет: при текущих
-      # ~63% он бы горел месяцами и обесценил чат. Добавить, когда покрытие
-      # подтянут и появится целевое значение.
+      # No threshold alert on the coverage percentage itself: at the current
+      # ~63% it would fire for months and devalue the chat. Add one once
+      # coverage is raised and a target value exists.
       - alert: EdrCollectionStale
-        # Сбор идёт раз в 6 часов; полтора суток тишины — экспортер завис или
-        # источники недоступны.
+        # Collection runs every 6 hours; a day and a half of silence means
+        # the exporter is stuck or sources are unavailable.
         expr: time() - edr_collection_timestamp_seconds > 86400 * 1.5
         for: 30m
         labels:
           severity: warning
         annotations:
-          summary: "Покрытие EDR не пересчитывалось больше суток"
-          description: "Последний успешный сбор: {{ $value | humanizeDuration }} назад."
+          summary: "EDR coverage has not been recalculated for more than a day"
+          description: "Last successful collection: {{ $value | humanizeDuration }} ago."
 
       - alert: EdrCollectionFailing
         expr: edr_collect_errors > 0
@@ -21,22 +21,23 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Сбор покрытия EDR падает на секции {{ $labels.section }}"
-          description: "Метрики считаются на предыдущих данных. Смотреть логи контейнера edr-exporter."
+          summary: "EDR coverage collection is failing on section {{ $labels.section }}"
+          description: "Metrics are computed from previous data. Check edr-exporter container logs."
 
       - alert: EdrAgentsWithoutInventoryGrew
-        # Пропажу целого источника инвентаря покрытие не показывает: процент
-        # считается по тем хостам, которые видно, и остаётся красивым. Видно
-        # это только с другой стороны — по агентам, которым не нашлось хоста.
+        # Coverage does not show a whole inventory source going missing: the
+        # percentage is computed over hosts that are still visible and stays
+        # pretty. That is only visible from the other side — agents with no
+        # matching host.
         #
-        # Порог не абсолютный: 73 бесхозных агента на 13.08.2026 — это норма
-        # «на сегодня» (VDI-пул облака B, тенант project-f в облаке A, офисный
-        # сегмент, несобираемый on-prem), а не авария. Алертим на РОСТ против
-        # минимума за неделю: исчезнувший источник даёт скачок в десятки.
+        # Threshold is not absolute: 73 orphan agents on 13.08.2026 is the
+        # "for today" baseline (cloud B VDI pool, project-f tenant in cloud A,
+        # office segment, uncollectable on-prem), not an incident. Alert on
+        # GROWTH vs the weekly minimum: a vanished source jumps by tens.
         #
-        # Метрика тенантная: у компаний общего тенанта значение одинаковое,
-        # поэтому один потерянный источник даст несколько строк в сообщении —
-        # это одна проблема, а не несколько. Суммировать по company нельзя.
+        # Metric is tenant-scoped: companies in a shared tenant share the
+        # same value, so one lost source produces several rows in the
+        # message — that is one problem, not several. Do not sum by company.
         expr: >
           edr_agents_without_inventory
           - min_over_time(edr_agents_without_inventory[7d]) > 15
@@ -44,18 +45,19 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "У тенанта {{ $labels.company }} прибавилось агентов без инвентаря (+{{ $value }})"
-          description: "Похоже, отвалился источник инвентаря: агенты есть, хостов под них нет. Проверить выгрузки AD/облаков в /opt/sec-stack/exporters/edr/data."
+          summary: "Tenant {{ $labels.company }} gained agents without inventory (+{{ $value }})"
+          description: "Looks like an inventory source dropped: agents exist, hosts for them do not. Check AD/cloud exports in /opt/sec-stack/exporters/edr/data."
 
       - alert: EdrSourceDataStale
-        # Выгрузка из EDR vendor пока кладётся руками — если про неё забыли,
-        # покрытие на дашборде превращается в тыкву незаметно. Смотрим на время
-        # ВНУТРИ данных, а не на mtime файла: копирование переставляет mtime на
-        # «сейчас», и метрика по файлу показывала бы свежесть там, где её нет.
+        # The EDR vendor export is still dropped in by hand — if it is
+        # forgotten, dashboard coverage silently turns into a pumpkin. Look
+        # at the timestamp INSIDE the data, not file mtime: a copy resets
+        # mtime to "now", and a file-based metric would show freshness
+        # where there is none.
         expr: time() - edr_source_data_timestamp_seconds{source="edr"} > 86400 * 14
         for: 1h
         labels:
           severity: warning
         annotations:
-          summary: "Выгрузка EDR по {{ $labels.company }} не обновлялась больше двух недель"
-          description: "Файл {{ $labels.company }}_edr.csv старше 14 дней — цифры покрытия неактуальны."
+          summary: "EDR export for {{ $labels.company }} has not been updated for more than two weeks"
+          description: "File {{ $labels.company }}_edr.csv is older than 14 days — coverage numbers are stale."

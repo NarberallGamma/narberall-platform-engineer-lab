@@ -1,9 +1,9 @@
-//локал стор + модули авторизации которые добавлены во флоу + настроойка каналов доставки
+// local store + auth modules added to the flow + delivery-channel settings
 {
-    //Конфигурация плагинов
+    // Plugin configuration
     "Plugins": 
 	{
-        //Модули аутентификации
+        // Authentication modules
         "IAuthenticationModule": [
             //DataStoreLoginModule
             {
@@ -39,7 +39,7 @@
                 }
             }
         ],
-        // Каналы доставки
+        // Delivery channels
         "IMessagingChannel": [
             //FileMessagingChannel
             {
@@ -105,7 +105,7 @@
             }
         ]
     },
-    //Конфигурация потоков аутентификации
+    // Authentication flow configuration
     "AuthFlows": 
 		{
 			"Default": 

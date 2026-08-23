@@ -1,4 +1,4 @@
-"""certbot certonly + плагин REG.RU DNS (entry point «dns», флаги --dns-* в Certbot 3.x). Вызов через бинарник certbot из PATH (python -m certbot в части сборок недоступен)."""
+"""certbot certonly + REG.RU DNS plugin (entry point "dns", --dns-* flags in Certbot 3.x). Call the certbot binary from PATH (python -m certbot is unavailable in some builds)."""
 
 from __future__ import annotations
 
@@ -14,9 +14,9 @@ from regru_ini import RegruCredentialsError, resolve_regru_credentials_path
 def build_certbot_cmd(cfg: OrchestratorConfig, force_renewal: bool = False) -> List[str]:
     le = cfg.letsencrypt
     if not (le.email or "").strip():
-        raise ValueError("letsencrypt.email обязателен для certbot")
+        raise ValueError("letsencrypt.email is required for certbot")
     if not (le.domain or "").strip():
-        raise ValueError("letsencrypt.domain обязателен")
+        raise ValueError("letsencrypt.domain is required")
     creds = resolve_regru_credentials_path(le)
     domain = le.domain.strip()
     certbot_bin = shutil.which("certbot") or "certbot"

@@ -1,9 +1,9 @@
 ---
-# groupfolders_etc_ldap_reset: сброс кеша LDAP для указанных групп (occ ldap:reset-group).
-# Подключается из main.yml при nextcloud_ldap_reset_groups_enabled и непустом nextcloud_ldap_reset_groups.
-# Создание папок и назначение прав по матрице в этом запуске не выполняются.
+# groupfolders_etc_ldap_reset: reset LDAP cache for the listed groups (occ ldap:reset-group).
+# Included from main.yml when nextcloud_ldap_reset_groups_enabled and nextcloud_ldap_reset_groups is non-empty.
+# Folder creation and matrix permissions are not run in this invocation.
 
-- name: Сбросить кеш LDAP для указанных групп (occ ldap:reset-group)
+- name: Reset LDAP cache for the listed groups (occ ldap:reset-group)
   ansible.builtin.shell: |
     docker exec -u www-data {{ nextcloud_container_name }} php occ --no-warnings ldap:reset-group -y "{{ item }}"
   loop: "{{ nextcloud_ldap_reset_groups }}"
@@ -13,6 +13,6 @@
   changed_when: (_ldap_reset_result.results | default([]) | length) > 0
   failed_when: false
 
-- name: Итог режима сброса LDAP — создание папок и назначение прав в этом запуске не выполняются
+- name: LDAP-reset summary — folder creation and permissions are skipped in this run
   ansible.builtin.debug:
-    msg: "Режим сброса LDAP-групп выполнен ({{ nextcloud_ldap_reset_groups | length }} групп). Создание иерархии по матрице и назначение прав в этом запуске пропущены. При следующем запуске с nextcloud_ldap_reset_groups_enabled: false группы из AD подтянутся под правильными именами."
+    msg: "LDAP group reset completed ({{ nextcloud_ldap_reset_groups | length }} groups). Matrix hierarchy creation and permission apply were skipped in this run. On the next run with nextcloud_ldap_reset_groups_enabled: false, groups from AD are pulled under the correct names."

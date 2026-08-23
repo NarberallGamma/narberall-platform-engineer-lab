@@ -1,5 +1,5 @@
 ---
-# KV v2 в Vault. Окружение на control node: VAULT_ADDR, VAULT_TOKEN.
+# KV v2 in Vault. Control-node environment: VAULT_ADDR, VAULT_TOKEN.
 llm_dev_vault_mount_point: "platform-infra"
 llm_dev_vault_path: "Ubuntu_servers"
 
@@ -10,7 +10,7 @@ llm_dev_vault_key_webui_secret_key: "ansible_llm_dev_webui_secret_key"
 llm_dev_enable_api_key: false
 llm_dev_enable_hf_token: false
 
-# Если playbook вызывается без group_vars — безопасное значение для условий Vault в llm_dev_init
+# Safe default for Vault conditions in llm_dev_init when the playbook runs without group_vars
 llm_dev_open_webui_enabled: false
 
 llm_dev_model_fetch_enabled: false

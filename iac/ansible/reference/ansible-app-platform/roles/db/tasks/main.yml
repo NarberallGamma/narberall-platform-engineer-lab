@@ -1,4 +1,4 @@
-- name: Установить psycopg2 при необходимости
+- name: Install psycopg2 if needed
   ansible.builtin.pip:
     name: psycopg2-binary
     state: present
@@ -15,7 +15,7 @@
     login_port: "{{ pg_port }}"
   loop: "{{ db }}"
 
-- name: "Создание баз данных PostgreSQL"
+- name: "Create PostgreSQL databases"
   community.general.postgresql_db:
     name: "{{ item.name }}"
     encoding: "{{ default_encoding }}"

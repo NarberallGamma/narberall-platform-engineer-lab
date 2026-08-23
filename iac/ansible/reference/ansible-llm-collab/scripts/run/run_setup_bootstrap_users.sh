@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Bootstrap пользователей ansible и gitlab-runner.
+# Bootstrap ansible and gitlab-runner users.
 #
-# SSH-ключ с passphrase (WSL): eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
+# SSH key with a passphrase (WSL): eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
 #   ./scripts/run/run_setup_bootstrap_users.sh --remote --limit HOST --ssh-key ~/.ssh/your_key --ssh-agent
-# -u/--user: первый SSH-пользователь (передаётся как -e ansible_user=…).
-# Подробнее: scripts/run/lib/docker_ssh.sh
+# -u/--user: first SSH user (passed as -e ansible_user=…).
+# Details: scripts/run/lib/docker_ssh.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/docker_ssh.sh

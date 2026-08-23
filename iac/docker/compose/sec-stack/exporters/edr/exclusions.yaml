@@ -1,27 +1,27 @@
-# Хосты, исключённые из расчёта EDR-покрытия (appliance, сетевое железо и т.п.)
-# Исключённые хосты остаются в edr_coverage_report.csv с флагом excluded=True,
-# но не учитываются в метриках.
+# Hosts excluded from EDR coverage calculation (appliances, network gear, etc.)
+# Excluded hosts stay in edr_coverage_report.csv with excluded=True,
+# but are not counted in metrics.
 #
-# Правила применяются в порядке: global → company.
-# Хост исключается, если совпадает хотя бы одно правило из любой секции.
+# Rules apply in order: global → company.
+# A host is excluded if it matches at least one rule from any section.
 
-# Применяется ко всем компаниям
+# Applies to all companies
 global:
-  # Glob-паттерны по hostname (регистронезависимо). * — любая подстрока, ? — один символ.
+  # Hostname glob patterns (case-insensitive). * — any substring, ? — one character.
   patterns:
-    - "ngfw*"          # межсетевые экраны
-    - "*-ngfw-*"       # ngfw-ноды в середине имени (в т.ч. из облачного тега NGFW)
+    - "ngfw*"          # firewalls
+    - "*-ngfw-*"       # ngfw nodes in the middle of the name (incl. cloud NGFW tag)
 #    - "palo-*"        # Palo Alto
 #    - "*.oob"         # out-of-band management
-  # Точные имена хостов (регистронезависимо)
+  # Exact hostnames (case-insensitive)
   hostnames: []
-  # IP-адреса (точное совпадение с полем sourceip)
+  # IP addresses (exact match against the sourceip field)
   ips: []
-  # OU из Active Directory: хост исключается, если его DN содержит любой из этих суффиксов.
-  # Указывается как часть DN, начиная с OU= (регистронезависимо).
+  # Active Directory OUs: a host is excluded if its DN contains any of these suffixes.
+  # Specified as a DN fragment starting at OU= (case-insensitive).
   ous: []
 
-# Дополнения для конкретных компаний (добавляются к global, не заменяют)
+# Per-company extras (added to global, do not replace it)
 companies:
   my-company:
     patterns:

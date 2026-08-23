@@ -16,7 +16,7 @@
     "list": [
       {
         "name": "company",
-        "label": "Компания",
+        "label": "Company",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -38,8 +38,8 @@
     {
       "id": 1,
       "type": "stat",
-      "title": "Покрытие EDR",
-      "description": "Доля хостов в пуле, на которых найден агент. Считается из счётчиков, а не берётся готовым процентом — поэтому корректно агрегируется по любому набору компаний.",
+      "title": "EDR coverage",
+      "description": "Share of hosts in the pool that have an agent. Computed from counters, not taken as a ready-made percentage — so it aggregates correctly over any set of companies.",
       "gridPos": {
         "h": 5,
         "w": 5,
@@ -98,8 +98,8 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Агент на связи",
-      "description": "Доля хостов, у которых агент не просто установлен, а онлайн.",
+      "title": "Agent online",
+      "description": "Share of hosts whose agent is not only installed but online.",
       "gridPos": {
         "h": 5,
         "w": 5,
@@ -158,7 +158,7 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "Хостов без агента",
+      "title": "Hosts without agent",
       "gridPos": {
         "h": 5,
         "w": 4,
@@ -198,8 +198,8 @@
     {
       "id": 4,
       "type": "stat",
-      "title": "Всего хостов в пуле",
-      "description": "Знаменатель покрытия. Не входят: исключённые правилами exclusions.yaml и managed-ноды, помеченные облаком.",
+      "title": "Total hosts in pool",
+      "description": "Coverage denominator. Excluded: hosts dropped by exclusions.yaml rules and managed nodes marked by the cloud.",
       "gridPos": {
         "h": 5,
         "w": 3,
@@ -238,8 +238,8 @@
     {
       "id": 5,
       "type": "stat",
-      "title": "Свежесть данных",
-      "description": "Слева — когда последний раз считалось покрытие, справа — возраст самой старой выгрузки из EDR. Пока выгрузка кладётся руками, второе число важнее первого.",
+      "title": "Data freshness",
+      "description": "Left — when coverage was last computed; right — age of the oldest EDR export. While the export is dropped in by hand, the second number matters more.",
       "gridPos": {
         "h": 5,
         "w": 4,
@@ -253,13 +253,13 @@
       "targets": [
         {
           "expr": "time() - edr_collection_timestamp_seconds",
-          "legendFormat": "расчёт",
+          "legendFormat": "calculation",
           "instant": true,
           "refId": "A"
         },
         {
           "expr": "time() - min(edr_source_data_timestamp_seconds{source=\"edr\"})",
-          "legendFormat": "выгрузка EDR",
+          "legendFormat": "EDR export",
           "instant": true,
           "refId": "B"
         }
@@ -300,8 +300,8 @@
     {
       "id": 6,
       "type": "timeseries",
-      "title": "Динамика покрытия по компаниям",
-      "description": "Ради этого всё и затевалось: видно, растёт покрытие или стоит.",
+      "title": "Coverage trend by company",
+      "description": "This is the point of the dashboard: whether coverage is growing or stuck.",
       "gridPos": {
         "h": 9,
         "w": 12,
@@ -320,7 +320,7 @@
         },
         {
           "expr": "100 * sum(edr_hosts_with_agent{company=~\"$company\"}) / sum(edr_hosts_total{company=~\"$company\"})",
-          "legendFormat": "всего",
+          "legendFormat": "total",
           "refId": "B"
         }
       ],
@@ -339,7 +339,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "всего"
+              "options": "total"
             },
             "properties": [
               {
@@ -361,8 +361,8 @@
     {
       "id": 7,
       "type": "bargauge",
-      "title": "Покрытие по компаниям — клик проваливается в компанию",
-      "description": "Клик по столбцу открывает этот же дашборд, отфильтрованный на выбранную компанию: таблицы ниже покажут её конкретные машины.",
+      "title": "Coverage by company — click drills into the company",
+      "description": "A click on a bar opens this same dashboard filtered to the selected company: tables below show its machines.",
       "gridPos": {
         "h": 9,
         "w": 6,
@@ -398,7 +398,7 @@
           "decimals": 1,
           "links": [
             {
-              "title": "Показать хосты компании ${__field.labels.company}",
+              "title": "Show hosts of company ${__field.labels.company}",
               "url": "/d/edr-coverage/edr-coverage?var-company=${__field.labels.company}"
             }
           ],
@@ -430,7 +430,7 @@
     {
       "id": 8,
       "type": "bargauge",
-      "title": "Покрытие: серверы против АРМ",
+      "title": "Coverage: servers vs workstations",
       "gridPos": {
         "h": 9,
         "w": 6,
@@ -492,8 +492,8 @@
     {
       "id": 9,
       "type": "table",
-      "title": "Хосты без агента EDR — на них надо донести",
-      "description": "Фильтруется переменной «Компания» вверху и кликом по столбцу выше.",
+      "title": "Hosts without an EDR agent — these still need rollout",
+      "description": "Filtered by the Company variable at the top and by a click on the bar above.",
       "gridPos": {
         "h": 12,
         "w": 12,
@@ -524,9 +524,9 @@
               "job": true
             },
             "renameByName": {
-              "company": "Компания",
-              "hostname": "Хост",
-              "host_type": "Тип"
+              "company": "Company",
+              "hostname": "Host",
+              "host_type": "Type"
             }
           }
         },
@@ -535,10 +535,10 @@
           "options": {
             "sort": [
               {
-                "field": "Компания"
+                "field": "Company"
               },
               {
-                "field": "Хост"
+                "field": "Host"
               }
             ]
           }
@@ -551,7 +551,7 @@
             "count"
           ],
           "fields": [
-            "Хост"
+            "Host"
           ]
         }
       },
@@ -563,8 +563,8 @@
     {
       "id": 10,
       "type": "table",
-      "title": "Агент есть, но молчит — разбираться, а не переустанавливать",
-      "description": "Агент найден, но по данным EDR не на связи: машина выключена, агент сломан или её вывели из эксплуатации.",
+      "title": "Agent present but silent — investigate, do not reinstall",
+      "description": "Agent was found but is offline according to EDR: the machine is off, the agent is broken, or it was decommissioned.",
       "gridPos": {
         "h": 12,
         "w": 12,
@@ -595,9 +595,9 @@
               "job": true
             },
             "renameByName": {
-              "company": "Компания",
-              "hostname": "Хост",
-              "host_type": "Тип"
+              "company": "Company",
+              "hostname": "Host",
+              "host_type": "Type"
             }
           }
         },
@@ -606,10 +606,10 @@
           "options": {
             "sort": [
               {
-                "field": "Компания"
+                "field": "Company"
               },
               {
-                "field": "Хост"
+                "field": "Host"
               }
             ]
           }
@@ -622,7 +622,7 @@
             "count"
           ],
           "fields": [
-            "Хост"
+            "Host"
           ]
         }
       },
@@ -634,7 +634,7 @@
     {
       "id": 11,
       "type": "table",
-      "title": "Сводка по компаниям",
+      "title": "Company summary",
       "gridPos": {
         "h": 8,
         "w": 24,
@@ -704,12 +704,12 @@
               "Time 6": true
             },
             "renameByName": {
-              "company": "Компания",
-              "Value #A": "Всего",
-              "Value #B": "С агентом",
-              "Value #C": "На связи",
-              "Value #D": "Без агента",
-              "Value #E": "Покрытие, %",
+              "company": "Company",
+              "Value #A": "Total",
+              "Value #B": "With agent",
+              "Value #C": "Online",
+              "Value #D": "Without agent",
+              "Value #E": "Coverage, %",
               "Value #F": "Managed"
             }
           }
@@ -723,7 +723,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Покрытие, %"
+              "options": "Coverage, %"
             },
             "properties": [
               {
@@ -770,7 +770,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Без агента"
+              "options": "Without agent"
             },
             "properties": [
               {
@@ -788,8 +788,8 @@
     {
       "id": 12,
       "type": "stat",
-      "title": "Managed (агент невозможен)",
-      "description": "Ноды managed-сервисов (БД, kubernetes): облако помечает их в своём API, агент туда поставить нельзя. В покрытие не входят — ни в числитель, ни в знаменатель. Показаны отдельно, чтобы исключение было видимым, а не тихим.",
+      "title": "Managed (agent not possible)",
+      "description": "Managed-service nodes (DB, kubernetes): the cloud marks them in its API; an agent cannot be installed there. They are not in coverage — neither numerator nor denominator. Shown separately so the exclusion is visible, not silent.",
       "gridPos": {
         "h": 5,
         "w": 3,
@@ -829,8 +829,8 @@
     {
       "id": 13,
       "type": "timeseries",
-      "title": "Агенты без хоста в инвентаре — сигнал о пропавшем источнике",
-      "description": "Когда источник инвентаря отваливается целиком, покрытие остаётся красивым: процент считается по тем хостам, которые ещё видно. Заметно это только отсюда — по агентам, которым не нашлось хоста. Значение ТЕНАНТНОЕ: компании общего тенанта (project-b, project-a, project-c, project-e и др.) делят один список агентов, поэтому их линии совпадают — это одно число, а не несколько. Складывать по компаниям нельзя. Постоянный уровень (известные дыры в общем тенанте и в project-d): VDI-пул облака B, тенант project-f в облаке A, офисный сегмент, несобираемый on-prem. Смотреть надо на скачки.",
+      "title": "Agents without a host in inventory — missing-source signal",
+      "description": "When an inventory source drops entirely, coverage stays pretty: the percentage is computed over hosts that are still visible. That is only visible from here — agents with no matching host. The value is TENANT-SCOPED: companies in a shared tenant (project-b, project-a, project-c, project-e, and others) share one agent list, so their lines coincide — that is one number, not several. Do not sum by company. Steady baseline (known gaps in the shared tenant and in project-d): cloud B VDI pool, project-f tenant in cloud A, office segment, uncollectable on-prem. Watch for jumps.",
       "gridPos": {
         "h": 8,
         "w": 24,

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# LLM dev deploy. SSH-ключ с passphrase: eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
+# LLM dev deploy. SSH key with a passphrase: eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
 #   ./scripts/run/run_llm_dev.sh --limit llm-dev-01.example.com --ssh-key ~/.ssh/your_key --ssh-agent
-# Подробнее: scripts/run/lib/docker_ssh.sh
+# Details: scripts/run/lib/docker_ssh.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/docker_ssh.sh
 source "$(dirname "$0")/lib/docker_ssh.sh"
-# Подхват Vault-переменных с контрол-ноды (создаются пайплайном из CI Variables в /ansible/.env.vault).
+# Load Vault variables from the control node (created by the pipeline from CI Variables into /ansible/.env.vault).
 [ -f .env.vault ] && source .env.vault
 
 ANSIBLE_IMAGE="${ANSIBLE_IMAGE:-git.example.com/platform-infra/base-images/ansible:1.0}"
@@ -32,7 +32,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${LIMIT_HOST:-}" ]]; then
-  echo "Ошибка: задайте хост, например: --limit llm-dev-01.example.com" >&2
+  echo "Error: set a host, for example: --limit llm-dev-01.example.com" >&2
   exit 1
 fi
 
@@ -52,7 +52,7 @@ VAULT_ENV=()
 LOG_DIR="artifacts/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_DIR}/llm_dev_deploy_$(date +%Y-%m-%d_%H-%M-%S).log"
-echo "Лог вывода: $LOG_FILE" >&2
+echo "Output log: $LOG_FILE" >&2
 
 DOCKER_TTY=""
 [[ -t 0 ]] && [[ -t 1 ]] && DOCKER_TTY="-it"

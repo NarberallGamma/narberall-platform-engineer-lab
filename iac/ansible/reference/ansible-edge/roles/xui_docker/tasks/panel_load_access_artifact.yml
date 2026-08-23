@@ -1,5 +1,5 @@
 ---
-# panel-access.json на control node (логин/пароль не выводятся в setting -show)
+# panel-access.json on the control node (login/password are not printed by setting -show)
 
 - name: Init panel access cache
   ansible.builtin.set_fact:

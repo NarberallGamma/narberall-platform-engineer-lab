@@ -7,10 +7,10 @@
     - role: network
       tags: ["network"]
 
-### Задача для вызова роли исходя из включенных или выключенных миграций, и развертывания в docker или k8s
+### Include the role based on migration flags and Docker vs k8s deploy
   tasks:
 
-    ### Вызов роли для деплоя в docker без первоначальной настройки
+    ### Include the Docker deploy role without first-run setup
     - name: Include a role am no first_deploy
       ansible.builtin.include_role:
         name: am
@@ -20,14 +20,14 @@
         - "{{ not am_update_migrations | bool }}"
 
     - block:
-      ### Вызов роли для деплоя в docker с первоначальной настройки
+      ### Include the Docker deploy role with first-run setup
       - name: Include a role am with first_deploy
         ansible.builtin.include_role:
           name: amcli
         when:
           - "{{ am_first_deploy | bool }} or {{ am_update_plugins | bool }} or {{ am_update_migrations | bool }}"
 
-      ### Ожидание выполенныя первоначальных настроек
+      ### Wait for first-run setup to finish
       - name: Wait for service {{ docker_stack_name }}_{{ amcli_name }} to reach complete or failed state
         command: "docker service ps {{ docker_stack_name }}_{{ amcli_name }} --format '{{ '{{.CurrentState}}' }}'"
         register: service_state
@@ -38,7 +38,7 @@
         when:
           - "{{ am_first_deploy | bool }} or {{ am_update_plugins | bool }} or {{ am_update_migrations | bool }}"
         
-      ### Вывод сообщение об ошибке и остановка Deploy
+      ### Print an error and stop the deploy
       - name: Error message
         fail:
           msg: "Deploy no Complete !"
@@ -46,7 +46,7 @@
           - "'Complete' not in service_state.stdout"
           - "{{ am_first_deploy | bool }} or {{ am_update_plugins | bool }} or {{ am_update_migrations | bool }}"
 
-      ### Удаление контейнера первоначальных настроек в docker после успешного выполнения (не удаляет при включенном debug)
+      ### Remove the first-run setup container after success (kept when debug is on)
       - name: "{{ amcli_name }} -> Docker service {{ docker_stack_name }}_{{ amcli_name }} remove"
         docker_swarm_service:
           name: "{{ docker_stack_name }}_{{ amcli_name }}"
@@ -56,7 +56,7 @@
           - "'Complete' in service_state.stdout"
           - "{{ not am_deploy_debug | bool }}"
 
-      ### Запуск сервиса после успешного выполнения первоначальных настроек
+      ### Start the service after first-run setup succeeds
       - name: Check if the first deploy was successful and run the second playbook
         ansible.builtin.include_role:
           name: am

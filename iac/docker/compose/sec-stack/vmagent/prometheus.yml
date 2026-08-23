@@ -1,6 +1,7 @@
-# Скрейп-конфиг vmagent для площадки site-a.
-# Для других площадок (site-b, on-prem) — копия с другим external_labels.site
-# и своими таргетами; remote_write указывает на центральную VictoriaMetrics.
+# vmagent scrape config for the site-a location.
+# For other locations (site-b, on-prem) — a copy with a different
+# external_labels.site and its own targets; remote_write points at the
+# central VictoriaMetrics.
 
 global:
   scrape_interval: 30s
@@ -8,7 +9,7 @@ global:
     site: site-a
 
 scrape_configs:
-  # --- self-monitoring стека -------------------------------------------------
+  # --- stack self-monitoring --------------------------------------------------
   - job_name: victoriametrics
     static_configs:
       - targets: ["victoriametrics:8428"]
@@ -25,19 +26,19 @@ scrape_configs:
     static_configs:
       - targets: ["grafana:3000"]
 
-  # --- Palo Alto (через panos-exporter, multi-target) -------------------------
-  # В targets — имена файрволов из exporters/panos/config.yml, не IP.
+  # --- Palo Alto (via panos-exporter, multi-target) ---------------------------
+  # targets — firewall names from exporters/panos/config.yml, not IPs.
   - job_name: panos
     scrape_interval: 60s
-    # экспортер опрашивает PAN-OS API с таймаутом 15с на вызов — дефолтных 10с
-    # скрейпа не хватает, особенно пока файрволы недоступны
+    # exporter polls the PAN-OS API with a 15s timeout per call — the default
+    # 10s scrape is not enough, especially while firewalls are unreachable
     scrape_timeout: 50s
     metrics_path: /metrics
     static_configs:
       - targets:
           - ngfw01-site-a
           - ngfw02-site-a
-          # - ngfw-test-site-a   # сломан, см. exporters/panos/config.yml
+          # - ngfw-test-site-a   # broken, see exporters/panos/config.yml
           - ngfw-project-b
           - ngfw-project-c
           - ngfw01-project-d
@@ -51,26 +52,26 @@ scrape_configs:
       - target_label: __address__
         replacement: panos-exporter:9654
 
-  # --- Покрытие EDR -----------------------------------------------------------
-  # Экспортер считает покрытие фоном раз в 6 часов и отдаёт последний снапшот,
-  # поэтому обычный частый скрейп его не нагружает.
+  # --- EDR coverage -----------------------------------------------------------
+  # Exporter computes coverage in the background every 6 hours and serves the
+  # last snapshot, so a regular frequent scrape does not load it.
   - job_name: edr
     scrape_interval: 60s
     static_configs:
       - targets: ["edr-exporter:9655"]
 
   # --- Teleport ---------------------------------------------------------------
-  # На ВМ Teleport должен быть включён диагностический endpoint:
-  # teleport start --diag-addr=0.0.0.0:3000 (см. README). До этого таргет будет down.
+  # The Teleport VM must have the diagnostic endpoint enabled:
+  # teleport start --diag-addr=0.0.0.0:3000 (see README). Until then the target is down.
   - job_name: teleport
     static_configs:
       - targets: ["teleport.example.com:3000"]
         labels:
           service: teleport
 
-  # --- node_exporter на инфраструктурных ВМ -----------------------------------
-  # TODO: раскомментировать с реальными IP (ВМ Teleport + 5 db-ВМ), предварительно
-  # раскатив node_exporter ansible-ролью.
+  # --- node_exporter on infrastructure VMs ------------------------------------
+  # TODO: uncomment with real IPs (Teleport VM + 5 db VMs), after rolling out
+  # node_exporter with the ansible role.
   # - job_name: node
   #   static_configs:
   #     - targets: ["<TELEPORT_IP>:9100"]
@@ -80,16 +81,16 @@ scrape_configs:
   #       labels:
   #         role: teleport-db
 
-  # --- TLS-endpoints: доступность + срок сертификата --------------------------
+  # --- TLS endpoints: availability + certificate expiry -----------------------
   - job_name: blackbox-tls
     metrics_path: /probe
     params:
       module: [http_2xx]
     static_configs:
       - targets:
-          - https://git.example.com              # GitLab — первый реальный TLS-таргет
-          - https://vault.example.com    # Vaultwarden (пароли)
-          # TODO: Teleport proxy, веб-морды файрволов, GP-порталы и т.д.
+          - https://git.example.com              # GitLab — first real TLS target
+          - https://vault.example.com    # Vaultwarden (passwords)
+          # TODO: Teleport proxy, firewall web UIs, GP portals, etc.
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -98,16 +99,16 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox:9115
 
-  # --- ICMP: базовая достижимость ----------------------------------------------
-  # Пинг С ЭТОЙ ВМ. Для пингов "от ВМ A к ВМ B" blackbox ставится на ВМ A —
-  # это следующий этап.
+  # --- ICMP: basic reachability -----------------------------------------------
+  # Ping FROM THIS VM. For pings "from VM A to VM B" blackbox is placed on VM A —
+  # that is the next step.
   - job_name: blackbox-icmp
     metrics_path: /probe
     params:
       module: [icmp]
     static_configs:
       - targets:
-          - 10.10.1.20   # GitLab; TODO: mgmt-IP файрволов и другие критичные адреса
+          - 10.10.1.20   # GitLab; TODO: firewall mgmt IPs and other critical addresses
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

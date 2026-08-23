@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
-# Этот скрипт - способ бэкапа ETCD со взятием снапшота прямиком из маунта на ноде
+# This script backs up ETCD by taking a snapshot from the node mount
 
-# Скрипт необходимо запускать на узле с Master-компонентами Kubernetes, чаще
-# всего им является узел с именем kube-master или именем bastion
+# The script must run on a node with Kubernetes Master components, most
+# often a node named kube-master or bastion
 
-# Принцип работы:
-#   - получение списка подов ETCD в пространстве имен kube-system
-#   - для каждого пода:
-#     - для версии ETCDCTL_API равной 2:
-#       - копирование каталога с данными ETCD во временный каталог ${BACKUP_DIR}
-#     - для версии ETCDCTL_API равной 3:
-#       - создание снимка данных ETCD с помощью 'etcdctl snapshot save'
-#       - копирование снимка в файл etcd-snapshot во временный каталог ${BACKUP_DIR}
-#     - сохранение версии ETCD в файле etcd-version.txt во временном каталоге ${BACKUP_DIR}
-#   - резервное копирование каталога ${BACKUP_DIR} с помощью скрипта borg_backup_files.sh
+# How it works:
+#   - list ETCD pods in the kube-system namespace
+#   - for each pod:
+#     - when ETCDCTL_API is 2:
+#       - copy the ETCD data directory to temporary directory ${BACKUP_DIR}
+#     - when ETCDCTL_API is 3:
+#       - create an ETCD data snapshot with 'etcdctl snapshot save'
+#       - copy the snapshot to etcd-snapshot in temporary directory ${BACKUP_DIR}
+#     - save the ETCD version to etcd-version.txt in temporary directory ${BACKUP_DIR}
+#   - back up directory ${BACKUP_DIR} with borg_backup_files.sh
 
-# Примеры использования в schedule:
+# Usage examples in schedule:
 # borg_run_on.sh 10.0.0.1 borg_backup_etcd_by_node.sh kube-master-X
 
 ################################################################################
 
-# Путь до конфига kubectl
+# Path to the kubectl config
 KUBECONF_FILE="/root/.kube/config"
 export KUBECONFIG=${KUBECONF_FILE}
 KUBECTL="/opt/deckhouse/bin/kubectl"
 
 BACKUP_DIR="/var/lib/etcd/backup"
 
-# Регексп по которому грепать под etcd
+# Regex used to grep the etcd pod
 ETCD_PODS_REGEX="etcd-"
 ETCD_SNAPSHOT_FILE="/var/lib/etcd/backup/etcd-snapshot"
 
@@ -79,7 +79,7 @@ if [ $(ip a | grep $(${KUBECTL} describe no ${ETCD_NODE} |grep InternalIP | awk 
   exit 1
 fi
 
-#Список подов с именем попадающим под ${ETCD_PODS_REGEX} находящихся на узле
+# Pods on this node whose names match ${ETCD_PODS_REGEX}
 PODS="$( ${KUBECTL} -n kube-system get pods -o wide| grep "${ETCD_PODS_REGEX}" | grep ${ETCD_NODE} | awk '{print $1}' )"
 if test -z "${PODS}";
 then
@@ -90,7 +90,7 @@ fi
 echo "Found pods:
 ${PODS}"
 
-#Список подов в которых присутствует etcdctl (определяется через получение версии etcdctl)
+# Pods that have etcdctl (detected by reading the etcdctl version)
 for pod in ${PODS};
 do
   etcdctl_version=""
@@ -127,7 +127,7 @@ echo "Valid pods:
 ${ETCD_PODS}"
 echo "Valid pods count: ${ETCD_PODS_COUNT}"
 
-#Определение максимально поддерживаемой версии ETCDCTL_API
+# Determine the highest supported ETCDCTL_API version
 for pod in ${ETCD_PODS};
 do
   for probe in ${ETCDCTL_VERSION_PROBES};

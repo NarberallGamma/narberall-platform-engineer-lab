@@ -1,7 +1,7 @@
 ---
-# Удалить inbound по remark из xui_legacy_inbound_remarks_remove (миграция имён).
+# Remove inbounds by remark from xui_legacy_inbound_remarks_remove (name migration).
 
-- name: Remove legacy inbounds by remark (not on target port — порт мигрирует через sync)
+- name: Remove legacy inbounds by remark (not on target port — port migrates via sync)
   ansible.builtin.uri:
     url: "{{ xui_panel_url_base }}panel/api/inbounds/del/{{ legacy_inbound.id }}"
     method: POST

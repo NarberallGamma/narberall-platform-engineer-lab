@@ -1,34 +1,34 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - способ бэкапа ETCD развернутого в кластере для patroni
+# This script backs up ETCD deployed in a cluster for Patroni
 
-# Скрипт необходимо запускать на узле с Master-компонентами Kubernetes, чаще
-# всего им является узел с именем kube-master или именем bastion
+# The script must run on a node with Kubernetes Master components, most
+# often a node named kube-master or bastion
 
-# Принцип работы:
-#   - получение списка подов ETCD в пространстве имен infra-patroni-etcd
-#   - для каждого пода:
-#     - для версии ETCDCTL_API равной 2:
-#       - копирование каталога с данными ETCD во временный каталог ${BACKUP_DIR}
-#     - для версии ETCDCTL_API равной 3:
-#       - создание снимка данных ETCD с помощью 'etcdctl snapshot save'
-#       - копирование снимка в файл etcd-snapshot во временный каталог ${BACKUP_DIR}
-#     - сохранение версии ETCD в файле etcd-version.txt во временном каталоге ${BACKUP_DIR}
-#   - резервное копирование каталога ${BACKUP_DIR} с помощью скрипта borg_backup_files.sh
+# How it works:
+#   - list ETCD pods in the infra-patroni-etcd namespace
+#   - for each pod:
+#     - when ETCDCTL_API is 2:
+#       - copy the ETCD data directory to temporary directory ${BACKUP_DIR}
+#     - when ETCDCTL_API is 3:
+#       - create an ETCD data snapshot with 'etcdctl snapshot save'
+#       - copy the snapshot to etcd-snapshot in temporary directory ${BACKUP_DIR}
+#     - save the ETCD version to etcd-version.txt in temporary directory ${BACKUP_DIR}
+#   - back up directory ${BACKUP_DIR} with borg_backup_files.sh
 
-# Примеры использования в schedule:
+# Usage examples in schedule:
 # borg_run_on.sh 10.0.0.1 borg_backup_etcd_patroni.sh
 
 ################################################################################
 
-# Путь до конфига kubectl
+# Path to the kubectl config
 KUBECONF_FILE="/root/.kube/config"
 export KUBECONFIG=${KUBECONF_FILE}
 KUBECTL="/opt/deckhouse/bin/kubectl"
 
 BACKUP_DIR="/tmp/backup/etcd/"
 
-# Регексп по которому грепать под etcd
+# Regex used to grep the etcd pod
 ETCD_PODS_REGEX="patroni-etcd"
 ETCD_SNAPSHOT_FILE="/tmp/etcd-backup"
 
@@ -75,7 +75,7 @@ ETCDCTL_API_MAX="${ETCDCTL_API_MIN}"
 
 IFS=$'\n'
 
-#Список подов с именем попадающим под ${ETCD_PODS_REGEX}
+# Pods whose names match ${ETCD_PODS_REGEX}
 PODS="$( ${KUBECTL} -n infra-patroni-etcd get pods | grep "${ETCD_PODS_REGEX}" | awk '{print $1}' )"
 if test -z "${PODS}";
 then
@@ -86,7 +86,7 @@ fi
 echo "Find pods:
 ${PODS}"
 
-#Список подов в которых присутствует etcdctl (определяется через получение версии etcdctl)
+# Pods that have etcdctl (detected by reading the etcdctl version)
 for pod in ${PODS};
 do
   etcdctl_version=""
@@ -123,7 +123,7 @@ echo "Valid pods:
 ${ETCD_PODS}"
 echo "Valid pods count: ${ETCD_PODS_COUNT}"
 
-#Определение максимально поддерживаемой версии ETCDCTL_API
+# Determine the highest supported ETCDCTL_API version
 for pod in ${ETCD_PODS};
 do
   for probe in ${ETCDCTL_VERSION_PROBES};

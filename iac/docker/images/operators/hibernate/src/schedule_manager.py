@@ -392,7 +392,7 @@ class ScheduleManager:
                                 # Same day - check time overlap
                                 if self._times_overlap(sched1['start_time'], sched1['end_time'],
                                                        sched2['start_time'], sched2['end_time']):
-                                    warnings.append(f"Пересечение расписаний: '{sched1['original']}' и '{sched2['original']}'")
+                                    warnings.append(f"Overlapping schedules: '{sched1['original']}' and '{sched2['original']}'")
         
         return (len(warnings) == 0, warnings)
     

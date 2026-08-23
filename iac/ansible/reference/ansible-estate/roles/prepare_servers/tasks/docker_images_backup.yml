@@ -1,8 +1,8 @@
 ---
-# Сохранение локальных образов Docker в tar до purge docker.io или docker_migrate (остановка engine).
-# Восстановление: tasks/docker_images_restore.yml после установки docker-ce и старта Docker.
+# Save local Docker images to tar before purge docker.io or docker_migrate (engine stop).
+# Restore: tasks/docker_images_restore.yml after docker-ce install and Docker start.
 
-- name: Условие бэкапа образов Docker
+- name: Docker images backup condition
   ansible.builtin.set_fact:
     docker_images_backup_needed: >-
       {{
@@ -14,26 +14,26 @@
       }}
   tags: [docker]
 
-- name: Проверить маркер бэкапа образов Docker
+- name: Check Docker images backup marker
   ansible.builtin.stat:
     path: "{{ docker_images_backup_marker }}"
   register: docker_images_backup_marker_stat
   when: docker_images_backup_needed
   tags: [docker]
 
-- name: Бэкап образов Docker в tar (docker save)
+- name: Backup Docker images to tar (docker save)
   when:
     - docker_images_backup_needed
     - not docker_images_backup_marker_stat.stat.exists | default(false)
   block:
-    - name: Проверить доступность Docker для бэкапа образов
+    - name: Check Docker availability for image backup
       ansible.builtin.command: docker info
       register: docker_backup_info
       changed_when: false
       failed_when: false
       tags: [docker]
 
-    - name: Запустить Docker для бэкапа образов (если остановлен)
+    - name: Start Docker for image backup (if stopped)
       ansible.builtin.systemd:
         name: docker
         state: started
@@ -41,14 +41,14 @@
       failed_when: false
       tags: [docker]
 
-    - name: Повторная проверка Docker для бэкапа образов
+    - name: Recheck Docker for image backup
       ansible.builtin.command: docker info
       register: docker_backup_info_retry
       changed_when: false
       failed_when: false
       tags: [docker]
 
-    - name: Список образов Docker для бэкапа
+    - name: List Docker images for backup
       ansible.builtin.shell: |
         set -euo pipefail
         docker images --format '{{ "{{" }}.Repository{{ "}}" }}:{{ "{{" }}.Tag{{ "}}" }}'
@@ -59,7 +59,7 @@
       when: docker_backup_info_retry.rc == 0
       tags: [docker]
 
-    - name: Отфильтровать образы для бэкапа
+    - name: Filter images for backup
       ansible.builtin.set_fact:
         docker_images_backup_list: >-
           {{
@@ -73,7 +73,7 @@
       when: docker_backup_info_retry.rc == 0
       tags: [docker]
 
-    - name: Каталог бэкапа образов Docker
+    - name: Docker images backup directory
       ansible.builtin.file:
         path: "{{ docker_images_backup_dir }}"
         state: directory
@@ -83,7 +83,7 @@
         - docker_images_backup_list | default([]) | length > 0
       tags: [docker]
 
-    - name: Сохранить образы Docker в tar (docker save)
+    - name: Save Docker images to tar (docker save)
       ansible.builtin.command:
         argv:
           - docker
@@ -96,7 +96,7 @@
       register: docker_save_results
       tags: [docker]
 
-    - name: Маркер завершённого бэкапа образов Docker
+    - name: Marker for completed Docker images backup
       ansible.builtin.copy:
         dest: "{{ docker_images_backup_marker }}"
         content: |
@@ -108,18 +108,18 @@
       when: docker_backup_info_retry.rc == 0
       tags: [docker]
 
-    - name: Итог бэкапа образов Docker
+    - name: Docker images backup summary
       ansible.builtin.debug:
         msg: |
-          Бэкап образов Docker на {{ inventory_hostname }}: {{ docker_images_backup_list | default([]) | length }} tar в {{ docker_images_backup_dir }}.
-          После миграции и docker load проверить: docker images
-          Удалить каталог бэкапа после успешной проверки: rm -rf {{ docker_images_backup_dir }}
+          Docker images backup on {{ inventory_hostname }}: {{ docker_images_backup_list | default([]) | length }} tar in {{ docker_images_backup_dir }}.
+          After migrate and docker load, verify: docker images
+          Remove the backup directory after a successful check: rm -rf {{ docker_images_backup_dir }}
       when: docker_images_backup_list | default([]) | length > 0
       tags: [docker]
 
-    - name: Бэкап образов Docker пропущен (нет локальных образов)
+    - name: Docker images backup skipped (no local images)
       ansible.builtin.debug:
-        msg: "Бэкап образов Docker: локальных образов не найдено, tar не создавались."
+        msg: "Docker images backup: no local images found, no tar files created."
       when:
         - docker_backup_info_retry.rc == 0
         - docker_images_backup_list | default([]) | length == 0

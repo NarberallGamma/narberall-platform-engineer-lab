@@ -1,13 +1,13 @@
 ---
-# Самоподписанный сертификат и PKCS12 для listener SASL_SSL.
-# Повторный прогон не перезаписывает существующий kafka.keystore.p12 — удалить файл для перевыпуска.
+# Self-signed certificate and PKCS12 for the SASL_SSL listener.
+# A rerun does not overwrite an existing kafka.keystore.p12 — delete the file to reissue.
 
-- name: Проверить наличие keystore
+- name: Check whether the keystore exists
   ansible.builtin.stat:
     path: "{{ kafka_config_dir }}/ssl/kafka.keystore.p12"
   register: kafka_keystore_stat
 
-- name: Сгенерировать TLS-ключ и сертификат для брокера
+- name: Generate a TLS key and certificate for the broker
   ansible.builtin.command:
     argv:
       - openssl
@@ -27,7 +27,7 @@
       - "subjectAltName=DNS:{{ kafka_ssl_cert_cn }}"
   when: not kafka_keystore_stat.stat.exists
 
-- name: Собрать PKCS12 keystore
+- name: Build the PKCS12 keystore
   ansible.builtin.command:
     argv:
       - openssl
@@ -46,7 +46,7 @@
   when: not kafka_keystore_stat.stat.exists
   no_log: true
 
-- name: Права на файлы TLS
+- name: Permissions on TLS files
   ansible.builtin.file:
     path: "{{ item }}"
     mode: "{{ '0600' if ('.key' in item) else '0644' }}"

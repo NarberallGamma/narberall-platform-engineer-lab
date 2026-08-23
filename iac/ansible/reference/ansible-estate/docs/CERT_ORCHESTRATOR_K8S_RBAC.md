@@ -1,12 +1,12 @@
-# cert-orchestrator: K8s RBAC и токен
+# cert-orchestrator: K8s RBAC and token
 
-Выполнять на **GitLab control node** с рабочим `kubectl` (preprod: `estate-preprod-gitlab`, prod: `estate-prod-gitlab`).
+Run on the **GitLab control node** with a working `kubectl` (preprod: `estate-preprod-gitlab`, prod: `estate-prod-gitlab`).
 
-Оркестратор ходит в API по `kubernetes.api_server` + `K8S_TOKEN` + CA (`k8s_ca_cert` в Vault). Список namespace: `cert_orchestrator_k8s_namespace_secrets` в `group_vars/cert-orchestrator.yml`.
+The orchestrator calls the API with `kubernetes.api_server` + `K8S_TOKEN` + CA (`k8s_ca_cert` in Vault). Namespace list: `cert_orchestrator_k8s_namespace_secrets` in `group_vars/cert-orchestrator.yml`.
 
-## 1. Манифест
+## 1. Manifest
 
-Файл `/tmp/cert-orchestrator-rbac.yaml`:
+File `/tmp/cert-orchestrator-rbac.yaml`:
 
 ```yaml
 apiVersion: v1
@@ -56,7 +56,7 @@ type: kubernetes.io/service-account-token
 kubectl apply -f /tmp/cert-orchestrator-rbac.yaml
 ```
 
-Проверка:
+Check:
 
 ```bash
 kubectl auth can-i patch secrets/wildcard-tls \
@@ -64,7 +64,7 @@ kubectl auth can-i patch secrets/wildcard-tls \
   -n platform
 ```
 
-## 2. Токен и CA в Vault
+## 2. Token and CA in Vault
 
 ```bash
 kubectl get secret cert-orchestrator-token -n cert-orchestrator \
@@ -84,7 +84,7 @@ vault kv patch ansible/cert-orchestrator \
   k8s_ca_cert=@/tmp/k8s-ca.crt
 ```
 
-Prod (на `estate-prod-gitlab`, свой kube context):
+Prod (on `estate-prod-gitlab`, its own kube context):
 
 ```bash
 export VAULT_ADDR=https://vault.example.com
@@ -102,8 +102,8 @@ cd /ansible && source .env.vault
 # ./scripts/run/run_docker_app.sh deploy cert-orchestrator --prod --limit estate-prod-gitlab
 ```
 
-## Примечания
+## Notes
 
-- Secret `kubernetes.io/service-account-token`: токен без срока, пока Secret не удалён (legacy, для automation).
-- Bound token (если нужен): `kubectl create token cert-orchestrator -n cert-orchestrator --duration=8760h`
-- См. также: `DOCKER_APPS_VAULT_SECRETS.md`
+- Secret `kubernetes.io/service-account-token`: token with no expiry while the Secret exists (legacy, for automation).
+- Bound token (if needed): `kubectl create token cert-orchestrator -n cert-orchestrator --duration=8760h`
+- See also: `DOCKER_APPS_VAULT_SECRETS.md`

@@ -1,11 +1,11 @@
 ---
-- name: Каталог стека
+- name: Stack directory
   ansible.builtin.file:
     path: "{{ sec_stack_dir }}"
     state: directory
     mode: "0755"
 
-- name: Выложить stack/ (compose + конфиги + экспортеры)
+- name: Deploy stack/ (compose + configs + exporters)
   ansible.builtin.copy:
     src: "{{ playbook_dir }}/../../stack/"
     dest: "{{ sec_stack_dir }}/"
@@ -13,11 +13,11 @@
   register: sec_stack_files
   notify: Restart stack services with static configs
 
-- name: Каталог данных edr-exporter
-  # Живёт вне stack/ в репозитории: сюда сборщики (в контейнере, под nobody)
-  # пишут CSV-выгрузки и отчёт. recurse + владелец nobody — чтобы контейнер мог
-  # ПЕРЕЗАПИСАТЬ и старые файлы (иначе PermissionError на чужих по владельцу).
-  # Символьный режим: каталогам X (0775), файлам без X (0664).
+- name: edr-exporter data directory
+  # Lives outside stack/ in the repo: collectors (in the container, as nobody)
+  # write CSV dumps and the report here. recurse + owner nobody so the container
+  # can OVERWRITE old files (otherwise PermissionError on files owned by others).
+  # Symbolic mode: directories get X (0775), files do not (0664).
   ansible.builtin.file:
     path: "{{ sec_stack_dir }}/exporters/edr/data"
     state: directory
@@ -26,27 +26,27 @@
     mode: "u=rwX,g=rwX,o=rX"
     recurse: true
 
-- name: Выложить exclusions.yaml для edr-exporter
-  # Конфиг покрытия для прода живёт здесь (копия в cybersec/edr-coverage — для
-  # ручных прогонов с ноутбука). Правки — через MR, а не руками на ВМ.
+- name: Deploy exclusions.yaml for edr-exporter
+  # Prod coverage config lives here (a copy in cybersec/edr-coverage is for
+  # laptop runs). Changes go through an MR, not by hand on the VM.
   ansible.builtin.copy:
     src: "{{ playbook_dir }}/../../stack/exporters/edr/exclusions.yaml"
     dest: "{{ sec_stack_dir }}/exporters/edr/data/exclusions.yaml"
     mode: "0644"
 
-- name: Выложить aliases.yaml для edr-exporter
-  # Ручные соответствия «хост -> агент» (маки, регистрирующиеся под локальным
-  # именем). Файл необязательный для экспортера, но здесь он есть всегда —
-  # пустой companies: {} ведёт себя так же, как отсутствие файла.
+- name: Deploy aliases.yaml for edr-exporter
+  # Manual "host -> agent" mappings (Macs that register under a local name).
+  # Optional for the exporter, but always present here —
+  # empty companies: {} behaves the same as a missing file.
   ansible.builtin.copy:
     src: "{{ playbook_dir }}/../../stack/exporters/edr/aliases.yaml"
     dest: "{{ sec_stack_dir }}/exporters/edr/data/aliases.yaml"
     mode: "0644"
 
-- name: Каталог конфигов сборщиков edr-exporter
-  # Секретные конфиги AD/облаков/edr-vendor. Отдельно от data/: монтируется в
-  # контейнер read-only. 0750 + группа deploy-пользователя, владелец nobody
-  # (под ним бежит контейнер и читает конфиги).
+- name: edr-exporter collector config directory
+  # Secret AD/cloud/edr-vendor configs. Separate from data/: mounted into
+  # the container read-only. 0750 + deploy-user group, owner nobody
+  # (the container runs as nobody and reads the configs).
   ansible.builtin.file:
     path: "{{ sec_stack_dir }}/exporters/edr/config"
     state: directory
@@ -54,10 +54,10 @@
     group: "{{ ansible_user }}"
     mode: "0750"
 
-- name: Отрендерить конфиги сборщиков из SOPS
-  # Каждый ключ sec_stack_edr_configs (имя файла -> содержимое) пишется в
-  # /config. Источник без конфига экспортер просто пропускает (не ошибка),
-  # поэтому класть можно только те, для которых есть креды.
+- name: Render collector configs from SOPS
+  # Each sec_stack_edr_configs key (filename -> contents) is written to
+  # /config. A source without a config is skipped by the exporter (not an error),
+  # so only sources that have credentials need to be placed here.
   ansible.builtin.copy:
     content: "{{ item.value }}"
     dest: "{{ sec_stack_dir }}/exporters/edr/config/{{ item.key }}"
@@ -70,23 +70,23 @@
   no_log: true
   notify: Restart edr-exporter
 
-- name: Сгенерировать alertmanager.yml из секретов
+- name: Generate alertmanager.yml from secrets
   ansible.builtin.template:
     src: alertmanager.yml.j2
     dest: "{{ sec_stack_dir }}/alertmanager/alertmanager.yml"
-    # контейнер alertmanager читает конфиг не root'ом — 0600 ломает его
+    # the alertmanager container does not read the config as root — 0600 breaks it
     mode: "0644"
   notify: Restart stack services with static configs
 
-- name: Сгенерировать .env из секретов
+- name: Generate .env from secrets
   ansible.builtin.template:
     src: env.j2
     dest: "{{ sec_stack_dir }}/.env"
     mode: "0600"
   register: sec_stack_env_file
 
-- name: Логин в registry GitLab (образ edr-exporter)
-  # --password-stdin, а не аргументом: иначе токен светится в списке процессов
+- name: Log in to the GitLab registry (edr-exporter image)
+  # --password-stdin, not as an argument: otherwise the token shows in the process list
   ansible.builtin.command:
     cmd: docker login --username {{ sec_stack_registry_user | quote }} --password-stdin {{ sec_stack_registry_host | quote }}
     stdin: "{{ sec_stack_registry_token }}"
@@ -94,7 +94,7 @@
   changed_when: false
   no_log: true
 
-- name: Поднять/обновить стек
+- name: Bring up / update the stack
   ansible.builtin.command:
     cmd: docker compose up -d --build --remove-orphans
     chdir: "{{ sec_stack_dir }}"

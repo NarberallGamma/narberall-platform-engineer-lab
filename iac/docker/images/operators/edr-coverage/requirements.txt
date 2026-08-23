@@ -1,5 +1,5 @@
-# Сгенерировано из uv.lock: uv export --no-hashes --no-dev --no-emit-project --no-annotate
-# Для контейнера экспортера (Dockerfile). Правь pyproject.toml + uv lock, потом пересоздай.
+# Generated from uv.lock: uv export --no-hashes --no-dev --no-emit-project --no-annotate
+# For the exporter container (Dockerfile). Edit pyproject.toml + uv lock, then regenerate.
 anyio==4.12.1
 certifi==2026.1.4
 charset-normalizer==3.4.4

@@ -1,5 +1,5 @@
 output "vip_id" {
-  description = "ID созданного VIP"
+  description = "ID of the created VIP"
   value       = sbercloud_networking_vip.this.id
 }
 
@@ -35,12 +35,12 @@ output "vip_ip_address" {
 
 /*
 output "vip_ip" {
-  description = "IP-адрес VIP"
+  description = "VIP IP address"
   value       = sbercloud_networking_vip.this.ip_address
 }
 
 output "vip_port_id" {
-  description = "ID порта, соответствующего VIP (нужен для привязки EIP)"
+  description = "Port ID that corresponds to the VIP (needed to attach an EIP)"
   value       = sbercloud_networking_vip.this.port_id
 }
 */

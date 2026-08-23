@@ -1,32 +1,32 @@
-# Установка и настройка ntpd
+# Install and configure ntpd
 
-Пример инвентаря без генерации из SSH-config: `inventories/hosts.ini.example` (скопировать в `inventories/hosts.ini`). Сгенерированные `inventories/project_*.yml` не коммитить.
+Example inventory without generating from SSH config: `inventories/hosts.ini.example` (copy to `inventories/hosts.ini`). Generated `inventories/project_*.yml` files are not committed.
 
-## Для всех проектов сразу
+## All projects at once
 
-Список узлов:
+Host list:
 
 ```bash
 ./update_inventory --project-filter ".*" && ansible-playbook setup_ntpd.yml --list-hosts
 ```
 
-Установка:
+Install:
 
 ```bash
 ./update_inventory --project-filter ".*" && ansible-playbook setup_ntpd.yml
 ```
 
-## Для одного проекта
+## One project
 
-Для вымышленного проекта **aproject**.
+For a fictional project **aproject**.
 
-Список узлов:
+Host list:
 
 ```bash
 ./update_inventory --project-filter "aproject" && ansible-playbook setup_ntpd.yml --limit localhost,project_aproject --list-hosts
 ```
 
-Установка:
+Install:
 
 ```bash
 ./update_inventory --project-filter "aproject" && ansible-playbook setup_ntpd.yml --limit localhost,project_aproject

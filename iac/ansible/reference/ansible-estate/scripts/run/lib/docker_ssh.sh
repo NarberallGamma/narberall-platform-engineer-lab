@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
-# Общая логика SSH для scripts/run/*.sh (source после set -euo pipefail).
+# Shared SSH logic for scripts/run/*.sh (source after set -euo pipefail).
 #
-# === Ключ с passphrase (локальный запуск) ===
-# Ansible в Docker неинтерактивен — зашифрованный ключ без ssh-agent не сработает.
+# === Key with passphrase (local run) ===
+# Ansible in Docker is non-interactive — an encrypted key without ssh-agent will not work.
 #
 #   eval "$(ssh-agent -s)"
-#   ssh-add ~/.ssh/your_key              # passphrase один раз на сессию
-#   ssh-add -l                           # убедиться, что ключ в agent
+#   ssh-add ~/.ssh/your_key              # passphrase once per session
+#   ssh-add -l                           # confirm the key is in the agent
 #
 #   ./scripts/run/run_*.sh ... \
 #     --ssh-key ~/.ssh/your_key \
 #     --ssh-agent
 #
-# --ssh-key  — монтирует ключ в /work/.ssh_key_mount (нужно при IdentitiesOnly=yes в inventory).
-# --ssh-agent — пробрасывает SSH_AUTH_SOCK в контейнер (расшифровка passphrase).
-# Только --ssh-agent (без --ssh-key) — сбрасывает ключ и IdentitiesOnly из inventory, ключи берутся из agent.
+# --ssh-key  — mounts the key at /work/.ssh_key_mount (needed when IdentitiesOnly=yes in inventory).
+# --ssh-agent — forwards SSH_AUTH_SOCK into the container (passphrase unlock).
+# --ssh-agent only (no --ssh-key) — clears the key and IdentitiesOnly from inventory; keys come from the agent.
 #
-# Вход (globals): SSH_KEY_PATH, USE_SSH_AGENT, ASK_PASS
-# Выход: дополняет DOCKER_MOUNTS[], DOCKER_ENV[], ANSIBLE_EXTRA[]
+# Input (globals): SSH_KEY_PATH, USE_SSH_AGENT, ASK_PASS
+# Output: appends DOCKER_MOUNTS[], DOCKER_ENV[], ANSIBLE_EXTRA[]
 
 docker_ssh_apply() {
   if [[ -n "${ASK_PASS:-}" ]]; then
     if [[ -n "${SSH_KEY_PATH:-}" || -n "${USE_SSH_AGENT:-}" ]]; then
-      echo "ERROR: --ask-pass несовместим с --ssh-key / --ssh-agent" >&2
+      echo "ERROR: --ask-pass is incompatible with --ssh-key / --ssh-agent" >&2
       return 1
     fi
     ANSIBLE_EXTRA+=(-e ansible_ssh_private_key_file= -k)
@@ -31,7 +31,7 @@ docker_ssh_apply() {
 
   if [[ -n "${USE_SSH_AGENT:-}" ]]; then
     if [[ -z "${SSH_AUTH_SOCK:-}" || ! -S "$SSH_AUTH_SOCK" ]]; then
-      echo "ERROR: --ssh-agent требует ssh-agent (eval \"\$(ssh-agent -s)\" && ssh-add PATH_TO_KEY)" >&2
+      echo "ERROR: --ssh-agent requires ssh-agent (eval \"\$(ssh-agent -s)\" && ssh-add PATH_TO_KEY)" >&2
       return 1
     fi
     DOCKER_MOUNTS+=(-v "$SSH_AUTH_SOCK:/ssh-agent")

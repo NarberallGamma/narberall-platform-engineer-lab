@@ -1,5 +1,5 @@
 ---
-# JAAS читается при старте JVM; без перезапуска контейнера новые пользователи/пароли не подхватятся.
+# JAAS is read at JVM start; without a container restart new users/passwords are not picked up.
 - name: restart kafka container
   ansible.builtin.command:
     cmd: docker compose restart kafka

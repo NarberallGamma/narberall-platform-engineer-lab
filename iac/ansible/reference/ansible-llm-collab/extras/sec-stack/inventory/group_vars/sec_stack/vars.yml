@@ -1,15 +1,15 @@
-# Несекретные переменные группы sec-stack.
+# Non-secret variables for the sec-stack group.
 sec_stack_dir: /opt/sec-stack
 
-# Telegram-чаты бота @sec_stack_bot (chat_id — не секрет, токен — в SOPS).
-# id формата -100…: группы мигрировали в супергруппы, при миграции id меняется!
-sec_stack_telegram_chat_id_default: -1000000000001 # супергруппа "sec-stack"
-sec_stack_telegram_chat_id_critical: -1000000000002 # супергруппа "sec-stack РУГАЕТСЯ"
+# Telegram chats of the @sec_stack_bot bot (chat_id is not a secret; token is in SOPS).
+# ids of the -100… form: groups migrated to supergroups; the id changes on migration.
+sec_stack_telegram_chat_id_default: -1000000000001 # "sec-stack" supergroup
+sec_stack_telegram_chat_id_critical: -1000000000002 # "sec-stack CRITICAL" supergroup
 
-# Секреты живут рядом в secrets.sops.yml (SOPS + age), расшифровываются
-# vars-плагином community.sops.sops на лету. Редактировать:
+# Secrets live next to this file in secrets.sops.yml (SOPS + age) and are decrypted
+# on the fly by the community.sops.sops vars plugin. Edit with:
 #   sops ansible/inventory/group_vars/sec_stack/secrets.sops.yml
-# Внутри:
+# Contents:
 #   sec_stack_grafana_admin_password: "..."
 #   sec_stack_panos_api_keys:
 #     fw-pair1-a: "LUFRPT1..."

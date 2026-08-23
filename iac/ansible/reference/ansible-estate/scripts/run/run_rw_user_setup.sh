@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# RW-пользователь PostgreSQL: GRANT DML на данные (без OWNER, без CREATE на схеме).
-# Плейбук: playbooks/estate_databases/playbooks/rw_user_setup.yaml
-# Запуск из корня каталога ansible:
+# PostgreSQL RW user: GRANT DML on data (no OWNER, no CREATE on the schema).
+# Playbook: playbooks/estate_databases/playbooks/rw_user_setup.yaml
+# Run from the ansible directory root:
 #   ./scripts/run/run_rw_user_setup.sh <db_name|all> --extra-vars "rw_user=... rw_password=... pg_admin_password=..." [--check] [-v]
-# Учётка уже в облаке (пароль не менять):
+# Account already in the cloud (do not change the password):
 #   ./scripts/run/run_rw_user_setup.sh all --extra-vars "rw_user=estate_analyst manage_password=false pg_admin_password=..."
-# SSH не используется (inventory localhost).
+# SSH is not used (inventory localhost).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -45,14 +45,14 @@ else
   DB_DESCRIPTION="database '$DB_ARG'"
 fi
 
-echo "=== RW USER SETUP (PostgreSQL GRANT DML, без OWNER) ==="
+echo "=== RW USER SETUP (PostgreSQL GRANT DML, no OWNER) ==="
 echo "Playbook: $PLAYBOOK_ABS"
 echo "Database(s): $DB_DESCRIPTION"
 echo ""
-echo "rw_user обязателен; rw_password обязателен при manage_password=true (по умолчанию)."
-echo "manage_password=false: только GRANT, пароль учётки не меняется (роль должна существовать в RDS)."
-echo "pg_admin_password: из vars плейбука или --extra-vars."
-echo "default_databases не включает openobserve."
+echo "rw_user is required; rw_password is required when manage_password=true (default)."
+echo "manage_password=false: GRANTs only, account password is left unchanged (role must already exist in RDS)."
+echo "pg_admin_password: from playbook vars or --extra-vars."
+echo "default_databases does not include openobserve."
 echo ""
 read -p "Continue? (yes/no): " confirmation
 if [[ "$confirmation" != "yes" ]]; then

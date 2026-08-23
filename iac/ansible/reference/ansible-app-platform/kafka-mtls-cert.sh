@@ -14,8 +14,8 @@ function client_cert {
   CERTNAME=$1
   CA=$2
 
-  [ -f "${CERTNAME}.keystore.jks" ] && { echo "Ошибка: файл ${CERTNAME}.keystore.jks существует"; exit 1; }
-  [ -f "${CERTNAME}.truststore.jks" ] && { echo "Ошибка: файл ${CERTNAME}.truststore.jks существует"; exit 1; }
+  [ -f "${CERTNAME}.keystore.jks" ] && { echo "Error: file ${CERTNAME}.keystore.jks already exists"; exit 1; }
+  [ -f "${CERTNAME}.truststore.jks" ] && { echo "Error: file ${CERTNAME}.truststore.jks already exists"; exit 1; }
 
   keytool -genkey -keystore ${CERTNAME}.keystore.jks -alias localhost -validity 3650 -keyalg RSA -keysize 2048 -storepass $pass -keypass $pass -dname "CN=${CERTNAME}"
   keytool -keystore ${CERTNAME}.keystore.jks -alias localhost -certreq -file ${CERTNAME}.crt -storepass $pass -keypass $pass

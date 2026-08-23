@@ -5,7 +5,7 @@ SSH_OPTIONS="-o StrictHostKeyChecking=no ${SSH_DISABLE_CONTROL_OPTIONS}"
 
 ################################################################################
 
-# Отправляет алерт
+# Send an alert
 # ${1} - if equal 'under_sudo' then try run backup_notify under sudo, otherwise - without sudo
 alert()
 {

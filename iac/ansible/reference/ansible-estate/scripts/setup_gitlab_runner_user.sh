@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Запускать на целевом сервере пользователем с доступом к sudo.
-# Создаёт пользователя для GitLab Runner (по умолчанию gitlab-runner), даёт NOPASSWD sudo,
-# ставит случайный пароль 25 символов, добавляет переданный открытый ключ в authorized_keys.
-# Пароль сохраняет в /tmp.
-# Вызов: $0 [username] <путь_к_файлу_с_открытым_ключом> [set_password]
-# set_password: yes — задать новый пароль и записать в /tmp; no — не трогать пароль.
+# Run on the target server as a user with sudo access.
+# Creates a GitLab Runner user (default gitlab-runner), grants NOPASSWD sudo,
+# sets a random 25-character password, appends the given public key to authorized_keys.
+# Password is stored in /tmp.
+# Invocation: $0 [username] <path_to_public_key_file> [set_password]
+# set_password: yes — set a new password and write it to /tmp; no — leave the password unchanged.
 set -euo pipefail
 
 USER_NAME="${1:-gitlab-runner}"
@@ -13,44 +13,44 @@ SET_PASSWORD="${3:-yes}"
 CRED_FILE="/tmp/gitlab_runner_user_credentials.txt"
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  echo "Запустите скрипт с правами sudo (например: sudo bash $0)." >&2
+  echo "This script requires sudo (example: sudo bash $0)." >&2
   exit 1
 fi
 
 if [[ -z "$PUBKEY_FILE" || ! -f "$PUBKEY_FILE" ]]; then
-  echo "Укажите путь к файлу с открытым ключом: $0 $USER_NAME /path/to/key.pub" >&2
+  echo "Pass the path to a public key file: $0 $USER_NAME /path/to/key.pub" >&2
   exit 1
 fi
 
-# Создать пользователя, если ещё нет
+# Create the user if it does not exist
 if ! id -u "$USER_NAME" &>/dev/null; then
   useradd -m -s /bin/bash "$USER_NAME"
-  echo "Пользователь $USER_NAME создан."
+  echo "User $USER_NAME created."
 else
-  echo "Пользователь $USER_NAME уже существует."
+  echo "User $USER_NAME already exists."
 fi
 
 USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
 
-# Sudo без пароля
+# Passwordless sudo
 SUDOERS_FILE="/etc/sudoers.d/$USER_NAME"
 echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE"
 chmod 0440 "$SUDOERS_FILE"
-echo "Sudo NOPASSWD настроен: $SUDOERS_FILE"
+echo "Sudo NOPASSWD configured: $SUDOERS_FILE"
 
 if [[ "${SET_PASSWORD,,}" == "yes" ]]; then
   PASSWORD=$(openssl rand -base64 25 | tr -dc 'A-Za-z0-9' | head -c 25)
   echo "$USER_NAME:$PASSWORD" | chpasswd
-  echo "Пароль установлен."
+  echo "Password set."
 fi
 
-# .ssh и authorized_keys: добавить переданный открытый ключ
+# .ssh and authorized_keys: append the given public key
 mkdir -p "$USER_HOME/.ssh"
 chmod 700 "$USER_HOME/.ssh"
 cat "$PUBKEY_FILE" >> "$USER_HOME/.ssh/authorized_keys"
 chmod 600 "$USER_HOME/.ssh/authorized_keys"
 chown -R "$USER_NAME:$USER_NAME" "$USER_HOME/.ssh"
-echo "Открытый ключ добавлен в $USER_HOME/.ssh/authorized_keys"
+echo "Public key appended to $USER_HOME/.ssh/authorized_keys"
 
 if [[ "${SET_PASSWORD,,}" == "yes" ]]; then
   {
@@ -59,5 +59,5 @@ if [[ "${SET_PASSWORD,,}" == "yes" ]]; then
     echo "password=$PASSWORD"
   } > "$CRED_FILE"
   chmod 0600 "$CRED_FILE"
-  echo "Пароль сохранён в $CRED_FILE — скопируйте в безопасное место и удалите файл на сервере."
+  echo "Password saved to $CRED_FILE — copy it to a safe place and delete the file on the server."
 fi

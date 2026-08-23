@@ -1,7 +1,7 @@
 ---
-# Ожидает _occ_deny_batch — список dict path, group, perms (deny после --). Накопление в _occ_deny_acc.
-# script не поддерживает async — тот же файл из roles/.../files через stdin (bash -s).
-- name: Запустить occ groupfolders:permissions deny (async) в батче
+# Expects _occ_deny_batch — list of dicts path, group, perms (deny after --). Accumulate into _occ_deny_acc.
+# script does not support async — same file from roles/.../files via stdin (bash -s).
+- name: Fire occ groupfolders:permissions deny (async) in a batch
   ansible.builtin.shell:
     cmd: /bin/bash -s
     stdin: "{{ lookup('file', role_path ~ '/files/nextcloud_occ_groupfolders_permissions.sh') }}"
@@ -23,7 +23,7 @@
   register: _occ_deny_fired
   failed_when: false
 
-- name: Дождаться occ deny батча
+- name: Wait for the occ deny batch
   ansible.builtin.async_status:
     jid: "{{ _occ_dj.ansible_job_id }}"
   loop: "{{ _occ_deny_fired.results }}"
@@ -34,6 +34,6 @@
   retries: "{{ nextcloud_async_status_retries | default(300) | int }}"
   delay: "{{ nextcloud_async_status_delay | default(1) | int }}"
 
-- name: Накопить результаты occ deny
+- name: Accumulate occ deny results
   ansible.builtin.set_fact:
     _occ_deny_acc: "{{ _occ_deny_acc + (_occ_deny_wait.results | default([])) }}"

@@ -1,12 +1,12 @@
 ---
-# Deploy edge-lb (nginx + keepalived в /docker/apps/edge-lb)
-# Переменные: group_vars/edge-lb.yml
+# Deploy edge-lb (nginx + keepalived under /docker/apps/edge-lb)
+# Variables: group_vars/edge-lb.yml
 #
-# Запуск:
+# Run:
 #   ./scripts/run/run_docker_app.sh deploy edge-lb --prod --limit estate-prod-lb-1
 #   ./scripts/run/run_docker_app.sh deploy edge-lb --preprod --limit estate-preprod-lb-1
 #
-# Перед первым запуском на legacy host nginx/keepalived: migrate_edge_lb_legacy.yml
+# Before the first run on legacy host nginx/keepalived: migrate_edge_lb_legacy.yml
 
 - name: Deploy edge-lb
   hosts: edge_lb

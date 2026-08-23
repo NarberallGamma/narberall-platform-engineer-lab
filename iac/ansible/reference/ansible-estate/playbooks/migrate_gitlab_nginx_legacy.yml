@@ -1,22 +1,22 @@
 ---
-# Legacy-миграция: вынести TLS с GitLab Omnibus nginx во внешний docker gitlab-nginx.
-# Omnibus nginx отключается полностью (nginx['enable']=false); UI -> gitlab-workhorse:8181.
+# Legacy migration: move TLS from GitLab Omnibus nginx to external docker gitlab-nginx.
+# Omnibus nginx is fully disabled (nginx['enable']=false); UI -> gitlab-workhorse:8181.
 #
-# Порядок (краткий downtime на 443):
-#   1) Выложить конфиги gitlab-nginx и скопировать сертификаты из /etc/gitlab/ssl
-#   2) Закомментировать legacy SSL в /etc/gitlab/gitlab.rb, добавить proxy-блок
-#   3) gitlab-ctl reconfigure (освобождает 443)
+# Order (brief downtime on 443):
+#   1) Render gitlab-nginx configs and copy certificates from /etc/gitlab/ssl
+#   2) Comment out legacy SSL in /etc/gitlab/gitlab.rb, add the proxy block
+#   3) gitlab-ctl reconfigure (frees 443)
 #   4) docker compose up gitlab-nginx
 #
-# Запуск:
+# Run:
 #   ./scripts/run/run_migrate_gitlab_nginx_legacy.sh --preprod --limit estate-preprod-gitlab
 #   ./scripts/run/run_migrate_gitlab_nginx_legacy.sh --prod --limit estate-prod-gitlab
 #
-# Только подготовка файлов без reconfigure/compose:
+# File prepare only, without reconfigure/compose:
 #   ... -- --tags prepare
 #
-# Переменные: group_vars/gitlab-nginx.yml
-# Переключатель: gitlab_nginx_legacy_migration_enabled (false после migrate на стенде)
+# Variables: group_vars/gitlab-nginx.yml
+# Switch: gitlab_nginx_legacy_migration_enabled (false after migrate on the environment)
 
 - name: Migrate GitLab TLS to external gitlab-nginx (legacy)
   hosts: gitlab_nginx
@@ -50,16 +50,16 @@
       - "registry_nginx\\['enable'\\]"
 
   pre_tasks:
-    - name: Проверить, что legacy-миграция включена в group_vars
+    - name: Check that legacy migration is enabled in group_vars
       ansible.builtin.assert:
         that:
           - gitlab_nginx_legacy_migration_enabled | default(false) | bool
         fail_msg: >-
-          Legacy-миграция отключена (gitlab_nginx_legacy_migration_enabled: false в group_vars/gitlab-nginx.yml).
-          Migrate на этом стенде завершён. Для нового стенда: true и раскомментировать migration vars в group_vars.
+          Legacy migration is disabled (gitlab_nginx_legacy_migration_enabled: false in group_vars/gitlab-nginx.yml).
+          Migrate on this environment is complete. For a new environment: set true and uncomment migration vars in group_vars.
       tags: [always]
 
-    - name: Проверить наличие gitlab-ctl
+    - name: Check that gitlab-ctl is present
       ansible.builtin.stat:
         path: /usr/bin/gitlab-ctl
       register: gitlab_ctl_bin
@@ -77,14 +77,14 @@
       tags: [prepare, migrate, verify]
 
   tasks:
-    - name: Подготовить gitlab-nginx (конфиги без compose up)
+    - name: Prepare gitlab-nginx (configs without compose up)
       ansible.builtin.include_role:
         name: docker_app
       vars:
         docker_app_compose_up: false
       tags: [prepare, migrate]
 
-    - name: Проверить legacy-сертификаты GitLab
+    - name: Check GitLab legacy certificates
       ansible.builtin.stat:
         path: "{{ gitlab_nginx_legacy_ssl_source_dir }}/{{ gitlab_nginx_cert_basename }}.{{ item }}"
       register: gitlab_nginx_legacy_cert_stat
@@ -93,17 +93,17 @@
         - key
       tags: [prepare, migrate]
 
-    - name: Убедиться, что legacy-сертификаты существуют
+    - name: Assert legacy certificates exist
       ansible.builtin.assert:
         that:
           - item.stat.exists
-        fail_msg: "Не найден {{ gitlab_nginx_legacy_ssl_source_dir }}/{{ gitlab_nginx_cert_basename }}.{{ item.item }}"
+        fail_msg: "Not found {{ gitlab_nginx_legacy_ssl_source_dir }}/{{ gitlab_nginx_cert_basename }}.{{ item.item }}"
       loop: "{{ gitlab_nginx_legacy_cert_stat.results }}"
       loop_control:
         label: "{{ gitlab_nginx_cert_basename }}.{{ item.item }}"
       tags: [prepare, migrate]
 
-    - name: Скопировать TLS-сертификаты в gitlab-nginx/certs
+    - name: Copy TLS certificates into gitlab-nginx/certs
       ansible.builtin.copy:
         src: "{{ gitlab_nginx_legacy_ssl_source_dir }}/{{ gitlab_nginx_cert_basename }}.{{ item.ext }}"
         dest: "{{ gitlab_nginx_app_dir }}/certs/{{ gitlab_nginx_cert_basename }}.{{ item.ext }}"
@@ -114,7 +114,7 @@
         - { ext: key, mode: "0600" }
       tags: [prepare, migrate]
 
-    - name: Бэкап gitlab.rb перед миграцией
+    - name: Back up gitlab.rb before migration
       ansible.builtin.copy:
         src: /etc/gitlab/gitlab.rb
         dest: "/etc/gitlab/gitlab.rb.backup.{{ ansible_date_time.iso8601_basic_short }}"
@@ -122,21 +122,21 @@
         mode: "0600"
       tags: [migrate]
 
-    - name: Удалить managed-блок gitlab-nginx перед правкой legacy строк
+    - name: Remove the gitlab-nginx managed block before editing legacy lines
       ansible.builtin.blockinfile:
         path: /etc/gitlab/gitlab.rb
         marker: "# {mark} ANSIBLE MANAGED gitlab-nginx"
         state: absent
       tags: [migrate]
 
-    - name: Удалить битые legacy-комментарии от предыдущих прогонов
+    - name: Remove broken legacy comments from previous runs
       ansible.builtin.replace:
         path: /etc/gitlab/gitlab.rb
         regexp: '^# \\1  # legacy: gitlab-nginx migration$'
         replace: ''
       tags: [migrate]
 
-    - name: Закомментировать legacy SSL/TLS строки в gitlab.rb
+    - name: Comment out legacy SSL/TLS lines in gitlab.rb
       ansible.builtin.replace:
         path: /etc/gitlab/gitlab.rb
         regexp: '^(?!\\s*#)(({{ item }}).*)$'
@@ -144,7 +144,7 @@
       loop: "{{ gitlab_nginx_legacy_rb_comment_patterns }}"
       tags: [migrate]
 
-    - name: Добавить proxy-блок gitlab.rb для внешнего nginx
+    - name: Add the gitlab.rb proxy block for external nginx
       ansible.builtin.blockinfile:
         path: /etc/gitlab/gitlab.rb
         marker: "# {mark} ANSIBLE MANAGED gitlab-nginx"
@@ -152,13 +152,13 @@
         insertafter: EOF
       tags: [migrate]
 
-    - name: gitlab-ctl reconfigure (отключить Omnibus nginx, поднять workhorse :8181)
+    - name: gitlab-ctl reconfigure (disable Omnibus nginx, bring up workhorse :8181)
       ansible.builtin.command: /usr/bin/gitlab-ctl reconfigure
       register: gitlab_reconfigure
       changed_when: true
       tags: [migrate]
 
-    - name: Дождаться gitlab-workhorse backend
+    - name: Wait for the gitlab-workhorse backend
       ansible.builtin.wait_for:
         host: "{{ docker_app.gitlab_backend_host }}"
         port: "{{ docker_app.gitlab_backend_port }}"
@@ -166,7 +166,7 @@
         state: started
       tags: [migrate, verify]
 
-    - name: Дождаться registry backend
+    - name: Wait for the registry backend
       ansible.builtin.wait_for:
         host: "{{ docker_app.registry_backend_host }}"
         port: "{{ docker_app.registry_backend_port }}"
@@ -174,7 +174,7 @@
         state: started
       tags: [migrate, verify]
 
-    - name: Убедиться, что Omnibus nginx не слушает 443
+    - name: Assert Omnibus nginx is not listening on 443
       ansible.builtin.shell: |
         set -euo pipefail
         if ss -tlnp 2>/dev/null | grep ':443 ' | grep -q nginx; then
@@ -186,14 +186,14 @@
       changed_when: false
       tags: [migrate, verify]
 
-    - name: Запустить gitlab-nginx compose
+    - name: Start gitlab-nginx compose
       community.docker.docker_compose_v2:
         project_src: "{{ gitlab_nginx_app_dir }}"
         state: present
         pull: "{{ docker_app_compose_pull }}"
       tags: [migrate]
 
-    - name: Проверить HTTPS GitLab UI
+    - name: Check GitLab UI over HTTPS
       ansible.builtin.uri:
         url: "https://{{ gitlab_nginx_gitlab_host }}/users/sign_in"
         validate_certs: true
@@ -204,7 +204,7 @@
       until: gitlab_https_check is succeeded
       tags: [verify, migrate]
 
-    - name: Проверить HTTPS Container Registry (/v2/)
+    - name: Check Container Registry over HTTPS (/v2/)
       ansible.builtin.uri:
         url: "https://{{ gitlab_nginx_registry_host }}/v2/"
         validate_certs: true
@@ -215,7 +215,7 @@
       until: registry_https_check is succeeded
       tags: [verify, migrate]
 
-    - name: Итог миграции
+    - name: Migration summary
       ansible.builtin.debug:
         msg:
           - "gitlab-nginx: {{ gitlab_nginx_app_dir }}"
@@ -225,10 +225,10 @@
           - "TLS certs: {{ gitlab_nginx_ssl_dir }}"
       tags: [verify, migrate]
 
-    - name: Итог миграции (cert-orchestrator, только preprod)
+    - name: Migration summary (cert-orchestrator, preprod only)
       ansible.builtin.debug:
         msg:
-          - "Preprod: redeploy cert-orchestrator для ssl_dir {{ gitlab_nginx_ssl_dir }}"
+          - "Preprod: redeploy cert-orchestrator for ssl_dir {{ gitlab_nginx_ssl_dir }}"
           - "./scripts/run/run_docker_app.sh deploy cert-orchestrator --preprod --limit {{ inventory_hostname }}"
       when: inventory_hostname in (groups.get('cert_orchestrator') | default([]))
       tags: [verify, migrate]

@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Prometheus-экспортер покрытия EDR.
+"""Prometheus exporter for EDR coverage.
 
-Отдаёт метрики покрытия из merge3: агрегаты по компаниям/типам хостов и
-детализацию по каждому хосту (какие машины без агента).
+Serves coverage metrics from merge3: aggregates by company/host type and
+per-host detail (which machines have no agent).
 
-Пайплайн ходит в LDAP и облачные API — это минуты, поэтому считать его на
-каждый scrape нельзя. Сбор идёт фоновым потоком раз в EDR_COLLECT_INTERVAL,
-а /metrics мгновенно отдаёт последний снапшот: серия в VictoriaMetrics
-получается непрерывной, а внешние источники опрашиваются редко.
+The pipeline talks to LDAP and cloud APIs — that takes minutes, so it cannot
+run on every scrape. Collection runs on a background thread every
+EDR_COLLECT_INTERVAL, and /metrics instantly returns the last snapshot: the
+VictoriaMetrics series stays continuous, and external sources are polled rarely.
 
-  EDR_DATA_DIR         каталог с CSV и результатами (см. merge3.DATA_DIR)
-  EDR_CONFIG_DIR       каталог с конфигами сборщиков (read-only, из SOPS)
-  EDR_COLLECT_SOURCES  1 (по умолч.) — гонять сборщики; 0 — только merge по CSV
-  EDR_LISTEN           адрес HTTP-сервера, по умолчанию 0.0.0.0:9655
-  EDR_COLLECT_INTERVAL период пересчёта в секундах, по умолчанию 6 часов
-  EDR_WATCH_INTERVAL   как часто проверять mtime исходных CSV, по умолчанию 60с
+  EDR_DATA_DIR         directory with CSV and results (see merge3.DATA_DIR)
+  EDR_CONFIG_DIR       collector config directory (read-only, from SOPS)
+  EDR_COLLECT_SOURCES  1 (default) — run collectors; 0 — merge CSV only
+  EDR_LISTEN           HTTP server address, default 0.0.0.0:9655
+  EDR_COLLECT_INTERVAL recalculation period in seconds, default 6 hours
+  EDR_WATCH_INTERVAL   how often to check source CSV mtime, default 60s
 
---oneshot: посчитать один раз, напечатать метрики в stdout и выйти.
+--oneshot: compute once, print metrics to stdout, and exit.
 """
 
 import argparse
@@ -42,8 +42,9 @@ WATCH_INTERVAL = int(os.environ.get("EDR_WATCH_INTERVAL", "60"))
 CONFIG_DIR = Path(os.environ.get("EDR_CONFIG_DIR", "."))
 COLLECT_SOURCES = os.environ.get("EDR_COLLECT_SOURCES", "1") not in ("0", "false", "no", "")
 
-# Сборщики источников: (секция, файл-скрипт, конфиг, наличие которого включает
-# сбор). Скрипты с дефисом в имени импортируются по пути (обычный import нельзя).
+# Source collectors: (section, script file, config whose presence enables
+# collection). Scripts with a hyphen in the name are imported by path
+# (a normal import cannot).
 COLLECTORS = [
     ("active_directory", "active-directory.py", "ad_config.yaml"),
     ("vkcloud", "vkcloud.py", "vkcloud_config.yaml"),
@@ -51,8 +52,8 @@ COLLECTORS = [
     ("vendor", "vendor-edr.py", "edr_config.json"),
 ]
 
-# Суффикс файла-источника -> значение метки source. Порядок важен: '_edr'
-# проверяется первым, иначе '-ad' не отличить от прочих выгрузок.
+# Source-file suffix -> source label value. Order matters: '_edr' is checked
+# first, otherwise '-ad' cannot be told apart from other exports.
 SOURCE_SUFFIXES = [
     ("_edr", "edr"),
     ("-ad", "ad"),
@@ -62,7 +63,7 @@ SOURCE_SUFFIXES = [
 
 
 def _source_kind(stem: str) -> tuple[str, str] | None:
-    """('project-a-ad') -> ('project-a', 'ad'); None для незнакомых файлов."""
+    """('project-a-ad') -> ('project-a', 'ad'); None for unknown files."""
     for suffix, kind in SOURCE_SUFFIXES:
         if stem.endswith(suffix):
             return stem[: -len(suffix)], kind
@@ -70,7 +71,7 @@ def _source_kind(stem: str) -> tuple[str, str] | None:
 
 
 def source_files() -> dict[tuple[str, str], float]:
-    """{(company, source): mtime} по всем исходным CSV в каталоге данных."""
+    """{(company, source): mtime} for all source CSVs in the data directory."""
     result = {}
     for path in merge3.DATA_DIR.glob("*.csv"):
         if path.name == merge3.OUTPUT_CSV.name:
@@ -83,13 +84,13 @@ def source_files() -> dict[tuple[str, str], float]:
 
 def edr_export_times() -> dict[str, float]:
     """
-    {company: unix-время выгрузки} по колонке lastseenat из *_edr.csv.
+    {company: export unix time} from the lastseenat column of *_edr.csv.
 
-    Возраст файла для этого не годится: выгрузка кладётся руками, и обычный
-    scp/копирование переставляет mtime на «сейчас» — метрика свежести начинает
-    врать ровно там, где она нужна. Максимальный lastseenat берётся из самих
-    данных: хоть один агент почти всегда онлайн, поэтому он близок к моменту
-    выгрузки и не зависит от того, как файл доехал.
+    File age is not usable: the export is dropped in by hand, and a normal
+    scp/copy resets mtime to "now" — the freshness metric then lies exactly
+    where it is needed. Max lastseenat is taken from the data: at least one
+    agent is almost always online, so it is close to the export moment and
+    does not depend on how the file arrived.
     """
     result = {}
     for path in merge3.DATA_DIR.glob("*_edr.csv"):
@@ -98,7 +99,7 @@ def edr_export_times() -> dict[str, float]:
             column = pd.read_csv(path, usecols=["lastseenat"])["lastseenat"]
             latest = pd.to_datetime(column, errors="coerce", utc=True).max()
         except Exception:
-            log.warning("[%s] не смог определить время выгрузки EDR", company)
+            log.warning("[%s] could not determine EDR export time", company)
             continue
         if pd.notna(latest):
             result[company] = latest.timestamp()
@@ -106,7 +107,7 @@ def edr_export_times() -> dict[str, float]:
 
 
 class Snapshot:
-    """Последний успешно посчитанный результат, отдаваемый на каждый scrape."""
+    """Last successfully computed result, served on every scrape."""
 
     def __init__(self):
         self._lock = threading.Lock()
@@ -119,15 +120,15 @@ class Snapshot:
         def gauge(name, doc, labels=()):
             return Gauge(name, doc, labels, registry=registry)
 
-        collect_errors = gauge("edr_collect_errors", "1 если секция сбора упала", ["section"])
+        collect_errors = gauge("edr_collect_errors", "1 if the collect section failed", ["section"])
         for section, failed in errors.items():
             collect_errors.labels(section).set(int(failed))
 
-        gauge("edr_collection_duration_seconds", "Длительность последнего сбора").set(duration)
+        gauge("edr_collection_duration_seconds", "Duration of the last collection").set(duration)
 
         source_ts = gauge(
             "edr_source_file_timestamp_seconds",
-            "Unix-время последнего изменения файла-источника",
+            "Unix time of the last source-file change",
             ["company", "source"],
         )
         for (company, source), mtime in source_files().items():
@@ -135,7 +136,7 @@ class Snapshot:
 
         export_ts = gauge(
             "edr_source_data_timestamp_seconds",
-            "Unix-время выгрузки по данным внутри неё (не по mtime файла)",
+            "Unix time of the export from data inside it (not file mtime)",
             ["company", "source"],
         )
         for company, ts in edr_export_times().items():
@@ -143,32 +144,32 @@ class Snapshot:
 
         if overall:
             hosts_total = gauge(
-                "edr_hosts_total", "Хостов в пуле подсчёта", ["company", "host_type"]
+                "edr_hosts_total", "Hosts in the counting pool", ["company", "host_type"]
             )
             hosts_with_agent = gauge(
-                "edr_hosts_with_agent", "Хостов с агентом EDR", ["company", "host_type"]
+                "edr_hosts_with_agent", "Hosts with an EDR agent", ["company", "host_type"]
             )
             hosts_online = gauge(
-                "edr_hosts_agent_online", "Хостов с агентом на связи", ["company", "host_type"]
+                "edr_hosts_agent_online", "Hosts with an agent in contact", ["company", "host_type"]
             )
             hosts_excluded = gauge(
-                "edr_hosts_excluded", "Хостов исключено правилами exclusions", ["company"]
+                "edr_hosts_excluded", "Hosts excluded by exclusion rules", ["company"]
             )
-            # Агенты, не сматченные ни с одним хостом. Единственный сигнал о том,
-            # что источник инвентаря отсутствует целиком: покрытие при этом
-            # остаётся красивым — считается по тем хостам, которые видно.
-            # Число тенантное: у компаний общего тенанта оно одинаковое.
+            # Agents not matched to any host. The only signal that an inventory
+            # source is missing entirely: coverage still looks fine because it
+            # is counted on the hosts that are visible.
+            # Tenant-level number: companies on a shared tenant share it.
             agents_without_inventory = gauge(
                 "edr_agents_without_inventory",
-                "Агентов EDR без хоста в инвентаре (по тенанту)",
+                "EDR agents without a host in inventory (per tenant)",
                 ["company"],
             )
-            # Managed-ноды (БД, kubernetes) агент принять не могут и в покрытие
-            # не входят. Показываем их числом, а не прячем: молча выпавший из
-            # знаменателя хост — это то, чего в метрике покрытия быть не должно.
+            # Managed nodes (DB, kubernetes) cannot take an agent and are out
+            # of coverage. Shown as a count, not hidden: a host silently
+            # dropped from the denominator must not happen in a coverage metric.
             hosts_managed = gauge(
                 "edr_hosts_managed",
-                "Хостов исключено как managed-сервис (агент невозможен)",
+                "Hosts excluded as a managed service (agent impossible)",
                 ["company", "managed_type"],
             )
             managed_rows = frame[frame[merge3.MANAGED_COL] != ""]
@@ -176,8 +177,8 @@ class Snapshot:
                 managed_rows.groupby([merge3.COMPANY_COL, merge3.MANAGED_COL]).size().items()
             ):
                 hosts_managed.labels(company, kind).set(count)
-            # Проценты не экспортируем: считаются в Grafana из счётчиков, иначе
-            # агрегат по нескольким компаниям пришлось бы усреднять неверно.
+            # Percents are not exported: Grafana computes them from counters,
+            # otherwise a multi-company aggregate would have to be averaged wrongly.
             for company, m in overall["COMPANIES"].items():
                 for host_type, key in (("server", "SERVERS"), ("workstation", "WORKSTATIONS")):
                     hosts_total.labels(company, host_type).set(m[key]["VM_TOTAL"])
@@ -190,31 +191,31 @@ class Snapshot:
 
             installed = gauge(
                 "edr_host_agent_installed",
-                "На хосте найден агент EDR",
+                "EDR agent found on the host",
                 ["company", "hostname", "host_type"],
             )
             online = gauge(
                 "edr_host_agent_online",
-                "Агент EDR на хосте на связи",
+                "EDR agent on the host is in contact",
                 ["company", "hostname", "host_type"],
             )
             last_seen = gauge(
                 "edr_host_agent_last_seen_seconds",
-                "Unix-время последней связи агента (для окна «молчит»; только хосты с агентом)",
+                "Unix time of last agent contact (for the silence window; hosts with an agent only)",
                 ["company", "hostname", "host_type"],
             )
-            # Только хосты из пула: исключённые не должны попадать ни в списки,
-            # ни в счётчики, иначе дашборд разойдётся с агрегатами.
+            # Pool hosts only: excluded ones must not enter lists or counters,
+            # or the dashboard would diverge from the aggregates.
             for row in frame[frame["in_pool"]].itertuples():
                 labels = (row.company, row.hostname, row.source_type)
                 installed.labels(*labels).set(int(bool(row.has_edr)))
                 online.labels(*labels).set(int(bool(row.edr_online)))
                 ls = getattr(row, "edr_last_seen", float("nan"))
-                if ls == ls:  # не NaN — агент есть и у него известна дата связи
+                if ls == ls:  # not NaN — agent exists and last-seen is known
                     last_seen.labels(*labels).set(float(ls))
 
             gauge(
-                "edr_collection_timestamp_seconds", "Unix-время последнего успешного сбора"
+                "edr_collection_timestamp_seconds", "Unix time of the last successful collection"
             ).set(time.time())
 
         body = generate_latest(registry)
@@ -236,12 +237,12 @@ def _load_module(name, filename):
 
 
 def run_collectors() -> dict:
-    """Прогнать сборщики источников перед merge. Возвращает {section: failed}.
+    """Run source collectors before merge. Returns {section: failed}.
 
-    Каждый сборщик — в своей секции: падение одного (протухший токен, недоступный
-    DC) не роняет остальные, остаётся прошлый CSV этого источника, а флаг ошибки
-    поднимается в edr_collect_errors{section}. Источник без конфига пропускается —
-    это не ошибка (например SberCloud, пока не завезли креды).
+    Each collector is its own section: a failure in one (stale token, DC down)
+    does not drop the others, the previous CSV of that source stays, and the
+    error flag is raised in edr_collect_errors{section}. A source without a
+    config is skipped — that is not an error (e.g. SberCloud before creds).
     """
     errors = {}
     if not COLLECT_SOURCES:
@@ -253,17 +254,17 @@ def run_collectors() -> dict:
         if not configured:
             continue
         try:
-            log.info("сбор источника: %s", section)
+            log.info("collecting source: %s", section)
             _load_module(section, filename).main()
             errors[section] = False
         except Exception:
-            log.exception("сбор источника %s упал", section)
+            log.exception("source collect %s failed", section)
             errors[section] = True
     return errors
 
 
 def collect(snapshot):
-    """Полный прогон пайплайна с записью артефактов и обновлением снапшота."""
+    """Full pipeline run: write artifacts and refresh the snapshot."""
     started = time.time()
     errors = run_collectors()
 
@@ -271,7 +272,7 @@ def collect(snapshot):
         frame, overall = merge3.build_report()
         errors["merge"] = False
     except Exception:
-        log.exception("сбор упал")
+        log.exception("collect failed")
         errors["merge"] = True
         snapshot.render(None, {}, time.time() - started, errors)
         return
@@ -283,9 +284,9 @@ def collect(snapshot):
         try:
             frame.to_csv(merge3.OUTPUT_CSV, index=False, encoding="utf-8")
         except Exception:
-            log.exception("не смог записать %s", merge3.OUTPUT_CSV)
+            log.exception("failed to write %s", merge3.OUTPUT_CSV)
         log.info(
-            "сбор за %.1fс: хостов %d, с агентом %d (%.1f%%)",
+            "collect in %.1fs: hosts %d, with agent %d (%.1f%%)",
             duration,
             overall["VM_TOTAL"],
             overall["EDR_VM_TOTAL"],
@@ -294,12 +295,12 @@ def collect(snapshot):
 
 
 def collect_loop(snapshot):
-    """Пересчёт по расписанию; в ручном режиме — ещё и при подмене CSV.
+    """Recalculate on a schedule; in manual mode also when CSV files change.
 
-    ВАЖНО: следить за mtime исходных CSV имеет смысл только когда сборщики
-    ВЫКЛЮЧЕНЫ (ручная заливка файлов). Если сборщики включены, они сами пишут
-    эти файлы — и слежка приняла бы собственную запись за изменение, устроив
-    бесконечный пересбор раз в WATCH_INTERVAL (и долбёжку LDAP/облаков/EDR vendor).
+    IMPORTANT: watching source CSV mtime only makes sense when collectors are
+    OFF (manual file drop). If collectors are on, they write those files
+    themselves — watching would treat its own write as a change and loop
+    forever every WATCH_INTERVAL (and hammer LDAP/clouds/EDR vendor).
     """
     last_mtimes = source_files()
     last_run = 0.0
@@ -312,7 +313,7 @@ def collect_loop(snapshot):
             last_mtimes = mtimes
         if due or changed:
             if changed and not due:
-                log.info("исходные файлы изменились — пересчитываю")
+                log.info("source files changed — recalculating")
             collect(snapshot)
             last_run = time.time()
         time.sleep(WATCH_INTERVAL)
@@ -321,7 +322,7 @@ def collect_loop(snapshot):
 class Handler(BaseHTTPRequestHandler):
     snapshot = None
 
-    def log_message(self, fmt, *args):  # шумный дефолтный лог — в debug
+    def log_message(self, fmt, *args):  # noisy default log — debug only
         log.debug(fmt, *args)
 
     def _respond(self, code, body, content_type="text/plain; charset=utf-8"):
@@ -340,8 +341,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._respond(404, "use /metrics\n")
         body = self.snapshot.body()
         if not body:
-            # Первый сбор ещё идёт: 503 честнее пустого ответа — vmagent
-            # пометит таргет down вместо того, чтобы записать нули.
+            # First collect is still running: 503 is more honest than an empty
+            # body — vmagent marks the target down instead of recording zeros.
             return self._respond(503, "collecting, no snapshot yet\n")
         self._respond(200, body, CONTENT_TYPE_LATEST)
 
@@ -349,7 +350,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--oneshot", action="store_true", help="посчитать один раз, вывести метрики и выйти"
+        "--oneshot", action="store_true", help="compute once, print metrics, and exit"
     )
     args = parser.parse_args()
 
@@ -371,7 +372,7 @@ def main():
     Handler.snapshot = snapshot
     host, _, port = LISTEN.rpartition(":")
     server = ThreadingHTTPServer((host, int(port)), Handler)
-    log.info("слушаю %s, данные из %s, пересчёт раз в %dс",
+    log.info("listening on %s, data from %s, recalculate every %ds",
              LISTEN, merge3.DATA_DIR.resolve(), COLLECT_INTERVAL)
     server.serve_forever()
 

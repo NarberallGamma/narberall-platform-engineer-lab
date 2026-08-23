@@ -1,4 +1,4 @@
-"""SCP/SSH: раскладка PEM и удалённые команды (openssh-client в образе)."""
+"""SCP/SSH: PEM deploy and remote commands (openssh-client in the image)."""
 
 from __future__ import annotations
 
@@ -98,12 +98,12 @@ def _deploy_nginx_host_one(
     target_id = h or "(empty host)"
 
     if not h:
-        return TargetDeployResult("nginx", target_id, False, "пустой host")
+        return TargetDeployResult("nginx", target_id, False, "empty host")
 
     cert_name, key_name = _dest_names(domain, host_cfg.cert_basename)
     identity = host_cfg.identity_file
     if not identity or not Path(identity).is_file():
-        return TargetDeployResult("nginx", target_id, False, f"SSH identity не найден: {identity}")
+        return TargetDeployResult("nginx", target_id, False, f"SSH identity not found: {identity}")
 
     u = host_cfg.user or "root"
     dest_dir = host_cfg.ssl_dir.rstrip("/")
@@ -161,7 +161,7 @@ def deploy_nginx_hosts(
     key_path: Path,
     timeout_ssh: int,
 ) -> List[TargetDeployResult]:
-    """Раскладка PEM на nginx targets; ошибка одного хоста не прерывает остальные."""
+    """Deploy PEM to nginx targets; a failure on one host does not stop the rest."""
     nr = cfg.targets.nginx_remotes
     if not nr.enabled:
         return []

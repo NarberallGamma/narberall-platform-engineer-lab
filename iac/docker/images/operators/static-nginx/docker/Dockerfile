@@ -6,7 +6,7 @@ LABEL maintainer="ops@example.com" \
       description="Static corporate site" \
       version="1.0"
 
-# Устанавливаем nginx и необходимые инструменты в один слой
+# Install nginx and required tools in one layer
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         nginx \
@@ -20,20 +20,20 @@ RUN apt-get update && \
     ln -sf /dev/stdout /var/log/nginx/access.log && \
     ln -sf /dev/stderr /var/log/nginx/error.log
 
-# Копируем статические файлы сайта
+# Copy static site files
 COPY index.html styles.css script.js content.json /var/www/html/
 COPY logo.jpg logo.svg logo_full-2.svg /var/www/html/
 
-# Копируем кастомную конфигурацию nginx
+# Copy custom nginx config
 COPY docker/nginx.conf /etc/nginx/sites-enabled/default
 
-# Добавляем healthcheck
+# Healthcheck
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost/ || exit 1
 
-# Экспонируем порт 80
+# Expose port 80
 EXPOSE 80
 
-# Останавливаем nginx daemon режим и запускаем в foreground
+# Disable nginx daemon mode and run in the foreground
 CMD ["nginx", "-g", "daemon off;"]
 

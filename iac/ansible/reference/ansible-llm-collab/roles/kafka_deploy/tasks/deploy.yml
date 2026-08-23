@@ -1,5 +1,5 @@
 ---
-- name: Файл окружения с секретами для compose (env_file)
+- name: Environment file with secrets for compose (env_file)
   ansible.builtin.template:
     src: dotenv.j2
     dest: "{{ kafka_app_root }}/{{ kafka_env_file_name }}"
@@ -8,7 +8,7 @@
     group: "{{ ansible_user }}"
   no_log: true
 
-- name: JAAS PlainLoginModule для Kafka (владелец uid/gid как в образе apache/kafka — чтение bind mount из контейнера)
+- name: Kafka JAAS PlainLoginModule (owner uid/gid as in the apache/kafka image — bind-mount readable from the container)
   ansible.builtin.template:
     src: kafka_server_jaas.conf.j2
     dest: "{{ kafka_config_dir }}/kafka_server_jaas.conf"
@@ -19,7 +19,7 @@
   notify: restart kafka container
   no_log: true
 
-- name: Конфигурация AKHQ (application.yml)
+- name: AKHQ configuration (application.yml)
   ansible.builtin.template:
     src: akhq-application.yml.j2
     dest: "{{ kafka_config_dir }}/akhq-application.yml"
@@ -30,7 +30,7 @@
   notify: restart akhq container
   no_log: true
 
-- name: Права на keystore для чтения процессом в контейнере
+- name: Keystore permissions for the process in the container
   ansible.builtin.file:
     path: "{{ kafka_config_dir }}/ssl/kafka.keystore.p12"
     mode: "0640"
@@ -38,13 +38,13 @@
     group: "{{ kafka_container_user_gid }}"
   when: kafka_sasl_enabled | bool and kafka_sasl_tls_enabled | bool
 
-- name: docker-compose.yml для Kafka
+- name: docker-compose.yml for Kafka
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ kafka_app_root }}/docker-compose.yml"
     mode: "0644"
 
-- name: Поднять или обновить стек Kafka
+- name: Bring up or update the Kafka stack
   community.docker.docker_compose_v2:
     project_src: "{{ kafka_app_root }}"
     project_name: "{{ kafka_compose_project_name }}"

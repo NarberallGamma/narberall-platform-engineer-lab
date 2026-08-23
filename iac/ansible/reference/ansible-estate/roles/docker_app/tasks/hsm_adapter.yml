@@ -1,7 +1,7 @@
 ---
-# hsm-adapter: bind-mount data/ рядом с compose (не docker named volumes)
+# hsm-adapter: bind-mount data/ next to compose (not docker named volumes)
 
-- name: "{{ docker_app.slug }} | каталоги data (bind mounts)"
+- name: "{{ docker_app.slug }} | data directories (bind mounts)"
   ansible.builtin.file:
     path: "{{ docker_app_base_dir }}/hsm-adapter/{{ item.path }}"
     state: directory

@@ -1,8 +1,8 @@
 # telegram_vps_egress
 
-Local Envoy на GitLab: TCP proxy к VPS cluster (PRIORITY failover) для Telegram API.
+Local Envoy on GitLab: TCP proxy to the VPS cluster (PRIORITY failover) for Telegram API.
 
-Конфигурация роли: **`group_vars/telegram_vps_egress.yml`** (только плейбук `telegram_vps_egress.yml`).  
-Клиент docker_app: **`docker_app.telegram_egress`** в `group_vars/<service>.yml`, без общих vars с egress.
+Role configuration: **`group_vars/telegram_vps_egress.yml`** (playbook `telegram_vps_egress.yml` only).  
+docker_app client: **`docker_app.telegram_egress`** in `group_vars/<service>.yml`, with no shared vars with egress.
 
-См. **`docs/TELEGRAM_VPS_EGRESS_GITLAB.md`**.
+See **`docs/TELEGRAM_VPS_EGRESS_GITLAB.md`**.

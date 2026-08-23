@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Снятие GRANT-ов дополнительной роли PostgreSQL (без REASSIGN OWNED).
-# Запуск: ./scripts/run/run_drop_db_user.sh <db_name|all> --extra-vars "drop_user=... [drop_role_after_cleanup=true] pg_admin_password=..." [--check]
+# Revoke GRANTs of an extra PostgreSQL role (no REASSIGN OWNED).
+# Run: ./scripts/run/run_drop_db_user.sh <db_name|all> --extra-vars "drop_user=... [drop_role_after_cleanup=true] pg_admin_password=..." [--check]
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -43,8 +43,8 @@ echo "=== DROP DB USER (revoke grants only, no REASSIGN) ==="
 echo "Playbook: $PLAYBOOK_ABS"
 echo "Database(s): $DB_DESCRIPTION"
 echo ""
-echo "Пароли: drop_user обязателен; pg_admin_password из vars или --extra-vars."
-echo "DROP ROLE выполняется только при drop_role_after_cleanup=true."
+echo "Passwords: drop_user is required; pg_admin_password from vars or --extra-vars."
+echo "DROP ROLE runs only when drop_role_after_cleanup=true."
 echo ""
 read -p "Continue? (yes/no): " confirmation
 if [[ "$confirmation" != "yes" ]]; then

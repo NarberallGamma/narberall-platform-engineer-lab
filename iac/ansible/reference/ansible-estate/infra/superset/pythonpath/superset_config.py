@@ -1,15 +1,15 @@
 # pylint: disable=invalid-name
-"""Конфигурация Superset для docker-compose.
+"""Superset configuration for docker-compose.
 
-Ожидаемые переменные окружения (часть задаётся в docker-compose.yml, часть — в .env):
+Expected environment variables (some set in docker-compose.yml, some in .env):
 
-- SUPERSET_SECRET_KEY — из .env
-- SQLALCHEMY_DATABASE_URI — из compose (PostgreSQL 17, сервис db)
-- REDIS_URL — из compose (Redis 7, сервис redis; Celery broker/backend и кэш)
+- SUPERSET_SECRET_KEY — from .env
+- SQLALCHEMY_DATABASE_URI — from compose (PostgreSQL 17, db service)
+- REDIS_URL — from compose (Redis 7, redis service; Celery broker/backend and cache)
 
-Прокси: nginx завершает TLS; ENABLE_PROXY_FIX включён.
+Proxy: nginx terminates TLS; ENABLE_PROXY_FIX is enabled.
 
-Аутентификация: по умолчанию OAuth2/OIDC (ADFS), либо только БД — SUPERSET_AUTH_TYPE=db (см. env.example).
+Authentication: OAuth2/OIDC (ADFS) by default, or database only — SUPERSET_AUTH_TYPE=db (see env.example).
 """
 
 import os
@@ -56,7 +56,7 @@ CELERY_CONFIG = CeleryConfig
 WTF_CSRF_ENABLED = True
 WTF_CSRF_TIME_LIMIT = 60 * 60 * 24 * 365
 
-# За reverse proxy с HTTPS у cookie должен быть флаг Secure (см. SESSION_COOKIE_SECURE в .env)
+# Behind an HTTPS reverse proxy the cookie must have the Secure flag (see SESSION_COOKIE_SECURE in .env)
 SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() in (
     "1",
     "true",
@@ -65,8 +65,8 @@ SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() 
 
 MAPBOX_API_KEY = os.environ.get("MAPBOX_API_KEY", "")
 
-# --- Аутентификация: OAuth2/OIDC (ADFS) или только локальная БД ---
-# По умолчанию db — чтобы стек поднимался без ADFS; в проде задать SUPERSET_AUTH_TYPE=oauth
+# --- Authentication: OAuth2/OIDC (ADFS) or local database only ---
+# Default is db so the stack comes up without ADFS; in prod set SUPERSET_AUTH_TYPE=oauth
 _auth = os.environ.get("SUPERSET_AUTH_TYPE", "db").lower().strip()
 
 if _auth == "db":
@@ -109,7 +109,7 @@ else:
         "Public",
     )
 
-    # Имена групп должны совпадать с выдачей ADFS в токене (role_keys → см. custom_sso_security_manager)
+    # Group names must match the ADFS claim in the token (role_keys → see custom_sso_security_manager)
     AUTH_ROLES_MAPPING = {
         "Estate Superset Administrators": ["Admin"],
         "Estate Superset Users": ["Public"],

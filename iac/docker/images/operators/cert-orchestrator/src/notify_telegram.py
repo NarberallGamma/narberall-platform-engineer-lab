@@ -1,4 +1,4 @@
-"""Telegram Bot API: sendMessage, parse_mode HTML, эмодзи в заголовках и сводках."""
+"""Telegram Bot API: sendMessage, parse_mode HTML, emoji in headers and summaries."""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ class TelegramClient:
         max_attempts: Optional[int] = None,
         **kwargs,
     ):
-        """HTTP к Telegram API через VPS (extra_hosts + IPv4)."""
+        """HTTP to the Telegram API via VPS (extra_hosts + IPv4)."""
         if max_attempts is None:
             max_attempts = self.cfg.telegram.retry_attempts
         last_error = None
@@ -130,7 +130,7 @@ class TelegramClient:
         for chat_id in self.chat_ids:
             for i, chunk in enumerate(chunks):
                 if i > 0:
-                    chunk = f"<i>Продолжение {i + 1}/{len(chunks)}</i>\n\n{chunk}"
+                    chunk = f"<i>Continued {i + 1}/{len(chunks)}</i>\n\n{chunk}"
                 await self._send_single_message(chat_id, chunk)
                 await asyncio.sleep(0.5)
 
@@ -152,19 +152,19 @@ class TelegramClient:
         ts = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
         return (
             f"{emoji} <b>{title}</b>\n"
-            f"📊 <b>Статус:</b> {status_line}\n"
-            f"🕐 <b>Время:</b> {ts}\n"
+            f"📊 <b>Status:</b> {status_line}\n"
+            f"🕐 <b>Time:</b> {ts}\n"
         )
 
     async def send_startup(self) -> None:
         if not telegram_enabled(self.cfg) or not _flag(self.cfg.telegram.notify_on, "container_start"):
             return
         c = self.cfg
-        msg = self._header("✅", "Cert Orchestrator", "ЗАПУЩЕН")
-        msg += f"\n📋 <b>Окружение:</b> {_escape_html(c.meta.environment)}\n"
-        msg += f"🌐 <b>Домен:</b> <code>{_escape_html((c.letsencrypt.domain or '').strip() or '—')}</code>\n"
-        msg += f"📅 <b>Расписание:</b> {c.schedule.weekday} {c.schedule.time_hhmm} ({c.meta.timezone})\n"
-        msg += f"⏳ <b>Интервал:</b> раз в {c.schedule.days_interval} дн.\n"
+        msg = self._header("✅", "Cert Orchestrator", "STARTED")
+        msg += f"\n📋 <b>Environment:</b> {_escape_html(c.meta.environment)}\n"
+        msg += f"🌐 <b>Domain:</b> <code>{_escape_html((c.letsencrypt.domain or '').strip() or '—')}</code>\n"
+        msg += f"📅 <b>Schedule:</b> {c.schedule.weekday} {c.schedule.time_hhmm} ({c.meta.timezone})\n"
+        msg += f"⏳ <b>Interval:</b> every {c.schedule.days_interval} day(s)\n"
         msg += f"\n🤖 <b>Cert Orchestrator v{APP_VERSION}</b>"
         await self._send_message(msg)
 
@@ -172,17 +172,17 @@ class TelegramClient:
         if not telegram_enabled(self.cfg) or not _flag(self.cfg.telegram.notify_on, "renewal_started"):
             return
         d = (self.cfg.letsencrypt.domain or "").strip() or "—"
-        msg = self._header("🔄", "Cert Orchestrator", "ОБНОВЛЕНИЕ TLS")
-        msg += f"\n🔐 <b>Домен:</b> <code>{_escape_html(d)}</code>\n"
+        msg = self._header("🔄", "Cert Orchestrator", "TLS RENEWAL")
+        msg += f"\n🔐 <b>Domain:</b> <code>{_escape_html(d)}</code>\n"
         msg += f"\n🤖 <b>Cert Orchestrator v{APP_VERSION}</b>"
         await self._send_message(msg)
 
     async def send_renewal_error(self, step: str, detail: str) -> None:
         if not telegram_enabled(self.cfg) or not _flag(self.cfg.telegram.notify_on, "errors"):
             return
-        msg = self._header("🚨", "Cert Orchestrator", "ОШИБКА")
-        msg += f"\n⚠️ <b>Этап:</b> {_escape_html(step)}\n"
-        msg += f"📝 <b>Детали:</b>\n<pre>{_escape_html(detail[:3500])}</pre>\n"
+        msg = self._header("🚨", "Cert Orchestrator", "ERROR")
+        msg += f"\n⚠️ <b>Step:</b> {_escape_html(step)}\n"
+        msg += f"📝 <b>Details:</b>\n<pre>{_escape_html(detail[:3500])}</pre>\n"
         msg += f"\n🤖 <b>Cert Orchestrator v{APP_VERSION}</b>"
         await self._send_message(msg)
 
@@ -197,18 +197,18 @@ class TelegramClient:
         if not telegram_enabled(self.cfg) or not _flag(self.cfg.telegram.notify_on, "renewal_finished"):
             return
         if full_success:
-            status = "ОБНОВЛЕНИЕ ЗАВЕРШЕНО"
+            status = "RENEWAL COMPLETE"
             emoji = "✅"
         elif partial:
-            status = "ЧАСТИЧНОЕ ОБНОВЛЕНИЕ"
+            status = "PARTIAL RENEWAL"
             emoji = "⚠️"
         else:
-            status = "ОБНОВЛЕНИЕ НЕ УДАЛОСЬ"
+            status = "RENEWAL FAILED"
             emoji = "🚨"
         msg = self._header(emoji, "Cert Orchestrator", status)
         d = (self.cfg.letsencrypt.domain or "").strip() or "—"
-        msg += f"\n🔐 <b>Домен:</b> <code>{_escape_html(d)}</code>\n\n"
-        msg += "📈 <b>Сводка этапов:</b>\n"
+        msg += f"\n🔐 <b>Domain:</b> <code>{_escape_html(d)}</code>\n\n"
+        msg += "📈 <b>Step summary:</b>\n"
         for name, ok, note in step_lines:
             em = "🟢" if ok else "🔴"
             msg += f"{em} <b>{_escape_html(name)}</b>"
@@ -216,7 +216,7 @@ class TelegramClient:
                 msg += f" — {_escape_html(note)}"
             msg += "\n"
         if https_lines and _flag(self.cfg.telegram.notify_on, "per_host_result"):
-            msg += "\n📋 <b>Проверка HTTPS:</b>\n"
+            msg += "\n📋 <b>HTTPS check:</b>\n"
             for hp, ok, meta, extra in https_lines:
                 em = "🟢" if ok else "❌"
                 msg += f"{em} <code>{_escape_html(hp)}</code>\n"
@@ -240,9 +240,9 @@ class TelegramClient:
         if not telegram_enabled(self.cfg) or not _flag(self.cfg.telegram.notify_on, "next_rotation_reminder"):
             return
         s = self.cfg.schedule
-        msg = self._header("📅", "Cert Orchestrator", "СЛЕДУЮЩАЯ РОТАЦИЯ")
-        msg += f"\n• Окно: <b>{_escape_html(s.weekday)}</b> {_escape_html(s.time_hhmm)} ({_escape_html(self.cfg.meta.timezone)})\n"
-        msg += f"• Следующая попытка не ранее чем через <b>{s.days_interval}</b> дн. после последнего прогона\n"
+        msg = self._header("📅", "Cert Orchestrator", "NEXT ROTATION")
+        msg += f"\n• Window: <b>{_escape_html(s.weekday)}</b> {_escape_html(s.time_hhmm)} ({_escape_html(self.cfg.meta.timezone)})\n"
+        msg += f"• Next attempt no sooner than <b>{s.days_interval}</b> day(s) after the last run\n"
         msg += f"\n🤖 <b>Cert Orchestrator v{APP_VERSION}</b>"
         await self._send_message(msg)
 

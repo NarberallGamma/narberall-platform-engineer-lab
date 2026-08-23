@@ -1,5 +1,5 @@
-# Локальный запуск (scripts/run/ с опцией --local): плейбук на том же хосте.
-# connection=local, SSH не используется.
+# Local run (scripts/run/ with --local): playbook on the same host.
+# connection=local, SSH is not used.
 
 [local]
 localhost ansible_connection=local

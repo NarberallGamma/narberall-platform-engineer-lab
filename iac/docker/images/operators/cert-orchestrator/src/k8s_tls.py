@@ -1,4 +1,4 @@
-"""TLS Secret в перечисленных namespace (kubectl + ServiceAccount token)."""
+"""TLS Secret in the listed namespaces (kubectl + ServiceAccount token)."""
 
 from __future__ import annotations
 
@@ -17,12 +17,12 @@ def _kubectl_cmd(cfg: OrchestratorConfig, *args: str) -> list[str]:
     cmd = ["kubectl"]
     api_server = (k8.api_server or "").strip()
     if not api_server:
-        raise RuntimeError("kubernetes.api_server не задан в конфиге")
+        raise RuntimeError("kubernetes.api_server is not set in the config")
     cmd.extend(["--server", api_server])
 
     token = os.environ.get("K8S_TOKEN", "").strip()
     if not token:
-        raise RuntimeError("K8S_TOKEN не задан (Vault / .env)")
+        raise RuntimeError("K8S_TOKEN is not set (Vault / .env)")
 
     cmd.extend(["--token", token])
 
@@ -33,7 +33,7 @@ def _kubectl_cmd(cfg: OrchestratorConfig, *args: str) -> list[str]:
         cmd.extend(["--insecure-skip-tls-verify"])
     else:
         raise RuntimeError(
-            "kubernetes.ca_cert_path не найден и insecure_skip_tls_verify=false"
+            "kubernetes.ca_cert_path not found and insecure_skip_tls_verify=false"
         )
 
     cmd.extend(args)
@@ -87,18 +87,18 @@ def _deploy_tls_secret_one(
 
 
 def deploy_wildcard_tls(cfg: OrchestratorConfig) -> List[TargetDeployResult]:
-    """Раскладка TLS secret по namespace; ошибка одного ns не прерывает остальные."""
+    """Deploy the TLS secret to namespaces; a failure in one ns does not stop the rest."""
     if not cfg.kubernetes.enabled:
         return []
 
     cert_path, key_path = pem_paths(cfg.letsencrypt)
     if not cert_path.is_file() or not key_path.is_file():
-        raise FileNotFoundError(f"Нет PEM: {cert_path} / {key_path}")
+        raise FileNotFoundError(f"PEM missing: {cert_path} / {key_path}")
 
     targets = list(cfg.kubernetes.namespace_secrets or [])
     if not targets:
         raise RuntimeError(
-            "kubernetes.namespace_secrets пуст: задать namespace и secret_name в конфиге"
+            "kubernetes.namespace_secrets is empty: set namespace and secret_name in the config"
         )
 
     timeout = cfg.timeouts.kubectl_seconds

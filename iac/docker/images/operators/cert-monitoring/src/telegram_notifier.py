@@ -37,7 +37,7 @@ class TelegramNotifier:
         max_attempts: Optional[int] = None,
         **kwargs,
     ):
-        """HTTP к Telegram API через VPS (extra_hosts + IPv4, без IPv6 happy-eyeballs)."""
+        """HTTP to the Telegram API via VPS (extra_hosts + IPv4, no IPv6 happy-eyeballs)."""
         if max_attempts is None:
             max_attempts = config.telegram_retry_attempts
         last_error = None
@@ -135,60 +135,60 @@ class TelegramNotifier:
         # Emoji and status based on highest priority
         if any(h['status'] in ['ERROR', 'EXPIRED', 'CRITICAL'] for h in warning_hosts + error_hosts):
             emoji = "🚨"
-            status = "КРИТИЧЕСКИЕ ОШИБКИ"
+            status = "CRITICAL ERRORS"
         elif any(h['status'] == 'WARNING' for h in warning_hosts):
             emoji = "⚠️"
-            status = "ПРЕДУПРЕЖДЕНИЯ"
+            status = "WARNINGS"
         elif any(h['status'] == 'EARLY_WARNING' for h in warning_hosts):
             emoji = "🔵"
-            status = "РАННИЕ ПРЕДУПРЕЖДЕНИЯ"
+            status = "EARLY WARNINGS"
         else:
             emoji = "✅"
-            status = "ВСЕ В ПОРЯДКЕ"
+            status = "ALL CLEAR"
         
         # Header
         message = f"{emoji} <b>SSL Certificate Monitor</b>\n"
-        message += f"📊 <b>Статус:</b> {status}\n"
-        message += f"🕐 <b>Время:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n\n"
+        message += f"📊 <b>Status:</b> {status}\n"
+        message += f"🕐 <b>Time:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n\n"
         
         # Summary
-        message += f"📈 <b>Сводка:</b>\n"
-        message += f"🔴 Истекшие: {len([r for r in all_results if r['status'] == 'EXPIRED'])}\n"
-        message += f"🟠 Критические: {len([r for r in all_results if r['status'] == 'CRITICAL'])}\n"
-        message += f"🟡 Предупреждения: {len([r for r in all_results if r['status'] == 'WARNING'])}\n"
-        message += f"🔵 Ранние предупреждения: {len([r for r in all_results if r['status'] == 'EARLY_WARNING'])}\n"
+        message += f"📈 <b>Summary:</b>\n"
+        message += f"🔴 Expired: {len([r for r in all_results if r['status'] == 'EXPIRED'])}\n"
+        message += f"🟠 Critical: {len([r for r in all_results if r['status'] == 'CRITICAL'])}\n"
+        message += f"🟡 Warnings: {len([r for r in all_results if r['status'] == 'WARNING'])}\n"
+        message += f"🔵 Early warnings: {len([r for r in all_results if r['status'] == 'EARLY_WARNING'])}\n"
         message += f"🟢 OK: {len([r for r in all_results if r['status'] == 'OK'])}\n"
-        message += f"❌ Ошибки: {len([r for r in all_results if r['status'] == 'ERROR'])}\n\n"
+        message += f"❌ Errors: {len([r for r in all_results if r['status'] == 'ERROR'])}\n\n"
         
         # Critical certificates (EXPIRED and CRITICAL)
         critical_certs = [r for r in warning_hosts + error_hosts if r['status'] in ['EXPIRED', 'CRITICAL']]
         if critical_certs:
-            message += f"🚨 *КРИТИЧЕСКИЕ СЕРТИФИКАТЫ:*\n"
+            message += f"🚨 *CRITICAL CERTIFICATES:*\n"
             for cert in critical_certs:
                 if cert['status'] == 'EXPIRED':
-                    message += f"🔴 `{cert['host']}:{cert['port']}` - ИСТЕКШИЙ\n"
+                    message += f"🔴 `{cert['host']}:{cert['port']}` - EXPIRED\n"
                 else:
-                    message += f"🟠 `{cert['host']}:{cert['port']}` - КРИТИЧЕСКИЙ\n"
-                message += f"   📅 Истекает: {cert['expiry_date'] or 'N/A'}\n"
+                    message += f"🟠 `{cert['host']}:{cert['port']}` - CRITICAL\n"
+                message += f"   📅 Expires: {cert['expiry_date'] or 'N/A'}\n"
                 if cert['days_until_expiry'] is not None:
-                    message += f"   ⏰ Осталось дней: {cert['days_until_expiry']}\n"
+                    message += f"   ⏰ Days left: {cert['days_until_expiry']}\n"
                 if cert['subject']:
                     message += f"   📋 {cert['subject']}\n"
                 message += "\n"
         
         # Warning certificates
         if warning_hosts:
-            message += f"⚠️ *ПРЕДУПРЕЖДЕНИЯ (ИСТЕКАЮТ СКОРО):*\n"
+            message += f"⚠️ *WARNINGS (EXPIRING SOON):*\n"
             for cert in warning_hosts:
                 message += f"🟡 `{cert['host']}:{cert['port']}`\n"
-                message += f"   ⏰ Осталось дней: {cert['days_until_expiry']}\n"
-                message += f"   📅 Истекает: {cert['expiry_date'] or 'N/A'}\n"
+                message += f"   ⏰ Days left: {cert['days_until_expiry']}\n"
+                message += f"   📅 Expires: {cert['expiry_date'] or 'N/A'}\n"
                 if cert['subject']:
                     message += f"   📋 {cert['subject']}\n"
                 message += "\n"
         
         # All certificates summary
-        message += f"📋 *ВСЕ СЕРТИФИКАТЫ:*\n"
+        message += f"📋 *ALL CERTIFICATES:*\n"
         for cert in all_results:
             status_emoji = {
                 'OK': '🟢',
@@ -200,7 +200,7 @@ class TelegramNotifier:
             message += f"{status_emoji} `{cert['host']}:{cert['port']}` - {cert['status']}"
             
             if cert['days_until_expiry'] is not None:
-                message += f" ({cert['days_until_expiry']} дней)"
+                message += f" ({cert['days_until_expiry']} days)"
             elif cert['error']:
                 # Escape special characters in error message for HTML
                 error_msg = cert['error'].replace('<', '&lt;').replace('>', '&gt;').replace('&', '&amp;')
@@ -222,7 +222,7 @@ class TelegramNotifier:
                 chunks = self._split_message(message, 4000)  # Leave some buffer
                 for i, chunk in enumerate(chunks):
                     if i > 0:
-                        chunk = f"*Продолжение {i+1}/{len(chunks)}:*\n\n{chunk}"
+                        chunk = f"*Continued {i+1}/{len(chunks)}:*\n\n{chunk}"
                     await self._send_single_message(chat_id, chunk)
                     await asyncio.sleep(0.5)  # Small delay between messages
             else:
@@ -303,31 +303,31 @@ class TelegramNotifier:
     def _create_startup_message(self, details: Optional[Dict[str, Any]] = None) -> str:
         """Create startup notification message"""
         message = f"✅ <b>SSL Certificate Monitor</b>\n"
-        message += f"🚀 <b>Статус:</b> УСПЕШНО ЗАПУЩЕН\n"
-        message += f"🕐 <b>Время:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
+        message += f"🚀 <b>Status:</b> STARTED SUCCESSFULLY\n"
+        message += f"🕐 <b>Time:</b> {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
         
         if details:
-            message += f"\n📋 <b>Конфигурация:</b>\n"
+            message += f"\n📋 <b>Configuration:</b>\n"
             
             if 'hosts_count' in details:
-                message += f"• Мониторинг хостов: {details['hosts_count']}\n"
+                message += f"• Hosts monitored: {details['hosts_count']}\n"
             
             if 'check_interval' in details:
                 hours = details['check_interval'] // 3600
                 minutes = (details['check_interval'] % 3600) // 60
                 if hours > 0:
-                    interval_text = f"{hours} ч"
+                    interval_text = f"{hours} h"
                     if minutes > 0:
-                        interval_text += f" {minutes} мин"
+                        interval_text += f" {minutes} min"
                 else:
-                    interval_text = f"{minutes} мин"
-                message += f"• Интервал проверки: {interval_text} ({details['check_interval']} сек)\n"
+                    interval_text = f"{minutes} min"
+                message += f"• Check interval: {interval_text} ({details['check_interval']} sec)\n"
             
             if 'excluded_hosts' in details and details['excluded_hosts']:
-                message += f"• Исключенные хосты из алертов: {len(details['excluded_hosts'])}\n"
+                message += f"• Hosts excluded from alerts: {len(details['excluded_hosts'])}\n"
             
             if 'version' in details:
-                message += f"• Версия: {details['version']}\n"
+                message += f"• Version: {details['version']}\n"
         
         message += f"\n🤖 <b>SSL Certificate Monitor v{config.app_version}</b>"
         

@@ -1,5 +1,5 @@
-# Managed by ansible (sec_stack): генерится из SOPS-секретов поверх
-# stack/alertmanager/alertmanager.yml. Правки — в шаблоне роли.
+# Managed by ansible (sec_stack): generated from SOPS secrets on top of
+# stack/alertmanager/alertmanager.yml. Edits go in the role template.
 templates:
   - /etc/alertmanager/templates/*.tmpl
 
@@ -10,7 +10,7 @@ route:
   group_interval: 5m
   repeat_interval: 12h
   routes:
-    # Heartbeat уходит отдельно и часто, минуя группировку
+    # Heartbeat is sent separately and often, bypassing grouping
     - matchers: [alertname = DeadManSwitch]
       receiver: heartbeat
       group_wait: 0s
@@ -33,7 +33,7 @@ receivers:
 {% if sec_stack_telegram_bot_token and sec_stack_telegram_chat_id_critical %}
     telegram_configs:
       - bot_token: "{{ sec_stack_telegram_bot_token }}"
-        chat_id: {{ sec_stack_telegram_chat_id_critical }}   # чат "вахтёр ругается"
+        chat_id: {{ sec_stack_telegram_chat_id_critical }}   # "watchman yelling" chat
         parse_mode: HTML
         message: '{{ '{{ template "sec_stack.telegram" . }}' }}'
 {% endif %}
@@ -46,11 +46,11 @@ receivers:
 {% endif %}
 
 inhibit_rules:
-  # Если файрвол целиком недоступен — не спамить про его туннели/лицензии
+  # When the firewall is fully unreachable — do not spam about its tunnels/licenses
   - source_matchers: [alertname = PanosUnreachable]
     target_matchers: [alertname =~ "Panos(IpsecTunnelDown|HAUnhealthyState|SessionUsageHigh)"]
     equal: [firewall]
-  # NB: правила PanosHAUnhealthyState -> PanosIpsecTunnelDown здесь СОЗНАТЕЛЬНО нет.
-  # HAUnhealthyState срабатывает и когда нездоров peer, а метка firewall у него —
-  # локальной ноды: при peer=suspended оно гасило туннель-алерты ЗДОРОВОЙ активной
-  # ноды. Не-активные ноды отсекаются в самом правиле PanosIpsecTunnelDown (vmalert).
+  # NB: a PanosHAUnhealthyState -> PanosIpsecTunnelDown rule is INTENTIONALLY absent here.
+  # HAUnhealthyState also fires when the peer is unhealthy, and its firewall label is
+  # the local node: with peer=suspended it suppressed tunnel alerts of the HEALTHY
+  # active node. Non-active nodes are filtered in the PanosIpsecTunnelDown rule itself (vmalert).

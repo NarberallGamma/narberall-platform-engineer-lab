@@ -1,6 +1,6 @@
 ---
-# Deploy cert-orchestrator (docker compose в /docker/apps/cert-orchestrator)
-# Переменные: group_vars/cert-orchestrator.yml
+# Deploy cert-orchestrator (docker compose under /docker/apps/cert-orchestrator)
+# Variables: group_vars/cert-orchestrator.yml
 
 - name: Deploy cert-orchestrator
   hosts: cert_orchestrator

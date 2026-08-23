@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
-# Скрипт для создания администратора в базе данных treasury_api
-# Создание пользователя с правами администратора в API сервисе
+# Create an administrator in the treasury_api database
+# Create a user with administrator rights in the API service
 
 set -euo pipefail
 
-# Параметры подключения к целевой БД
+# Target database connection parameters
 TARGET_HOST="10.10.16.30"
 PG_PORT="5432"
 PG_USER="root"
 TARGET_PASSWORD=""
 DB_NAME="treasury_api"
 
-# ID пользователя из Keycloak
+# Keycloak user ID
 KEYCLOAK_USER_ID=""
 
-# Данные пользователя
+# User fields
 USER_EMAIL="admin@example.com"
-USER_LAST_NAME="Захаревич"
-USER_FIRST_NAME="Павел"
-USER_MIDDLE_NAME="Андреевич"
+USER_LAST_NAME="Doe"
+USER_FIRST_NAME="Jane"
+USER_MIDDLE_NAME="Ann"
 
-# Используем официальный образ PostgreSQL
+# Official PostgreSQL image
 PG_IMAGE="postgres:15-alpine"
 
 echo "=== Creating API Administrator User ==="
@@ -29,7 +29,7 @@ echo "Host: ${TARGET_HOST}:${PG_PORT}"
 echo "Keycloak User ID: ${KEYCLOAK_USER_ID}"
 echo ""
 
-# Проверка доступности целевого сервера
+# Check target server connectivity
 echo "Checking target server connectivity..."
 if ! docker run --rm --network host \
   -e PGPASSWORD="${TARGET_PASSWORD}" \
@@ -40,7 +40,7 @@ if ! docker run --rm --network host \
 fi
 echo "✓ Target server is accessible"
 
-# Проверка существования базы данных
+# Check that the database exists
 echo "Checking if database '${DB_NAME}' exists..."
 if ! docker run --rm --network host \
   -e PGPASSWORD="${TARGET_PASSWORD}" \
@@ -51,7 +51,7 @@ if ! docker run --rm --network host \
 fi
 echo "✓ Database '${DB_NAME}' exists"
 
-# Проверка существования таблицы
+# Check that the table exists
 echo "Checking if table 'public.app_user' exists..."
 if ! docker run --rm --network host \
   -e PGPASSWORD="${TARGET_PASSWORD}" \
@@ -62,7 +62,7 @@ if ! docker run --rm --network host \
 fi
 echo "✓ Table 'public.app_user' exists"
 
-# Проверка, не существует ли уже пользователь с таким ID
+# Check whether a user with this ID already exists
 echo "Checking if user with ID '${KEYCLOAK_USER_ID}' already exists..."
 if docker run --rm --network host \
   -e PGPASSWORD="${TARGET_PASSWORD}" \
@@ -112,7 +112,7 @@ else
     echo ""
     echo "Executing INSERT statement..."
     
-    # Проверяем, не существует ли уже пользователь с таким email
+    # Check whether a user with this email already exists
     echo "Checking if user with email '${USER_EMAIL}' already exists..."
     if docker run --rm --network host \
       -e PGPASSWORD="${TARGET_PASSWORD}" \
@@ -125,7 +125,7 @@ else
             echo "Operation cancelled."
             exit 0
         fi
-        # Используем UPDATE вместо INSERT
+        # Use UPDATE instead of INSERT
         docker run --rm --network host \
           -e PGPASSWORD="${TARGET_PASSWORD}" \
           "${PG_IMAGE}" \
@@ -142,7 +142,7 @@ else
         fi
     fi
     
-    # Выполняем INSERT с полным выводом
+    # Run INSERT with verbose output
     echo "Executing INSERT with verbose output..."
     docker run --rm --network host \
       -e PGPASSWORD="${TARGET_PASSWORD}" \
@@ -156,7 +156,7 @@ else
     if [ $RESULT -eq 0 ]; then
         echo "✓ User created successfully"
         
-        # Проверяем, что пользователь действительно создан
+        # Confirm the user was created
         echo "Verifying user was created..."
         if docker run --rm --network host \
           -e PGPASSWORD="${TARGET_PASSWORD}" \

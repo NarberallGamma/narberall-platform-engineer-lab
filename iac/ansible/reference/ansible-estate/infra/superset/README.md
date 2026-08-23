@@ -1,53 +1,53 @@
 # Superset (estate prod) — Docker Compose
 
-Стек по официальному образу [apache/superset](https://hub.docker.com/r/apache/superset) с фиксированным тегом **`6.0.0`**: Gunicorn, Celery worker, Celery beat. **PostgreSQL** и **Redis** — контейнеры в том же `docker-compose.yml`; наружу на хосте только **`127.0.0.1:8088`** для обратного прокси. TLS — на отдельном **nginx** `1.29.0` (`network_mode: host`), по аналогии с `estate-prod-app-1` в `/docker/nginx`.
+Stack based on the official [apache/superset](https://hub.docker.com/r/apache/superset) image with a pinned tag **`6.0.0`**: Gunicorn, Celery worker, Celery beat. **PostgreSQL** and **Redis** are containers in the same `docker-compose.yml`; the only host bind is **`127.0.0.1:8088`** for the reverse proxy. TLS is on a separate **nginx** `1.29.0` (`network_mode: host`), same pattern as `estate-prod-app-1` under `/docker/nginx`.
 
-Команды и имена сервисов согласованы с upstream [docker-compose-non-dev.yml](https://github.com/apache/superset/blob/master/docker-compose-non-dev.yml) (`app-gunicorn`, `docker-init.sh`, `docker-bootstrap.sh` для worker/beat). В upstream заявлено, что compose не позиционируется как production; для estate это осознанный self-hosted вариант с внешним nginx и привязкой портов к localhost. Отличие от upstream: образ **Docker Hub** вместо `build`, **профиль `init`** у `superset-init` (повторный `docker compose up -d` не перезапускает init), **bind-монты** для данных и **read-only** `pythonpath` вместо томов из репозитория разработки. Версия PostgreSQL в образе **`postgres:17-alpine`**, как в non-dev.
+Commands and service names follow upstream [docker-compose-non-dev.yml](https://github.com/apache/superset/blob/master/docker-compose-non-dev.yml) (`app-gunicorn`, `docker-init.sh`, `docker-bootstrap.sh` for worker/beat). Upstream states that compose is not positioned as production; for estate this is a deliberate self-hosted variant with external nginx and localhost port binds. Differences from upstream: **Docker Hub** image instead of `build`, **`init` profile** on `superset-init` (a repeat `docker compose up -d` does not re-run init), **bind mounts** for data and a **read-only** `pythonpath` instead of volumes from the development repository. PostgreSQL image version is **`postgres:17-alpine`**, same as non-dev.
 
-### Где что хранится
+### Where data lives
 
-| Данные | Место |
-|--------|--------|
-| Метаданные Superset (дашборды, датасеты, пользователи) | Том **`./data/postgres`** (PostgreSQL 17 в контейнере `db`) |
-| Кэш и очереди Celery | Том **`./data/redis`** (Redis 7 в контейнере `redis`, AOF) |
-| Домашний каталог приложения (`SUPERSET_HOME` → `/app/superset_home`) | **`./data/superset_home`** относительно `docker-compose.yml` |
+| Data | Location |
+|------|----------|
+| Superset metadata (dashboards, datasets, users) | Volume **`./data/postgres`** (PostgreSQL 17 in the `db` container) |
+| Celery cache and queues | Volume **`./data/redis`** (Redis 7 in the `redis` container, AOF) |
+| Application home (`SUPERSET_HOME` → `/app/superset_home`) | **`./data/superset_home`** relative to `docker-compose.yml` |
 
-Каталоги под тома создаются при первом запуске; при необходимости заранее: `mkdir -p data/postgres data/redis data/superset_home`.
+Volume directories are created on first start; to create them in advance: `mkdir -p data/postgres data/redis data/superset_home`.
 
-## Расположение на сервере
+## Location on the server
 
-Имеет смысл скопировать каталог `superset` в `/docker/superset` (или `/docker/apps/superset`) на `estate-prod-superset` (отдельный диск `/docker` уже смонтирован).
+Copy the `superset` directory to `/docker/superset` (or `/docker/apps/superset`) on `estate-prod-superset` (a separate `/docker` disk is already mounted).
 
-## Конфигурация
+## Configuration
 
 1. `cp env.example .env`
-2. Создать доверенный CA bundle для контейнера (том `./ca-certificates.crt` в `docker-compose.yml`): на Linux  
-   `sh scripts/prepare-ca-bundle.sh`  
-   либо вручную скопировать хостовый `/etc/ssl/certs/ca-certificates.crt` в `ca-certificates.crt` рядом с compose (файл в `.gitignore`).
-3. Заполнить `SUPERSET_SECRET_KEY`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`. После init первый вход в UI: пользователь **`admin`**, пароль из `ADMIN_PASSWORD` (в upstream `docker-init.sh` для 6.0.0 зашиты логин и `admin@superset.com`).
-4. **OAuth / ADFS (прод):** в `.env` задать `SUPERSET_AUTH_TYPE=oauth`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` (конфиденциальные строки из регистрации приложения в ADFS). При необходимости поправить `OAUTH_SERVER_METADATA_URL`, `ADFS_EXTRA_HOST_ENTRY`, `OAUTHLIB_INSECURE_TRANSPORT`.
-5. Положить `example.com.crt` и `example.com.key` в `nginx/certs/` (те же файлы, что на app01).
+2. Create a trusted CA bundle for the container (volume `./ca-certificates.crt` in `docker-compose.yml`): on Linux
+   `sh scripts/prepare-ca-bundle.sh`
+   or copy the host `/etc/ssl/certs/ca-certificates.crt` to `ca-certificates.crt` next to compose (the file is in `.gitignore`).
+3. Fill `SUPERSET_SECRET_KEY`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`. After init the first UI login is user **`admin`**, password from `ADMIN_PASSWORD` (in upstream `docker-init.sh` for 6.0.0 the login and `admin@superset.com` are hardcoded).
+4. **OAuth / ADFS (prod):** in `.env` set `SUPERSET_AUTH_TYPE=oauth`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` (confidential strings from the ADFS application registration). Adjust `OAUTH_SERVER_METADATA_URL`, `ADFS_EXTRA_HOST_ENTRY`, `OAUTHLIB_INSECURE_TRANSPORT` when needed.
+5. Place `example.com.crt` and `example.com.key` in `nginx/certs/` (the same files as on app01).
 
-### Вход через ADFS и что настраивается где
+### ADFS login and what is configured where
 
-- **ADFS:** выдача токена OIDC, membership в группах Windows (`Estate Superset Administrators` и т.д.). Имена групп в токене должны совпадать с ключами в `AUTH_ROLES_MAPPING` в `pythonpath/superset_config.py`. Поля в JWT (`upn`, `email`, `roles`, …) задаются на стороне ADFS и должны соответствовать ожиданиям `custom_sso_security_manager.py`.
-- **Superset UI:** подключения к **базам данных** (источники для дашбордов, SQL Lab), выдача прав на датасеты, строковая безопасность, роли поверх уже назначенных из групп — это **не** настраивается в ADFS, а в меню Superset (Data → Databases, Security → …).
+- **ADFS:** issues the OIDC token and Windows group membership (`Estate Superset Administrators` and similar). Group names in the token must match the keys in `AUTH_ROLES_MAPPING` in `pythonpath/superset_config.py`. JWT fields (`upn`, `email`, `roles`, …) are set on the ADFS side and must match what `custom_sso_security_manager.py` expects.
+- **Superset UI:** connections to **databases** (dashboard sources, SQL Lab), dataset grants, row-level security, and roles on top of those already assigned from groups — this is **not** configured in ADFS, but in the Superset menus (Data → Databases, Security → …).
 
-## OAuth / OIDC (файлы в репозитории)
+## OAuth / OIDC (files in the repository)
 
-| Файл | Назначение |
-|------|------------|
-| `requirements-local.txt` | `authlib` — подтягивается entrypoint-ом образа Superset при старте |
-| `pythonpath/custom_sso_security_manager.py` | Разбор JWT из `access_token`, маппинг claim → пользователь и `role_keys` |
-| `pythonpath/superset_config.py` | `OAUTH_PROVIDERS`, `AUTH_ROLES_MAPPING`, переключение `SUPERSET_AUTH_TYPE` |
-| `ca-certificates.crt` | Bundle для TLS к ADFS внутри контейнера (не коммитировать) |
-| `docker-compose.yml` | `extra_hosts` для ADFS, монтирование CA и `requirements-local.txt` |
+| File | Purpose |
+|------|---------|
+| `requirements-local.txt` | `authlib` — pulled in by the Superset image entrypoint at start |
+| `pythonpath/custom_sso_security_manager.py` | Parse JWT from `access_token`, map claims → user and `role_keys` |
+| `pythonpath/superset_config.py` | `OAUTH_PROVIDERS`, `AUTH_ROLES_MAPPING`, `SUPERSET_AUTH_TYPE` switch |
+| `ca-certificates.crt` | Bundle for TLS to ADFS inside the container (do not commit) |
+| `docker-compose.yml` | `extra_hosts` for ADFS, mounts for CA and `requirements-local.txt` |
 
-## Первый запуск (миграции и admin)
+## First start (migrations and admin)
 
-Сервис **`superset-init`** вынесен в **профиль `init`**, чтобы обычный `docker compose up -d` не перезапускал создание admin и не падал при повторе.
+The **`superset-init`** service is in the **`init` profile** so a regular `docker compose up -d` does not re-run admin creation and does not fail on repeat.
 
-Из каталога с `docker-compose.yml`:
+From the directory with `docker-compose.yml`:
 
 ```bash
 docker compose up -d db redis
@@ -55,13 +55,13 @@ docker compose --profile init run --rm superset-init
 docker compose up -d
 ```
 
-Повторный запуск с профилем init после появления admin приведёт к ошибке создания пользователя — инициализация только при пустой БД.
+A repeat run with the init profile after admin already exists fails on user creation — initialize only against an empty database.
 
-## Повседневная работа
+## Day-to-day operation
 
 ```bash
 docker compose up -d
-docker compose pull   # при смене тега в .env
+docker compose pull   # when the tag in .env changes
 ```
 
 ## Nginx
@@ -71,11 +71,11 @@ cd nginx
 docker compose up -d
 ```
 
-Проверить, что DNS `superset.example.com` указывает на эту ВМ и с балансировщика/фаервола доступны 443 (и при необходимости 80 для редиректа).
+Confirm that DNS `superset.example.com` points at this VM and that 443 is reachable from the load balancer / firewall (and 80 for redirect when needed).
 
-## Обновление версии Superset
+## Upgrading the Superset version
 
-В `.env` задать новый тег `SUPERSET_IMAGE`, затем:
+Set a new `SUPERSET_IMAGE` tag in `.env`, then:
 
 ```bash
 docker compose pull
@@ -83,17 +83,17 @@ docker compose run --rm superset superset db upgrade
 docker compose up -d
 ```
 
-Повторно вызывать `superset-init` с профилем init при обновлении не нужно (там полный `superset init` и создание admin).
+Do not re-run `superset-init` with the init profile on upgrade (that path does a full `superset init` and admin creation).
 
-## Резервное копирование
+## Backup
 
-Для снимка состояния копировать каталоги **`./data/postgres`**, **`./data/redis`**, **`./data/superset_home`** (с остановкой контейнеров или через снапшоты тома — по политике эксплуатации).
+For a state snapshot, copy **`./data/postgres`**, **`./data/redis`**, **`./data/superset_home`** (with containers stopped or via volume snapshots — per the operations policy).
 
-## Ссылки
+## Links
 
-- [Docker Compose (официально)](https://superset.apache.org/docs/installation/docker-compose/)
-- [Конфигурация](https://superset.apache.org/docs/configuration/configuring-superset/)
+- [Docker Compose (official)](https://superset.apache.org/docs/installation/docker-compose/)
+- [Configuration](https://superset.apache.org/docs/configuration/configuring-superset/)
 
 ## LDAP
 
-Отдельно не используется: вход через **OIDC к ADFS** (см. выше).
+Not used separately: login is **OIDC to ADFS** (see above).

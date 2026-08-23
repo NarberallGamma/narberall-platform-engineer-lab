@@ -1,28 +1,28 @@
-# Ручные соответствия «хост -> имя агента в EDR».
+# Manual mappings "host -> EDR agent name".
 #
-# Нужны там, где связь есть, но в данных её нет. Главный случай — маки в домене:
-# агент регистрируется под локальным именем ('MacBook-Air-admin.local'), а если
-# сетевое имя выглядит как IP-адрес, macOS режет его по первой точке, и в EDR
-# приезжает '192'. Доменного имени нет ни в одном поле API, никаким ключом это
-# не сшивается.
+# Needed where the link exists but the data does not show it. The main case is
+# domain-joined Macs: the agent registers under a local name
+# ('MacBook-Air-admin.local'), and if the network name looks like an IP,
+# macOS cuts it at the first dot and EDR gets '192'. The domain name is not in
+# any API field, so no key can join them.
 #
-# Автоматически по имени пользователя merge3 такие пары НЕ сопоставляет: второй
-# ноутбук у того же человека молча испортил бы метрику. Вместо этого он пишет
-# кандидатов в лог — строка «Кандидаты в aliases.yaml (совпал пользователь…)».
-# проверить глазами в панели EDR и перенести сюда.
+# merge3 does NOT auto-match such pairs by username: a second laptop of the
+# same person would silently break the metric. Instead it writes candidates
+# to the log — the line "aliases.yaml candidates (user matched…)".
+# Check them in the EDR console and copy them here.
 #
-# Имя агента — то, что лежит в колонке name файла {company}_edr.csv (регистр и
-# подчёркивания не важны). Если агента с таким именем в выгрузке нет, merge3
-# предупредит: скорее всего, агент переустановлен и запись протухла.
+# Agent name is the value in the name column of {company}_edr.csv (case and
+# underscores do not matter). If no agent with that name is in the export,
+# merge3 warns: the agent was likely reinstalled and the entry is stale.
 #
-# Для обрезанных имён ссылаться на displayname, а не на name: под именем '192'
-# сидят три разных мака, и merge3 различает их именно по displayname
-# (192.168.1.11 / .15 / .8) — так соответствие указывает на конкретную машину.
+# For truncated names, point at displayname, not name: three different Macs
+# share the name '192', and merge3 tells them apart by displayname
+# (192.168.1.11 / .15 / .8) — so the mapping points at a specific machine.
 
 companies:
   project-e:
     m-user-a: MAC             # Mac.loc, lastuser a.user
-    m-user-b: 192.168.1.15    # в панели виден так, name обрезан до '192'
+    m-user-b: 192.168.1.15    # shown this way in the console; name truncated to '192'
 
   project-c:
     m-proj-c-00020: M-PROJ-C-00020-1

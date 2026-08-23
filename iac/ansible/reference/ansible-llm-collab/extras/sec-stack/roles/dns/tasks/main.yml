@@ -1,12 +1,12 @@
 ---
-- name: Каталог drop-in конфигов systemd-resolved
+- name: systemd-resolved drop-in config directory
   ansible.builtin.file:
     path: /etc/systemd/resolved.conf.d
     state: directory
     mode: "0755"
   when: dns_servers | length > 0
 
-- name: Прописать корпоративные DNS
+- name: Set corporate DNS
   ansible.builtin.copy:
     dest: /etc/systemd/resolved.conf.d/corporate-dns.conf
     mode: "0644"
@@ -19,5 +19,5 @@
   when: dns_servers | length > 0
   notify: Restart systemd-resolved
 
-- name: Применить настройки resolved сразу
+- name: Apply resolved settings immediately
   ansible.builtin.meta: flush_handlers

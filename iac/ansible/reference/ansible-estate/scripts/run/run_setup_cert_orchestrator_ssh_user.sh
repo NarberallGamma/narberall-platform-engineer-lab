@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap пользователя estate-cert-orchestrator на целевых хostах cert-orchestrator.
+# Bootstrap the estate-cert-orchestrator user on target cert-orchestrator hosts.
 #   ./scripts/run/run_setup_cert_orchestrator_ssh_user.sh --preprod --all
 #   ./scripts/run/run_setup_cert_orchestrator_ssh_user.sh --prod --limit estate-prod-gitlab
 set -euo pipefail

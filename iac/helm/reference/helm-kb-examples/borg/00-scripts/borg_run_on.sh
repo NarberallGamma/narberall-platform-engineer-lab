@@ -9,7 +9,7 @@ BACKUP_USER="borg"
 
 ################################################################################
 
-# Отправляет алерт
+# Send an alert
 # ${1} - if equal 'under_sudo' then try run backup_notify under sudo, otherwise - without sudo
 alert()
 {

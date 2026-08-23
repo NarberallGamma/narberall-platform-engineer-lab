@@ -1,18 +1,19 @@
-"""Выгрузка агентов EDR в {company}_edr.csv.
+"""Export EDR agents to {company}_edr.csv.
 
-Заменяет ручной экспорт: раньше *_edr.csv клали руками. API — OAuth2 password +
-курсорная пагинация /api/v1/agents/list-v2 (см. swagger tenant'а).
+Replaces a manual export: *_edr.csv used to be dropped in by hand. The API is
+OAuth2 password + cursor pagination on /api/v1/agents/list-v2 (see the tenant swagger).
 
-Несколько компаний часто сидят на одном tenant с одними кредами — тянем список
-раз на (url, username) и пишем одинаковый CSV для каждой компании группы, а не
-дёргаем API по разу на компанию.
+Several companies often share one tenant and the same credentials — the list is
+fetched once per (url, username) and the same CSV is written for each company
+in the group, instead of hitting the API once per company.
 
-Конфиг: EDR_CONFIG_DIR/edr_config.json (по умолчанию текущий каталог):
+Config: EDR_CONFIG_DIR/edr_config.json (defaults to the current directory):
   {"<company>": {"username": "", "password": "",
                  "url": "https://<tenant>.edr.example.com:8080", "use_proxy": false}}
 
-Прокси (use_proxy=true) берётся из EDR_PROXY_URL — в отличие от старого скрипта
-адрес не захардкожен. ВМ мониторинга ходит в EDR vendor напрямую, там use_proxy=false.
+The proxy (use_proxy=true) is taken from EDR_PROXY_URL — unlike the old script
+the address is not hardcoded. The monitoring VM talks to the EDR vendor
+directly, so use_proxy=false there.
 """
 
 import collections
@@ -37,8 +38,8 @@ CONFIG_PATH = CONFIG_DIR / "edr_config.json"
 REQUEST_TIMEOUT = int(os.environ.get("EDR_API_TIMEOUT", "60"))
 PROXY_URL = os.environ.get("EDR_PROXY_URL", "")
 
-# Локальные домены, которые надо срезать с hostname, чтобы имена совпадали с
-# инвентарём облаков/AD. Панель сенсоров иногда отдаёт FQDN.
+# Local domains to strip from hostname so names match cloud/AD inventory.
+# The sensor console sometimes returns an FQDN.
 LOCAL_DOMAIN_SUFFIXES = [
     s.strip().lower()
     for s in os.environ.get(
@@ -48,39 +49,39 @@ LOCAL_DOMAIN_SUFFIXES = [
     if s.strip()
 ]
 
-# Колонки итогового CSV (то, что читает merge3 и метрика свежести). Порядок и
-# нижний регистр — как в исторических выгрузках, чтобы ничего не поехало.
+# Final CSV columns (what merge3 and the freshness metric read). Order and
+# lowercase match historical exports so nothing drifts.
 OUTPUT_COLUMNS = [
     "id", "name", "displayname", "domain", "os", "osname", "osversion", "sourceip",
     "isauthorized", "version", "isonline", "versionstatus", "lastseenat",
     "registeredat", "lastuser", "inv_hostname", "mac",
 ]
 
-# Обогащение записей данными из /agents/{id}: список list-v2 их не отдаёт.
-#   disputed (по умолчанию) — только спорные записи, чьё имя не идентифицирует
-#     машину: дубли имён и обрезанные имена. Их около 49 из 482, обход занимает
-#     секунды. Для них inventory.hostname восстанавливает настоящее имя: агенты
-#     с именем '192' оказываются m-proj-c-00026 и m-proj-c-00012.
-#   all — по всем агентам (~482 запроса, порядка 30 секунд): нужно, если MAC
-#     используется как ключ сопоставления.
-#   off — не ходить в detail вовсе.
+# Enrich records from /agents/{id}: list-v2 does not return these fields.
+#   disputed (default) — only disputed records whose name does not identify
+#     a machine: name duplicates and truncated names. About 49 of 482; the
+#     walk takes seconds. For them inventory.hostname restores the real name:
+#     agents named '192' become m-proj-c-00026 and m-proj-c-00012.
+#   all — every agent (~482 requests, about 30 seconds): needed if MAC is
+#     used as a match key.
+#   off — do not call detail at all.
 ENRICH_MODE = os.environ.get("EDR_ENRICH", "disputed").strip().lower()
 
-# Имя, состоящее только из цифр и точек, машину не идентифицирует: macOS кладёт
-# в короткое имя часть до первой точки, и хост 192.168.1.11 приезжает как '192'.
+# A name of only digits and dots does not identify a machine: macOS puts the
+# part before the first dot into the short name, so host 192.168.1.11 arrives as '192'.
 NUMERIC_NAME = re.compile(r"^[\d.]+$")
-# Поля агента из API (camelCase) -> колонка CSV (lower). Отсутствующие в ответе
-# заполняются пустыми.
+# Agent fields from the API (camelCase) -> CSV column (lower). Missing keys
+# are filled with empty values.
 API_TO_CSV = {
     "id": "id", "name": "name", "displayName": "displayname",
     "domain": "domain", "os": "os",
     "osName": "osname", "osVersion": "osversion", "sourceIP": "sourceip",
     "isAuthorized": "isauthorized", "version": "version", "isOnline": "isonline",
     "versionStatus": "versionstatus", "lastSeenAt": "lastseenat",
-    # момент регистрации агента: у переустановленного он свежий, а у старой
-    # записи того же хоста — прежний, по нему видно, что это перерегистрация.
-    # NB: приходит заполненным только у 74 агентов из 482, так что как признак
-    # «мёртвой записи» он не годится — нечем измерять.
+    # agent registration time: a reinstalled agent has a fresh value, the old
+    # record of the same host keeps the previous one — that marks a re-register.
+    # NB: filled on only 74 of 482 agents, so it is not usable as a "dead
+    # record" signal — there is nothing to measure.
     "registeredAt": "registeredat", "lastUser": "lastuser",
 }
 
@@ -89,15 +90,15 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def load_config() -> dict:
     if not CONFIG_PATH.exists():
-        log.error("нет конфига %s", CONFIG_PATH)
+        log.error("config missing: %s", CONFIG_PATH)
         sys.exit(1)
     return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
 def make_session(use_proxy: bool) -> requests.Session:
     session = requests.Session()
-    # Панель сенсоров изредка рвёт TLS-хендшейк (UNEXPECTED_EOF) — переживаем
-    # ретраями с backoff, а не роняем всю секцию vendor.
+    # The sensor console sometimes tears the TLS handshake (UNEXPECTED_EOF) —
+    # survive with retries and backoff instead of failing the whole vendor section.
     retry = Retry(total=4, backoff_factor=1.0,
                   status_forcelist=[429, 500, 502, 503, 504],
                   allowed_methods=["GET", "POST"])
@@ -106,7 +107,7 @@ def make_session(use_proxy: bool) -> requests.Session:
     session.mount("http://", adapter)
     if use_proxy:
         if not PROXY_URL:
-            log.warning("use_proxy=true, но EDR_PROXY_URL не задан — иду напрямую")
+            log.warning("use_proxy=true but EDR_PROXY_URL is unset — going direct")
         else:
             session.proxies = {"http": PROXY_URL, "https": PROXY_URL}
     return session
@@ -125,7 +126,7 @@ def get_token(session: requests.Session, url: str, username: str, password: str)
 
 
 def fetch_agents(session: requests.Session, url: str, token: str) -> list[dict]:
-    """Все агенты tenant'а через курсорную пагинацию list-v2."""
+    """All tenant agents via cursor pagination on list-v2."""
     headers = {"Authorization": f"Bearer {token}"}
     agents, cursor = [], None
     while True:
@@ -152,15 +153,15 @@ def fetch_agents(session: requests.Session, url: str, token: str) -> list[dict]:
 
 
 def _match_key(name) -> str:
-    """Ключ сравнения имён — тот же, что в merge3._norm_host (upper, '_' -> '-')."""
+    """Name comparison key — same as merge3._norm_host (upper, '_' -> '-')."""
     return str(name or "").strip().upper().replace("_", "-")
 
 
 def disputed_agents(agents: list[dict]) -> list[dict]:
     """
-    Записи, чьё имя не идентифицирует машину: имя совпадает с именем другого
-    агента (переустановка или коллизия) либо состоит только из цифр и точек.
-    Ровно эти записи в merge3 схлопывает дедуп или отбраковывает матчинг.
+    Records whose name does not identify a machine: the name matches another
+    agent (reinstall or collision) or is only digits and dots.
+    These are exactly the records merge3 collapses in dedup or rejects in matching.
     """
     counts = collections.Counter(_match_key(a.get("name")) for a in agents)
     return [
@@ -170,7 +171,7 @@ def disputed_agents(agents: list[dict]) -> list[dict]:
 
 
 def fetch_agent_detail(session: requests.Session, url: str, token: str, agent_id: str) -> dict:
-    """Карточка агента: inventory (hostname, сетевые интерфейсы) в list-v2 не приходит."""
+    """Agent card: inventory (hostname, network interfaces) is not in list-v2."""
     resp = session.get(
         f"{url}/api/v1/agents/{agent_id}",
         headers={"Authorization": f"Bearer {token}"},
@@ -183,11 +184,11 @@ def fetch_agent_detail(session: requests.Session, url: str, token: str, agent_id
 
 def enrich_agents(session: requests.Session, url: str, token: str, agents: list[dict]) -> None:
     """
-    Дописать в записи агентов inventory.hostname и MAC-адреса из /agents/{id}.
+    Add inventory.hostname and MAC addresses from /agents/{id} onto agent records.
 
-    Ходим не по всем агентам, а по спорным (см. ENRICH_MODE): их единицы, а
-    именно им нечем верить. Сбой по одному агенту не должен ронять выгрузку —
-    поле останется пустым, это ровно то же состояние, что и без обогащения.
+    Walk disputed agents only (see ENRICH_MODE): there are few of them, and
+    those are the ones that cannot be trusted. A failure on one agent must not
+    drop the export — the field stays empty, the same state as without enrich.
     """
     if ENRICH_MODE == "off":
         return
@@ -201,7 +202,7 @@ def enrich_agents(session: requests.Session, url: str, token: str, agents: list[
             inventory = fetch_agent_detail(session, url, token, agent["id"]).get("inventory") or {}
         except Exception as exc:
             failed += 1
-            log.debug("detail для агента %s не получен: %s", agent.get("id"), exc)
+            log.debug("detail for agent %s not received: %s", agent.get("id"), exc)
             continue
         agent["invHostname"] = (inventory.get("hostname") or "").strip()
         macs = {
@@ -215,21 +216,21 @@ def enrich_agents(session: requests.Session, url: str, token: str, agents: list[
         1 for a in targets
         if a.get("invHostname") and _match_key(a["invHostname"]) != _match_key(a.get("name"))
     )
-    log.info("обогащено записей: %d из %d (режим %s), имя восстановлено у %d, без ответа %d",
+    log.info("enriched records: %d of %d (mode %s), name restored for %d, no reply %d",
              len(targets) - failed, len(agents), ENRICH_MODE, recovered, failed)
 
 
 def normalize_name(name, comment) -> str:
-    """Имя хоста: comment важнее name (тех.поддержка EDR vendor правит кривые FQDN),
-    срезаем локальный домен, в верхний регистр.
+    """Hostname: comment beats name (EDR vendor support fixes bad FQDNs),
+    strip the local domain, uppercase.
 
-    NB (проверено на живом API 2026-08-12): в ответе /agents/list-v2 поля comment
-    нет вовсе — непустой comment у 0 из 482 агентов, оно живёт только в
-    /agents/{id}. Ветка с comment остаётся на случай, если панель начнёт его
-    отдавать, но фактическое имя сейчас всегда приходит из name. Само API уже
-    может отдать имя обрезанным: macOS кладёт в короткое имя часть до первой
-    точки, поэтому хост с сетевым именем 192.168.1.11 приезжает как '192'.
-    Полное имя лежит в displayName — оно выгружается отдельной колонкой.
+    NB (checked on the live API 2026-08-12): /agents/list-v2 has no comment
+    field at all — a non-empty comment on 0 of 482 agents; it lives only on
+    /agents/{id}. The comment branch stays in case the console starts returning
+    it, but the actual name now always comes from name. The API itself can
+    already return a truncated name: macOS puts the part before the first dot
+    into the short name, so a host with network name 192.168.1.11 arrives as
+    '192'. The full name is in displayName — exported as a separate column.
     """
     comment = str(comment or "").strip()
     base = comment if comment and comment.lower() not in ("nan", "none") else str(name or "").strip()
@@ -246,12 +247,12 @@ def agents_to_df(agents: list[dict]) -> pd.DataFrame:
     for a in agents:
         row = {csv_col: a.get(api_key, "") for api_key, csv_col in API_TO_CSV.items()}
         row["name"] = normalize_name(a.get("name"), a.get("comment"))
-        # заполнены только у обогащённых записей (см. enrich_agents)
+        # filled only on enriched records (see enrich_agents)
         row["inv_hostname"] = a.get("invHostname", "")
         row["mac"] = a.get("macs", "")
         rows.append(row)
     df = pd.DataFrame(rows, columns=OUTPUT_COLUMNS)
-    # метки времени к виду YYYY-MM-DD HH:MM:SS (как в исторических выгрузках)
+    # timestamps as YYYY-MM-DD HH:MM:SS (same as historical exports)
     for col in ("lastseenat", "registeredat"):
         ts = pd.to_datetime(df[col], errors="coerce", utc=True)
         df[col] = ts.dt.tz_localize(None).dt.strftime("%Y-%m-%d %H:%M:%S")
@@ -266,7 +267,7 @@ def main():
     )
     config = load_config()
 
-    # Группируем компании по (url, username): один tenant — один запрос к API.
+    # Group companies by (url, username): one tenant — one API request.
     groups: dict[tuple, list[str]] = {}
     creds: dict[tuple, dict] = {}
     for company, cfg in config.items():
@@ -286,12 +287,12 @@ def main():
             for company in companies:
                 out = DATA_DIR / f"{company}_edr.csv"
                 df.to_csv(out, index=False, encoding="utf-8")
-            log.info("tenant %s: агентов %d -> %s",
+            log.info("tenant %s: agents %d -> %s",
                      url.split("//")[-1].split(".")[0], len(df),
                      ", ".join(f"{c}_edr.csv" for c in companies))
         except Exception:
             failures += 1
-            log.exception("tenant %s (%s): выгрузка не удалась",
+            log.exception("tenant %s (%s): export failed",
                           url, ", ".join(companies))
 
     if failures:

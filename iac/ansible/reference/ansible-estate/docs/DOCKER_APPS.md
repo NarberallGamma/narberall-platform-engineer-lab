@@ -1,42 +1,42 @@
-# Docker apps: деплой через Ansible
+# Docker apps: deploy via Ansible
 
-Роль **`docker_app`**: одно compose-приложение в **`/docker/apps/<slug>/`** на **любой** VM из inventory.
+Role **`docker_app`**: one compose application under **`/docker/apps/<slug>/`** on **any** VM from inventory.
 
-## Плейбуки, inventory и group_vars
+## Playbooks, inventory, and group_vars
 
 | App | Playbook | Inventory group | group_vars |
 |-----|----------|-----------------|------------|
 | cert-monitoring | `playbooks/docker_app_cert_monitoring.yml` | `[cert_monitoring]` | `group_vars/cert-monitoring.yml` |
 | cert-orchestrator | `playbooks/docker_app_cert_orchestrator.yml` | `[cert_orchestrator]` | `group_vars/cert-orchestrator.yml` |
 | cloud-hibernate-operator | `playbooks/docker_app_cloud_hibernate_operator.yml` | `[cloud_hibernate_operator]` | `group_vars/cloud-hibernate-operator.yml` |
-| **Telegram VPS proxy** | `playbooks/telegram_vps_egress.yml` | `[telegram_vps_egress]` | `group_vars/telegram_vps_egress.yml` (отдельно от docker_app) |
+| **Telegram VPS proxy** | `playbooks/telegram_vps_egress.yml` | `[telegram_vps_egress]` | `group_vars/telegram_vps_egress.yml` (separate from docker_app) |
 | gitlab-nginx | `playbooks/docker_app_gitlab_nginx.yml` | `[gitlab_nginx]` | `group_vars/gitlab-nginx.yml` |
 | edge-lb | `playbooks/docker_app_edge_lb.yml` | `[edge_lb]` | `group_vars/edge-lb.yml` |
 | hsm-adapter | `playbooks/docker_app_hsm_adapter.yml` | `[hsm_adapter]` → `[cryptopro_vm]` | `group_vars/hsm-adapter.yml` |
 | treasury-policy-gateway | `playbooks/docker_app_treasury_policy_gateway.yml` | `[cryptopro_vm]` | `group_vars/treasury-policy-gateway.yml` |
 | cryptopro | `playbooks/docker_app_cryptopro.yml` | `[cryptopro_vm]` | `group_vars/cryptopro.yml` |
 
-Legacy-миграция GitLab Omnibus TLS → gitlab-nginx: `playbooks/migrate_gitlab_nginx_legacy.yml`
-(скрипт `scripts/run/run_migrate_gitlab_nginx_legacy.sh`). Migrate завершён; переключатель `gitlab_nginx_legacy_migration_enabled: false` в group_vars.
+Legacy migration GitLab Omnibus TLS → gitlab-nginx: `playbooks/migrate_gitlab_nginx_legacy.yml`
+(script `scripts/run/run_migrate_gitlab_nginx_legacy.sh`). Migration is complete; switch `gitlab_nginx_legacy_migration_enabled: false` in group_vars.
 
-Legacy-миграция host nginx/keepalived → docker edge-lb: `playbooks/migrate_edge_lb_legacy.yml`
-(скрипт `scripts/run/run_migrate_edge_lb_legacy.sh`). Migrate завершён (preprod + prod lb-1/lb-2).
-Переключатель `edge_lb_legacy_migration_enabled: false` в group_vars/edge-lb.yml.
-При повторном migrate на prod: **lb-2** (BACKUP), затем **lb-1** (MASTER).
-После ansible на LB: post-check с паузой ~90 с (cooldown SSH).
+Legacy migration host nginx/keepalived → docker edge-lb: `playbooks/migrate_edge_lb_legacy.yml`
+(script `scripts/run/run_migrate_edge_lb_legacy.sh`). Migration is complete (preprod + prod lb-1/lb-2).
+Switch `edge_lb_legacy_migration_enabled: false` in group_vars/edge-lb.yml.
+On a repeat migrate in prod: **lb-2** (BACKUP), then **lb-1** (MASTER).
+After ansible on LB: post-check with ~90 s pause (SSH cooldown).
 
-Legacy-миграция hsm-adapter + apt nginx на хосте -> docker_app hsm-adapter (TLS на **edge-lb**): `playbooks/migrate_hsm_adapter_legacy.yml`
-(скрипт `scripts/run/run_migrate_hsm_adapter_legacy.sh`). Переключатель `hsm_adapter_legacy_migration_enabled` в group_vars.
-Перед migrate: deploy **edge-lb** с vhost `hsm-adapter` на LB. TLS только на edge-lb.
-Секрет `EXTERNAL_CSP_LICENSE`: Vault mount **`secret`**, path **`treasury-hsm-adapter`** (см. **`DOCKER_APPS_VAULT_SECRETS.md`**).
+Legacy migration hsm-adapter + apt nginx on the host -> docker_app hsm-adapter (TLS on **edge-lb**): `playbooks/migrate_hsm_adapter_legacy.yml`
+(script `scripts/run/run_migrate_hsm_adapter_legacy.sh`). Switch `hsm_adapter_legacy_migration_enabled` in group_vars.
+Before migrate: deploy **edge-lb** with vhost `hsm-adapter` on LB. TLS only on edge-lb.
+Secret `EXTERNAL_CSP_LICENSE`: Vault mount **`secret`**, path **`treasury-hsm-adapter`** (see **`DOCKER_APPS_VAULT_SECRETS.md`**).
 
-**edge-lb (из опыта migrate):** nginx OSS `proxy_next_upstream` без `http_501/472/474`;
+**edge-lb (from migrate experience):** nginx OSS `proxy_next_upstream` without `http_501/472/474`;
 keepalived osixia mount `./config/keepalived` → `/container/service/keepalived/assets` + `notify.sh`;
-active upstream: `config/vault_upstream/vault_active_upstream.conf` (не в `conf.d/`);
-cert-orchestrator `ssl_dir`: `/docker/apps/edge-lb/certs` (legacy `/etc/nginx/ssl` на LB снят).
-HSM adapter: `conf.d/hsm-adapter.conf`, backend `edge_lb_hsm_adapter_backend` (private IP hsm-adapter VM).
+active upstream: `config/vault_upstream/vault_active_upstream.conf` (not in `conf.d/`);
+cert-orchestrator `ssl_dir`: `/docker/apps/edge-lb/certs` (legacy `/etc/nginx/ssl` on LB removed).
+HSM adapter: `conf.d/hsm-adapter.conf`, backend `edge_lb_hsm_adapter_backend` (private IP of the hsm-adapter VM).
 
-Добавить хост в нужную группу в `inventories/*/hosts.ini`:
+Add the host to the required group in `inventories/*/hosts.ini`:
 
 ```ini
 [cert_monitoring]
@@ -44,13 +44,13 @@ estate-prod-gitlab
 some-other-host
 ```
 
-Конфиг приложения и **имена ключей Vault** (не значения): `group_vars/<service>.yml`.  
-Плейбук подключает файл через **`vars_files`** (как `prepare_vps_cluster.yml`), иначе при `-i inventories/prod/hosts.ini` корневой `group_vars/` не подхватывается автоматически.
+Application config and **Vault key names** (not values): `group_vars/<service>.yml`.  
+The playbook includes the file via **`vars_files`** (same as `prepare_vps_cluster.yml`); otherwise with `-i inventories/prod/hosts.ini` the repo-root `group_vars/` is not picked up automatically.
 
-## Запуск с control node (`/ansible` на GitLab)
+## Run from the control node (`/ansible` on GitLab)
 
-SSH: пользователь **`ansible`**, ключ **`/ansible/.ssh/ansible_ssh_key`** (CI), `become: true` в плейбуке.  
-Задано в `host_vars/estate-prod-gitlab.yml` / `host_vars/estate-preprod-gitlab.yml`.
+SSH: user **`ansible`**, key **`/ansible/.ssh/ansible_ssh_key`** (CI), `become: true` in the playbook.  
+Set in `host_vars/estate-prod-gitlab.yml` / `host_vars/estate-preprod-gitlab.yml`.
 
 ```bash
 cd /ansible
@@ -66,35 +66,35 @@ source .env.vault   # VAULT_ADDR + VAULT_TOKEN
 ./scripts/run/run_docker_app.sh deploy treasury-policy-gateway --prod --limit estate-prod-cryptopro-01
 ./scripts/run/run_docker_app.sh deploy cryptopro --prod --limit estate-prod-cryptopro-01
 
-# Preprod (estate-preprod-gitlab, отдельный clone /ansible)
+# Preprod (estate-preprod-gitlab, separate clone /ansible)
 ./scripts/run/run_docker_app.sh deploy cert-orchestrator --preprod --limit estate-preprod-gitlab
 ./scripts/run/run_docker_app.sh deploy cert-monitoring --preprod --limit estate-preprod-gitlab
 ./scripts/run/run_docker_app.sh deploy gitlab-nginx --preprod --limit estate-preprod-gitlab
 ./scripts/run/run_docker_app.sh deploy edge-lb --preprod --limit estate-preprod-lb-1
 ./scripts/run/run_docker_app.sh deploy hsm-adapter --preprod --limit estate-preprod-hsm-adapter
 
-# Legacy: hsm-adapter (preprod первым; edge-lb с hsm-adapter vhost уже выложен)
+# Legacy: hsm-adapter (preprod first; edge-lb with hsm-adapter vhost already deployed)
 ./scripts/run/run_migrate_hsm_adapter_legacy.sh --preprod --limit estate-preprod-hsm-adapter --ssh-key ~/.ssh/estate-preprod-ecs-key.pem
 
-# Legacy: первичная миграция TLS GitLab -> gitlab-nginx (один раз)
+# Legacy: initial GitLab TLS migration -> gitlab-nginx (once)
 ./scripts/run/run_migrate_gitlab_nginx_legacy.sh --preprod --limit estate-preprod-gitlab
 ./scripts/run/run_migrate_gitlab_nginx_legacy.sh --prod --limit estate-prod-gitlab
 
-# Legacy: host nginx/keepalived -> docker edge-lb (prod: lb-2, затем lb-1)
+# Legacy: host nginx/keepalived -> docker edge-lb (prod: lb-2, then lb-1)
 ./scripts/run/run_migrate_edge_lb_legacy.sh --preprod --limit estate-preprod-lb-1 --ssh-key ~/.ssh/estate-preprod-ecs-key.pem
 ./scripts/run/run_migrate_edge_lb_legacy.sh --prod --limit estate-prod-lb-2 --ssh-key ~/.ssh/estate-prod-ecs-key.pem
 ./scripts/run/run_migrate_edge_lb_legacy.sh --prod --limit estate-prod-lb-1 --ssh-key ~/.ssh/estate-prod-ecs-key.pem
 ```
 
-Секреты: Vault mount **`ansible`** (или **`secret`** для hsm-adapter), path по сервису (см. **`DOCKER_APPS_VAULT_SECRETS.md`**).
-Telegram через VPS: сначала **`run_telegram_vps_egress.sh`**, затем redeploy apps. Клиентские vars: **`docker_app.telegram_egress`** в `group_vars/<service>.yml` (без `vars_files` egress). См. **`TELEGRAM_VPS_EGRESS_GITLAB.md`**.
-gitlab-nginx Vault не использует; TLS в `certs/` (cert-orchestrator или legacy-миграция).
+Secrets: Vault mount **`ansible`** (or **`secret`** for hsm-adapter), path per service (see **`DOCKER_APPS_VAULT_SECRETS.md`**).
+Telegram via VPS: run **`run_telegram_vps_egress.sh`** first, then redeploy apps. Client vars: **`docker_app.telegram_egress`** in `group_vars/<service>.yml` (no egress `vars_files`). See **`TELEGRAM_VPS_EGRESS_GITLAB.md`**.
+gitlab-nginx does not use Vault; TLS is in `certs/` (cert-orchestrator or legacy migration).
 
-## Типичное размещение (inventory 2026-06-17)
+## Typical placement (inventory 2026-06-17)
 
-| Окружение | cert-monitoring | cert-orchestrator | cloud-hibernate-operator | gitlab-nginx |
+| Environment | cert-monitoring | cert-orchestrator | cloud-hibernate-operator | gitlab-nginx |
 |-----------|-----------------|-------------------|--------------------------|--------------|
-| Preprod | estate-preprod-gitlab | estate-preprod-gitlab | не деплоен | estate-preprod-gitlab |
-| Prod | estate-prod-gitlab | не деплоен | estate-prod-gitlab | estate-prod-gitlab |
+| Preprod | estate-preprod-gitlab | estate-preprod-gitlab | not deployed | estate-preprod-gitlab |
+| Prod | estate-prod-gitlab | not deployed | estate-prod-gitlab | estate-prod-gitlab |
 
-См. также: `roles/docker_app/README.md`, `TELEGRAM_VPS_EGRESS_GITLAB.md`
+See also: `roles/docker_app/README.md`, `TELEGRAM_VPS_EGRESS_GITLAB.md`

@@ -2,33 +2,31 @@
 
 English: playbooks in this folder recreate RDS PostgreSQL databases, split Flyway/DDL vs app DML users (`schema_flyway` / `treasury_user`), and grant extra **read-only** and **read-write** accounts across user schemas. Destructive restore is labelled below. Hub: [`../../../`](../../../). Case: [`../../../../../../../case-studies/10-ansible-estate.md`](../../../../../../../case-studies/10-ansible-estate.md).
 
-# Плейбуки управления базами estate (PostgreSQL)
-
-В этой папке плейбуки для работы с RDS PostgreSQL проекта estate: пересоздание баз данных, настройка разделения пользователей (schema_flyway / treasury_user), создание **read-only** учёток и **read-write** учёток (DML и CREATE) во **всех пользовательских схемах** каждой БД.
+Playbooks in this folder work with estate RDS PostgreSQL: recreate databases, split users (`schema_flyway` / `treasury_user`), and create extra **read-only** and **read-write** accounts (DML and CREATE) in **all user schemas** of each database.
 
 ---
 
-## 1. Плейбук пересоздания баз данных (`restore.yaml`)
+## 1. Database recreate playbook (`restore.yaml`)
 
-### Описание
+### Description
 
-Плейбук удаляет указанные базы данных, создаёт их заново с кодировкой UTF8 и локалью en_US.UTF-8, пересоздаёт схему `public` с владельцем `treasury_user`.
+The playbook drops the listed databases, creates them again with UTF8 encoding and locale en_US.UTF-8, and recreates schema `public` owned by `treasury_user`.
 
-### ⚠️ ВНИМАНИЕ
+### Warning
 
-**Плейбук полностью удаляет указанные базы данных и все данные в них!** Используйте только когда данные можно потерять или они будут восстановлены из бэкапа.
+**The playbook fully deletes the listed databases and all data in them.** Use only when the data may be discarded or will be restored from backup.
 
-### Что делает плейбук
+### What the playbook does
 
-1. Завершает все активные подключения к указанным базам данных
-2. Удаляет базы данных (если существуют) — **все данные будут удалены**
-3. Создаёт новые базы с кодировкой UTF8, локалью en_US.UTF-8, владелец БД — `treasury_user`
-4. Удаляет схему `public` (каскадно)
-5. Создаёт чистую схему `public` с владельцем `treasury_user`
+1. Terminates all active connections to the listed databases
+2. Drops the databases (if they exist) — **all data is deleted**
+3. Creates new databases with UTF8 encoding, locale en_US.UTF-8, database owner `treasury_user`
+4. Drops schema `public` (cascade)
+5. Creates a clean schema `public` owned by `treasury_user`
 
-### Запуск
+### Run
 
-**Через скрипт (рекомендуется):**
+**Via script (recommended):**
 
 ```bash
 ./scripts/run/run_db_restore.sh treasury_onboarding
@@ -36,7 +34,7 @@ English: playbooks in this folder recreate RDS PostgreSQL databases, split Flywa
 ./scripts/run/run_db_restore.sh treasury_contract --check
 ```
 
-**Напрямую через Ansible:**
+**Directly via Ansible:**
 
 ```bash
 ansible-playbook restore.yaml --extra-vars "db_name=treasury_onboarding"
@@ -45,43 +43,43 @@ ansible-playbook restore.yaml
 ansible-playbook restore.yaml --syntax-check
 ```
 
-### После пересоздания БД
+### After recreating databases
 
-- Если используете **разделение пользователей** (schema_flyway / treasury_user), запустите плейбук **schema_flyway_setup.yaml** — он выдаст treasury_user и schema_flyway нужные права.
-- Если **не** используете schema_flyway, права treasury_user настраиваются через плейбуки управления базами (restore и при необходимости дополнительные задачи).
-- При необходимости восстановите данные из бэкапа.
+- When **user split** is in use (`schema_flyway` / `treasury_user`), run **schema_flyway_setup.yaml** — it grants the required privileges to treasury_user and schema_flyway.
+- When schema_flyway is **not** in use, treasury_user privileges are set through the database-management playbooks (restore and extra tasks when needed).
+- Restore data from backup when needed.
 
 ---
 
-## 2. Плейбук настройки schema_flyway и разграничения прав (`schema_flyway_setup.yaml`)
+## 2. schema_flyway setup and privilege split (`schema_flyway_setup.yaml`)
 
-### Назначение
+### Purpose
 
-- Создать пользователя **schema_flyway** и разграничить права: **schema_flyway** — Flyway/DDL (владелец схемы и объектов), **treasury_user** — приложение (DML) и коннекторы (в т.ч. репликация).
-- Используется тот же список БД и те же коллекции, что и в `restore.yaml`.
+- Create user **schema_flyway** and split privileges: **schema_flyway** — Flyway/DDL (schema and object owner), **treasury_user** — application (DML) and connectors (including replication).
+- Uses the same database list and the same collections as `restore.yaml`.
 
-### Что делает плейбук
+### What the playbook does
 
-1. Создаёт пользователя `schema_flyway` с заданным паролем.
-2. Выдаёт **treasury_user** право **REPLICATION** (для Debezium / logical replication коннекторов).
-3. В каждой БД из списка:
-   - выдаёт `schema_flyway` CONNECT, USAGE и CREATE на схему `public`, переводит владельца схемы `public` на `schema_flyway`;
-   - переводит владельца всех таблиц и последовательностей в `public` на `schema_flyway`;
-   - выдаёт `treasury_user` USAGE на схему, DML (SELECT, INSERT, UPDATE, DELETE) на таблицы, права на последовательности и EXECUTE на функции;
-   - настраивает default privileges для новых объектов, созданных `schema_flyway`, чтобы `treasury_user` автоматически получал нужные права.
+1. Creates user `schema_flyway` with the given password.
+2. Grants **treasury_user** **REPLICATION** (for Debezium / logical replication connectors).
+3. In each database from the list:
+   - grants `schema_flyway` CONNECT, USAGE and CREATE on schema `public`, and sets schema `public` owner to `schema_flyway`;
+   - sets the owner of all tables and sequences in `public` to `schema_flyway`;
+   - grants `treasury_user` USAGE on the schema, DML (SELECT, INSERT, UPDATE, DELETE) on tables, sequence privileges, and EXECUTE on functions;
+   - sets default privileges for new objects created by `schema_flyway` so `treasury_user` receives the required privileges automatically.
 
-После этого разделение DDL/Flyway и DML/приложение должно сохраняться (не переопределять права вручную).
+After that the DDL/Flyway vs DML/application split should hold (do not override privileges by hand).
 
-### Переменные (в плейбуке или --extra-vars)
+### Variables (in the playbook or --extra-vars)
 
-- `pg_host`, `pg_port`, `pg_admin_user`, `pg_admin_password` — подключение под админом (root).
-- `treasury_user`, `treasury_password` — пользователь приложения (пароль в тасках не используется).
-- `schema_flyway`, `schema_flyway_password` — создаваемый пользователь Flyway и его пароль.
-- `db_list` или `db_name` — список БД или одна БД (как в `restore`).
+- `pg_host`, `pg_port`, `pg_admin_user`, `pg_admin_password` — connect as admin (root).
+- `treasury_user`, `treasury_password` — application user (password is not used in the tasks).
+- `schema_flyway`, `schema_flyway_password` — Flyway user to create and its password.
+- `db_list` or `db_name` — database list or a single database (same as `restore`).
 
-### Запуск
+### Run
 
-**Через скрипт (из корня каталога ansible, рекомендуется):**
+**Via script (from the ansible directory root, recommended):**
 
 ```bash
 ./scripts/run/run_schema_flyway_setup.sh all
@@ -89,9 +87,9 @@ ansible-playbook restore.yaml --syntax-check
 ./scripts/run/run_schema_flyway_setup.sh treasury_contract --check
 ```
 
-Пароли задать в плейбуке `schema_flyway_setup.yaml` (vars) или передать: `--extra-vars "pg_admin_password=... schema_flyway_password=..."`.
+Set passwords in playbook `schema_flyway_setup.yaml` (vars) or pass: `--extra-vars "pg_admin_password=... schema_flyway_password=..."`.
 
-**Напрямую через Ansible:**
+**Directly via Ansible:**
 
 ```bash
 cd playbooks/estate_databases/playbooks
@@ -100,35 +98,35 @@ ansible-playbook schema_flyway_setup.yaml -i "localhost," --extra-vars "db_name=
 ansible-playbook schema_flyway_setup.yaml -i "localhost," --extra-vars "db_list=['treasury_contract','treasury_web'] pg_admin_password=... schema_flyway_password=..."
 ```
 
-### После выполнения
+### After a successful run
 
-- Учётные данные `schema_flyway` положить в Vault.
-- В values/конфиге каждого приложения: для Flyway — `spring.flyway.user` / `spring.flyway.password` из Vault, для приложения — `spring.datasource.*` (treasury_user), как в п. 9 Runbook.
+- Store `schema_flyway` credentials in Vault.
+- In each application values/config: Flyway uses `spring.flyway.user` / `spring.flyway.password` from Vault, the application uses `spring.datasource.*` (treasury_user), as in Runbook item 9.
 
 ---
 
-## 3. Плейбук read-only пользователя (`ro_user_setup.yaml`)
+## 3. Read-only user playbook (`ro_user_setup.yaml`)
 
-### Назначение
+### Purpose
 
-Дополнительная учётка (аудит, ИБ, аналитика): **только GRANT**, без смены OWNER и без правок `treasury_user` / `schema_flyway`.
+Extra account (audit, InfoSec, analytics): **GRANTs only**, no OWNER change and no edits to `treasury_user` / `schema_flyway`.
 
-- CONNECT на БД
-- USAGE + SELECT на таблицы и последовательности во **всех пользовательских схемах** (обнаруживаются в runtime)
-- `ALTER DEFAULT PRIVILEGES FOR ROLE <default_privileges_for_role>` для **новых** объектов, которые создаёт Flyway (`schema_flyway` по умолчанию)
+- CONNECT on the database
+- USAGE + SELECT on tables and sequences in **all user schemas** (discovered at runtime)
+- `ALTER DEFAULT PRIVILEGES FOR ROLE <default_privileges_for_role>` for **new** objects created by Flyway (`schema_flyway` by default)
 
-**OWNER объектов не передаётся.** Переменная `default_privileges_for_role` указывает, **чьи** будущие объекты получат auto-grant, а не делает доп. учётку владельцем.
+**Object OWNER is not transferred.** Variable `default_privileges_for_role` names **whose** future objects receive the auto-grant; it does not make the extra account an owner.
 
-### Переменные
+### Variables
 
-- `pg_host`, `pg_port`, `pg_admin_user`, `pg_admin_password` — подключение под админом.
-- **`ro_user`**, **`ro_password`** — обязательны.
-- `default_privileges_for_role` — для `ALTER DEFAULT PRIVILEGES ... FOR ROLE` (по умолчанию `schema_flyway`).
-- `db_name` или `db_list` — как в других плейбуках этой папки.
+- `pg_host`, `pg_port`, `pg_admin_user`, `pg_admin_password` — connect as admin.
+- **`ro_user`**, **`ro_password`** — required.
+- `default_privileges_for_role` — for `ALTER DEFAULT PRIVILEGES ... FOR ROLE` (default `schema_flyway`).
+- `db_name` or `db_list` — same as the other playbooks in this folder.
 
-### Запуск
+### Run
 
-**Через скрипт (из корня каталога ansible):**
+**Via script (from the ansible directory root):**
 
 ```bash
 ./scripts/run/run_ro_user_setup.sh all --extra-vars "ro_user=superset_main ro_password=... pg_admin_password=..."
@@ -136,7 +134,7 @@ ansible-playbook schema_flyway_setup.yaml -i "localhost," --extra-vars "db_list=
 ./scripts/run/run_ro_user_setup.sh all --extra-vars "ro_user=superset_main ro_password=... pg_admin_password=..." --check
 ```
 
-**Напрямую через Ansible:**
+**Directly via Ansible:**
 
 ```bash
 cd playbooks/estate_databases/playbooks
@@ -144,37 +142,37 @@ ansible-playbook ro_user_setup.yaml -i "localhost," --extra-vars "ro_user=supers
 ansible-playbook ro_user_setup.yaml -i "localhost," --extra-vars "ro_user=superset_main ro_password=... pg_admin_password=... db_name=treasury_contract"
 ```
 
-### Ограничения
+### Limits
 
-- Системные схемы `pg_*` и `information_schema` не затрагиваются.
-- Только SELECT (без EXECUTE на функции). При необходимости расширить роль вручную.
+- System schemas `pg_*` and `information_schema` are not touched.
+- SELECT only (no EXECUTE on functions). Extend the role by hand when needed.
 
 ---
 
-## 4. Плейбук read-write пользователя (`rw_user_setup.yaml`)
+## 4. Read-write user playbook (`rw_user_setup.yaml`)
 
-### Назначение
+### Purpose
 
-Дополнительная учётка сопровождения: **редактирование данных через GRANT**, без OWNER и без CREATE на схемах.
+Extra operations account: **edit data via GRANT**, no OWNER and no CREATE on schemas.
 
-- CONNECT на БД
-- USAGE на схему (без CREATE)
-- ALL PRIVILEGES на существующие таблицы, последовательности, функции (DML: SELECT/INSERT/UPDATE/DELETE и т.п.)
-- `ALTER DEFAULT PRIVILEGES FOR ROLE schema_flyway` для будущих объектов Flyway
+- CONNECT on the database
+- USAGE on the schema (no CREATE)
+- ALL PRIVILEGES on existing tables, sequences, functions (DML: SELECT/INSERT/UPDATE/DELETE and similar)
+- `ALTER DEFAULT PRIVILEGES FOR ROLE schema_flyway` for future Flyway objects
 
-**OWNER не нужен** для правки данных в существующих таблицах. ALTER TABLE / DROP TABLE у объектов с owner `schema_flyway` через этот плейбук **не выдаётся** (ограничение PostgreSQL). DDL миграций остаётся у `schema_flyway` / `schema_flyway_setup`.
+**OWNER is not required** to edit data in existing tables. ALTER TABLE / DROP TABLE on objects owned by `schema_flyway` is **not granted** by this playbook (PostgreSQL limitation). Table-structure DDL stays with `schema_flyway` / `schema_flyway_setup`.
 
-### Переменные
+### Variables
 
-- `pg_host`, `pg_port`, `pg_admin_user`, `pg_admin_password` — подключение под админом.
-- **`rw_user`**, **`rw_password`** — обязательны при `manage_password=true` (по умолчанию).
-- **`manage_password`** — `false`: только GRANT, пароль не меняется (учётка уже создана в облаке).
-- `default_privileges_for_role` — для `ALTER DEFAULT PRIVILEGES ... FOR ROLE` (по умолчанию `schema_flyway`).
-- `db_name` или `db_list` — как в других плейбуках этой папки.
+- `pg_host`, `pg_port`, `pg_admin_user`, `pg_admin_password` — connect as admin.
+- **`rw_user`**, **`rw_password`** — required when `manage_password=true` (default).
+- **`manage_password`** — `false`: GRANTs only, password is not changed (account already created in the cloud).
+- `default_privileges_for_role` — for `ALTER DEFAULT PRIVILEGES ... FOR ROLE` (default `schema_flyway`).
+- `db_name` or `db_list` — same as the other playbooks in this folder.
 
-### Запуск
+### Run
 
-**Через скрипт (из корня каталога ansible):**
+**Via script (from the ansible directory root):**
 
 ```bash
 ./scripts/run/run_rw_user_setup.sh all --extra-vars "rw_user=migration_tool rw_password=... pg_admin_password=..."
@@ -183,7 +181,7 @@ ansible-playbook ro_user_setup.yaml -i "localhost," --extra-vars "ro_user=supers
 ./scripts/run/run_rw_user_setup.sh all --extra-vars "rw_user=migration_tool rw_password=... pg_admin_password=..." --check
 ```
 
-**Напрямую через Ansible:**
+**Directly via Ansible:**
 
 ```bash
 cd playbooks/estate_databases/playbooks
@@ -192,28 +190,28 @@ ansible-playbook rw_user_setup.yaml -i "localhost," --extra-vars "rw_user=migrat
 ansible-playbook rw_user_setup.yaml -i "localhost," --extra-vars "rw_user=migration_tool rw_password=... pg_admin_password=... db_list=['treasury_contract','treasury_audit']"
 ```
 
-### Ограничения
+### Limits
 
-- Системные схемы `pg_*` и `information_schema` не затрагиваются.
-- Нет CREATE на схеме, нет смены OWNER. DDL структуры таблиц: только `schema_flyway`.
+- System schemas `pg_*` and `information_schema` are not touched.
+- No CREATE on the schema, no OWNER change. Table-structure DDL: `schema_flyway` only.
 
 ---
 
-## 5. Плейбук снятия дополнительной роли (`drop_db_user.yaml`)
+## 5. Extra-role teardown playbook (`drop_db_user.yaml`)
 
-### Назначение
+### Purpose
 
-Снять GRANT-ы и default privileges **только у указанной доп. учётки** (например `estate_0006`) перед удалением. Для `treasury_user`, `schema_flyway`, `root` и системных ролей **запрещён**.
+Revoke GRANTs and default privileges **only for the named extra account** (for example `estate_0006`) before deletion. For `treasury_user`, `schema_flyway`, `root`, and system roles this is **refused**.
 
-**Без REASSIGN OWNED.** Порядок:
+**No REASSIGN OWNED.** Order:
 
-1. Завершить сессии роли (если есть)
-2. REVOKE default privileges (динамически по `pg_default_acl`)
-3. Явный REVOKE на схемах/объектах (без DROP OWNED: root на RDS не superuser)
+1. Terminate role sessions (if any)
+2. REVOKE default privileges (dynamically from `pg_default_acl`)
+3. Explicit REVOKE on schemas/objects (no DROP OWNED: root on RDS is not superuser)
 4. `REVOKE CONNECT ON DATABASE`
-5. Опционально `DROP ROLE` (`drop_role_after_cleanup=true`, по умолчанию false)
+5. Optional `DROP ROLE` (`drop_role_after_cleanup=true`, default false)
 
-### Запуск
+### Run
 
 ```bash
 ./scripts/run/run_drop_db_user.sh all --extra-vars "drop_user=estate_0006 pg_admin_password=..."
@@ -223,73 +221,73 @@ ansible-playbook rw_user_setup.yaml -i "localhost," --extra-vars "rw_user=migrat
 
 ---
 
-## Общее: список баз данных по умолчанию
+## Shared: default database list
 
-Плейбуки `ro_user_setup`, `rw_user_setup` и `drop_db_user` используют **`default_databases`** в vars (24 прикладные БД estate, снимок RDS 2026-07). **`openobserve` не включена** (отдельная БД observability, grants не выдаются):
+Playbooks `ro_user_setup`, `rw_user_setup`, and `drop_db_user` use **`default_databases`** in vars (24 estate application databases, RDS snapshot 2026-07). **`openobserve` is not included** (separate observability database, no grants):
 
 `cryptopro_service`, `hsm`, `keycloak`, `nodes_btc`, `nodes_eth`, `nodes_tron`, `treasury_aml`, `treasury_api`, `treasury_csp`, `treasury_aml`, `treasury_audit`, `treasury_auth_provider`, `treasury_contract`, `treasury_contract_restored_3`, `treasury_csp`, `treasury_notification`, `treasury_onboarding`, `treasury_otp`, `treasury_rates`, `treasury_report`, `treasury_safe_deal_adapter`, `treasury_lp_adapter`, `treasury_treasury_adapter`, `treasury_web`.
 
-Плейбуки `restore` и `schema_flyway_setup` по умолчанию требуют явный `db_name` / `db_list` (пустой `default_databases` для безопасности).
+Playbooks `restore` and `schema_flyway_setup` require an explicit `db_name` / `db_list` by default (empty `default_databases` for safety).
 
-Переопределение: `--extra-vars "db_name=..."` или `--extra-vars "db_list=['db1','db2']"`.
+Override: `--extra-vars "db_name=..."` or `--extra-vars "db_list=['db1','db2']"`.
 
 ---
 
-## Параметры подключения
+## Connection parameters
 
-Задаются в плейбуках (или через --extra-vars):
+Set in the playbooks (or via --extra-vars):
 
-- `pg_host` — IP RDS PostgreSQL
+- `pg_host` — RDS PostgreSQL IP
 - `pg_port` — 5432
-- `pg_admin_user` — root (или другой суперпользователь)
-- `pg_admin_password` — пароль администратора
-- `treasury_user` / `treasury_password` — пользователь приложения (для restore и при необходимости)
-- `schema_flyway` / `schema_flyway_password` — только для schema_flyway_setup
+- `pg_admin_user` — root (or another superuser)
+- `pg_admin_password` — administrator password
+- `treasury_user` / `treasury_password` — application user (for restore and when needed)
+- `schema_flyway` / `schema_flyway_password` — schema_flyway_setup only
 
 ---
 
-## Требования
+## Requirements
 
-- Коллекции Ansible: `community.postgresql`, `community.general` (см. `requirements.yml`)
-- На контрол-ноде: psycopg2 (устанавливается тасками schema_flyway при необходимости)
-- Для запуска через скрипт: Docker, Ansible EE при необходимости
+- Ansible collections: `community.postgresql`, `community.general` (see `requirements.yml`)
+- On the control node: psycopg2 (installed by schema_flyway tasks when needed)
+- For the wrapper scripts: Docker, Ansible EE when needed
 
 ---
 
-## Структура файлов
+## File layout
 
 ```
 playbooks/estate_databases/playbooks/
-├── restore.yaml              # Пересоздание БД
-├── drop_db.yaml              # Удаление БД (без recreate)
-├── schema_flyway_setup.yaml     # Настройка schema_flyway и прав
-├── ro_user_setup.yaml        # Read-only: GRANT SELECT (без OWNER)
-├── rw_user_setup.yaml        # Read-write: GRANT DML (без OWNER)
-├── drop_db_user.yaml         # Revoke grants доп. роли (без REASSIGN)
-├── README.md                 # Этот файл
+├── restore.yaml              # Recreate databases
+├── drop_db.yaml              # Drop databases (no recreate)
+├── schema_flyway_setup.yaml     # schema_flyway and privilege setup
+├── ro_user_setup.yaml        # Read-only: GRANT SELECT (no OWNER)
+├── rw_user_setup.yaml        # Read-write: GRANT DML (no OWNER)
+├── drop_db_user.yaml         # Revoke extra-role grants (no REASSIGN)
+├── README.md                 # This file
 ├── ansible.cfg
 ├── requirements.yml
 └── roles/
     ├── db/
-    │   └── tasks/main.yml    # Пересоздание БД
+    │   └── tasks/main.yml    # Recreate databases
     ├── schema_flyway/
-    │   └── tasks/main.yml    # schema_flyway + права treasury_user (DML + REPLICATION)
+    │   └── tasks/main.yml    # schema_flyway + treasury_user privileges (DML + REPLICATION)
     ├── ro_user/
-    │   └── tasks/main.yml    # RO: GRANT SELECT, без OWNER
+    │   └── tasks/main.yml    # RO: GRANT SELECT, no OWNER
     ├── rw_user/
-    │   └── tasks/main.yml    # RW: GRANT DML, без OWNER
+    │   └── tasks/main.yml    # RW: GRANT DML, no OWNER
     └── drop_db_user/
-        └── tasks/main.yml    # Revoke grants + DROP ROLE, без REASSIGN
+        └── tasks/main.yml    # Revoke grants + DROP ROLE, no REASSIGN
 ```
 
 ---
 
-## Устранение неполадок
+## Troubleshooting
 
-**Ошибка подключения к БД** — проверьте `pg_host`, пароли, доступность RDS из сети.
+**Database connection error** — typically `pg_host`, passwords, or RDS reachability from the network.
 
-**Weak password** — задайте более сложный пароль вручную через psql при создании пользователя.
+**Weak password** — set a stronger password by hand via psql when creating the user.
 
-**База не удаляется** — закройте все подключения; при необходимости используйте скрипт принудительного закрытия соединений.
+**Database will not drop** — close all connections; use a forced session-termination script when needed.
 
-**После schema_flyway_setup приложению не хватает прав** — при необходимости проверьте, что treasury_user получил REPLICATION и DML по всем нужным схемам/таблицам.
+**Application lacks privileges after schema_flyway_setup** — confirm that treasury_user received REPLICATION and DML on all required schemas/tables.

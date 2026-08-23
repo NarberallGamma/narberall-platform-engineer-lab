@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Список git-репозиториев с незакоммиченными изменениями.
+# List of git repositories with uncommitted changes.
 # Usage: list_dirty_repos.sh --env PREPROD|PROD
 
 set -euo pipefail

@@ -1,4 +1,4 @@
-"""Корень репозитория в sys.path: скрипты лежат плоско, пакета нет."""
+"""Repo root on sys.path: scripts sit at the top level, there is no package."""
 import sys
 from pathlib import Path
 

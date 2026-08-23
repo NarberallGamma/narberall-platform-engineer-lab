@@ -8,5 +8,5 @@ resource "sbercloud_vpc_subnet" "this" {
   name              = each.value.name != null ? each.value.name : each.key
 
   tags = each.value.tags
-  # при необходимости добавьте другие атрибуты (dhcp_lease_time и т.п.)
+  # additional attributes (dhcp_lease_time and similar) can be added when needed
 }

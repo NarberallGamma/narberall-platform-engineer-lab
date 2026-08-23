@@ -348,7 +348,7 @@ logstash:
               "[json][data][request_data]" => "data.request_data"
               "[json][data][response_data]" => "data.response_data"
               "[json][data][log_type]" => "data.log_type"
-              "[json][data][namespace]" => "data.namespace"  # Сохраняем namespace в конечном документе
+              "[json][data][namespace]" => "data.namespace"  # keep namespace in the final document
             }
             remove_field => ["message", "json"]
           }

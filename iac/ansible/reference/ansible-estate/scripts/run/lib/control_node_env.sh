@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Окружение контрол-ноды /ansible после деплоя из GitLab CI.
-# Вызывать после docker_ssh_apply в run-скриптах (cwd = корень репо ansible).
+# Control-node /ansible environment after a GitLab CI deploy.
+# Call after docker_ssh_apply in run scripts (cwd = ansible repo root).
 #
-# - source .env.vault (VAULT_ADDR, VAULT_TOKEN из CI Variables)
-# - автоподключение .ssh/ansible_ssh_key + ansible_user=ansible (inventory [all:vars] root)
-#   если не задан --ssh-key / --ssh-agent / --ask-pass
-# - проброс VAULT_* в контейнер ansible
+# - source .env.vault (VAULT_ADDR, VAULT_TOKEN from CI Variables)
+# - auto-attach .ssh/ansible_ssh_key + ansible_user=ansible (inventory [all:vars] root)
+#   when --ssh-key / --ssh-agent / --ask-pass is not set
+# - pass VAULT_* into the ansible container
 
 control_node_env_apply() {
   if [[ -f .env.vault ]]; then

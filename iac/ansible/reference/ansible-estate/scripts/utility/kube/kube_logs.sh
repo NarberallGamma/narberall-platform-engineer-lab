@@ -1,20 +1,20 @@
 #!/bin/bash
 
-# Скрипт для получения логов из Kubernetes подов
-# Использование:
-#   ./kube_logs.sh                         # Интерактивный режим
-#   ./kube_logs.sh -n <namespace>           # Указать namespace
-#   ./kube_logs.sh -n <ns> -s <service>     # Неинтерактивный (агент): namespace + сервис
-#   ./kube_logs.sh -n <ns> -s <svc> -t 1h  # + временной диапазон (1h, 3h, 6h, 30m и т.д.)
-#   ./kube_logs.sh -n <ns> -s <svc> --from-time RFC3339 --to-time RFC3339  # интервал от/до; обрезка файла по строкам (GNU date)
-#   ./kube_logs.sh -n <ns> -s <svc> -o /path/to/dir  # Директория для сохранения .log
+# Fetch logs from Kubernetes pods
+# Usage:
+#   ./kube_logs.sh                         # Interactive mode
+#   ./kube_logs.sh -n <namespace>           # Set namespace
+#   ./kube_logs.sh -n <ns> -s <service>     # Non-interactive (agent): namespace + service
+#   ./kube_logs.sh -n <ns> -s <svc> -t 1h  # + time range (1h, 3h, 6h, 30m, and similar)
+#   ./kube_logs.sh -n <ns> -s <svc> --from-time RFC3339 --to-time RFC3339  # from/to interval; trim the file by line timestamps (GNU date)
+#   ./kube_logs.sh -n <ns> -s <svc> -o /path/to/dir  # Directory to save the .log
 #
-# Переменные окружения (опционально):
-#   K8S_DEFAULT_NAMESPACE - namespace по умолчанию (по умолчанию: default)
+# Environment variables (optional):
+#   K8S_DEFAULT_NAMESPACE - default namespace (default: default)
 
 set -e
 
-# Цвета для красивого вывода
+# Colors for readable output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -22,121 +22,121 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Namespace по умолчанию (можно переопределить через переменную окружения)
+# Default namespace (can be overridden via an environment variable)
 DEFAULT_NAMESPACE="${K8S_DEFAULT_NAMESPACE:-default}"
 NAMESPACE="${DEFAULT_NAMESPACE}"
 
-# Неинтерактивный режим (для агента): переданы -n и -s
+# Non-interactive mode (for an agent): -n and -s are set
 CLI_SERVICE=""
 CLI_SINCE=""
 CLI_FROM_TIME=""
 CLI_TO_TIME=""
 OUTPUT_DIR=""
 
-# Функция для вывода справки
+# Help printer
 show_help() {
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}Kubernetes Logs Extractor${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo "Использование:"
-    echo "  $0                              # Интерактивный режим"
-    echo "  $0 -n <namespace>               # Указать namespace"
-    echo "  $0 -n <ns> -s <service>         # Неинтерактивный режим (для агента): namespace + имя сервиса"
-    echo "  $0 -n <ns> -s <svc> -t <time>   # + временной диапазон (1h, 3h, 6h, 30m и т.д.)"
-    echo "  $0 -n <ns> -s <svc> --from-time RFC3339 --to-time RFC3339  # интервал от/до (после выгрузки — обрезка файла)"
-    echo "  $0 -n <ns> -s <svc> -o <dir>    # Директория для сохранения .log"
-    echo "  $0 help                         # Показать эту справку"
+    echo "Usage:"
+    echo "  $0                              # Interactive mode"
+    echo "  $0 -n <namespace>               # Set namespace"
+    echo "  $0 -n <ns> -s <service>         # Non-interactive mode (for an agent): namespace + service name"
+    echo "  $0 -n <ns> -s <svc> -t <time>   # + time range (1h, 3h, 6h, 30m, and similar)"
+    echo "  $0 -n <ns> -s <svc> --from-time RFC3339 --to-time RFC3339  # from/to interval (after download — trim the file)"
+    echo "  $0 -n <ns> -s <svc> -o <dir>    # Directory to save the .log"
+    echo "  $0 help                         # Show this help"
     echo ""
-    echo "Аргументы:"
-    echo "  -n, --namespace <name>   Namespace (обязателен в неинтерактивном режиме)"
-    echo "  -s, --service <name>     Имя deployment или statefulset (для неинтерактивного режима)"
-    echo "  -t, --since <duration>   Временной диапазон: 1h, 3h, 6h, 30m и т.д. (по умолчанию: все логи)"
-    echo "  --from-time <RFC3339>    Начало интервала (вместе с --to-time; несовместимо с -t)"
-    echo "  --to-time <RFC3339>      Конец интервала (после сбора логи обрезаются по времени в строках, нужен GNU date)"
-    echo "  -o, --output-dir <path>  Директория для сохранения файла логов."
-    echo "                           Если путь начинается с /mnt/,"
-    echo "                           запись сначала в /tmp, затем копирование в указанную директорию (cp)."
-    echo "  -h, --help               Показать справку"
+    echo "Arguments:"
+    echo "  -n, --namespace <name>   Namespace (required in non-interactive mode)"
+    echo "  -s, --service <name>     Deployment or statefulset name (non-interactive mode)"
+    echo "  -t, --since <duration>   Time range: 1h, 3h, 6h, 30m, and similar (default: all logs)"
+    echo "  --from-time <RFC3339>    Interval start (together with --to-time; incompatible with -t)"
+    echo "  --to-time <RFC3339>      Interval end (after collection, logs are trimmed by line time; GNU date is required)"
+    echo "  -o, --output-dir <path>  Directory to save the log file."
+    echo "                           If the path starts with /mnt/,"
+    echo "                           write to /tmp first, then copy into the given directory (cp)."
+    echo "  -h, --help               Show help"
     echo ""
-    echo "Скрипт позволяет:"
-    echo "  - Выбрать namespace (по умолчанию: ${DEFAULT_NAMESPACE})"
-    echo "  - Выбрать сервис из списка deployments и statefulsets"
-    echo "  - Выбрать временной диапазон для логов"
-    echo "  - Автоматически определить формат даты из логов"
-    echo "  - Сохранить логи в файл .log: напрямую или через копирование при -o /mnt/..."
+    echo "The script can:"
+    echo "  - Select a namespace (default: ${DEFAULT_NAMESPACE})"
+    echo "  - Select a service from deployments and statefulsets"
+    echo "  - Select a time range for logs"
+    echo "  - Detect the date format from the logs automatically"
+    echo "  - Save logs to a .log file: directly or via a copy when -o /mnt/..."
     echo ""
 }
 
-# Функция для проверки доступности kubectl
+# Check that kubectl is available
 check_kubectl() {
     if ! command -v kubectl &> /dev/null; then
-        echo -e "${RED}Ошибка: kubectl не найден в PATH${NC}"
+        echo -e "${RED}Error: kubectl is not in PATH${NC}"
         exit 1
     fi
     
     if ! kubectl cluster-info &> /dev/null; then
-        echo -e "${RED}Ошибка: Не удалось подключиться к кластеру${NC}"
+        echo -e "${RED}Error: Failed to connect to the cluster${NC}"
         exit 1
     fi
 }
 
-# Функция для проверки поддержки --until-time в kubectl
+# Check whether kubectl supports --until-time
 check_until_time_support() {
-    # Проверяем, поддерживает ли kubectl флаг --until-time
+    # Check whether kubectl supports the --until-time flag
     if kubectl logs --help 2>&1 | grep -q "\-\-until-time"; then
-        return 0  # Поддерживается
+        return 0  # Supported
     else
-        return 1  # Не поддерживается
+        return 1  # Not supported
     fi
 }
 
-# Функция для проверки существования namespace
+# Check that the namespace exists
 check_namespace() {
     local ns="$1"
     if ! kubectl get namespace "$ns" &> /dev/null; then
-        echo -e "${RED}Ошибка: Namespace '${ns}' не найден${NC}"
+        echo -e "${RED}Error: Namespace '${ns}' not found${NC}"
         return 1
     fi
     return 0
 }
 
-# Функция для получения списка сервисов (deployments и statefulsets)
+# List services (deployments and statefulsets)
 get_services() {
     local ns="$1"
     local services=()
     
-    # Получаем deployments
+    # Get deployments
     local deployments=$(kubectl -n "$ns" get deployments -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
     for deploy in $deployments; do
         services+=("deployment:$deploy")
     done
     
-    # Получаем statefulsets
+    # Get statefulsets
     local statefulsets=$(kubectl -n "$ns" get statefulsets -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
     for sts in $statefulsets; do
         services+=("statefulset:$sts")
     done
     
-    # Выводим массив
+    # Print the array
     printf '%s\n' "${services[@]}"
 }
 
-# Функция для получения подов по сервису
+# Get pods for a service
 get_pods_for_service() {
     local ns="$1"
     local service_type="$2"
     local service_name="$3"
     
     if [ "$service_type" = "deployment" ]; then
-        # Пробуем получить поды через селектор deployment
+        # Try to get pods via the deployment selector
         local pods=""
         
-        # Используем jsonpath для получения всех пар ключ=значение
+        # Use jsonpath to get all key=value pairs
         local selector_pairs=$(kubectl -n "$ns" get deployment "$service_name" -o jsonpath='{.spec.selector.matchLabels}' 2>/dev/null)
         
         if [ -n "$selector_pairs" ] && [ "$selector_pairs" != "{}" ]; then
-            # Преобразуем JSON в формат селектора (key1=value1,key2=value2)
+            # Convert JSON to selector form (key1=value1,key2=value2)
             local selector=$(echo "$selector_pairs" | grep -o '"[^"]*":"[^"]*"' | \
                 sed 's/"\([^"]*\)":"\([^"]*\)"/\1=\2/' | tr '\n' ',' | sed 's/,$//')
             
@@ -145,7 +145,7 @@ get_pods_for_service() {
             fi
         fi
         
-        # Если не получилось через селектор, пробуем fallback методы
+        # If the selector fails, try fallback methods
         if [ -z "$pods" ] || [ -z "$(echo "$pods" | tr -d ' ')" ]; then
             pods=$(kubectl -n "$ns" get pods -l app="$service_name" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || \
                    kubectl -n "$ns" get pods -l app.kubernetes.io/name="$service_name" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || \
@@ -154,10 +154,10 @@ get_pods_for_service() {
         
         echo "$pods"
     elif [ "$service_type" = "statefulset" ]; then
-        # Для statefulset поды имеют имя вида: <statefulset-name>-<ordinal>
+        # For a statefulset, pods are named: <statefulset-name>-<ordinal>
         local pods=""
         
-        # Пробуем получить селектор
+        # Try to get the selector
         local selector_pairs=$(kubectl -n "$ns" get statefulset "$service_name" -o jsonpath='{.spec.selector.matchLabels}' 2>/dev/null)
         
         if [ -n "$selector_pairs" ] && [ "$selector_pairs" != "{}" ]; then
@@ -169,9 +169,9 @@ get_pods_for_service() {
             fi
         fi
         
-        # Если не получилось через селектор, пробуем fallback методы
+        # If the selector fails, try fallback methods
         if [ -z "$pods" ] || [ -z "$(echo "$pods" | tr -d ' ')" ]; then
-            # Поды statefulset обычно начинаются с имени statefulset
+            # Statefulset pods usually start with the statefulset name
             pods=$(kubectl -n "$ns" get pods | grep "^${service_name}-" | awk '{print $1}' || \
                    kubectl -n "$ns" get pods -l app.kubernetes.io/name="$service_name" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || \
                    kubectl -n "$ns" get pods | grep "$service_name" | awk '{print $1}' || echo "")
@@ -183,34 +183,34 @@ get_pods_for_service() {
     fi
 }
 
-# Функция для получения контейнеров в поде (исключая sidecar)
+# Get containers in the pod (excluding sidecars)
 get_application_containers() {
     local ns="$1"
     local pod="$2"
     
-    # Получаем все контейнеры
+    # Get all containers
     local containers=$(kubectl -n "$ns" get pod "$pod" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null || echo "")
     
-    # Фильтруем sidecar контейнеры
+    # Filter sidecar containers
     local app_containers=()
     for container in $containers; do
-        # Исключаем известные sidecar контейнеры
+        # Exclude known sidecar containers
         if [[ ! "$container" =~ ^(istio-proxy|sidecar|envoy|linkerd-proxy|vault-agent)$ ]]; then
             app_containers+=("$container")
         fi
     done
     
-    # Если не нашли, берем первый контейнер или "application"
+    # If none found, take the first container or "application"
     if [ ${#app_containers[@]} -eq 0 ]; then
-        # Пробуем найти контейнер с именем "application"
+        # Try to find a container named "application"
         if echo "$containers" | grep -q "application"; then
             echo "application"
         else
-            # Берем первый контейнер
+            # Take the first container
             echo "$containers" | awk '{print $1}'
         fi
     else
-        # Если нашли несколько, предпочитаем "application"
+        # If several are found, prefer "application"
         if printf '%s\n' "${app_containers[@]}" | grep -q "^application$"; then
             echo "application"
         else
@@ -219,13 +219,13 @@ get_application_containers() {
     fi
 }
 
-# Функция для определения формата даты из логов
+# Detect the date format from logs
 detect_date_format() {
     local ns="$1"
     local pod="$2"
     local container="$3"
     
-    # Получаем последние 50 строк логов
+    # Fetch the last 50 log lines
     local sample_logs=$(kubectl -n "$ns" logs "$pod" -c "$container" --tail=50 2>/dev/null || echo "")
     
     if [ -z "$sample_logs" ]; then
@@ -233,14 +233,14 @@ detect_date_format() {
         return
     fi
     
-    # Ищем различные форматы дат в логах
-    # RFC3339: 2025-12-18T13:41:05.741+03:00 или 2025-12-18T13:41:05Z
+    # Search for various date formats in logs
+    # RFC3339: 2025-12-18T13:41:05.741+03:00 or 2025-12-18T13:41:05Z
     if echo "$sample_logs" | grep -qE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}'; then
         echo "rfc3339"
         return
     fi
     
-    # ISO 8601: 2025-12-18 13:41:05 или 2026-03-04 10:11:31,753 (Keycloak и др.)
+    # ISO 8601: 2025-12-18 13:41:05 or 2026-03-04 10:11:31,753 (Keycloak and others)
     if echo "$sample_logs" | grep -qE '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}(,[0-9]+)?'; then
         echo "iso8601"
         return
@@ -255,13 +255,13 @@ detect_date_format() {
     echo "unknown"
 }
 
-# Функция для определения часового пояса из логов
+# Detect the timezone from logs
 detect_timezone() {
     local ns="$1"
     local pod="$2"
     local container="$3"
     
-    # Получаем последние 50 строк логов (больше, чтобы точно найти дату с часовым поясом)
+    # Fetch the last 50 log lines (more, to find a date with a timezone)
     local sample_logs=$(kubectl -n "$ns" logs "$pod" -c "$container" --tail=50 2>/dev/null || echo "")
     
     if [ -z "$sample_logs" ]; then
@@ -269,8 +269,8 @@ detect_timezone() {
         return
     fi
     
-    # Ищем часовой пояс в различных форматах:
-    # 1. С миллисекундами: 2025-12-18T13:41:05.741+03:00
+    # Search for a timezone in various formats:
+    # 1. With milliseconds: 2025-12-18T13:41:05.741+03:00
     local timezone=$(echo "$sample_logs" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?[+\-][0-9]{2}:[0-9]{2}' | head -1 | grep -oE '[+\-][0-9]{2}:[0-9]{2}$' | head -1)
     
     if [ -n "$timezone" ]; then
@@ -278,7 +278,7 @@ detect_timezone() {
         return
     fi
     
-    # 2. Без миллисекунд: 2025-12-18T13:41:05+03:00
+    # 2. Without milliseconds: 2025-12-18T13:41:05+03:00
     timezone=$(echo "$sample_logs" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+\-][0-9]{2}:[0-9]{2}' | head -1 | grep -oE '[+\-][0-9]{2}:[0-9]{2}$' | head -1)
     
     if [ -n "$timezone" ]; then
@@ -286,16 +286,16 @@ detect_timezone() {
         return
     fi
     
-    # 3. Если не найден, проверяем наличие Z (UTC)
+    # 3. If not found, check for Z (UTC)
     if echo "$sample_logs" | grep -qE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z[^a-zA-Z]'; then
         echo "Z"
         return
     fi
     
-    # 4. Если все еще не найден, пробуем найти любую дату и посмотреть на формат
+    # 4. If still not found, try any date and inspect the format
     local first_date=$(echo "$sample_logs" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1)
     if [ -n "$first_date" ]; then
-        # Проверяем, есть ли после даты что-то (миллисекунды или часовой пояс)
+        # Check whether anything follows the date (milliseconds or a timezone)
         local date_with_tz=$(echo "$sample_logs" | grep -oE "${first_date}[\.\+\-Z].*" | head -1)
         if [[ "$date_with_tz" =~ [+\-][0-9]{2}:[0-9]{2} ]]; then
             timezone=$(echo "$date_with_tz" | grep -oE '[+\-][0-9]{2}:[0-9]{2}' | head -1)
@@ -309,13 +309,13 @@ detect_timezone() {
     echo ""
 }
 
-# Функция для получения примера даты из логов
+# Get a sample date from the logs
 get_date_example() {
     local ns="$1"
     local pod="$2"
     local container="$3"
     
-    # Получаем последние 10 строк логов
+    # Fetch the last 10 log lines
     local sample_logs=$(kubectl -n "$ns" logs "$pod" -c "$container" --tail=10 2>/dev/null || echo "")
     
     if [ -z "$sample_logs" ]; then
@@ -323,7 +323,7 @@ get_date_example() {
         return
     fi
     
-    # Ищем первую дату в формате RFC3339 (с часовым поясом или без)
+    # Find the first RFC3339 date (with or without a timezone)
     local date_example=$(echo "$sample_logs" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([\+\-][0-9]{2}:[0-9]{2}|Z)?' | head -1)
     
     if [ -n "$date_example" ]; then
@@ -331,7 +331,7 @@ get_date_example() {
         return
     fi
     
-    # Если не найден RFC3339, пробуем ISO8601
+    # If RFC3339 is not found, try ISO8601
     date_example=$(echo "$sample_logs" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1)
     
     if [ -n "$date_example" ]; then
@@ -342,14 +342,14 @@ get_date_example() {
     echo ""
 }
 
-# Функция для парсинга даты в формате логов
+# Parse a date in the log format
 parse_log_date() {
     local date_str="$1"
     local format="$2"
     
     case "$format" in
         "rfc3339")
-            # Пробуем разные варианты RFC3339
+            # Try different RFC3339 variants
             if [[ "$date_str" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}) ]]; then
                 echo "${BASH_REMATCH[1]}"
             else
@@ -365,7 +365,7 @@ parse_log_date() {
     esac
 }
 
-# Дополнить время часовым поясом из логов, если его нет (для GNU date)
+# Add a timezone from the logs when missing (for GNU date)
 append_tz_if_missing() {
     local ts="$1"
     local tz_hint="$2"
@@ -384,7 +384,7 @@ append_tz_if_missing() {
     echo "${ts}${tz_hint}"
 }
 
-# Первое вхождение метки времени в строке лога (RFC3339 / ISO с пробелом)
+# First timestamp in the log line (RFC3339 / ISO with a space)
 extract_timestamp_from_log_line() {
     local line="$1"
     local fmt_hint="$2"
@@ -402,7 +402,7 @@ extract_timestamp_from_log_line() {
     echo "$m"
 }
 
-# Обрезка сохранённого файла по интервалу [time_from, time_to] с учётом формата строк (GNU date для сравнения)
+# Trim the saved file to [time_from, time_to] using line formats (GNU date for comparison)
 filter_log_file_by_time_window() {
     local file_path="$1"
     local time_from="$2"
@@ -411,7 +411,7 @@ filter_log_file_by_time_window() {
     local tz_for_bare="$5"
 
     if ! command -v date &> /dev/null; then
-        echo -e "${YELLOW}⚠ date не найден, обрезка пропущена${NC}" >&2
+        echo -e "${YELLOW}⚠ date not found, trim skipped${NC}" >&2
         return 1
     fi
 
@@ -424,11 +424,11 @@ filter_log_file_by_time_window() {
     from_s=$(date -d "$tf" +%s 2>/dev/null)
     to_s=$(date -d "$tt" +%s 2>/dev/null)
     if [ -z "$from_s" ] || [ -z "$to_s" ]; then
-        echo -e "${RED}Ошибка: не удалось разобрать границы интервала (нужен GNU date, RFC3339)${NC}" >&2
+        echo -e "${RED}Error: failed to parse interval bounds (GNU date and RFC3339 required)${NC}" >&2
         return 1
     fi
     if [ "$from_s" -gt "$to_s" ]; then
-        echo -e "${RED}Ошибка: время начала позже времени конца${NC}" >&2
+        echo -e "${RED}Error: start time is after end time${NC}" >&2
         return 1
     fi
 
@@ -476,11 +476,11 @@ filter_log_file_by_time_window() {
         rm -f "$tmp_out"
         return 1
     fi
-    echo -e "${GREEN}✓ Обрезка по интервалу от/до применена (формат: ${date_format_hint:-rfc3339})${NC}"
+    echo -e "${GREEN}✓ From/to interval trim applied (format: ${date_format_hint:-rfc3339})${NC}"
     return 0
 }
 
-# Функция для получения логов
+# Fetch logs
 get_logs() {
     local ns="$1"
     local container="$2"
@@ -489,41 +489,41 @@ get_logs() {
     shift 4
     local pods=("$@")
     
-    # Проверяем, что путь к файлу указан
+    # Confirm a file path is set
     if [ -z "$output_file" ]; then
-        echo -e "${RED}Ошибка: Не указан путь для сохранения файла${NC}" >&2
+        echo -e "${RED}Error: No path to save the file${NC}" >&2
         return 1
     fi
     
     local temp_file=$(mktemp)
     
-    echo -e "${CYAN}Сбор логов...${NC}"
+    echo -e "${CYAN}Collecting logs...${NC}"
     
-    # Определяем часовой пояс из первого пода, если время указано без часового пояса
+    # Detect timezone from the first pod when time has no timezone
     local detected_timezone=""
     if [ ${#pods[@]} -gt 0 ] && [ -n "${pods[0]}" ]; then
         local first_pod="${pods[0]}"
-        # Проверяем, есть ли в time_filter время без часового пояса
+        # Check whether time_filter has a time without a timezone
         if [[ "$time_filter" == *"--since-time="* ]] && [[ ! "$time_filter" =~ [\+\-][0-9]{2}:[0-9]{2} ]] && [[ ! "$time_filter" =~ Z[^a-zA-Z] ]] && [[ ! "$time_filter" =~ Z$ ]]; then
             detected_timezone=$(detect_timezone "$ns" "$first_pod" "$container")
-            echo "  [DEBUG] Определен часовой пояс из логов: '${detected_timezone}'" >&2
+            echo "  [DEBUG] Timezone detected from logs: '${detected_timezone}'" >&2
             if [ -z "$detected_timezone" ]; then
-                # Если не удалось определить, проверяем, есть ли вообще логи в поде
+                # If detection failed, check whether the pod has any logs
                 local test_logs=$(kubectl -n "$ns" logs "$first_pod" -c "$container" --tail=5 2>/dev/null || echo "")
                 if [ -z "$test_logs" ]; then
-                    echo "  [DEBUG] Логи в поде пустые, используем UTC по умолчанию" >&2
+                    echo "  [DEBUG] Pod logs are empty, defaulting to UTC" >&2
                     detected_timezone="Z"
                 else
-                    echo "  [DEBUG] Логи есть, но часовой пояс не определен. Пробуем найти вручную..." >&2
-                    # Пробуем найти любую дату в логах
+                    echo "  [DEBUG] Logs exist but timezone is unknown. Trying a manual search..." >&2
+                    # Try to find any date in the logs
                     local sample_date=$(echo "$test_logs" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1)
                     if [ -n "$sample_date" ]; then
-                        echo "  [DEBUG] Найдена дата в логах: $sample_date" >&2
-                        # Пробуем найти полную строку с датой
+                        echo "  [DEBUG] Date found in logs: $sample_date" >&2
+                        # Try to find the full line with the date
                         local full_date_line=$(echo "$test_logs" | grep -m1 "$sample_date")
-                        echo "  [DEBUG] Строка с датой: ${full_date_line:0:100}..." >&2
+                        echo "  [DEBUG] Line with the date: ${full_date_line:0:100}..." >&2
                     fi
-                    # Используем UTC как fallback, но предупредим пользователя
+                    # Fall back to UTC and warn
                     detected_timezone="Z"
                 fi
             fi
@@ -536,39 +536,39 @@ get_logs() {
             continue
         fi
         
-        echo -e "${BLUE}Обработка пода: ${pod}${NC}"
+        echo -e "${BLUE}Processing pod: ${pod}${NC}"
         
-        # Формируем команду kubectl logs
+        # Build the kubectl logs command
         local log_cmd="kubectl -n $ns logs $pod -c $container --prefix=true"
         
-        # Проверяем, нужно ли фильтровать по end_time (если --until-time не поддерживается)
+        # Check whether to filter by end_time (when --until-time is unsupported)
         local end_time=""
         local actual_time_filter="$time_filter"
         
         if [[ "$time_filter" == *"|END_TIME:"* ]]; then
-            # Извлекаем end_time и actual_time_filter
+            # Extract end_time and actual_time_filter
             end_time=$(echo "$time_filter" | sed 's/.*|END_TIME://')
             actual_time_filter=$(echo "$time_filter" | sed 's/|END_TIME:.*//')
         fi
         
-        # Если время без часового пояса и мы определили часовой пояс, добавляем его
+        # If time has no timezone and one was detected, append it
         if [ -n "$detected_timezone" ] && [[ "$actual_time_filter" == *"--since-time="* ]]; then
-            # Извлекаем значение времени из --since-time=...
+            # Extract the time value from --since-time=...
             local time_value=$(echo "$actual_time_filter" | sed 's/.*--since-time=//' | sed 's/|.*//')
-            # Проверяем, не имеет ли уже время часового пояса (Z или +/-HH:MM)
+            # Check whether the time already has a timezone (Z or +/-HH:MM)
             if [[ ! "$time_value" =~ [\+\-][0-9]{2}:[0-9]{2}$ ]] && [[ ! "$time_value" =~ Z$ ]]; then
-                # Добавляем часовой пояс к времени
+                # Append the timezone to the time
                 actual_time_filter=$(echo "$actual_time_filter" | sed "s/--since-time=${time_value}/--since-time=${time_value}${detected_timezone}/")
-                echo "  [DEBUG] Добавлен часовой пояс из логов: ${detected_timezone}" >&2
+                echo "  [DEBUG] Timezone from logs appended: ${detected_timezone}" >&2
             fi
         fi
         
-        # Добавляем фильтр по времени
+        # Add the time filter
         if [ -n "$actual_time_filter" ] && [ "$actual_time_filter" != "" ]; then
             log_cmd="$log_cmd $actual_time_filter"
         fi
         
-        # Получаем логи и добавляем заголовок
+        # Fetch logs and add a header
         {
             echo "=== Pod: $pod ==="
             local log_output
@@ -577,23 +577,23 @@ get_logs() {
             
             if [ $log_exit_code -eq 0 ]; then
                 if [ -n "$log_output" ]; then
-                    # Сырые логи пода; интервал от/до обрабатывается после сборки всего файла (filter_log_file_by_time_window)
+                    # Raw pod logs; the from/to interval is applied after the full file is built (filter_log_file_by_time_window)
                     echo "$log_output"
                 else
-                    # Логи пустые - выводим более информативное сообщение
+                    # Logs are empty — print a more informative message
                     if [ -n "$end_time" ]; then
-                        echo "Логи пусты или отсутствуют для данного временного диапазона"
-                        echo "  Проверьте:"
-                        echo "  - Правильность формата времени в --since-time"
-                        echo "  - Наличие логов в указанном временном диапазоне"
-                        echo "  - Доступность пода и контейнера"
+                        echo "Logs are empty or missing for this time range"
+                        echo "  Check:"
+                        echo "  - That --since-time uses a valid format"
+                        echo "  - That logs exist in the given time range"
+                        echo "  - That the pod and container are reachable"
                     else
-                        echo "Логи пусты или отсутствуют для данного временного диапазона"
+                        echo "Logs are empty or missing for this time range"
                     fi
                 fi
             else
-                echo "Ошибка при получении логов: $log_output"
-                echo "  Команда: $log_cmd"
+                echo "Error fetching logs: $log_output"
+                echo "  Command: $log_cmd"
             fi
             echo ""
         } >> "$temp_file"
@@ -601,19 +601,19 @@ get_logs() {
         ((pod_count++))
     done
     
-    # Проверяем, есть ли данные в временном файле
+    # Check whether the temporary file has data
     if [ ! -f "$temp_file" ]; then
-        echo -e "${RED}Ошибка: Временный файл не был создан${NC}"
+        echo -e "${RED}Error: Temporary file was not created${NC}"
         return 1
     fi
     
-    # Проверяем размер файла для отладки
+    # Check file size for debugging
     local file_size=0
     if [ -f "$temp_file" ]; then
         file_size=$(wc -c < "$temp_file" 2>/dev/null || echo "0")
     fi
 
-    # После выгрузки: оставить в файле только строки в интервале [since-time, END_TIME] (kubectl не умеет --until-time)
+    # After download: keep only lines in [since-time, END_TIME] (kubectl has no --until-time)
     if [[ "$time_filter" == *"|END_TIME:"* ]]; then
         local trim_to_var=""
         local trim_from_var=""
@@ -623,16 +623,16 @@ get_logs() {
         if [ -n "$trim_from_var" ] && [ -n "$trim_to_var" ] && [ -f "$temp_file" ]; then
             local df_trim=""
             df_trim=$(detect_date_format "$ns" "${pods[0]}" "$container")
-            echo -e "${CYAN}Обрезка файла по времени в строках логов: ${trim_from_var} … ${trim_to_var}${NC}"
+            echo -e "${CYAN}Trim the file by timestamps in log lines: ${trim_from_var} … ${trim_to_var}${NC}"
             filter_log_file_by_time_window "$temp_file" "$trim_from_var" "$trim_to_var" "$df_trim" "$detected_timezone" || \
-                echo -e "${YELLOW}⚠ Обрезка не выполнена; в файле остался полный вывод kubectl с --since-time${NC}"
+                echo -e "${YELLOW}⚠ Trim was not applied; the file still has the full kubectl --since-time output${NC}"
         fi
     fi
     
-    # Сохраняем файл в текущую директорию (pwd)
-    # Файл всегда сохраняется в директории, откуда запущен скрипт
+    # Save the file in the current directory (pwd)
+    # The file is always saved in the directory from which the script was started
     if mv "$temp_file" "$output_file" 2>/dev/null; then
-        # Получаем полный абсолютный путь к файлу (учитываем -o/--output-dir)
+        # Resolve the full absolute file path (honour -o/--output-dir)
         local abs_path="$output_file"
         if [[ "$output_file" != /* ]]; then
             abs_path="$(pwd)/${output_file}"
@@ -640,51 +640,51 @@ get_logs() {
         
         echo ""
         if [ -s "$output_file" ]; then
-            echo -e "${GREEN}✓ Логи успешно сохранены!${NC}"
+            echo -e "${GREEN}✓ Logs saved successfully!${NC}"
         else
-            echo -e "${YELLOW}⚠ Файл сохранен, но он пустой${NC}"
+            echo -e "${YELLOW}⚠ The file was saved but is empty${NC}"
         fi
-        echo -e "${CYAN}Имя файла: ${output_file}${NC}"
-        echo -e "${CYAN}Полный путь: ${abs_path}${NC}"
+        echo -e "${CYAN}File name: ${output_file}${NC}"
+        echo -e "${CYAN}Full path: ${abs_path}${NC}"
         local final_size=$(wc -c < "$output_file" 2>/dev/null || echo "0")
-        echo -e "${CYAN}Размер: ${final_size} байт${NC}"
-        echo -e "${CYAN}Обработано подов: ${pod_count}${NC}"
+        echo -e "${CYAN}Size: ${final_size} bytes${NC}"
+        echo -e "${CYAN}Pods processed: ${pod_count}${NC}"
         
         if [ ! -s "$output_file" ]; then
             echo ""
-            echo -e "${YELLOW}Возможные причины пустого файла:${NC}"
-            echo -e "${YELLOW}  - Указанный временной диапазон не содержит логов${NC}"
-            echo -e "${YELLOW}  - Под не содержит логи в указанном контейнере${NC}"
-            echo -e "${YELLOW}  - Нет доступа к логам${NC}"
+            echo -e "${YELLOW}Possible reasons for an empty file:${NC}"
+            echo -e "${YELLOW}  - The given time range has no logs${NC}"
+            echo -e "${YELLOW}  - The pod has no logs in the given container${NC}"
+            echo -e "${YELLOW}  - No access to the logs${NC}"
         fi
         echo ""
     else
-        echo -e "${RED}Ошибка: Не удалось сохранить файл${NC}" >&2
+        echo -e "${RED}Error: Failed to save the file${NC}" >&2
         rm -f "$temp_file"
         return 1
     fi
 }
 
-# Функция для получения списка namespace
+# List namespaces
 get_namespaces() {
     kubectl get namespaces -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | sort
 }
 
-# Функция для интерактивного выбора namespace
+# Interactive namespace picker
 select_namespace() {
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}Выбор Namespace${NC}"
+    echo -e "${CYAN}Namespace selection${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
     
-    # Получаем список namespace
+    # Get the namespace list
     local namespaces=($(get_namespaces))
     
     if [ ${#namespaces[@]} -eq 0 ]; then
-        echo -e "${YELLOW}Не удалось получить список namespace${NC}"
+        echo -e "${YELLOW}Failed to get the namespace list${NC}"
         echo ""
-        read -p "Введите namespace вручную [${DEFAULT_NAMESPACE}]: " input_ns
+        read -p "Enter the namespace manually [${DEFAULT_NAMESPACE}]: " input_ns
         
         if [ -z "$input_ns" ]; then
             input_ns="$DEFAULT_NAMESPACE"
@@ -695,19 +695,19 @@ select_namespace() {
         fi
         
         NAMESPACE="$input_ns"
-        echo -e "${GREEN}✓ Выбран namespace: ${NAMESPACE}${NC}"
+        echo -e "${GREEN}✓ Selected namespace: ${NAMESPACE}${NC}"
         echo ""
         return 0
     fi
     
-    # Выводим список namespace с номерами
+    # Print the numbered namespace list
     local index=1
     local default_index=0
     
     for ns in "${namespaces[@]}"; do
         local marker=""
         if [ "$ns" = "$DEFAULT_NAMESPACE" ]; then
-            marker="${GREEN}✓${NC} (по умолчанию)"
+            marker="${GREEN}✓${NC} (default)"
             default_index=$index
         fi
         echo -e "  ${index}) ${BLUE}${ns}${NC} ${marker}"
@@ -715,40 +715,40 @@ select_namespace() {
     done
     echo ""
     
-    # Запрашиваем выбор
+    # Ask for a choice
     if [ $default_index -gt 0 ]; then
-        read -p "Выберите namespace (1-${#namespaces[@]}) или 'q' для выхода [${default_index}]: " choice
+        read -p "Select a namespace (1-${#namespaces[@]}) or 'q' to quit [${default_index}]: " choice
     else
-        read -p "Выберите namespace (1-${#namespaces[@]}) или введите имя вручную, 'q' для выхода: " choice
+        read -p "Select a namespace (1-${#namespaces[@]}) or type a name, 'q' to quit: " choice
     fi
     
-    # Проверка на выход
+    # Check for quit
     if [ "$choice" = "q" ] || [ "$choice" = "Q" ]; then
-        echo "Отменено"
+        echo "Cancelled"
         return 1
     fi
     
-    # Если пустой ввод и есть default, используем его
+    # If input is empty and a default exists, use it
     if [ -z "$choice" ] && [ $default_index -gt 0 ]; then
         choice=$default_index
     fi
     
-    # Проверяем, является ли выбор числом
+    # Check whether the choice is a number
     if [[ "$choice" =~ ^[0-9]+$ ]]; then
-        # Выбор по номеру
+        # Choose by number
         if [ "$choice" -ge 1 ] && [ "$choice" -le ${#namespaces[@]} ]; then
             NAMESPACE="${namespaces[$((choice-1))]}"
         else
-            echo -e "${RED}Неверный номер!${NC}"
+            echo -e "${RED}Invalid number!${NC}"
             return 1
         fi
     else
-        # Ввод вручную
+        # Manual input
         if [ -z "$choice" ]; then
             choice="$DEFAULT_NAMESPACE"
         fi
         
-        # Проверяем, есть ли такой namespace в списке
+        # Check whether the namespace is in the list
         local found=0
         for ns in "${namespaces[@]}"; do
             if [ "$ns" = "$choice" ]; then
@@ -760,40 +760,40 @@ select_namespace() {
         if [ $found -eq 1 ]; then
             NAMESPACE="$choice"
         else
-            # Пробуем использовать введенное значение (может быть новый namespace)
+            # Try the typed value (it may be a new namespace)
             if check_namespace "$choice"; then
                 NAMESPACE="$choice"
             else
-                echo -e "${RED}Namespace '${choice}' не найден!${NC}"
+                echo -e "${RED}Namespace '${choice}' not found!${NC}"
                 return 1
             fi
         fi
     fi
     
-    echo -e "${GREEN}✓ Выбран namespace: ${NAMESPACE}${NC}"
+    echo -e "${GREEN}✓ Selected namespace: ${NAMESPACE}${NC}"
     echo ""
     return 0
 }
 
-# Функция для интерактивного выбора сервиса
+# Interactive service picker
 select_service() {
     local ns="$1"
     
-    # Выводим заголовок и список в stderr, чтобы они были видны при использовании $()
+    # Print the header and list on stderr so they stay visible under $()
     echo "" >&2
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
-    echo -e "${CYAN}Выбор сервиса${NC}" >&2
+    echo -e "${CYAN}Service selection${NC}" >&2
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
     echo "" >&2
     
     local services=($(get_services "$ns"))
     
     if [ ${#services[@]} -eq 0 ]; then
-        echo -e "${YELLOW}В namespace '${ns}' не найдено deployments или statefulsets${NC}" >&2
+        echo -e "${YELLOW}In namespace '${ns}' no deployments or statefulsets found${NC}" >&2
         return 1
     fi
     
-    # Выводим список сервисов в stderr
+    # Print the service list on stderr
     local index=1
     for service in "${services[@]}"; do
         local service_type=$(echo "$service" | cut -d: -f1)
@@ -803,74 +803,74 @@ select_service() {
     done
     echo "" >&2
     
-    # Запрашиваем выбор в цикле, пока не получим валидный
+    # Loop until a valid choice is entered
     while true; do
-        read -p "Выберите сервис (1-${#services[@]}) или 'q' для выхода: " choice
+        read -p "Select a service (1-${#services[@]}) or 'q' to quit: " choice
         
-        # Проверка на выход
+        # Check for quit
         if [ "$choice" = "q" ] || [ "$choice" = "Q" ]; then
-            echo "Отменено" >&2
+            echo "Cancelled" >&2
             return 1
         fi
         
-        # Проверка на пустой ввод
+        # Check for empty input
         if [ -z "$choice" ]; then
-            echo -e "${YELLOW}Пожалуйста, введите номер сервиса${NC}" >&2
+            echo -e "${YELLOW}Enter a service number${NC}" >&2
             continue
         fi
         
-        # Проверяем валидность выбора
+        # Validate the choice
         if ! [[ "$choice" =~ ^[0-9]+$ ]]; then
-            echo -e "${RED}Неверный выбор! Введите число от 1 до ${#services[@]}${NC}" >&2
+            echo -e "${RED}Invalid choice! Enter a number from 1 to ${#services[@]}${NC}" >&2
             continue
         fi
         
         if [ "$choice" -lt 1 ] || [ "$choice" -gt ${#services[@]} ]; then
-            echo -e "${RED}Неверный выбор! Введите число от 1 до ${#services[@]}${NC}" >&2
+            echo -e "${RED}Invalid choice! Enter a number from 1 to ${#services[@]}${NC}" >&2
             continue
         fi
         
-        # Валидный выбор - возвращаем результат в stdout
+        # Valid choice — return the result on stdout
         local selected_service="${services[$((choice-1))]}"
         echo "$selected_service"
         return 0
     done
 }
 
-# Функция для выбора временного диапазона
+# Time-range picker
 select_time_range() {
     local date_format="$1"
     local ns="$2"
     local pod="$3"
     local container="$4"
     
-    # Получаем реальный пример даты из логов
+    # Get a real date sample from the logs
     local date_example=""
     if [ -n "$ns" ] && [ -n "$pod" ] && [ -n "$container" ]; then
         date_example=$(get_date_example "$ns" "$pod" "$container")
     fi
     
-    # Если не удалось получить пример, используем стандартный
+    # If no sample is available, use a standard one
     if [ -z "$date_example" ]; then
         date_example="2025-12-18T13:41:05+03:00"
     fi
     
-    # Выводим заголовок и список в stderr, чтобы они были видны при использовании $()
+    # Print the header and list on stderr so they stay visible under $()
     echo "" >&2
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
-    echo -e "${CYAN}Выбор временного диапазона${NC}" >&2
+    echo -e "${CYAN}Time range selection${NC}" >&2
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}" >&2
     echo "" >&2
-    echo "  1) За последний час" >&2
-    echo "  2) За последние 3 часа" >&2
-    echo "  3) За последние 6 часов" >&2
-    echo "  4) За произвольное количество часов" >&2
-    echo "  5) За произвольное количество минут" >&2
-    echo "  6) За определенный период времени (начало и конец)" >&2
-    echo "  7) Все доступные логи" >&2
+    echo "  1) Last hour" >&2
+    echo "  2) Last 3 hours" >&2
+    echo "  3) Last 6 hours" >&2
+    echo "  4) Custom number of hours" >&2
+    echo "  5) Custom number of minutes" >&2
+    echo "  6) Custom period (start and end)" >&2
+    echo "  7) All available logs" >&2
     echo "" >&2
     
-    read -p "Выберите вариант (1-7): " time_choice
+    read -p "Select an option (1-7): " time_choice
     
     case "$time_choice" in
         1)
@@ -883,77 +883,77 @@ select_time_range() {
             echo "--since=6h"
             ;;
         4)
-            read -p "Введите количество часов: " hours
+            read -p "Enter hours: " hours
             if [[ "$hours" =~ ^[0-9]+$ ]]; then
                 echo "--since=${hours}h"
             else
-                echo -e "${RED}Неверное значение!${NC}" >&2
+                echo -e "${RED}Invalid value!${NC}" >&2
                 return 1
             fi
             ;;
         5)
-            read -p "Введите количество минут: " minutes
+            read -p "Enter minutes: " minutes
             if [[ "$minutes" =~ ^[0-9]+$ ]]; then
                 echo "--since=${minutes}m"
             else
-                echo -e "${RED}Неверное значение!${NC}" >&2
+                echo -e "${RED}Invalid value!${NC}" >&2
                 return 1
             fi
             ;;
         6)
             echo "" >&2
-            # Используем реальный пример даты из логов
+            # Use a real date sample from the logs
             local example_with_tz="$date_example"
             local example_without_tz=$(echo "$date_example" | sed 's/[+\-][0-9][0-9]:[0-9][0-9]$//' | sed 's/Z$//' | sed 's/\.[0-9]*$//')
             
             if [ -n "$date_example" ]; then
-                echo -e "${YELLOW}Формат даты: RFC3339 (пример из логов: ${example_with_tz})${NC}" >&2
+                echo -e "${YELLOW}Date format: RFC3339 (sample from logs: ${example_with_tz})${NC}" >&2
                 if [ "$example_with_tz" != "$example_without_tz" ]; then
-                    echo -e "${YELLOW}Можно также указать без часового пояса: ${example_without_tz}${NC}" >&2
+                    echo -e "${YELLOW}A value without a timezone is also accepted: ${example_without_tz}${NC}" >&2
                 fi
             else
-                echo -e "${YELLOW}Формат даты: RFC3339 (например: 2025-12-18T13:41:05+03:00 или 2025-12-18T13:41:05Z)${NC}" >&2
-                echo -e "${YELLOW}Можно также указать без часового пояса: 2025-12-18T13:41:05${NC}" >&2
+                echo -e "${YELLOW}Date format: RFC3339 (example: 2025-12-18T13:41:05+03:00 or 2025-12-18T13:41:05Z)${NC}" >&2
+                echo -e "${YELLOW}A value without a timezone is also accepted: 2025-12-18T13:41:05${NC}" >&2
             fi
             echo "" >&2
-            read -p "Введите время начала: " start_time
-            read -p "Введите время конца: " end_time
+            read -p "Enter start time: " start_time
+            read -p "Enter end time: " end_time
             
             if [ -z "$start_time" ] || [ -z "$end_time" ]; then
-                echo -e "${RED}Оба времени должны быть указаны!${NC}" >&2
+                echo -e "${RED}Both times must be set!${NC}" >&2
                 return 1
             fi
             
-            # Преобразуем в RFC3339 формат, если нужно
-            # Добавляем секунды, если их нет (формат должен быть HH:MM:SS, а не HH:MM)
+            # Convert to RFC3339 if needed
+            # Add seconds when missing (format must be HH:MM:SS, not HH:MM)
             if [[ "$start_time" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$ ]]; then
-                # Формат YYYY-MM-DDTHH:MM - добавляем секунды
+                # Format YYYY-MM-DDTHH:MM — add seconds
                 start_time="${start_time}:00"
             elif [[ "$start_time" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}[+\-][0-9]{2}:[0-9]{2}$ ]]; then
-                # Формат YYYY-MM-DDTHH:MM+HH:MM - добавляем секунды перед часовым поясом
+                # Format YYYY-MM-DDTHH:MM+HH:MM — add seconds before the timezone
                 start_time=$(echo "$start_time" | sed 's/\(T[0-9][0-9]:[0-9][0-9]\)\([+\-]\)/\1:00\2/')
             fi
             
             if [[ "$end_time" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$ ]]; then
-                # Формат YYYY-MM-DDTHH:MM - добавляем секунды
+                # Format YYYY-MM-DDTHH:MM — add seconds
                 end_time="${end_time}:00"
             elif [[ "$end_time" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}[+\-][0-9]{2}:[0-9]{2}$ ]]; then
-                # Формат YYYY-MM-DDTHH:MM+HH:MM - добавляем секунды перед часовым поясом
+                # Format YYYY-MM-DDTHH:MM+HH:MM — add seconds before the timezone
                 end_time=$(echo "$end_time" | sed 's/\(T[0-9][0-9]:[0-9][0-9]\)\([+\-]\)/\1:00\2/')
             fi
             
-            # Если нет часового пояса, НЕ добавляем Z автоматически
-            # Часовой пояс будет определен из логов в get_logs()
-            # Это позволяет использовать часовой пояс из самих логов, а не принудительно UTC
+            # If there is no timezone, do NOT append Z automatically
+            # Timezone is detected from logs in get_logs()
+            # This uses the timezone from the logs themselves instead of forcing UTC
             
-            # Проверяем поддержку --until-time
+            # Check --until-time support
             if check_until_time_support; then
                 echo "--since-time=${start_time} --until-time=${end_time}"
             else
-                # Если --until-time не поддерживается, используем только --since-time
-                # и сохраняем end_time для последующей фильтрации
-                echo -e "${YELLOW}⚠ Ваша версия kubectl не поддерживает --until-time${NC}" >&2
-                echo -e "${YELLOW}Логи будут отфильтрованы по дате окончания в самих логах${NC}" >&2
+                # If --until-time is unsupported, use only --since-time
+                # and keep end_time for later filtering
+                echo -e "${YELLOW}⚠ This kubectl version does not support --until-time${NC}" >&2
+                echo -e "${YELLOW}Logs will be filtered by the end date in the log lines${NC}" >&2
                 echo "--since-time=${start_time}|END_TIME:${end_time}"
             fi
             ;;
@@ -961,14 +961,14 @@ select_time_range() {
             echo ""
             ;;
         *)
-            echo -e "${RED}Неверный выбор!${NC}" >&2
+            echo -e "${RED}Invalid choice!${NC}" >&2
             return 1
             ;;
     esac
 }
 
 
-# Определить тип сервиса (deployment или statefulset) по имени
+# Resolve service type (deployment or statefulset) by name
 resolve_service_type() {
     local ns="$1"
     local name="$2"
@@ -985,9 +985,9 @@ resolve_service_type() {
     return 1
 }
 
-# Основная функция
+# Main function
 main() {
-    # Парсим аргументы
+    # Parse arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
             -n|--namespace)
@@ -1019,7 +1019,7 @@ main() {
                 exit 0
                 ;;
             *)
-                echo -e "${RED}Неизвестный аргумент: $1${NC}"
+                echo -e "${RED}Unknown argument: $1${NC}"
                 show_help
                 exit 1
                 ;;
@@ -1028,16 +1028,16 @@ main() {
 
     if [ -n "$CLI_FROM_TIME" ] || [ -n "$CLI_TO_TIME" ]; then
         if [ -z "$CLI_FROM_TIME" ] || [ -z "$CLI_TO_TIME" ]; then
-            echo -e "${RED}Для интервала от/до нужно указать оба аргумента: --from-time и --to-time (RFC3339)${NC}"
+            echo -e "${RED}A from/to interval needs both --from-time and --to-time (RFC3339)${NC}"
             exit 1
         fi
         if [ -n "$CLI_SINCE" ]; then
-            echo -e "${RED}Нельзя совмещать -t/--since с --from-time/--to-time${NC}"
+            echo -e "${RED}Cannot combine -t/--since with --from-time/--to-time${NC}"
             exit 1
         fi
     fi
     
-    # Проверяем kubectl
+    # Check kubectl
     check_kubectl
     
     local selected_service=""
@@ -1045,20 +1045,20 @@ main() {
     local service_name=""
     
     if [ -n "$CLI_SERVICE" ] && [ -n "$NAMESPACE" ]; then
-        # Неинтерактивный режим: проверяем namespace и разрешаем сервис по имени
+        # Non-interactive mode: validate namespace and resolve the service by name
         if ! check_namespace "$NAMESPACE"; then
             exit 1
         fi
         selected_service=$(resolve_service_type "$NAMESPACE" "$CLI_SERVICE")
         if [ -z "$selected_service" ]; then
-            echo -e "${RED}Сервис '${CLI_SERVICE}' не найден в namespace '${NAMESPACE}'${NC}"
+            echo -e "${RED}Service '${CLI_SERVICE}' not found in namespace '${NAMESPACE}'${NC}"
             exit 1
         fi
         service_type=$(echo "$selected_service" | cut -d: -f1)
         service_name=$(echo "$selected_service" | cut -d: -f2-)
-        echo -e "${GREEN}✓ Namespace: ${NAMESPACE}, сервис: ${service_name} (${service_type})${NC}"
+        echo -e "${GREEN}✓ Namespace: ${NAMESPACE}, service: ${service_name} (${service_type})${NC}"
     else
-        # Интерактивный режим
+        # Interactive mode
         if ! select_namespace; then
             exit 1
         fi
@@ -1071,34 +1071,34 @@ main() {
         fi
         service_type=$(echo "$selected_service" | cut -d: -f1)
         service_name=$(echo "$selected_service" | cut -d: -f2-)
-        echo -e "${GREEN}✓ Выбран сервис: ${service_name} (${service_type})${NC}"
+        echo -e "${GREEN}✓ Selected service: ${service_name} (${service_type})${NC}"
     fi
     
-    # Получаем поды для сервиса
+    # Get pods for the service
     local pods=($(get_pods_for_service "$NAMESPACE" "$service_type" "$service_name"))
     
     if [ ${#pods[@]} -eq 0 ] || [ -z "${pods[0]}" ]; then
-        echo -e "${YELLOW}Не найдено подов для сервиса '${service_name}'${NC}"
+        echo -e "${YELLOW}No pods found for service '${service_name}'${NC}"
         exit 1
     fi
     
-    echo -e "${CYAN}Найдено подов: ${#pods[@]}${NC}"
+    echo -e "${CYAN}Pods found: ${#pods[@]}${NC}"
     for pod in "${pods[@]}"; do
         echo -e "  - ${pod}"
     done
     
-    # Определяем контейнер приложения (берем первый под)
+    # Resolve the application container (use the first pod)
     local first_pod="${pods[0]}"
     local container=$(get_application_containers "$NAMESPACE" "$first_pod")
     
     if [ -z "$container" ]; then
-        echo -e "${YELLOW}Не удалось определить контейнер приложения, используется 'application'${NC}"
+        echo -e "${YELLOW}Could not detect the application container, using 'application'${NC}"
         container="application"
     fi
     
-    echo -e "${GREEN}✓ Используется контейнер: ${container}${NC}"
+    echo -e "${GREEN}✓ Using container: ${container}${NC}"
     
-    # Временной диапазон
+    # Time range
     local time_filter=""
     if [ -n "$CLI_FROM_TIME" ] && [ -n "$CLI_TO_TIME" ]; then
         if check_until_time_support; then
@@ -1107,11 +1107,11 @@ main() {
             time_filter="--since-time=${CLI_FROM_TIME}|END_TIME:${CLI_TO_TIME}"
         fi
     elif [ -n "$CLI_SINCE" ]; then
-        # Поддержка форматов: 1h, 3h, 30m, 24h
+        # Supported formats: 1h, 3h, 30m, 24h
         if [[ "$CLI_SINCE" =~ ^[0-9]+[hm]$ ]]; then
             time_filter="--since=${CLI_SINCE}"
         else
-            echo -e "${RED}Неверный формат -t/--since. Примеры: 1h, 3h, 30m${NC}"
+            echo -e "${RED}Invalid -t/--since format. Examples: 1h, 3h, 30m${NC}"
             exit 1
         fi
     else
@@ -1122,8 +1122,8 @@ main() {
         fi
     fi
     
-    # Путь для сохранения: текущая директория или OUTPUT_DIR
-    # При пути в /mnt/ запись сначала в /tmp, затем копирование в указанную директорию
+    # Save path: current directory or OUTPUT_DIR
+    # For a /mnt/ path, write to /tmp first, then copy into the given directory
     local log_basename="${service_name}-logs-$(date +%Y%m%d_%H%M%S).log"
     local output_file=""
     local copy_to_path=""
@@ -1131,45 +1131,45 @@ main() {
     if [ -n "$OUTPUT_DIR" ]; then
         output_file="${OUTPUT_DIR}/${log_basename}"
         if [[ "$output_file" == /mnt/* ]]; then
-            # Путь под /mnt/: писать в /tmp, после успеха копировать в -o
+            # Path under /mnt/: write to /tmp, then copy to -o on success
             copy_to_path="$output_file"
             output_file="/tmp/kube_logs_${log_basename}"
             if ! mkdir -p "$(dirname "$copy_to_path")" 2>/dev/null; then
-                echo -e "${YELLOW}Предупреждение: не удалось создать директорию для копирования: $(dirname "$copy_to_path")${NC}"
+                echo -e "${YELLOW}Warning: failed to create the copy destination directory: $(dirname "$copy_to_path")${NC}"
             fi
-            echo -e "${CYAN}Запись во временный файл: ${output_file}${NC}"
-            echo -e "${CYAN}После успеха — копирование в: ${copy_to_path}${NC}"
+            echo -e "${CYAN}Writing to a temporary file: ${output_file}${NC}"
+            echo -e "${CYAN}On success — copy to: ${copy_to_path}${NC}"
         else
             if ! mkdir -p "$OUTPUT_DIR" 2>/dev/null; then
-                echo -e "${RED}Не удалось создать директорию: ${OUTPUT_DIR}${NC}"
+                echo -e "${RED}Failed to create directory: ${OUTPUT_DIR}${NC}"
                 exit 1
             fi
-            echo -e "${CYAN}Файл будет сохранен: ${output_file}${NC}"
+            echo -e "${CYAN}The file will be saved: ${output_file}${NC}"
         fi
     else
         output_file="$(pwd)/${log_basename}"
-        echo -e "${CYAN}Файл будет сохранен в текущей директории: ${output_file}${NC}"
+        echo -e "${CYAN}The file will be saved in the current directory: ${output_file}${NC}"
     fi
     echo ""
     
-    # Получаем логи (писать в итоговый путь или в /tmp при copy_to_path)
+    # Fetch logs (write to the final path or /tmp when copy_to_path is set)
     if get_logs "$NAMESPACE" "$container" "$time_filter" "$output_file" "${pods[@]}"; then
         if [ -n "$copy_to_path" ] && [ -f "$output_file" ]; then
             if cp "$output_file" "$copy_to_path" 2>/dev/null; then
-                echo -e "${GREEN}✓ Файл скопирован в указанную директорию: ${copy_to_path}${NC}"
+                echo -e "${GREEN}✓ File copied to the given directory: ${copy_to_path}${NC}"
                 rm -f "$output_file"
             else
-                echo -e "${YELLOW}⚠ Файл сохранен: ${output_file}${NC}"
-                echo -e "${YELLOW}  Копирование в ${copy_to_path} не удалось (проверьте путь и права).${NC}"
+                echo -e "${YELLOW}⚠ File saved: ${output_file}${NC}"
+                echo -e "${YELLOW}  Copy to ${copy_to_path} failed (check the path and permissions).${NC}"
             fi
         fi
-        echo -e "${GREEN}Готово!${NC}"
+        echo -e "${GREEN}Done!${NC}"
     else
-        echo -e "${RED}Произошла ошибка при сохранении логов${NC}"
+        echo -e "${RED}An error occurred while saving logs${NC}"
         exit 1
     fi
 }
 
-# Запуск
+# Run
 main "$@"
 

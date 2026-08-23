@@ -6,8 +6,8 @@ modules:
       preferred_ip_protocol: ip4
       follow_redirects: true
 
-  # Для админок с self-signed сертификатами: доступность проверяем,
-  # срок действия probe_ssl_earliest_cert_expiry всё равно отдаётся.
+  # Admin UIs with self-signed certificates: availability is still probed;
+  # probe_ssl_earliest_cert_expiry is still returned.
   http_2xx_insecure:
     prober: http
     timeout: 10s
@@ -17,7 +17,7 @@ modules:
       tls_config:
         insecure_skip_verify: true
 
-  # Не-HTTP TLS endpoints (ldaps, postgres+tls и т.п.)
+  # Non-HTTP TLS endpoints (ldaps, postgres+tls, and similar)
   tcp_tls:
     prober: tcp
     timeout: 10s

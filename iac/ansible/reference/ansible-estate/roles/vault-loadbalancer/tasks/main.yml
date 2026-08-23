@@ -1,5 +1,5 @@
 ---
-# Vault Load Balancer Role - Nginx для HA
+# Vault Load Balancer Role - Nginx for HA
 
 - name: Install Nginx and Keepalived
   apt:

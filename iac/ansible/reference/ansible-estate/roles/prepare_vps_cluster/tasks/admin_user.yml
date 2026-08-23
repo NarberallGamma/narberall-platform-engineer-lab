@@ -1,12 +1,12 @@
 ---
-- name: Проверить, существует ли пользователь {{ vps_admin_username }}
+- name: Check whether user {{ vps_admin_username }} exists
   ansible.builtin.command: "getent passwd {{ vps_admin_username }}"
   register: vps_admin_user_getent
   changed_when: false
   failed_when: false
   tags: [vps, admin_user, prepare_vps]
 
-- name: Сгенерировать пароль для {{ vps_admin_username }}
+- name: Generate password for {{ vps_admin_username }}
   ansible.builtin.set_fact:
     vps_admin_generated_password: "{{ lookup('password', '/dev/null chars=ascii_letters,digits length=' ~ (vps_admin_password_length | string)) }}"
     vps_admin_password_changed: true
@@ -15,7 +15,7 @@
     - vps_admin_user_getent.rc != 0 or vps_admin_regenerate_password | bool
   tags: [vps, admin_user, prepare_vps]
 
-- name: Создать или обновить пользователя {{ vps_admin_username }}
+- name: Create or update user {{ vps_admin_username }}
   ansible.builtin.user:
     name: "{{ vps_admin_username }}"
     groups: "{{ vps_admin_sudo_group }}"
@@ -26,7 +26,7 @@
   when: vps_admin_password_changed | default(false) | bool
   tags: [vps, admin_user, prepare_vps]
 
-- name: Установить пароль для {{ vps_admin_username }}
+- name: Set password for {{ vps_admin_username }}
   ansible.builtin.shell: |
     set -euo pipefail
     printf '%s:%s\n' "$VPS_ADMIN_USERNAME" "$VPS_ADMIN_PASSWORD" | chpasswd
@@ -39,7 +39,7 @@
   when: vps_admin_password_changed | default(false) | bool
   tags: [vps, admin_user, prepare_vps]
 
-- name: Убедиться, что группа sudo у {{ vps_admin_username }}
+- name: Ensure {{ vps_admin_username }} is in the sudo group
   ansible.builtin.user:
     name: "{{ vps_admin_username }}"
     groups: "{{ vps_admin_sudo_group }}"
@@ -47,7 +47,7 @@
   when: vps_admin_user_getent.rc == 0
   tags: [vps, admin_user, prepare_vps]
 
-- name: Настроить sudo NOPASSWD для {{ vps_admin_username }}
+- name: Configure sudo NOPASSWD for {{ vps_admin_username }}
   ansible.builtin.copy:
     content: "{{ vps_admin_username }} ALL=(ALL) NOPASSWD:ALL\n"
     dest: "/etc/sudoers.d/{{ vps_admin_username }}"
@@ -58,7 +58,7 @@
   when: vps_admin_sudo_nopasswd | bool
   tags: [vps, admin_user, prepare_vps]
 
-- name: Добавить SSH-ключи в authorized_keys для {{ vps_admin_username }}
+- name: Add SSH keys to authorized_keys for {{ vps_admin_username }}
   ansible.builtin.authorized_key:
     user: "{{ vps_admin_username }}"
     key: "{{ item }}"
@@ -67,7 +67,7 @@
   when: item | trim | length > 0
   tags: [vps, admin_user, prepare_vps]
 
-- name: Каталог артефактов на control node
+- name: Artifacts directory on the control node
   ansible.builtin.file:
     path: "{{ vps_admin_artifacts_dest }}/{{ inventory_hostname }}"
     state: directory
@@ -76,10 +76,10 @@
   become: false
   tags: [vps, admin_user, prepare_vps]
 
-- name: Записать credentials на хост (временный файл)
+- name: Write credentials on the host (temporary file)
   ansible.builtin.copy:
     content: |
-      # Managed by Ansible prepare_vps_cluster: хранить локально, не коммитить
+      # Managed by Ansible prepare_vps_cluster: store locally, do not commit
       host: {{ inventory_hostname }}
       ansible_host: {{ ansible_host | default(inventory_hostname) }}
       user: {{ vps_admin_username }}
@@ -91,7 +91,7 @@
   when: vps_admin_password_changed | default(false) | bool
   tags: [vps, admin_user, prepare_vps]
 
-- name: Выгрузить credentials в artifacts на control node
+- name: Fetch credentials into artifacts on the control node
   ansible.builtin.fetch:
     src: "{{ vps_admin_credentials_tmp_path }}"
     dest: "{{ vps_admin_artifacts_dest }}/{{ inventory_hostname }}/{{ vps_admin_username }}_credentials.txt"
@@ -99,7 +99,7 @@
   when: vps_admin_password_changed | default(false) | bool
   tags: [vps, admin_user, prepare_vps]
 
-- name: Удалить временный файл credentials на хосте
+- name: Remove temporary credentials file on the host
   ansible.builtin.file:
     path: "{{ vps_admin_credentials_tmp_path }}"
     state: absent
@@ -108,10 +108,10 @@
     - vps_admin_cleanup_credentials_tmp | bool
   tags: [vps, admin_user, prepare_vps]
 
-- name: Подсказка по credentials (без пароля в лог)
+- name: Credentials hint (no password in the log)
   ansible.builtin.debug:
     msg: >-
-      Пароль {{ vps_admin_username }} сохранён:
+      Password for {{ vps_admin_username }} saved:
       {{ vps_admin_artifacts_dest }}/{{ inventory_hostname }}/{{ vps_admin_username }}_credentials.txt
   when: vps_admin_password_changed | default(false) | bool
   tags: [vps, admin_user, prepare_vps]

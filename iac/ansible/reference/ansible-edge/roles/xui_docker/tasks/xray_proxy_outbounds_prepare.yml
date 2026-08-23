@@ -50,7 +50,7 @@
     that:
       - xui_outbounds_effective | length > 0
     fail_msg: >-
-      Proxy: задать xui_outbounds (список) или включить xui_outbound_enabled с legacy-переменными.
+      Proxy: set xui_outbounds (list) or enable xui_outbound_enabled with legacy variables.
 
 - name: Assert each outbound has tag and main artifacts source
   ansible.builtin.assert:
@@ -61,8 +61,8 @@
         (item.main_artifacts_host | default('') | length > 0)
         or (item.main_inventory_hostname | default('') | length > 0)
     fail_msg: >-
-      Outbound «{{ item.tag | default('?') }}»: нужны tag и main_artifacts_host
-      (папка artifacts/xui/<host>/) или main_inventory_hostname.
+      Outbound «{{ item.tag | default('?') }}»: tag and main_artifacts_host
+      (artifacts/xui/<host>/ directory) or main_inventory_hostname are required.
   loop: "{{ xui_outbounds_effective }}"
   loop_control:
     label: "{{ item.tag | default('outbound') }}"

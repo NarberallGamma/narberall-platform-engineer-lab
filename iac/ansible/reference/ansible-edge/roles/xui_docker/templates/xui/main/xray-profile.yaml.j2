@@ -1,5 +1,5 @@
-# 3X-UI / Xray — профиль MAIN (NL). Сверка с vless/README.md
-# Ключи Reality / ML-KEM: только через UI (Get New Cert / Get New keys)
+# 3X-UI / Xray — MAIN profile (NL). Cross-check with vless/README.md
+# Reality / ML-KEM keys: only via the UI (Get New Cert / Get New keys)
 
 profile: main
 server_role: primary_nl
@@ -23,9 +23,9 @@ inbound:
   client_auth:
     ml_kem_enabled: {{ xui_inbound_ml_kem_enabled | bool | lower }}
     mldsa65_enabled: {{ xui_inbound_mldsa65_enabled | bool | lower }}
-    decryption: "none"  # как Jump на скриншотах, если ml_kem_enabled false
+    decryption: "none"  # same as Jump on screenshots when ml_kem_enabled is false
     encryption: "none"
-    flow: "{{ xui_inbound_flow }}"  # пусто — без xtls-rprx-vision при PQ
+    flow: "{{ xui_inbound_flow }}"  # empty — no xtls-rprx-vision with PQ
 
   transport:
     tcp_header: {{ xui_inbound_tcp_header_type }}
@@ -64,7 +64,7 @@ inbound:
     min_client_ver: "{{ xui_inbound_reality_min_client_ver }}"
     max_client_ver: "{{ xui_inbound_reality_max_client_ver }}"
     spider_x: "{{ xui_inbound_reality_spider_x }}"
-    # private_key, public_key, short_ids, mldsa65_seed: Get New Cert / Get New Seed в UI
+    # private_key, public_key, short_ids, mldsa65_seed: Get New Cert / Get New Seed in the UI
 
   sniffing:
     enabled: {{ xui_sniffing_enabled | bool | lower }}

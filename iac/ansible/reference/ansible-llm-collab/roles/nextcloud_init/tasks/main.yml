@@ -1,20 +1,20 @@
 ---
-# Роль nextcloud_init: WebDAV user/password — из переменных (vars, -e, CI Variables) или из Vault.
-# Если nextcloud_webdav_user/nextcloud_webdav_password уже заданы — Vault не вызывается.
-# Пути и имена ключей в Vault: nextcloud_vault_mount_point, nextcloud_vault_path, nextcloud_vault_key_webdav_user, nextcloud_vault_key_webdav_password (group_vars).
-# Для Vault на control node: VAULT_ADDR, VAULT_TOKEN (или AppRole).
+# Role nextcloud_init: WebDAV user/password — from variables (vars, -e, CI Variables) or from Vault.
+# If nextcloud_webdav_user/nextcloud_webdav_password are already set — Vault is not called.
+# Vault paths and key names: nextcloud_vault_mount_point, nextcloud_vault_path, nextcloud_vault_key_webdav_user, nextcloud_vault_key_webdav_password (group_vars).
+# For Vault on the control node: VAULT_ADDR, VAULT_TOKEN (or AppRole).
 
-- name: Проверить, что задано имя клиента
+- name: Assert that a client name is set
   ansible.builtin.assert:
     that: client_name is defined and client_name | length > 0
-    fail_msg: 'Задайте client_name: ansible-playbook ... -e "client_name=ООО Рога и Копыта"'
+    fail_msg: 'Set client_name: ansible-playbook ... -e "client_name=Acme LLC"'
   when: not (nextcloud_reapply_all_clients_enabled | default(false) | bool) and not (nextcloud_ldap_reset_groups_enabled | default(false) | bool)
   tags: always
 
-# Имена ключей в Vault зависят от профиля (nextcloud_profile_map → pre_tasks плейбука).
-# Доступ через secrets[k_user] в vars, а не _vault.secret[k] в одной строке: иначе Jinja иногда
-# превращает это в attribute lookup и даёт «dict has no attribute ansible_regul_…».
-- name: Загрузить секреты Nextcloud из Vault
+# Vault key names depend on the profile (nextcloud_profile_map → playbook pre_tasks).
+# Access via secrets[k_user] in vars, not _vault.secret[k] in one expression: otherwise Jinja sometimes
+# turns it into an attribute lookup and raises "dict has no attribute ansible_regul_…".
+- name: Load Nextcloud secrets from Vault
   ansible.builtin.set_fact:
     nextcloud_webdav_user: "{{ secrets[k_user] }}"
     nextcloud_webdav_password: "{{ secrets[k_pass] }}"
@@ -28,10 +28,10 @@
     (nextcloud_webdav_user is not defined or nextcloud_webdav_user | length == 0) or
     (nextcloud_webdav_password is not defined or nextcloud_webdav_password | length == 0)
 
-- name: Проверить, что учётные данные WebDAV заданы
+- name: Assert that WebDAV credentials are set
   ansible.builtin.assert:
     that:
       - nextcloud_webdav_user is defined and nextcloud_webdav_user | length > 0
       - nextcloud_webdav_password is defined and nextcloud_webdav_password | length > 0
-    fail_msg: 'Задайте nextcloud_webdav_user и nextcloud_webdav_password (Vault или -e/group_vars/CI Variables). Путь в Vault: nextcloud_vault_mount_point, nextcloud_vault_path.'
+    fail_msg: 'Set nextcloud_webdav_user and nextcloud_webdav_password (Vault or -e/group_vars/CI Variables). Vault path: nextcloud_vault_mount_point, nextcloud_vault_path.'
   tags: always

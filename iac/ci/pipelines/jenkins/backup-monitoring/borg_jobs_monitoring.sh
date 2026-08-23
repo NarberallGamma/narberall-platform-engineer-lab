@@ -5,19 +5,19 @@
 # Dependencies: sed, find, numfmt, uuidgen, jq, yq, borg
 
 ################################################################################
-# Значения по умолчанию
+# Defaults
 
-# Пороговая (вызывающая тревогу) разница по умолчанию между временем проверки и
-# датой создания последнего архива резервной копии, единица измерения - час
+# Default alert threshold between check time and
+# last backup archive creation date, unit: hour
 THRESHOLD_AGE_BY_DEFAULT='24'
 
-# Предел хранения отключенных бэкапов, единица измерения - день
+# Retention limit for disabled backups, unit: day
 DISABLED_BACKUPS_STORAGE_LIMIT='65'
 
-# Минимальный размер последнего архива по умолчанию, единица измерения - байт
+# Default minimum last-archive size, unit: byte
 LAST_ARCHIVE_MIN_SIZE="1048576"
 
-# Допустимое уменьшение размера последнего архива по умолчанию, единица измерения - %
+# Default allowed last-archive size decrease, unit: %
 LAST_ARCHIVE_ALLOWABLE_DECREASE_SIZE="50"
 
 BACKUP_DIRECTORY_EXPECTED_OWNER_USER="root"
@@ -33,8 +33,8 @@ TEMP
 lost+found
 '
 
-# ВременнЫе параметры повторной обработки Borg-репозиториев (заданий резервного
-# копирования)
+# Timing for retrying Borg repositories (backup
+# jobs)
 ATTEMPTS_MAX_TIME='600'
 ATTEMPTS_PAUSE='60'
 
@@ -47,13 +47,13 @@ TEMP_FILE_PREFIX="${SCRIPT_NAME}_"
 
 STOP_BORG_REPO_PROCESSING_DIR="/tmp/borg_jobs_mon_stop_borg_repo_processing"
 
-# Версия скрипта
+# Script version
 VERSION='2.13'
 
 ################################################################################
-# Определения функций
+# Function definitions
 
-# Выводит в stderr текст в зеленом цвете
+# Print green text to stderr
 # ${1} - input string
 debug_green()
 {
@@ -63,7 +63,7 @@ debug_green()
   fi
 }
 
-# Выводит в stderr текст в желтом цвете
+# Print yellow text to stderr
 # ${1} - input string
 debug_yellow()
 {
@@ -73,7 +73,7 @@ debug_yellow()
   fi
 }
 
-# Выводит в stderr текст в красном цвете
+# Print red text to stderr
 # ${1} - input string
 debug_red()
 {
@@ -83,7 +83,7 @@ debug_red()
   fi
 }
 
-# Проверяет входную строку на наличие в ней символов '/'
+# Check that the input string contains '/'
 # ${1} - string
 check_to_vfs_divider()
 {
@@ -100,7 +100,7 @@ check_to_vfs_divider()
   return 0
 }
 
-# Проверяет входную строку на соответствие положительному числовому формату ( >=1 )
+# Check that the input string is a positive number ( >=1 )
 # ${1} - string
 check_to_positive_number_format()
 {
@@ -117,7 +117,7 @@ check_to_positive_number_format()
   return 0
 }
 
-# Проверяет входную строку на соответствие неотрицательному числовому формату ( >=0 )
+# Check that the input string is a non-negative number ( >=0 )
 # ${1} - string
 check_to_non_negative_number_format()
 {
@@ -134,21 +134,21 @@ check_to_non_negative_number_format()
   return 0
 }
 
-# Удаляет избыточные символы '/' в строке
+# Collapse extra '/' characters in the string
 # ${1} - string
 remove_repeating_vfs_divider()
 {
   printf "%s" "${1}" | sed --quiet "s/\/\/*/\//g;p;"
 }
 
-# Экранирует символы для передачи в json
+# Escape characters for JSON
 # ${1} - input string
 escape_chars_for_json()
 {
   printf "%s" "${1}" | sed --quiet "s/\\\/\\\\\\\/g;s/\r/\\\r/g;s/\t/\\\t/g;s/\"/\\\\\"/g;p"
 }
 
-# Заменяет символ новой строки на символ '\n'
+# Replace newline with '\n'
 # ${1} - input string
 escape_new_line()
 {
@@ -169,14 +169,14 @@ escape_new_line()
   printf "%s" "${out_string}"
 }
 
-# Удаляет пробелы с краев строки
+# Strip leading and trailing spaces
 # ${1} - string
 trim_trailing_spaces()
 {
   printf "%s" "${1}" | sed --quiet "s/^[ \t][ \t]*//;s/[ \t][ \t]*$//;p"
 }
 
-# Удаляет из YAML-текста комментарии
+# Strip comments from YAML text
 # ${1} - yaml text
 clear_yaml_of_comments()
 {
@@ -188,14 +188,14 @@ clear_yaml_of_insignificant_words()
   printf "%s" "${1}" | sed --quiet "s/^---$//;s/[ \t]\#.*//g;s/^\#.*//g;s/[ \t]//g;p"
 }
 
-# Извлекает имя задания резервного копирования из имени репозитория
+# Extract the backup job name from the repository name
 # ${1} - repository name
 get_backup_job_type()
 {
   printf "%s" "${1}" | sed --quiet "s/.*-\([^-]*\)$/\1/;p"
 }
 
-# Смещает текст на указанное количество пробелов
+# Indent text by the given number of spaces
 # ${1} - text
 # ${2} - indentation (spaces) quantity
 set_text_indentation()
@@ -214,14 +214,14 @@ set_text_indentation()
   printf "%s" "${1}" | sed --quiet "s/^/${indent_string}/;p"
 }
 
-# Проверяет что в выводе borg есть строка с ошибкой блокировки по таймауту
+# Check that borg output contains a lock-timeout error line
 # ${1} - borg error text
 check_that_borg_repo_locked_by_timeout()
 {
   printf "%s" "${1}" | sed --quiet "/Failed to create\/acquire the lock[ \t][ \t]*.*\/lock\.exclusive[ \t][ \t]*(timeout)/{;p}"
 }
 
-# Преобразует строку, содержащую размер с кратными приставкам, в строку с числом
+# Convert a size string with SI prefixes into a numeric string
 # ${1} - formated string
 string_with_size_to_number()
 {
@@ -232,7 +232,7 @@ string_with_size_to_number()
   ( export LC_ALL="en_US.UTF-8"; printf "%s" "${1}" | numfmt --from=iec --suffix="${suffix}" | tr -d '\n' | sed --quiet "s/${suffix} *$//;p" )
 }
 
-# Преобразует строку с числом в строку, содержащую размер с кратными приставкам
+# Convert a numeric string into a size string with SI prefixes
 # ${1} - formated string
 number_to_string_with_size()
 {
@@ -350,7 +350,7 @@ create_ticket()
   return 0
 }
 
-# Выполняет отправку алертов из массива COMMON_WARNINGS
+# Send alerts from the COMMON_WARNINGS array
 # Global variables:
 #   - RO
 #     - ONE_PROJECT
@@ -386,7 +386,7 @@ alerts_about_common_warnings()
   fi
 }
 
-# Выполняет отправку алертов из массива COMMON_ERRORS
+# Send alerts from the COMMON_ERRORS array
 # Global variables:
 #   - RO
 #     - ONE_PROJECT
@@ -422,7 +422,7 @@ alerts_about_common_errors()
   fi
 }
 
-# Выполняет отправку алертов из массива PROJECTS_WARNINGS_COMMON
+# Send alerts from the PROJECTS_WARNINGS_COMMON array
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 # Global variables:
@@ -466,7 +466,7 @@ alerts_about_projects_common_warnings()
   fi
 }
 
-# Выполняет отправку алертов из массива PROJECTS_ERRORS_COMMON
+# Send alerts from the PROJECTS_ERRORS_COMMON array
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 # Global variables:
@@ -510,7 +510,7 @@ alerts_about_projects_common_erros()
   fi
 }
 
-# Выполняет отправку алертов из массивов PROJECTS_WARNINGS_BACKUP
+# Send alerts from the PROJECTS_WARNINGS_BACKUP arrays
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 # Global variables:
@@ -561,7 +561,7 @@ alerts_about_projects_backup_warnings()
   fi
 }
 
-# Выполняет отправку алертов из массива PROJECTS_ERRORS_BACKUP
+# Send alerts from the PROJECTS_ERRORS_BACKUP array
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 # Global variables:
@@ -669,12 +669,12 @@ create_tickets_about_disabled_backups()
 
   if test -n "${run_message}";
   then
-    create_ticket "${PROJECTS["${project_index}"]}" "Превышен предел хранения отключенных бэкапов" "${run_message}" "${OUTPUT_DIRECTION}"
+    create_ticket "${PROJECTS["${project_index}"]}" "Disabled-backup retention limit exceeded" "${run_message}" "${OUTPUT_DIRECTION}"
   fi
 }
 
-# Извлекает данные о последних бэкапах в массивы
-# PROJECTS_JOBS_LAST_ARCHIVE_NAME, PROJECTS_JOBS_LAST_ARCHIVE_DATE и PROJECTS_JOBS_LAST_ARCHIVE_SIZE
+# Load last-backup data into arrays
+# PROJECTS_JOBS_LAST_ARCHIVE_NAME, PROJECTS_JOBS_LAST_ARCHIVE_DATE, and PROJECTS_JOBS_LAST_ARCHIVE_SIZE
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 #   - ${2} - project index in PROJECTS_JOBS array
@@ -710,11 +710,11 @@ get_backup_data()
 
   local project_job_last_archive_index
 
-  # Путь к временному файлу журнала с ошибками
+  # Path to the temporary error log file
   local temporary_error_log
   temporary_error_log="${TEMP_DIR}/${TEMP_FILE_PREFIX}_${FUNCNAME[0]}_${PROJECTS["${project_index}"]}.log"
 
-  # Залокаливание остальных переменных
+  # Localize remaining variables
   local project_error_backup_index
   local current_job
   local current_job_dir
@@ -768,7 +768,7 @@ get_backup_data()
   )"
   if test "${?}" -ne 0;
   then
-    # Эта ошибка может быть разрешена
+    # This error may be recoverable
     let PROJECTS_ERRORS_BACKUP_COUNT["${project_index},${project_job_index}"]+=1
     let project_error_backup_index=PROJECTS_ERRORS_BACKUP_COUNT["${project_index},${project_job_index}"]-1
     PROJECTS_ERRORS_BACKUP["${project_index},${project_job_index},${project_error_backup_index}"]="ERROR: Cannot get list of archives for project {${PROJECTS["${project_index}"]}}: job {${current_job}}. Didn't check for late backups! $( printf "\n  Error message:\n" && set_text_indentation "$( cat "${temporary_error_log}" )" "4" )"
@@ -779,7 +779,7 @@ get_backup_data()
       return 2
     fi
 
-    # Запоминание индекса ошибки на случай ее разрешения
+    # Remember the error index in case it is recovered
     let PROJECTS_JOBS_ERROS_RECOVERED_INDEXES_COUNT["${FUNCNAME[0]}"]+=1
     let projects_jobs_erros_recovered_indexes_index=PROJECTS_JOBS_ERROS_RECOVERED_INDEXES_COUNT["${FUNCNAME[0]}"]-1
     PROJECTS_JOBS_ERROS_RECOVERED_INDEXES["${FUNCNAME[0]},${projects_jobs_erros_recovered_indexes_index}"]="${project_error_backup_index}"
@@ -855,7 +855,7 @@ get_backup_data()
       )"
       if test "${?}" -ne 0;
       then
-        # Эта ошибка может быть разрешена
+        # This error may be recoverable
         let PROJECTS_ERRORS_BACKUP_COUNT["${project_index},${project_job_index}"]+=1
         let project_error_backup_index=PROJECTS_ERRORS_BACKUP_COUNT["${project_index},${project_job_index}"]-1
         PROJECTS_ERRORS_BACKUP["${project_index},${project_job_index},${project_error_backup_index}"]="ERROR: Cannot get info of archives for project {${PROJECTS["${project_index}"]}}: job {${current_job}}. Didn't check for late backups! $( printf "\n  Error message:\n" && set_text_indentation "$( cat "${temporary_error_log}" )" "4" )"
@@ -866,7 +866,7 @@ get_backup_data()
           return 2
         fi
 
-        # Запоминание индекса ошибки на случай ее разрешения
+        # Remember the error index in case it is recovered
         let PROJECTS_JOBS_ERROS_RECOVERED_INDEXES_COUNT["${FUNCNAME[0]}"]+=1
         let projects_jobs_erros_recovered_indexes_index=PROJECTS_JOBS_ERROS_RECOVERED_INDEXES_COUNT["${FUNCNAME[0]}"]-1
         PROJECTS_JOBS_ERROS_RECOVERED_INDEXES["${FUNCNAME[0]},${projects_jobs_erros_recovered_indexes_index}"]="${project_error_backup_index}"
@@ -891,7 +891,7 @@ get_backup_data()
       fi
     fi
 
-    # Заполнение:
+    # Fill:
     #   - PROJECTS_JOBS_LAST_ARCHIVE_NAME
     #   - PROJECTS_JOBS_LAST_ARCHIVE_DATE
     #   - PROJECTS_JOBS_LAST_ARCHIVE_SIZE
@@ -905,7 +905,7 @@ get_backup_data()
 
   unlink "${temporary_error_log}"
 
-  # Обнуление ошибок в связи с тем, что нахождение в этом месте означает либо изначальное отсутствие ошибок, либо их разрешение путем повторения операции
+  # Clear errors: reaching this point means there were none, or they were recovered by retrying
   let projects_jobs_erros_recovered_indexes_index=0
   while test "${projects_jobs_erros_recovered_indexes_index}" -lt "${PROJECTS_JOBS_ERROS_RECOVERED_INDEXES_COUNT["${FUNCNAME[0]}"]}";
   do
@@ -917,7 +917,7 @@ get_backup_data()
   return 0
 }
 
-# Извлекает данные о бэкапах с повторением в случае появления разрешимых ошибок (timeout и т.п.)
+# Load backup data, retrying on recoverable errors (timeout, etc.)
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 # Global variables:
@@ -945,7 +945,7 @@ get_backup_data_handler()
   local project_job_index
   local project_job_last_archive_index
 
-  # Переменные для работы с разрешением ошибок через повторение
+  # Variables for recovering errors by retrying
   local projects_jobs_remaining_count
   let projects_jobs_remaining_count=0
 
@@ -958,19 +958,19 @@ get_backup_data_handler()
 
   local attempts_count
 
-  # Массив с индексами сообщений об ошибках (их нужно запомнить на случай их разрешения)
-  # Итерируются через "${FUNCNAME[0]},${projects_jobs_erros_recovered_indexes_index}"
+  # Array of error-message indexes (kept in case they are recovered)
+  # Iterated via "${FUNCNAME[0]},${projects_jobs_erros_recovered_indexes_index}"
   local PROJECTS_JOBS_ERROS_RECOVERED_INDEXES_COUNT
   local PROJECTS_JOBS_ERROS_RECOVERED_INDEXES
   declare -a PROJECTS_JOBS_ERROS_RECOVERED_INDEXES_COUNT
   declare -A PROJECTS_JOBS_ERROS_RECOVERED_INDEXES
 
-  # Залокаливание остальных переменных
+  # Localize remaining variables
   local last_archives_count
   local archive_data_level
   local get_backup_data_exit_value
 
-  # Заполнение projects_jobs_remaining символом '1', означающим необходимость выполнения действий для соответствующего задания
+  # Fill projects_jobs_remaining with '1' meaning the corresponding job still needs work
   let project_job_index=0
   while test "${project_job_index}" -lt "${PROJECTS_JOBS_COUNT["${project_index}"]}";
   do
@@ -980,7 +980,7 @@ get_backup_data_handler()
     let project_job_index+=1
   done
 
-  # Индексы ошибок для функции get_backup_data
+  # Error indexes for get_backup_data
   PROJECTS_JOBS_ERROS_RECOVERED_INDEXES_COUNT["get_backup_data"]=0
 
   projects_jobs_remaining_count="${PROJECTS_JOBS_COUNT["${project_index}"]}"
@@ -1007,7 +1007,7 @@ get_backup_data_handler()
       then
         PROJECTS_JOBS_LAST_ARCHIVE_COUNT["${project_index},${project_job_index}"]=0
 
-        # В обычном режиме выполняем извлечение данных из репозитория только для НЕ disable заданий
+        # In normal mode, load repository data only for jobs that are NOT disabled
         if test "${CHECK_MODE}" != "check-disabled-backups-storage-limit" -a "${PROJECTS_JOBS_STATE["${project_index},${project_job_index}"]}" == "disable";
         then
           let projects_jobs_remaining_count-=1
@@ -1016,7 +1016,7 @@ get_backup_data_handler()
           continue
         fi
 
-        # В режиме проверки отключенных бэкапов выполняем извлечение данных из репозитория только ДЛЯ disable заданий
+        # In disabled-backup check mode, load repository data only FOR disabled jobs
         if test "${CHECK_MODE}" == "check-disabled-backups-storage-limit" -a "${PROJECTS_JOBS_STATE["${project_index},${project_job_index}"]}" != "disable";
         then
           let projects_jobs_remaining_count-=1
@@ -1118,7 +1118,7 @@ get_backup_data_handler_wrapper_in_case_of_run_in_new_process()
   local json_data_file
   json_data_file="${2}"
 
-  # Локальные аналоги глобальных массивов необходимых из-за запуска в новом процессе
+  # Local copies of global arrays needed because this runs in a new process
   local PROJECTS_JOBS_LAST_ARCHIVE_COUNT
   local PROJECTS_JOBS_LAST_ARCHIVE_NAME
   local PROJECTS_JOBS_LAST_ARCHIVE_DATE
@@ -1139,7 +1139,7 @@ get_backup_data_handler_wrapper_in_case_of_run_in_new_process()
   let project_job_index=0
   while test "${project_job_index}" -lt "${PROJECTS_JOBS_COUNT["${project_index}"]}";
   do
-    # Инициализация PROJECTS_ERRORS_BACKUP_COUNT аналогично основному потоку
+    # Initialize PROJECTS_ERRORS_BACKUP_COUNT the same way as the main thread
     let PROJECTS_ERRORS_BACKUP_COUNT["${project_index},${project_job_index}"]=0
 
     let project_job_index+=1
@@ -1147,11 +1147,11 @@ get_backup_data_handler_wrapper_in_case_of_run_in_new_process()
 
   get_backup_data_handler "${project_index}"
 
-  # Преобразование массивов в json и сохранение его в файле
+  # Convert arrays to JSON and write them to a file
   converting_backup_data "${project_index}" "${json_data_file}" "serialization"
 }
 
-# Выполняет преобразование следующих массивов в json и обратно:
+# Convert the following arrays to JSON and back:
 #   - PROJECTS_JOBS_CHECK_START
 #   - PROJECTS_JOBS_LAST_ARCHIVE_COUNT
 #   - PROJECTS_JOBS_LAST_ARCHIVE_NAME
@@ -1187,7 +1187,7 @@ converting_backup_data()
   local direction
   direction="${3}"
 
-  # Залокаливание остальных переменных
+  # Localize remaining variables
   local backup_data_in_json
   local job_errors_json_data
   local job_archives_json_data
@@ -1200,7 +1200,7 @@ converting_backup_data()
   local job_errors_index
   local deserialization_erros_count
 
-#  Формат:
+#  Format:
 #    {
 #      "jobs":
 #      {
@@ -1402,9 +1402,9 @@ converting_backup_data()
   fi
 }
 
-# Выполняет проверку что:
-#   - (PROJECTS_JOBS_CHECK_START - PROJECTS_JOBS_LAST_ARCHIVE_DATE) не больше PROJECTS_JOBS_THRESHOLD_AGE
-#   - (PROJECTS_JOBS_CHECK_START - PROJECTS_JOBS_LAST_ARCHIVE_DATE) не больше PROJECTS_JOBS_STORAGE_LIMIT
+# Check that:
+#   - (PROJECTS_JOBS_CHECK_START - PROJECTS_JOBS_LAST_ARCHIVE_DATE) is not greater than PROJECTS_JOBS_THRESHOLD_AGE
+#   - (PROJECTS_JOBS_CHECK_START - PROJECTS_JOBS_LAST_ARCHIVE_DATE) is not greater than PROJECTS_JOBS_STORAGE_LIMIT
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 # Global variables:
@@ -1433,7 +1433,7 @@ check_last_backup_archive_date()
   local project_job_index
   local project_job_last_archive_index
 
-  # Залокаливание остальных переменных
+  # Localize remaining variables
   local current_job_last_archive_index
   local current_job_last_archive_date_in_seconds
   local current_job_check_start_in_seconds
@@ -1520,8 +1520,8 @@ check_last_backup_archive_date()
   done
 }
 
-# Выполняет проверку что:
-#   - PROJECTS_JOBS_LAST_ARCHIVE_SIZE не меньше PROJECTS_JOBS_MIN_SIZE
+# Check that:
+#   - PROJECTS_JOBS_LAST_ARCHIVE_SIZE is not less than PROJECTS_JOBS_MIN_SIZE
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 # Global variables:
@@ -1544,7 +1544,7 @@ check_last_backup_archive_size()
   local project_job_index
   local project_job_last_archive_index
 
-  # Залокаливание остальных переменных
+  # Localize remaining variables
   local current_job_last_archive_index
   local current_job_last_archive_size
   local current_job_min_size
@@ -1593,9 +1593,9 @@ check_last_backup_archive_size()
   done
 }
 
-# Выполняет проверку что:
-#   -  (1 - last(PROJECTS_JOBS_LAST_ARCHIVE_SIZE)/max(PROJECTS_JOBS_LAST_ARCHIVE_SIZE))*100 не больше PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE
-#      где, (1 - last(PROJECTS_JOBS_LAST_ARCHIVE_SIZE)/max(PROJECTS_JOBS_LAST_ARCHIVE_SIZE))*100 - уменьшение размера последнего архива в % по сравнению с размером архива, имеющего максимальный размер в полученном списке архивов
+# Check that:
+#   -  (1 - last(PROJECTS_JOBS_LAST_ARCHIVE_SIZE)/max(PROJECTS_JOBS_LAST_ARCHIVE_SIZE))*100 is not greater than PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE
+#      where (1 - last(PROJECTS_JOBS_LAST_ARCHIVE_SIZE)/max(PROJECTS_JOBS_LAST_ARCHIVE_SIZE))*100 is the last-archive size decrease in % vs the largest archive in the collected list
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 # Global variables:
@@ -1620,7 +1620,7 @@ check_last_backup_archive_size_decrease()
   local project_job_index
   local project_job_last_archive_index
 
-  # Залокаливание остальных переменных
+  # Localize remaining variables
   local current_job_last_archive_index
   local current_job_last_archive_size
   local current_job_archive_with_max_size_index
@@ -1690,8 +1690,8 @@ check_last_backup_archive_size_decrease()
   done
 }
 
-# Выполняет получение данных, проверку даты архивов и отправку алертов
-# Все действия выполняются последовательно
+# Load data, check archive dates, and send alerts
+# All steps run sequentially
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 do_check_archive_date()
@@ -1699,16 +1699,16 @@ do_check_archive_date()
   local project_index
   project_index="${1}"
 
-  # Получение данных о бэкапах
+  # Load backup data
   get_backup_data_handler "${project_index}"
 
-  # Выполнение проверок:
-  #   - что (PROJECTS_JOBS_CHECK_START - PROJECTS_JOBS_LAST_ARCHIVE_DATE)
-  #     не больше PROJECTS_JOBS_THRESHOLD_AGE и не больше PROJECTS_JOBS_STORAGE_LIMIT
-  #     для каждого задания каждого проекта
+  # Run checks:
+  #   - that (PROJECTS_JOBS_CHECK_START - PROJECTS_JOBS_LAST_ARCHIVE_DATE)
+  #     is not greater than PROJECTS_JOBS_THRESHOLD_AGE and not greater than PROJECTS_JOBS_STORAGE_LIMIT
+  #     for each job of each project
   check_last_backup_archive_date "${project_index}"
 
-  # Отправка попроектных алертов и создание тикетов
+  # Send per-project alerts and create tickets
   alerts_about_projects_common_warnings "${project_index}"
   alerts_about_projects_common_erros "${project_index}"
 
@@ -1717,8 +1717,8 @@ do_check_archive_date()
   create_tickets_about_disabled_backups "${project_index}"
 }
 
-# Выполняет получение данных, проверку размера архивов и отправку алертов
-# Все действия выполняются последовательно
+# Load data, check archive sizes, and send alerts
+# All steps run sequentially
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 do_check_archive_size()
@@ -1726,17 +1726,17 @@ do_check_archive_size()
   local project_index
   project_index="${1}"
 
-  # Получение данных о бэкапах
+  # Load backup data
   get_backup_data_handler "${project_index}"
 
-  # Выполнение проверок:
-  #   - что (PROJECTS_JOBS_CHECK_START - PROJECTS_JOBS_LAST_ARCHIVE_DATE)
-  #     не больше PROJECTS_JOBS_THRESHOLD_AGE и не больше PROJECTS_JOBS_STORAGE_LIMIT
-  #     для каждого задания каждого проекта
+  # Run checks:
+  #   - that (PROJECTS_JOBS_CHECK_START - PROJECTS_JOBS_LAST_ARCHIVE_DATE)
+  #     is not greater than PROJECTS_JOBS_THRESHOLD_AGE and not greater than PROJECTS_JOBS_STORAGE_LIMIT
+  #     for each job of each project
   check_last_backup_archive_size "${project_index}"
   check_last_backup_archive_size_decrease "${project_index}"
 
-  # Отправка попроектных алертов и создание тикетов
+  # Send per-project alerts and create tickets
   alerts_about_projects_common_warnings "${project_index}"
   alerts_about_projects_common_erros "${project_index}"
 
@@ -1745,12 +1745,12 @@ do_check_archive_size()
   create_tickets_about_disabled_backups "${project_index}"
 }
 
-# Выполняет получение данных, проверку даты архивов и отправку алертов
-# Данные об архивах извлекаются параллельно, с распараллеливанием по проектам
-# Проверка данных и отправка алертов выполняются последовательно
+# Load data, check archive dates, and send alerts
+# Archive data is loaded in parallel, one process per project
+# Data checks and alert sending run sequentially
 do_check_archive_date_with_parallel_per_project_data_acquisition()
 {
-  # Получение данных о бэкапах
+  # Load backup data
   let project_index=0
   while test "${project_index}" -lt "${PROJECTS_COUNT}";
   do
@@ -1783,10 +1783,10 @@ do_check_archive_date_with_parallel_per_project_data_acquisition()
     let project_index+=1
   done
 
-  # Ожидание всех запущенных процессов получения данных о бэкапах
+  # Wait for all backup-data load processes
   wait > "/dev/null" 2>&1
 
-  # Десериализация данных из json-файлов
+  # Deserialize data from JSON files
   let project_index=0
   while test "${project_index}" -lt "${PROJECTS_COUNT}";
   do
@@ -1799,7 +1799,7 @@ do_check_archive_date_with_parallel_per_project_data_acquisition()
     let project_index+=1
   done
 
-  # Вывод полученных значений:
+  # Print collected values:
   #   - PROJECTS
   #   - PROJECTS_DIR
   #   - PROJECTS_JOBS
@@ -1853,10 +1853,10 @@ do_check_archive_date_with_parallel_per_project_data_acquisition()
     done
   fi
 
-  # Выполнение проверок:
-  #   - что (PROJECTS_JOBS_CHECK_START - PROJECTS_JOBS_LAST_ARCHIVE_DATE)
-  #     не больше PROJECTS_JOBS_THRESHOLD_AGE и не больше PROJECTS_JOBS_STORAGE_LIMIT
-  #     для каждого задания каждого проекта
+  # Run checks:
+  #   - that (PROJECTS_JOBS_CHECK_START - PROJECTS_JOBS_LAST_ARCHIVE_DATE)
+  #     is not greater than PROJECTS_JOBS_THRESHOLD_AGE and not greater than PROJECTS_JOBS_STORAGE_LIMIT
+  #     for each job of each project
   let project_index=0
   while test "${project_index}" -lt "${PROJECTS_COUNT}";
   do
@@ -1865,7 +1865,7 @@ do_check_archive_date_with_parallel_per_project_data_acquisition()
     let project_index+=1
   done
 
-  # Отправка попроектных алертов и создание тикетов
+  # Send per-project alerts and create tickets
   let project_index=0
   while test "${project_index}" -lt "${PROJECTS_COUNT}";
   do
@@ -1880,12 +1880,12 @@ do_check_archive_date_with_parallel_per_project_data_acquisition()
   done
 }
 
-# Выполняет получение данных, проверку размера архивов и отправку алертов
-# Данные об архивах извлекаются параллельно, с распараллеливанием по проектам
-# Проверка данных и отправка алертов выполняются последовательно
+# Load data, check archive sizes, and send alerts
+# Archive data is loaded in parallel, one process per project
+# Data checks and alert sending run sequentially
 do_check_archive_size_with_parallel_per_project_data_acquisition()
 {
-  # Получение данных о бэкапах
+  # Load backup data
   let project_index=0
   while test "${project_index}" -lt "${PROJECTS_COUNT}";
   do
@@ -1918,10 +1918,10 @@ do_check_archive_size_with_parallel_per_project_data_acquisition()
     let project_index+=1
   done
 
-  # Ожидание всех запущенных процессов получения данных о бэкапах
+  # Wait for all backup-data load processes
   wait > "/dev/null" 2>&1
 
-  # Десериализация данных из json-файлов
+  # Deserialize data from JSON files
   let project_index=0
   while test "${project_index}" -lt "${PROJECTS_COUNT}";
   do
@@ -1934,7 +1934,7 @@ do_check_archive_size_with_parallel_per_project_data_acquisition()
     let project_index+=1
   done
 
-  # Вывод полученных значений:
+  # Print collected values:
   #   - PROJECTS
   #   - PROJECTS_DIR
   #   - PROJECTS_JOBS
@@ -1988,10 +1988,10 @@ do_check_archive_size_with_parallel_per_project_data_acquisition()
     done
   fi
 
-  # Выполнение проверок:
-  #   - что PROJECTS_JOBS_LAST_ARCHIVE_SIZE не меньше PROJECTS_JOBS_MIN_SIZE
-  #   - что (1 - last(PROJECTS_JOBS_LAST_ARCHIVE_SIZE)/max(PROJECTS_JOBS_LAST_ARCHIVE_SIZE))*100 не больше PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE
-  #     для каждого задания каждого проекта
+  # Run checks:
+  #   - that PROJECTS_JOBS_LAST_ARCHIVE_SIZE is not less than PROJECTS_JOBS_MIN_SIZE
+  #   - that (1 - last(PROJECTS_JOBS_LAST_ARCHIVE_SIZE)/max(PROJECTS_JOBS_LAST_ARCHIVE_SIZE))*100 is not greater than PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE
+  #     for each job of each project
   let project_index=0
   while test "${project_index}" -lt "${PROJECTS_COUNT}";
   do
@@ -2001,7 +2001,7 @@ do_check_archive_size_with_parallel_per_project_data_acquisition()
     let project_index+=1
   done
 
-  # Отправка попроектных алертов и создание тикетов
+  # Send per-project alerts and create tickets
   let project_index=0
   while test "${project_index}" -lt "${PROJECTS_COUNT}";
   do
@@ -2016,8 +2016,8 @@ do_check_archive_size_with_parallel_per_project_data_acquisition()
   done
 }
 
-# Выполняет проверку соответствия фактических и ожидаемых прав на каталоги с
-# проектами и бэкапами
+# Check that actual and expected permissions match on
+# project and backup directories
 # Input variables:
 #   - ${1} - project index in PROJECTS array
 # Global variables:
@@ -2180,8 +2180,8 @@ check_backups_access_rights()
   done
 }
 
-# Выполняет проверку соответствия фактических и ожидаемых прав на корневой
-# каталог с бэкапами
+# Check that actual and expected permissions match on the root
+# backup directory
 # Global variables:
 #   - RO
 #     - BACKUP_DIRECTORY
@@ -2228,7 +2228,7 @@ check_backup_directory_access_rights()
   fi
 }
 
-# Отображает версию скрипта
+# Print the script version
 print_version()
 {
   printf "%s\n" "${VERSION}"
@@ -2236,7 +2236,7 @@ print_version()
   return 0
 }
 
-# Отображает справку по использованию скрипта
+# Print usage help
 print_reference()
 {
   cat <<EOF
@@ -2325,16 +2325,16 @@ EOF
 }
 
 ################################################################################
-# Точка входа
+# Entry point
 
-# Объявления и определения переменных
+# Variable declarations
 BACKUP_DIRECTORY=""
 CONFIG_FILE_PATH=""
 ONE_PROJECT=""
 ONE_PROJECT_USER=""
 CHECK_MODE=""
 OUTPUT_DIRECTION=""
-# Период выполнения проверки размера архивов, единица измерения - часы
+# Archive-size check interval, unit: hours
 CHECK_ARCHIVE_SIZE_PERIOD=""
 PARALLELIZE_ALL_OPERATIONS=""
 
@@ -2343,13 +2343,13 @@ CONFIG_FILE_CONTENT=""
 TEMP_DIR_NAME=""
 TEMP_DIR=""
 
-# Итерируются через "${project_index}"
+# Iterated via "${project_index}"
 let PROJECTS_COUNT=0
 declare -a PROJECTS
 declare -a PROJECTS_DIR
 declare -a PROJECTS_JOBS_COUNT
 
-# Итерируются через "${project_index},${project_job_index}"
+# Iterated via "${project_index},${project_job_index}"
 declare -A PROJECTS_JOBS
 declare -A PROJECTS_JOBS_DIR
 declare -A PROJECTS_JOBS_CHECK_START
@@ -2359,43 +2359,43 @@ declare -A PROJECTS_JOBS_STORAGE_LIMIT
 declare -A PROJECTS_JOBS_MIN_SIZE
 declare -A PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE
 
-# Массивы с датами создания и размерами последних архивов резервных копий
-# Итерируется через "${project_index},${project_job_index}"
+# Arrays with last-backup archive dates and sizes
+# Iterated via "${project_index},${project_job_index}"
 declare -A PROJECTS_JOBS_LAST_ARCHIVE_COUNT
-# Итерируются через "${project_index},${project_job_index},${project_job_last_archive_index}"
+# Iterated via "${project_index},${project_job_index},${project_job_last_archive_index}"
 declare -A PROJECTS_JOBS_LAST_ARCHIVE_NAME
 declare -A PROJECTS_JOBS_LAST_ARCHIVE_DATE
 declare -A PROJECTS_JOBS_LAST_ARCHIVE_SIZE
 
-# Массивы с сообщениями о попроектных проблемах
-# Итерируются через "${project_index},${project_warning_common_index}"
+# Arrays with per-project problem messages
+# Iterated via "${project_index},${project_warning_common_index}"
 declare -a PROJECTS_WARNINGS_COMMON_COUNT
 declare -A PROJECTS_WARNINGS_COMMON
 
-# Итерируются через "${project_index},${project_error_common_index}"
+# Iterated via "${project_index},${project_error_common_index}"
 declare -a PROJECTS_ERRORS_COMMON_COUNT
 declare -A PROJECTS_ERRORS_COMMON
 
-# Итерируются через "${project_index},${project_job_index},${project_warning_backup_index}"
+# Iterated via "${project_index},${project_job_index},${project_warning_backup_index}"
 declare -a PROJECTS_WARNINGS_BACKUP_COUNT
 declare -A PROJECTS_WARNINGS_BACKUP
-# Итерируются через "${project_index},${project_job_index},${project_warning_backup_disabled_index}"
+# Iterated via "${project_index},${project_job_index},${project_warning_backup_disabled_index}"
 declare -a PROJECTS_WARNINGS_BACKUP_DISABLED_COUNT
 declare -A PROJECTS_WARNINGS_BACKUP_DISABLED
-# Итерируются через "${project_index},${project_job_index},${project_error_backup_index}"
+# Iterated via "${project_index},${project_job_index},${project_error_backup_index}"
 declare -a PROJECTS_ERRORS_BACKUP_COUNT
 declare -A PROJECTS_ERRORS_BACKUP
 
-# Массивы с сообщениями об общих проблемах
-# Итерируются через "${common_warnings_index}
+# Arrays with common-problem messages
+# Iterated via "${common_warnings_index}
 let COMMON_WARNINGS_COUNT=0
 declare -a COMMON_WARNINGS
 
-# Итерируются через "${common_errors_index}
+# Iterated via "${common_errors_index}
 let COMMON_ERRORS_COUNT=0
 declare -a COMMON_ERRORS
 
-# Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options d:c:t:p:o:vh --longoptions ,backup-dir:,config:,threshold-age:,one-project:,one-project-user:,check-disabled-backups-storage-limit,check-access-rights,check-archive-size:,parallelize-all-operations,message-out:,attempts-max-time:,attempts-pause:,stop,unstop,debug,version,help -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then
@@ -2430,7 +2430,7 @@ do
   esac
 done
 
-# Обработка и проверка данных, поступивших через командную строку
+# Process and validate command-line data
 BACKUP_DIRECTORY="$( trim_trailing_spaces "${BACKUP_DIRECTORY}" )"
 CONFIG_FILE_PATH="$( trim_trailing_spaces "${CONFIG_FILE_PATH}" )"
 THRESHOLD_AGE_BY_DEFAULT="$( trim_trailing_spaces "${THRESHOLD_AGE_BY_DEFAULT}" )"
@@ -2537,18 +2537,18 @@ fi
 
 IFS=$'\n'
 
-# Определение действующих значений ограничений на количество попыток доступа к Borg-репозиториям
-# Условие - время выполнения не больше ATTEMPTS_MAX_TIME
+# Resolve effective limits on Borg-repository access attempts
+# Condition: runtime is not greater than ATTEMPTS_MAX_TIME
 
-# Основая проверка, по разнице текущего времени и времени старта
-# При ATTEMPTS_MAX_TIME=20 и ATTEMPTS_PAUSE=5, выполнение следущей попытки с предшествующей ей паузой в 5 при текущей длительности в 16 не должно произойти
+# Primary check: difference between now and start time
+# With ATTEMPTS_MAX_TIME=20 and ATTEMPTS_PAUSE=5, the next attempt (after a 5s pause) must not run when elapsed time is already 16
 let ATTEMPTS_MAX_TIME=ATTEMPTS_MAX_TIME-ATTEMPTS_PAUSE
 
-# На случай смещения времени, по количеству попыток
-# При ATTEMPTS_MAX_TIME=20 и ATTEMPTS_PAUSE=5 выполнение после 4 попытки не имеет смысла - оно точно превысит 20 т.к. сама проверка не моментальна
+# Fallback if the clock jumps: cap by attempt count
+# With ATTEMPTS_MAX_TIME=20 and ATTEMPTS_PAUSE=5, a fifth attempt is pointless — it will exceed 20 because the check itself is not instant
 let ATTEMPTS_MAX_ATTEMPTS=ATTEMPTS_MAX_TIME/ATTEMPTS_PAUSE
 
-# Создание временного каталога в котором будут хранится данные о бэкапах и логи borg (только на время работы скрипта)
+# Create a temporary directory for backup data and borg logs (script lifetime only)
 TEMP_DIR_NAME="$( uuidgen )"
 if test -z "${TEMP_DIR_NAME}";
 then
@@ -2565,7 +2565,7 @@ then
   exit 0
 fi
 
-# Формирование списка проектов
+# Build the project list
 if test -n "${ONE_PROJECT}";
 then
   let PROJECTS_COUNT=1
@@ -2620,7 +2620,7 @@ then
   exit 0
 fi
 
-# Формирование списка заданий проектов
+# Build the per-project job list
 let project_index=0
 while test "${project_index}" -lt "${PROJECTS_COUNT}";
 do
@@ -2629,8 +2629,8 @@ do
 
   if test -z "${ONE_PROJECT}";
   then
-    # Проверка наличия каталога borg в каталоге проекта, если он присутствует,
-    # то считаем этот каталог каталогом с резервными копиями проекта
+    # If a borg directory exists under the project directory,
+    # treat it as the project's backup directory
     current_project_dir_alt="$( remove_repeating_vfs_divider "${current_project_dir}/borg" )"
     if test -d "${current_project_dir_alt}";
     then
@@ -2689,7 +2689,7 @@ do
   let project_index+=1
 done
 
-# Получение параметров проверки из конфигурационного файла
+# Load check parameters from the config file
 projects_list=""
 
 if test -n "${ONE_PROJECT}";
@@ -2770,7 +2770,7 @@ do
   done
 done
 
-# Постобработка параметров проверки
+# Post-process check parameters
 let project_index=0
 while test "${project_index}" -lt "${PROJECTS_COUNT}";
 do
@@ -2782,7 +2782,7 @@ do
 
 
     # PROJECTS_JOBS_STATE
-    # Присвоение значения по умолчанию для PROJECTS_JOBS_STATE (если задание или значение не определены в конфигурационном файле)
+    # Default PROJECTS_JOBS_STATE when the job or value is missing from the config file
     if test -z "${PROJECTS_JOBS_STATE["${project_index},${project_job_index}"]}";
     then
       PROJECTS_JOBS_STATE["${project_index},${project_job_index}"]="enable"
@@ -2792,7 +2792,7 @@ do
       PROJECTS_JOBS_STATE["${project_index},${project_job_index}"]="enable"
     fi
 
-    # Проверка корректности PROJECTS_JOBS_STATE
+    # Validate PROJECTS_JOBS_STATE
     let job_state_correctly=0
 
     if test "${PROJECTS_JOBS_STATE["${project_index},${project_job_index}"]}" == "enable";
@@ -2816,7 +2816,7 @@ do
 
 
     # PROJECTS_JOBS_THRESHOLD_AGE
-    # Присвоение значения по умолчанию для PROJECTS_JOBS_THRESHOLD_AGE (если задание или значение не определены в конфигурационном файле)
+    # Default PROJECTS_JOBS_THRESHOLD_AGE when the job or value is missing from the config file
     if test -z "${PROJECTS_JOBS_THRESHOLD_AGE["${project_index},${project_job_index}"]}";
     then
       PROJECTS_JOBS_THRESHOLD_AGE["${project_index},${project_job_index}"]="${THRESHOLD_AGE_BY_DEFAULT}"
@@ -2825,13 +2825,13 @@ do
     then
       PROJECTS_JOBS_THRESHOLD_AGE["${project_index},${project_job_index}"]="${THRESHOLD_AGE_BY_DEFAULT}"
     fi
-    # Знак ~ - значение по умолчанию
+    # ~ means the default value
     if test "${PROJECTS_JOBS_THRESHOLD_AGE["${project_index},${project_job_index}"]}" == "~";
     then
       PROJECTS_JOBS_THRESHOLD_AGE["${project_index},${project_job_index}"]="${THRESHOLD_AGE_BY_DEFAULT}"
     fi
 
-    # Проверка корректности PROJECTS_JOBS_THRESHOLD_AGE
+    # Validate PROJECTS_JOBS_THRESHOLD_AGE
     let threshold_age_correctly=0
 
     check_to_positive_number_format "${PROJECTS_JOBS_THRESHOLD_AGE["${project_index},${project_job_index}"]}"
@@ -2849,7 +2849,7 @@ do
       PROJECTS_JOBS_THRESHOLD_AGE["${project_index},${project_job_index}"]="${THRESHOLD_AGE_BY_DEFAULT}"
     fi
 
-    # Для SYSTEM-бэкапов threshold_age больше в два раза
+    # For SYSTEM backups, threshold_age is doubled
     if test "${project_job_type,,}" == "system";
     then
       let PROJECTS_JOBS_THRESHOLD_AGE["${project_index},${project_job_index}"]*=2
@@ -2857,7 +2857,7 @@ do
 
 
     # PROJECTS_JOBS_STORAGE_LIMIT
-    # Присвоение значения по умолчанию для PROJECTS_JOBS_STORAGE_LIMIT (если задание или значение не определены в конфигурационном файле)
+    # Default PROJECTS_JOBS_STORAGE_LIMIT when the job or value is missing from the config file
     if test -z "${PROJECTS_JOBS_STORAGE_LIMIT["${project_index},${project_job_index}"]}";
     then
       PROJECTS_JOBS_STORAGE_LIMIT["${project_index},${project_job_index}"]="${DISABLED_BACKUPS_STORAGE_LIMIT}"
@@ -2867,7 +2867,7 @@ do
       PROJECTS_JOBS_STORAGE_LIMIT["${project_index},${project_job_index}"]="${DISABLED_BACKUPS_STORAGE_LIMIT}"
     fi
 
-    # Проверка корректности PROJECTS_JOBS_STORAGE_LIMIT
+    # Validate PROJECTS_JOBS_STORAGE_LIMIT
     let storage_limit_correctly=0
 
     check_to_positive_number_format "${PROJECTS_JOBS_STORAGE_LIMIT["${project_index},${project_job_index}"]}"
@@ -2887,7 +2887,7 @@ do
 
 
     # PROJECTS_JOBS_MIN_SIZE
-    # Присвоение значения по умолчанию для PROJECTS_JOBS_MIN_SIZE (если задание или значение не определены в конфигурационном файле)
+    # Default PROJECTS_JOBS_MIN_SIZE when the job or value is missing from the config file
     if test -z "${PROJECTS_JOBS_MIN_SIZE["${project_index},${project_job_index}"]}";
     then
       PROJECTS_JOBS_MIN_SIZE["${project_index},${project_job_index}"]="${LAST_ARCHIVE_MIN_SIZE}"
@@ -2897,10 +2897,10 @@ do
       PROJECTS_JOBS_MIN_SIZE["${project_index},${project_job_index}"]="${LAST_ARCHIVE_MIN_SIZE}"
     fi
 
-    # Преобразование числа с приставками в обычное число
+    # Convert a prefixed number into a plain number
     PROJECTS_JOBS_MIN_SIZE["${project_index},${project_job_index}"]="$( string_with_size_to_number "${PROJECTS_JOBS_MIN_SIZE["${project_index},${project_job_index}"]}" )"
 
-    # Проверка корректности PROJECTS_JOBS_MIN_SIZE
+    # Validate PROJECTS_JOBS_MIN_SIZE
     let min_size_correctly=0
 
     check_to_positive_number_format "${PROJECTS_JOBS_MIN_SIZE["${project_index},${project_job_index}"]}"
@@ -2920,7 +2920,7 @@ do
 
 
     # PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE
-    # Присвоение значения по умолчанию для PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE (если задание или значение не определены в конфигурационном файле)
+    # Default PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE when the job or value is missing from the config file
     if test -z "${PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE["${project_index},${project_job_index}"]}";
     then
       PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE["${project_index},${project_job_index}"]="${LAST_ARCHIVE_ALLOWABLE_DECREASE_SIZE}"
@@ -2930,7 +2930,7 @@ do
       PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE["${project_index},${project_job_index}"]="${LAST_ARCHIVE_ALLOWABLE_DECREASE_SIZE}"
     fi
 
-    # Проверка корректности PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE
+    # Validate PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE
     let allowable_decrease_size_correctly=0
 
     check_to_positive_number_format "${PROJECTS_JOBS_ALLOWABLE_DECREASE_SIZE["${project_index},${project_job_index}"]}"
@@ -2957,7 +2957,7 @@ do
   let project_index+=1
 done
 
-# Вывод полученных значений:
+# Print collected values:
 #   - PROJECTS
 #   - PROJECTS_DIR
 #   - PROJECTS_JOBS
@@ -2994,7 +2994,7 @@ then
   done
 fi
 
-# Выполнение проверок
+# Run checks
 case "${CHECK_MODE}"
 in
   check-archive-age|check-disabled-backups-storage-limit)
@@ -3010,21 +3010,21 @@ in
         let project_index+=1
       done
 
-      # Ожидание всех запущенных процессов
+      # Wait for all started processes
       wait > "/dev/null" 2>&1
     fi
   ;;
 
   check-access-rights)
 
-    # Выполнение проверок соответствия прав для корневого каталога бэкапов
+    # Check permissions on the root backup directory
     if test -z "${ONE_PROJECT}";
     then
       check_backup_directory_access_rights
     fi
 
-    # Выполнение проверок соответствия прав для каталогов проектов и каталогов
-    # заданий резервного копирования
+    # Check permissions on project directories and
+    # backup-job directories
     let project_index=0
     while test "${project_index}" -lt "${PROJECTS_COUNT}";
     do
@@ -3033,7 +3033,7 @@ in
       let project_index+=1
     done
 
-    # Отправка попроектных алертов и создание тикетов
+    # Send per-project alerts and create tickets
     let project_index=0
     while test "${project_index}" -lt "${PROJECTS_COUNT}";
     do
@@ -3062,17 +3062,17 @@ in
         let project_index+=1
       done
 
-      # Ожидание всех запущенных процессов
+      # Wait for all started processes
       wait > "/dev/null" 2>&1
     fi
   ;;
 esac
 
-# Отправка общих алертов
+# Send common alerts
 alerts_about_common_warnings
 alerts_about_common_errors
 
-# Удаление временного каталога в котором хранились данные о бэкапах и логи borg
+# Remove the temporary directory that held backup data and borg logs
 #find "${TEMP_DIR}" -mindepth 1 -maxdepth 1 -type f -delete
 #if test "${?}" -ne 0;
 #then

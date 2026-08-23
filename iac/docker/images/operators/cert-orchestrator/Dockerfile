@@ -1,4 +1,4 @@
-# Сборка из каталога cert-orchestrator (самодостаточный контекст):
+# Build from the cert-orchestrator directory (self-contained context):
 #   cd cert-orchestrator && docker build -t cert-orchestrator:1.0 .
 FROM python:3.11-alpine
 

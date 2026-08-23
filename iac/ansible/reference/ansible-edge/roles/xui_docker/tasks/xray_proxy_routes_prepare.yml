@@ -8,7 +8,7 @@
         or (xui_outbounds | default([]) | length > 0)
         or (xui_outbound_enabled | default(false) | bool)
     fail_msg: >-
-      Proxy: задать xui_proxy_routes (цели main) или xui_outbounds / legacy outbound.
+      Proxy: set xui_proxy_routes (main targets) or xui_outbounds / legacy outbound.
 
 - name: Init outbounds list from proxy routes
   ansible.builtin.set_fact:

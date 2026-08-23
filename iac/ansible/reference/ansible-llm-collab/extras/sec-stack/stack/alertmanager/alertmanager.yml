@@ -1,5 +1,5 @@
-# TODO: вписать реальные токены/чаты. Секреты сюда попадают при деплое —
-# Ansible шаблонизирует этот файл из SOPS-секретов (см. ansible/roles/sec_stack).
+# TODO: fill in real tokens/chats. Secrets land here at deploy time —
+# Ansible templates this file from SOPS secrets (see ansible/roles/sec_stack).
 route:
   receiver: default
   group_by: [alertname, site]
@@ -7,7 +7,7 @@ route:
   group_interval: 5m
   repeat_interval: 12h
   routes:
-    # Heartbeat уходит отдельно и часто, минуя группировку
+    # Heartbeat is sent separately and often, bypassing grouping
     - matchers: [alertname = DeadManSwitch]
       receiver: heartbeat
       group_wait: 0s
@@ -18,27 +18,27 @@ route:
 
 receivers:
   - name: default
-    # warning и ниже — в рабочий чат, бот sec-stack
+    # warning and below — work chat, sec-stack bot
     # telegram_configs:
-    #   - bot_token: "CHANGE_ME"   # бот sec-stack (@sec-stack_alertmanager_bot или подобное)
+    #   - bot_token: "CHANGE_ME"   # sec-stack bot (@sec-stack_alertmanager_bot or similar)
     #     chat_id: -1000000000001
     #     parse_mode: HTML
 
   - name: critical
     # telegram_configs:
     #   - bot_token: "CHANGE_ME"
-    #     chat_id: -1000000000001   # чат critical: только critical, без флуда
+    #     chat_id: -1000000000001   # critical chat: critical only, no flood
     #     parse_mode: HTML
 
   - name: heartbeat
-    # Бесплатный вариант: healthchecks.io — алерт DeadManSwitch пингует URL,
-    # а healthchecks поднимает тревогу, когда пинги пропали.
+    # Free option: healthchecks.io — the DeadManSwitch alert pings a URL,
+    # and healthchecks raises an alarm when pings stop.
     # webhook_configs:
     #   - url: "https://hc-ping.com/<uuid>"
     #     send_resolved: false
 
 inhibit_rules:
-  # Если файрвол целиком недоступен — не спамить про его туннели/лицензии
+  # When the firewall is fully unreachable — do not spam about its tunnels/licenses
   - source_matchers: [alertname = PanosUnreachable]
     target_matchers: [alertname =~ "Panos(IpsecTunnelDown|IpsecTunnelStale|HAUnhealthyState|SessionUsageHigh)"]
     equal: [firewall]

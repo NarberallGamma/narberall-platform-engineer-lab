@@ -6,11 +6,12 @@ I used a werf monorepo for a multi-service estate. Each unit is a folder with `w
 
 Brand feed adapters stay out. Live FQDNs, CIDRs, registry hosts, and werf-encrypted secret bodies are stripped.
 
-Hub: [`../../`](../../). Sanitize: [`../../SANITIZE.md`](../../SANITIZE.md). A thinner werf-raw tree (single app, `.helm/` without Chart.yaml) is a sibling sample under [`../`](../).
+CI button: [`.gitlab-ci.yml.example`](.gitlab-ci.yml.example) includes the catalog factory ([`../../../ci/pipelines/werf-other/monorepo-unit/`](../../../ci/pipelines/werf-other/monorepo-unit/)) with `spec:inputs` for this unit. Job bodies stay in the catalog. Hub: [`../../`](../../). Sanitize: [`../../SANITIZE.md`](../../SANITIZE.md). A thinner werf-raw tree (single app, `.helm/` without Chart.yaml) is a sibling sample under [`../`](../).
 
 ```text
 werf-monorepo-sample/
   .gitignore
+  .gitlab-ci.yml.example           # consumer: include the CI catalog factory
   .werf/
     common-templates/
       values.yaml                      # excerpt: envelope + s3_cache_proxy
@@ -63,6 +64,7 @@ It is shared values plus unit templates. It is not a Helm library chart, not an 
 | Symlinked helpers | Unit `templates/_*.tpl` point at `common-templates`. Placement, lockbox, and NOTES stay one edit |
 | Lockbox vs inline | Production: ExternalSecret from ClusterSecretStore. Dev: Secret from merged values + secret-values |
 | Cache proxy | nginx S3 gateway, `emptyDir` cache, Deckhouse secret-reload annotation, Recreate |
+| Consumer CI | App repo includes `platform/ci-catalog` `services-template.yml.example`. Inputs name this unit. Hidden werf jobs stay in `common.yml.example` |
 | Envoy helper | Gateway API HTTPRoute + optional JWT SecurityPolicy. This unit does not call it; the pack is shared |
 
 ## How the monorepo wires

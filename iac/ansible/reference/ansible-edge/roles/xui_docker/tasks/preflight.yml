@@ -109,7 +109,7 @@
     - "'udp' in ((item.ss_network | default(item.network | default(''))) | string).split(',')"
   tags: [preflight]
 
-- name: Resolve main artifacts host for proxy (папка inbound-summary.json)
+- name: Resolve main artifacts host for proxy (inbound-summary.json directory)
   ansible.builtin.set_fact:
     xui_main_artifacts_host_effective: >-
       {{
@@ -136,8 +136,8 @@
       - xui_main_artifacts_host_effective | default('') | length > 0
       - xui_main_server_ip | default('') | length > 0
     fail_msg: >-
-      Proxy: задать xui_main_artifacts_host (папка артефактов main) и xui_main_server_ip (IP NL),
-      либо xui_main_inventory_hostname в inventory для ansible_host.
+      Proxy: set xui_main_artifacts_host (main artifacts directory) and xui_main_server_ip (NL IP),
+      or xui_main_inventory_hostname in inventory for ansible_host.
   when:
     - xui_profile == 'proxy'
     - xui_outbound_enabled | default(false) | bool
@@ -167,7 +167,7 @@
       - xui_ssh_tunnel_listen_port | int > 0
       - xui_ssh_tunnel_target_port | int > 0
     fail_msg: >-
-      SSH tunnel: включите только на proxy (xui_profile=proxy), задайте
-      xui_main_inventory_hostname или xui_ssh_tunnel_target_host.
+      SSH tunnel: enable only on proxy (xui_profile=proxy); set
+      xui_main_inventory_hostname or xui_ssh_tunnel_target_host.
   when: xui_ssh_tunnel_enabled | bool
   tags: [preflight, ssh_tunnel]

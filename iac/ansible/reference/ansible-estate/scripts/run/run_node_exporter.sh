@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Node Exporter: деплой на внешние серверы. Обязательно: окружение (--prod/--preprod) и scope (--all или --limit HOST).
+# Node Exporter: deploy to external servers. Required: environment (--prod/--preprod) and scope (--all or --limit HOST).
 #
-# SSH-ключ с passphrase: eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
+# SSH key with passphrase: eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
 #   ./scripts/run/run_node_exporter.sh deploy --prod --limit HOST --ssh-key ~/.ssh/your_key --ssh-agent
-# Подробнее: scripts/run/lib/docker_ssh.sh
+# Details: scripts/run/lib/docker_ssh.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/docker_ssh.sh
@@ -21,7 +21,7 @@ ASK_PASS=""
 PLAYBOOK="playbooks/node-exporter-deploy.yml"
 EXTRA=()
 
-# Парсинг: первый не-опция = команда, затем обязательны --prod/--preprod и --all/--limit
+# Parse: first non-option is the command; then --prod/--preprod and --all/--limit are required
 COMMAND=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -76,8 +76,8 @@ if [[ -z "$SSH_KEY_PATH" && -z "$USE_SSH_AGENT" && -z "$ASK_PASS" && -d "$HOME/.
   DOCKER_MOUNTS+=(-v "$HOME/.ssh:/root/.ssh:ro")
 fi
 
-# При монтировании $HOME/.ssh в /root/.ssh ssh от root отклоняет чужой config (StrictModes).
-# Не читать user config — ключ и IdentitiesOnly из инвентаря / --ssh-key.
+# When $HOME/.ssh is mounted at /root/.ssh, root ssh rejects another user's config (StrictModes).
+# Do not read the user config — key and IdentitiesOnly come from inventory / --ssh-key.
 SSH_ANSIBLE_EXTRA=(-e "ansible_ssh_common_args='-o IdentitiesOnly=yes -F /dev/null'")
 if [[ -n "$USE_SSH_AGENT" && -z "$SSH_KEY_PATH" ]]; then
   SSH_ANSIBLE_EXTRA=()
@@ -117,7 +117,7 @@ case "$COMMAND" in
   help)
     echo "Node Exporter: deploy | status | help"
     echo "Required: --prod|--preprod and --all|--limit HOST"
-    echo "SSH: --ssh-key PATH [--ssh-agent] (passphrase: ssh-add перед запуском)"
+    echo "SSH: --ssh-key PATH [--ssh-agent] (passphrase: ssh-add before the run)"
     echo "Examples: $0 deploy --prod --all | $0 status --preprod --limit HOST"
     ;;
   *)

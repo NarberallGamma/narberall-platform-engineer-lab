@@ -1,5 +1,5 @@
-# Policy ansible-control: GitLab CI token для ansible control node
-# Mount ansible/ (docker apps: cert-*, cloud-hibernate) + secret/ (hsm-adapter и др.)
+# Policy ansible-control: GitLab CI token for the ansible control node
+# Mount ansible/ (docker apps: cert-*, cloud-hibernate) + secret/ (hsm-adapter and others)
 
 path "ansible/data/*" {
   capabilities = ["create", "read", "update", "delete", "list"]

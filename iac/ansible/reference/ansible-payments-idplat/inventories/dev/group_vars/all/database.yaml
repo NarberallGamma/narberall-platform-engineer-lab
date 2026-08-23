@@ -2,7 +2,7 @@ am_db_server: "{% if (idplat_postgres_install | bool) -%}
                                   idplat_postgres
                                 {%- else -%}
                                   {{ idplat_rdbms_hostname }} 
-                                {%- endif -%}" # Адрес базы, указан в global_env.yaml
+                                {%- endif -%}" # database host, set in global_env.yaml
 am_db_server_port: "{% if (idplat_postgres_install | bool) -%}
                                   5432
                                 {%- endif %}
@@ -15,7 +15,7 @@ am_db_server_port: "{% if (idplat_postgres_install | bool) -%}
                     {%- if (not idplat_postgres_install | bool) and idplat_rdbms_name is defined and (idplat_rdbms_name == 'mysql') -%}
                                   {{ idplat_rdbms_port | default(3306, true) }}
                                 {%- endif -%}
-                    " # Адрес базы, указан в global_env.yaml
+                    " # database host, set in global_env.yaml
 am_configuration_connection_string: "
                                       {%- if (idplat_rdbms_name is defined and (idplat_rdbms_name == 'postgres')) or (idplat_postgres_install | bool) -%}
                                         Host={{ am_db_server }};

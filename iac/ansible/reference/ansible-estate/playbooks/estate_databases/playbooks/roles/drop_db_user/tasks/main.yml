@@ -1,15 +1,15 @@
 ---
-# Снятие GRANT-ов и default privileges дополнительной учётки (аудит, ИБ, сопровождение).
-# Без REASSIGN OWNED, без правок treasury_user / schema_flyway / schema_flyway_setup.
-# Явный REVOKE GRANT-ов (root на RDS не superuser, DROP OWNED BY недоступен).
-# Требует: community.postgresql, community.general.
+# Revoke GRANTs and default privileges of an extra account (audit, InfoSec, operations).
+# No REASSIGN OWNED, no changes to treasury_user / schema_flyway / schema_flyway_setup.
+# Explicit REVOKE of GRANTs (root on RDS is not superuser, DROP OWNED BY is unavailable).
+# Requires: community.postgresql, community.general.
 
-- name: Установить py3-psycopg2 для модулей community.postgresql
+- name: Install py3-psycopg2 for community.postgresql modules
   community.general.apk:
     name: py3-psycopg2
     state: present
 
-- name: Завершить активные сессии удаляемой роли
+- name: Terminate active sessions of the role being dropped
   community.postgresql.postgresql_query:
     query: |
       SELECT pg_terminate_backend(pid)
@@ -21,7 +21,7 @@
     login_port: "{{ pg_port }}"
     login_db: postgres
 
-- name: Снять default privileges, выданные удаляемой роли
+- name: Revoke default privileges granted to the role being dropped
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -75,7 +75,7 @@
     login_db: "{{ item }}"
   loop: "{{ db_list }}"
 
-- name: Снять GRANT-ы удаляемой роли во всех пользовательских схемах (REVOKE, без DROP OWNED)
+- name: Revoke GRANTs of the role being dropped in all user schemas (REVOKE, no DROP OWNED)
   community.postgresql.postgresql_query:
     query: |
       DO $$
@@ -123,7 +123,7 @@
     login_db: "{{ item }}"
   loop: "{{ db_list }}"
 
-- name: Отозвать CONNECT на каждую БД
+- name: Revoke CONNECT on each database
   community.postgresql.postgresql_query:
     query: "REVOKE CONNECT ON DATABASE {{ item }} FROM {{ drop_user }};"
     login_host: "{{ pg_host }}"
@@ -133,7 +133,7 @@
     login_db: postgres
   loop: "{{ db_list }}"
 
-- name: Удалить роль PostgreSQL
+- name: Drop the PostgreSQL role
   community.postgresql.postgresql_user:
     name: "{{ drop_user }}"
     state: absent
@@ -144,12 +144,12 @@
     login_db: postgres
   when: drop_role_after_cleanup | default(false) | bool
 
-- name: Итог
+- name: Summary
   ansible.builtin.debug:
     msg: >-
-      Роль {{ drop_user }}: GRANT-ы и default privileges сняты на {{ db_list | length }} БД.
+      Role {{ drop_user }}: GRANTs and default privileges revoked on {{ db_list | length }} databases.
       {% if drop_role_after_cleanup | default(false) | bool %}
-      DROP ROLE выполнен.
+      DROP ROLE completed.
       {% else %}
-      DROP ROLE не выполнялся (drop_role_after_cleanup=false); при необходимости удалить роль через UI cloud.ru или повторить с drop_role_after_cleanup=true.
+      DROP ROLE was not run (drop_role_after_cleanup=false); drop the role in the cloud.ru UI when needed, or repeat with drop_role_after_cleanup=true.
       {% endif %}

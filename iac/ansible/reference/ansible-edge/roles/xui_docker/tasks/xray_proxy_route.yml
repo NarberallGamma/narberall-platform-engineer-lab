@@ -1,5 +1,5 @@
 ---
-# Несколько outbound на proxy: vars xui_outbounds[] + inbound-summary каждого main-хоста
+# Multiple outbounds on proxy: vars xui_outbounds[] + inbound-summary of each main host
 - name: Prepare proxy outbound list
   ansible.builtin.import_tasks: xray_proxy_outbounds_prepare.yml
   tags: [xray, autoconfigure, proxy_outbounds]
@@ -100,8 +100,8 @@
     that:
       - item in (xui_xray_config.outbounds | default([]) | map(attribute='tag') | list)
     fail_msg: >-
-      Outbound «{{ item }}» отсутствует в Xray template после apply.
-      Проверить panel/api/xray/update и перезапуск Xray.
+      Outbound «{{ item }}» is missing from the Xray template after apply.
+      Check panel/api/xray/update and the Xray restart.
   loop: "{{ xui_outbound_managed_tags }}"
   loop_control:
     label: "{{ item }}"

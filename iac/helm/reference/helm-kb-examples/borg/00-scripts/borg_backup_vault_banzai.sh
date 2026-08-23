@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа vault.banzaicloud.com
+# Primary backup method for vault.banzaicloud.com
 
-# Принцип работы:
-#   - создание резервной копии vault с помощью команды 'curl --header "X-Vault-Token: xxx" --request GET http://127.0.0.1:8200/v1/sys/storage/raft/snapshot -o raft.snap'
-#   - востановление из бэкапа 'curl --header "X-Vault-Token: yyy" --request POST --data-binary @raft.snap http://127.0.0.1:8200/v1/sys/storage/raft/snapshot'
-# Безопастность:
-#   - политика, настраивается в vault.banzaicloud.com operator cr
+# How it works:
+#   - create a Vault backup with 'curl --header "X-Vault-Token: xxx" --request GET http://127.0.0.1:8200/v1/sys/storage/raft/snapshot -o raft.snap'
+#   - restore from backup: 'curl --header "X-Vault-Token: yyy" --request POST --data-binary @raft.snap http://127.0.0.1:8200/v1/sys/storage/raft/snapshot'
+# Safety:
+#   - policy, configured in the vault.banzaicloud.com operator CR
 #  externalConfig:
 #    policies:
 #      - name: snapshot_agent
@@ -28,31 +28,31 @@
 #            bound_service_account_namespaces: ["backup"]
 #            policies: ["snapshot_agent"]
 #            ttl: 1h
-#    - SA для бэкапа
+#    - SA for backup
 #    apiVersion: v1
 #    kind: ServiceAccount
 #    metadata:
 #      name: backup
 #
-# Поддерживаемые опции:
-# -b|--name               - имя бэкапа
-# -h|--host               - адрес подключения к Vault.
+# Supported options:
+# -b|--name               - backup name
+# -h|--host               - Vault connection address.
 # -n|--namespace          - vault namespace
-# -r|--port               - порт подключения к Vault.
-# -s|--ssl                - протокол подключения к Vault.
-# -p|--path               - путь к каталогу в vault
-# -k|--prune              - строка с опциями алгоритма сохранения резервных копий в
-#                           формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                           Необязательный аргумент, без указания этой опции будет
-#                           использовано значение ${CUSTOMPRUNE_DEFAULT}
-# --skip-hostname-prefix  - позволяет исключить из имени Borg-репозитория
-#                           префикс '$(hostname)-'. Необязательный аргумент
+# -r|--port               - Vault connection port.
+# -s|--ssl                - Vault connection protocol.
+# -p|--path               - path to a directory in Vault
+# -k|--prune              - retention-options string in
+#                           Borg format, e.g. '--keep-hourly 72 --keep-within=30d'
+#                           Optional. When omitted,
+#                           ${CUSTOMPRUNE_DEFAULT} is used
+# --skip-hostname-prefix  - omit from the Borg repository name
+#                           the '$(hostname)-' prefix. Optional
 
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория, без указания будет
-#        использовано имя заданное в ${NAMEOFBACKUP_DEFAULT}
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix. When omitted,
+#        the name from ${NAMEOFBACKUP_DEFAULT} is used
 
-# Примеры использования в schedule:
+# Schedule examples:
 # wrapper_ssh-agent.sh borg_backup_vault_banzai.sh '--name VAULT-PROD --host vault-prod --namespace vault-prod --port 8200 --path "kubernetes/production" --ssl --skip-hostname-prefix'
 # wrapper_ssh-agent.sh borg_backup_vault_banzai.sh '--name VAULT --host vault-prod --namespace vault-prod --path "kubernetes/dev" --prune "--keep-hourly 3 --keep-within=30d"''
 
@@ -96,7 +96,7 @@ CUSTOMPRUNE=""
 PORT="8200"
 ERRLOG=`mktemp`
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options b:h:n:r:k:p:s: --longoptions ,name:,host:,namespace:,port:,prune:,ssl:,path:,skip-hostname-prefix -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

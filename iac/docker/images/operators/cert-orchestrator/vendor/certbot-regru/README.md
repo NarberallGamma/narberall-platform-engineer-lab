@@ -2,7 +2,7 @@
 
 Reg.ru DNS authenticator plugin for [Certbot](https://certbot.eff.org/) — DNS-01 challenge for domains on REG.RU nameservers.
 
-Эта копия входит в репозиторий **cert-orchestrator** (вендоринг). Апстрим: `https://github.com/free2er/certbot-regru`.
+This copy is vendored into the **cert-orchestrator** repository. Upstream: `https://github.com/free2er/certbot-regru`.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ sudo pip install certbot-regru
 
 ## Credentials
 
-Файл с учётными данными REG.RU (права 600), например `/etc/letsencrypt/regru.ini`:
+REG.RU credentials file (mode 600), for example `/etc/letsencrypt/regru.ini`:
 
 ```
 certbot_regru:dns_username=...
@@ -29,12 +29,12 @@ certbot_regru:dns_password=...
 sudo certbot certonly -a certbot-regru:dns -d sub.domain.tld -d *.wildcard.tld
 ```
 
-При Certbot 3.x имя плагина в CLI — `dns` (см. `certbot plugins`), флаги: `-a dns`, `--dns-credentials`, `--dns-propagation-seconds` (префикс `dns-`, не `certbot-regru:`).
+With Certbot 3.x the CLI plugin name is `dns` (see `certbot plugins`), flags: `-a dns`, `--dns-credentials`, `--dns-propagation-seconds` (prefix `dns-`, not `certbot-regru:`).
 
 ## Options
 
-- `--dns-propagation-seconds` (Certbot 3.x; ранее `--certbot-regru:dns-propagation-seconds`) — ожидание DNS (default 120)
-- `--dns-credentials` (Certbot 3.x; ранее `--certbot-regru:dns-credentials`) — путь к INI (default `/etc/letsencrypt/regru.ini`)
+- `--dns-propagation-seconds` (Certbot 3.x; previously `--certbot-regru:dns-propagation-seconds`) — DNS wait (default 120)
+- `--dns-credentials` (Certbot 3.x; previously `--certbot-regru:dns-credentials`) — path to INI (default `/etc/letsencrypt/regru.ini`)
 
 ## Removal
 

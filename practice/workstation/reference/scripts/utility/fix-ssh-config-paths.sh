@@ -1,40 +1,40 @@
 #!/usr/bin/env bash
-# SSH config: добавление фрагментов, синхронизация Windows -> WSL, исправление путей к ключам.
+# SSH config: add fragments, sync Windows -> WSL, fix key paths.
 #
-# Windows config (источник правды для новых хостов):
+# Windows config (source of truth for new hosts):
 #   /mnt/c/Users/<win_user>/.ssh/config
-# WSL config (пути IdentityFile в Linux-формате):
+# WSL config (IdentityFile paths in Linux form):
 #   ~/.ssh/config
 #
-# Использование:
-#   ./fix-ssh-config-paths.sh fix-paths [FILE]           # Windows -> Linux пути в FILE (по умолчанию ~/.ssh/config)
-#   ./fix-ssh-config-paths.sh add-fragment FRAGMENT       # добавить блоки в Windows config (без дубликатов Host)
-#   ./fix-ssh-config-paths.sh sync-wsl                      # скопировать Windows config в WSL и fix-paths
+# Usage:
+#   ./fix-ssh-config-paths.sh fix-paths [FILE]           # Windows -> Linux paths in FILE (default ~/.ssh/config)
+#   ./fix-ssh-config-paths.sh add-fragment FRAGMENT       # append blocks to Windows config (no duplicate Host)
+#   ./fix-ssh-config-paths.sh sync-wsl                      # copy Windows config to WSL and fix-paths
 #   ./fix-ssh-config-paths.sh apply-fragment FRAGMENT     # add-fragment + sync-wsl
-#   ./fix-ssh-config-paths.sh add-host ALIAS IP [OPTIONS]  # один Host-блок в Windows config
-#   ./fix-ssh-config-paths.sh set-user HOST USER [HOST USER ...]  # сменить User у существующих Host
-#   ./fix-ssh-config-paths.sh remove-host HOST [HOST ...]   # удалить Host-блоки из Windows config
-#   ./fix-ssh-config-paths.sh remove-fragment LIST_FILE   # alias по одному на строку (# комментарии ok)
-#   ./fix-ssh-config-paths.sh list-hosts [FILE]           # список Host alias
+#   ./fix-ssh-config-paths.sh add-host ALIAS IP [OPTIONS]  # one Host block in Windows config
+#   ./fix-ssh-config-paths.sh set-user HOST USER [HOST USER ...]  # change User on existing Host blocks
+#   ./fix-ssh-config-paths.sh remove-host HOST [HOST ...]   # remove Host blocks from Windows config
+#   ./fix-ssh-config-paths.sh remove-fragment LIST_FILE   # one alias per line (# comments ok)
+#   ./fix-ssh-config-paths.sh list-hosts [FILE]           # list Host aliases
 #
-# Опции:
-#   --dry-run          только показать действия
-#   --yes, -y          без интерактивного подтверждения
-#   --user USER        User для всех Host из фрагмента (перекрывает User в файле)
-#   --user ALIAS=USER  User для конкретного Host (можно повторять; перекрывает --user USER)
-#   --identity-file F  путь к ключу в Windows-формате (add-host; по умолчанию id_ed25519)
-#   --comment TEXT     комментарий перед блоком (add-host)
-#   --win-config PATH  явный путь к Windows config
-#   --wsl-config PATH  явный путь к WSL config
+# Options:
+#   --dry-run          show actions only
+#   --yes, -y          skip interactive confirmation
+#   --user USER        User for every Host in the fragment (overrides User in the file)
+#   --user ALIAS=USER  User for a specific Host (repeatable; overrides --user USER)
+#   --identity-file F  key path in Windows form (add-host; default id_ed25519)
+#   --comment TEXT     comment before the block (add-host)
+#   --win-config PATH  explicit Windows config path
+#   --wsl-config PATH  explicit WSL config path
 #
-# Переменные окружения:
+# Environment variables:
 #   WIN_SSH_CONFIG, WSL_SSH_CONFIG, WSL_USER_HOME, WIN_USERNAME, SSH_DEFAULT_USER
 #
-# Пример (новые хосты, redis под ubuntu):
+# Example (new hosts, redis as ubuntu):
 #   wsl bash .../fix-ssh-config-paths.sh apply-fragment .../extra-hosts.conf \
 #     --user redis=ubuntu --user redis01=ubuntu --yes
 #
-# Пример (один хост):
+# Example (single host):
 #   wsl bash .../fix-ssh-config-paths.sh add-host myvm 10.0.1.100 --user ubuntu --yes && \
 #   wsl bash .../fix-ssh-config-paths.sh sync-wsl --yes
 
@@ -90,7 +90,7 @@ resolve_win_ssh_config() {
     local win_user
     win_user=$(resolve_win_username)
     if [ -z "$win_user" ]; then
-        err "Не удалось определить пользователя Windows. Задать WIN_USERNAME или --win-config."
+        err "Could not determine the Windows user. Set WIN_USERNAME or --win-config."
         exit 1
     fi
     printf '/mnt/c/Users/%s/.ssh/config' "$win_user"
@@ -121,7 +121,7 @@ apply_user_overrides_to_file() {
         host="${pair%%=*}"
         user="${pair#*=}"
         if [ -z "$host" ] || [ -z "$user" ] || [ "$host" = "$user" ]; then
-            err "Неверный формат --user: $pair (ожидается ALIAS=USER)"
+            err "Invalid --user format: $pair (expected ALIAS=USER)"
             rm -f "$tmp"
             exit 1
         fi
@@ -181,11 +181,11 @@ set_users_in_win_config() {
     win_cfg=$(resolve_win_ssh_config)
 
     if [ ! -f "$win_cfg" ]; then
-        err "Windows SSH config не найден: $win_cfg"
+        err "Windows SSH config not found: $win_cfg"
         exit 1
     fi
     if [ $# -lt 2 ] || [ $(($# % 2)) -ne 0 ]; then
-        err "Использование: set-user HOST USER [HOST USER ...]"
+        err "Usage: set-user HOST USER [HOST USER ...]"
         exit 1
     fi
 
@@ -203,16 +203,16 @@ set_users_in_win_config() {
     SSH_USER_OVERRIDES=("${pairs[@]}")
     DEFAULT_SSH_USER=""
 
-    confirm_or_abort "Обновить User в Windows config?"
+    confirm_or_abort "Update User in Windows config?"
 
     if [ "$DRY_RUN" -eq 1 ]; then
-        log "[dry-run] set-user в $win_cfg"
+        log "[dry-run] set-user in $win_cfg"
         return 0
     fi
 
     backup_file "$win_cfg"
     apply_user_overrides_to_file "$win_cfg"
-    ok "User обновлён в $win_cfg"
+    ok "User updated in $win_cfg"
 
     if [ "$SYNC_AFTER" -eq 1 ]; then
         sync_wsl_from_windows
@@ -227,11 +227,11 @@ add_host_to_win_config() {
     win_cfg=$(resolve_win_ssh_config)
 
     if [ ! -f "$win_cfg" ]; then
-        err "Windows SSH config не найден: $win_cfg"
+        err "Windows SSH config not found: $win_cfg"
         exit 1
     fi
     if host_exists_in_file "$alias" "$win_cfg"; then
-        warn "Host уже есть: $alias (пропуск add-host)"
+        warn "Host already present: $alias (skip add-host)"
         return 0
     fi
 
@@ -241,7 +241,7 @@ add_host_to_win_config() {
     log "User:  $user"
     echo ""
 
-    confirm_or_abort "Добавить Host в Windows config?"
+    confirm_or_abort "Add Host to Windows config?"
 
     if [ "$DRY_RUN" -eq 1 ]; then
         render_host_block "$alias" "$ip" "$user"
@@ -253,7 +253,7 @@ add_host_to_win_config() {
         echo ""
         render_host_block "$alias" "$ip" "$user"
     } >> "$win_cfg"
-    ok "Host $alias добавлен в $win_cfg"
+    ok "Host $alias added to $win_cfg"
 
     if [ "$SYNC_AFTER" -eq 1 ]; then
         sync_wsl_from_windows
@@ -312,9 +312,9 @@ remove_hosts_from_file() {
         [[ "$host" =~ ^# ]] && continue
         if host_exists_in_file "$host" "$file"; then
             remove_host_block_from_file "$file" "$host"
-            ok "  удалён: $host"
+            ok "  removed: $host"
         else
-            warn "  нет в config: $host"
+            warn "  not in config: $host"
         fi
     done
 }
@@ -324,11 +324,11 @@ remove_hosts_from_win_config() {
     win_cfg=$(resolve_win_ssh_config)
 
     if [ ! -f "$win_cfg" ]; then
-        err "Windows SSH config не найден: $win_cfg"
+        err "Windows SSH config not found: $win_cfg"
         exit 1
     fi
     if [ $# -eq 0 ]; then
-        err "Указать Host alias: remove-host HOST [HOST ...] или remove-fragment FILE"
+        err "Specify a Host alias: remove-host HOST [HOST ...] or remove-fragment FILE"
         exit 1
     fi
 
@@ -336,7 +336,7 @@ remove_hosts_from_win_config() {
     log "Windows config: $win_cfg"
     echo ""
 
-    confirm_or_abort "Удалить Host-блоки из Windows config?"
+    confirm_or_abort "Remove Host blocks from Windows config?"
 
     if [ "$DRY_RUN" -eq 1 ]; then
         log "[dry-run] remove: $*"
@@ -345,7 +345,7 @@ remove_hosts_from_win_config() {
 
     backup_file "$win_cfg"
     remove_hosts_from_file "$win_cfg" "$@"
-    ok "Host-блоки удалены из $win_cfg"
+    ok "Host blocks removed from $win_cfg"
 
     if [ "$SYNC_AFTER" -eq 1 ]; then
         sync_wsl_from_windows
@@ -357,7 +357,7 @@ remove_hosts_from_list_file() {
     local hosts=()
 
     if [ ! -f "$list_file" ]; then
-        err "Файл не найден: $list_file"
+        err "File not found: $list_file"
         exit 1
     fi
 
@@ -369,7 +369,7 @@ remove_hosts_from_list_file() {
     done < "$list_file"
 
     if [ "${#hosts[@]}" -eq 0 ]; then
-        err "В $list_file нет Host alias"
+        err "No Host aliases in $list_file"
         exit 1
     fi
 
@@ -398,12 +398,12 @@ confirm_or_abort() {
     elif [ -e /dev/tty ]; then
         read -r -p "$prompt [y/N]: " reply < /dev/tty
     else
-        warn "Нет TTY, продолжение без подтверждения (задать --yes для явного согласия)."
+        warn "No TTY; continuing without confirmation (set --yes for an explicit opt-in)."
         return 0
     fi
     case "$reply" in
         y|Y|yes|YES) return 0 ;;
-        *) err "Отменено."; exit 1 ;;
+        *) err "Cancelled."; exit 1 ;;
     esac
 }
 
@@ -415,7 +415,7 @@ backup_file() {
         return 0
     fi
     cp "$f" "$bak"
-    ok "Резервная копия: $bak"
+    ok "Backup: $bak"
 }
 
 list_host_aliases() {
@@ -450,7 +450,7 @@ fix_paths_in_file() {
     windows_user=$(resolve_win_username)
 
     if [ ! -f "$cfg" ]; then
-        err "Файл не найден: $cfg"
+        err "File not found: $cfg"
         exit 1
     fi
 
@@ -477,14 +477,14 @@ fix_paths_in_file() {
     sed -i "s|IdentityFile \"~/.ssh/|IdentityFile \"${HOME}/.ssh/|g" "$tmp"
 
     if [ "$DRY_RUN" -eq 1 ]; then
-        log "[dry-run] fix-paths для $cfg"
+        log "[dry-run] fix-paths for $cfg"
         grep -n "IdentityFile" "$tmp" | head -15 || true
         rm -f "$tmp"
         return 0
     fi
 
     mv "$tmp" "$cfg"
-    ok "Пути IdentityFile исправлены в $cfg"
+    ok "IdentityFile paths fixed in $cfg"
 }
 
 add_fragment_to_win_config() {
@@ -493,19 +493,19 @@ add_fragment_to_win_config() {
     win_cfg=$(resolve_win_ssh_config)
 
     if [ ! -f "$fragment" ]; then
-        err "Фрагмент не найден: $fragment"
+        err "Fragment not found: $fragment"
         exit 1
     fi
     if [ ! -f "$win_cfg" ]; then
-        err "Windows SSH config не найден: $win_cfg"
+        err "Windows SSH config not found: $win_cfg"
         exit 1
     fi
 
     log "${CYAN}=== add-fragment ===${NC}"
     log "Windows config: $win_cfg"
-    log "Фрагмент:       $fragment"
+    log "Fragment:       $fragment"
     if [ -n "$DEFAULT_SSH_USER" ]; then
-        log "User (все Host): $DEFAULT_SSH_USER"
+        log "User (all Host): $DEFAULT_SSH_USER"
     fi
     if [ "${#SSH_USER_OVERRIDES[@]}" -gt 0 ]; then
         log "User (per-host): ${SSH_USER_OVERRIDES[*]}"
@@ -528,16 +528,16 @@ add_fragment_to_win_config() {
     done < <(list_host_aliases "$prepared")
 
     if [ "${#skipped[@]}" -gt 0 ]; then
-        warn "Уже есть в config (${#skipped[@]}): ${skipped[*]}"
+        warn "Already in config (${#skipped[@]}): ${skipped[*]}"
     fi
     if [ "${#to_add[@]}" -eq 0 ]; then
         rm -f "$prepared"
-        warn "Новых Host для добавления нет."
+        warn "No new Host entries to add."
         return 0
     fi
 
-    ok "Будет добавлено (${#to_add[@]}): ${to_add[*]}"
-    confirm_or_abort "Добавить фрагмент в Windows config?"
+    ok "Will add (${#to_add[@]}): ${to_add[*]}"
+    confirm_or_abort "Add fragment to Windows config?"
 
     if [ "$DRY_RUN" -eq 1 ]; then
         log "[dry-run] append prepared fragment -> $win_cfg"
@@ -552,7 +552,7 @@ add_fragment_to_win_config() {
         cat "$prepared"
     } >> "$win_cfg"
     rm -f "$prepared"
-    ok "Фрагмент добавлен в $win_cfg"
+    ok "Fragment added to $win_cfg"
 }
 
 sync_wsl_from_windows() {
@@ -561,16 +561,16 @@ sync_wsl_from_windows() {
     wsl_cfg="$WSL_SSH_CONFIG"
 
     log "${CYAN}=== sync-wsl ===${NC}"
-    log "Источник (Windows): $win_cfg"
-    log "Назначение (WSL):   $wsl_cfg"
+    log "Source (Windows): $win_cfg"
+    log "Destination (WSL): $wsl_cfg"
     echo ""
 
     if [ ! -f "$win_cfg" ]; then
-        err "Windows config не найден: $win_cfg"
+        err "Windows config not found: $win_cfg"
         exit 1
     fi
 
-    confirm_or_abort "Скопировать Windows config в WSL и исправить пути?"
+    confirm_or_abort "Copy Windows config to WSL and fix paths?"
 
     if [ "$DRY_RUN" -eq 1 ]; then
         log "[dry-run] cp $win_cfg -> $wsl_cfg; fix-paths"
@@ -585,7 +585,7 @@ sync_wsl_from_windows() {
     cp "$win_cfg" "$wsl_cfg"
     chmod 600 "$wsl_cfg"
     fix_paths_in_file "$wsl_cfg" 1
-    ok "WSL config обновлён: $wsl_cfg"
+    ok "WSL config updated: $wsl_cfg"
 }
 
 usage() {
@@ -654,7 +654,7 @@ case "$CMD" in
     add-fragment)
         FRAGMENT="${1:-}"
         if [ -z "$FRAGMENT" ]; then
-            err "Указать путь к фрагменту: add-fragment FILE"
+            err "Specify a fragment path: add-fragment FILE"
             exit 1
         fi
         add_fragment_to_win_config "$FRAGMENT"
@@ -665,7 +665,7 @@ case "$CMD" in
     apply-fragment)
         FRAGMENT="${1:-}"
         if [ -z "$FRAGMENT" ]; then
-            err "Указать путь к фрагменту: apply-fragment FILE"
+            err "Specify a fragment path: apply-fragment FILE"
             exit 1
         fi
         add_fragment_to_win_config "$FRAGMENT"
@@ -673,28 +673,28 @@ case "$CMD" in
         ;;
     add-host)
         if [ -z "${1:-}" ] || [ -z "${2:-}" ]; then
-            err "Использование: add-host ALIAS IP [--user USER] [--sync] [--yes]"
+            err "Usage: add-host ALIAS IP [--user USER] [--sync] [--yes]"
             exit 1
         fi
         add_host_to_win_config "$1" "$2" "${DEFAULT_SSH_USER:-admin}"
         ;;
     set-user)
         if [ $# -lt 2 ]; then
-            err "Использование: set-user HOST USER [HOST USER ...] [--sync] [--yes]"
+            err "Usage: set-user HOST USER [HOST USER ...] [--sync] [--yes]"
             exit 1
         fi
         set_users_in_win_config "$@"
         ;;
     remove-host)
         if [ $# -eq 0 ]; then
-            err "Использование: remove-host HOST [HOST ...] [--sync] [--yes]"
+            err "Usage: remove-host HOST [HOST ...] [--sync] [--yes]"
             exit 1
         fi
         remove_hosts_from_win_config "$@"
         ;;
     remove-fragment)
         if [ -z "${1:-}" ]; then
-            err "Использование: remove-fragment LIST_FILE [--sync] [--yes]"
+            err "Usage: remove-fragment LIST_FILE [--sync] [--yes]"
             exit 1
         fi
         remove_hosts_from_list_file "$1"
@@ -704,7 +704,7 @@ case "$CMD" in
         list_host_aliases "$TARGET_FILE"
         ;;
     *)
-        err "Неизвестная команда: $CMD"
+        err "Unknown command: $CMD"
         usage
         exit 1
         ;;

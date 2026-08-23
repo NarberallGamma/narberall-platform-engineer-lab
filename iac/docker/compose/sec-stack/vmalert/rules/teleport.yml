@@ -7,8 +7,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Teleport ({{ $labels.instance }}) не отдаёт метрики"
-          description: "Диагностический endpoint недоступен 3 минуты. Проверить контейнер teleport и --diag-addr."
+          summary: "Teleport ({{ $labels.instance }}) is not serving metrics"
+          description: "Diagnostic endpoint has been unreachable for 3 minutes. Check the teleport container and --diag-addr."
 
   - name: infra-nodes
     rules:
@@ -18,8 +18,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "ВМ {{ $labels.instance }} ({{ $labels.role }}): node_exporter недоступен"
-          description: "Либо ВМ лежит, либо упал node_exporter."
+          summary: "VM {{ $labels.instance }} ({{ $labels.role }}): node_exporter is unreachable"
+          description: "Either the VM is down, or node_exporter has crashed."
 
       - alert: NodeFilesystemAlmostFull
         expr: >
@@ -29,7 +29,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.instance }}: на {{ $labels.mountpoint }} осталось меньше 10% места"
+          summary: "{{ $labels.instance }}: less than 10% space left on {{ $labels.mountpoint }}"
 
       - alert: NodeMemoryPressure
         expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.05
@@ -37,4 +37,4 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.instance }}: доступно меньше 5% памяти"
+          summary: "{{ $labels.instance }}: less than 5% memory available"

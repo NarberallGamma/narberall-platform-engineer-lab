@@ -1,5 +1,5 @@
 ---
-- name: Use none VLESS client encryption (без ML-KEM в Clients)
+- name: Use none VLESS client encryption (no ML-KEM in Clients)
   ansible.builtin.set_fact:
     xui_inbound_decryption_effective: "none"
     xui_inbound_encryption_effective: "none"

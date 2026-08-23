@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# Скрипт для переключения между Kubernetes кластерами
-# Использование: 
-#   ./kube_switch.sh                    # Интерактивный выбор кластера
-#   ./kube_switch.sh <cluster-name>     # Переключение на указанный кластер
-#   ./kube_switch.sh list               # Показать список доступных кластеров
-#   ./kube_switch.sh current            # Показать текущий активный кластер
+# Switch between Kubernetes clusters
+# Usage: 
+#   ./kube_switch.sh                    # Interactive cluster selection
+#   ./kube_switch.sh <cluster-name>     # Switch to the given cluster
+#   ./kube_switch.sh list               # Show available clusters
+#   ./kube_switch.sh current            # Show the current active cluster
 
 set -e
 
-# Цвета для красивого вывода
+# Colors for readable output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -17,40 +17,40 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Путь к папке с конфигами кластеров
+# Path to the cluster config directory
 KUBE_CLUSTERS_DIR="${HOME}/.kube/clusters"
 KUBE_CONFIG_DIR="${HOME}/.kube"
 
-# Создаем папку для конфигов, если её нет
+# Create the config directory if it is missing
 mkdir -p "$KUBE_CLUSTERS_DIR"
 
-# Функция для вывода справки
+# Help printer
 show_help() {
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}Kubernetes Cluster Switcher${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo "Использование:"
-    echo "  $0                    # Интерактивный выбор кластера"
-    echo "  $0 <cluster-name>     # Переключение на указанный кластер"
-    echo "  $0 list               # Показать список доступных кластеров"
-    echo "  $0 current            # Показать текущий активный кластер"
-    echo "  $0 help               # Показать эту справку"
+    echo "Usage:"
+    echo "  $0                    # Interactive cluster selection"
+    echo "  $0 <cluster-name>     # Switch to the given cluster"
+    echo "  $0 list               # Show available clusters"
+    echo "  $0 current            # Show the current active cluster"
+    echo "  $0 help               # Show this help"
     echo ""
-    echo "Конфиги кластеров должны быть сохранены в: ${KUBE_CLUSTERS_DIR}/<cluster-name>/config"
-    echo "Структура: каждая подпапка с именем кластера содержит файл 'config'"
+    echo "Cluster configs must be stored in: ${KUBE_CLUSTERS_DIR}/<cluster-name>/config"
+    echo "Layout: each cluster-named subdirectory contains a 'config' file"
     echo ""
 }
 
-# Функция для получения списка доступных кластеров
+# List available clusters
 list_clusters() {
-    echo -e "${CYAN}Доступные кластеры:${NC}"
+    echo -e "${CYAN}Available clusters:${NC}"
     echo ""
     
     if [ ! -d "$KUBE_CLUSTERS_DIR" ]; then
-        echo -e "${YELLOW}Папка с конфигами не найдена: ${KUBE_CLUSTERS_DIR}${NC}"
+        echo -e "${YELLOW}Config directory not found: ${KUBE_CLUSTERS_DIR}${NC}"
         echo ""
-        echo "Для добавления кластера создайте папку и скопируйте конфиг:"
+        echo "To add a cluster, create a directory and copy the config:"
         echo "  mkdir -p ${KUBE_CLUSTERS_DIR}/<cluster-name>"
         echo "  cp /path/to/config ${KUBE_CLUSTERS_DIR}/<cluster-name>/config"
         echo ""
@@ -60,12 +60,12 @@ list_clusters() {
     local clusters=()
     local current_cluster=""
     
-    # Определяем текущий активный кластер
+    # Detect the current active cluster
     if [ -f "${KUBE_CONFIG_DIR}/config" ]; then
         current_cluster=$(kubectl config current-context 2>/dev/null || echo "")
     fi
     
-    # Собираем список кластеров (ищем подпапки с файлом config)
+    # Collect clusters (subdirectories that contain a config file)
     for cluster_dir in "$KUBE_CLUSTERS_DIR"/*; do
         if [ -d "$cluster_dir" ] && [ -f "$cluster_dir/config" ]; then
             local cluster_name=$(basename "$cluster_dir")
@@ -74,16 +74,16 @@ list_clusters() {
     done
     
     if [ ${#clusters[@]} -eq 0 ]; then
-        echo -e "${YELLOW}Конфиги кластеров не найдены!${NC}"
+        echo -e "${YELLOW}No cluster configs found!${NC}"
         echo ""
-        echo "Для добавления кластера создайте папку и скопируйте конфиг:"
+        echo "To add a cluster, create a directory and copy the config:"
         echo "  mkdir -p ${KUBE_CLUSTERS_DIR}/<cluster-name>"
         echo "  cp /path/to/config ${KUBE_CLUSTERS_DIR}/<cluster-name>/config"
         echo ""
         return 1
     fi
     
-    # Выводим список
+    # Print the list
     local index=1
     for cluster in "${clusters[@]}"; do
         local marker=""
@@ -100,91 +100,91 @@ list_clusters() {
     return 0
 }
 
-# Функция для показа текущего кластера
+# Show the current cluster
 show_current() {
     if [ ! -f "${KUBE_CONFIG_DIR}/config" ]; then
-        echo -e "${YELLOW}Активный конфиг не найден${NC}"
+        echo -e "${YELLOW}Active config not found${NC}"
         return 1
     fi
     
-    local current_context=$(kubectl config current-context 2>/dev/null || echo "не установлен")
-    local current_cluster=$(kubectl config view --minify -o jsonpath='{.clusters[0].name}' 2>/dev/null || echo "не определен")
+    local current_context=$(kubectl config current-context 2>/dev/null || echo "not set")
+    local current_cluster=$(kubectl config view --minify -o jsonpath='{.clusters[0].name}' 2>/dev/null || echo "not determined")
     
-    echo -e "${CYAN}Текущий активный кластер:${NC}"
+    echo -e "${CYAN}Current active cluster:${NC}"
     echo -e "  Context: ${GREEN}${current_context}${NC}"
     echo -e "  Cluster: ${GREEN}${current_cluster}${NC}"
     echo ""
     
-    # Показываем путь к активному конфигу
+    # Show the path of the active config
     if [ -L "${KUBE_CONFIG_DIR}/config" ]; then
         local symlink_target=$(readlink -f "${KUBE_CONFIG_DIR}/config")
-        echo -e "  Конфиг: ${symlink_target}"
+        echo -e "  Config: ${symlink_target}"
     else
-        echo -e "  Конфиг: ${KUBE_CONFIG_DIR}/config (прямой файл)"
+        echo -e "  Config: ${KUBE_CONFIG_DIR}/config (plain file)"
     fi
     echo ""
 }
 
-# Функция для переключения на кластер
+# Switch to a cluster
 switch_cluster() {
     local cluster_name="$1"
     local config_file="${KUBE_CLUSTERS_DIR}/${cluster_name}/config"
     
-    # Проверяем существование конфига
+    # Check that the config exists
     if [ ! -f "$config_file" ]; then
-        echo -e "${RED}Ошибка: Конфиг для кластера '${cluster_name}' не найден!${NC}"
+        echo -e "${RED}Error: Config for cluster '${cluster_name}' not found!${NC}"
         echo ""
-        echo "Конфиг должен находиться по пути: ${config_file}"
+        echo "The config must be at: ${config_file}"
         echo ""
-        echo "Доступные кластеры:"
+        echo "Available clusters:"
         list_clusters
         return 1
     fi
     
-    # Проверяем валидность конфига
+    # Validate the config
     if ! kubectl --kubeconfig="$config_file" cluster-info &>/dev/null; then
-        echo -e "${YELLOW}Предупреждение: Не удалось проверить подключение к кластеру${NC}"
-        echo "Конфиг будет активирован, но возможно потребуется обновление токенов/сертификатов"
+        echo -e "${YELLOW}Warning: Failed to verify the cluster connection${NC}"
+        echo "The config will be activated; tokens/certificates may need a refresh"
         echo ""
     fi
     
-    # Создаем симлинк или копируем конфиг
+    # Create a symlink or copy the config
     if [ -L "${KUBE_CONFIG_DIR}/config" ] || [ ! -f "${KUBE_CONFIG_DIR}/config" ]; then
-        # Если это симлинк или файла нет, создаем новый симлинк
+        # If it is a symlink or missing, create a new symlink
         ln -sf "$config_file" "${KUBE_CONFIG_DIR}/config"
     else
-        # Если это обычный файл, делаем резервную копию и создаем симлинк
+        # If it is a regular file, back it up and create a symlink
         local backup_file="${KUBE_CONFIG_DIR}/config.backup.$(date +%Y%m%d_%H%M%S)"
         cp "${KUBE_CONFIG_DIR}/config" "$backup_file"
-        echo -e "${YELLOW}Создана резервная копия: ${backup_file}${NC}"
+        echo -e "${YELLOW}Backup created: ${backup_file}${NC}"
         rm "${KUBE_CONFIG_DIR}/config"
         ln -sf "$config_file" "${KUBE_CONFIG_DIR}/config"
     fi
     
-    # Проверяем текущий контекст
+    # Check the current context
     local current_context=$(kubectl config current-context 2>/dev/null || echo "")
     
-    echo -e "${GREEN}✓ Успешно переключено на кластер: ${cluster_name}${NC}"
+    echo -e "${GREEN}✓ Switched to cluster: ${cluster_name}${NC}"
     if [ -n "$current_context" ]; then
         echo -e "  Context: ${current_context}"
     fi
     echo ""
     
-    # Показываем информацию о кластере
-    echo -e "${CYAN}Информация о кластере:${NC}"
-    kubectl cluster-info 2>/dev/null || echo -e "${YELLOW}Не удалось получить информацию о кластере${NC}"
+    # Show cluster info
+    echo -e "${CYAN}Cluster information:${NC}"
+    kubectl cluster-info 2>/dev/null || echo -e "${YELLOW}Failed to get cluster information${NC}"
     echo ""
 }
 
-# Функция для интерактивного выбора кластера
+# Interactive cluster picker
 interactive_select() {
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}Выбор Kubernetes кластера${NC}"
+    echo -e "${CYAN}Kubernetes cluster selection${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
     
-    # Получаем список кластеров
+    # Get the cluster list
     local clusters=()
     local current_cluster=""
     
@@ -192,7 +192,7 @@ interactive_select() {
         current_cluster=$(kubectl config current-context 2>/dev/null || echo "")
     fi
     
-    # Собираем список кластеров (ищем подпапки с файлом config)
+    # Collect clusters (subdirectories that contain a config file)
     for cluster_dir in "$KUBE_CLUSTERS_DIR"/*; do
         if [ -d "$cluster_dir" ] && [ -f "$cluster_dir/config" ]; then
             local cluster_name=$(basename "$cluster_dir")
@@ -201,21 +201,21 @@ interactive_select() {
     done
     
     if [ ${#clusters[@]} -eq 0 ]; then
-        echo -e "${YELLOW}Конфиги кластеров не найдены!${NC}"
+        echo -e "${YELLOW}No cluster configs found!${NC}"
         echo ""
-        echo "Для добавления кластера создайте папку и скопируйте конфиг:"
+        echo "To add a cluster, create a directory and copy the config:"
         echo "  mkdir -p ${KUBE_CLUSTERS_DIR}/<cluster-name>"
         echo "  cp /path/to/config ${KUBE_CLUSTERS_DIR}/<cluster-name>/config"
         echo ""
         return 1
     fi
     
-    # Выводим список с номерами
+    # Print the numbered list
     local index=1
     for cluster in "${clusters[@]}"; do
         local marker=""
         if [ -n "$current_cluster" ] && echo "$current_cluster" | grep -q "$cluster"; then
-            marker="${GREEN}✓${NC} (текущий)"
+            marker="${GREEN}✓${NC} (current)"
         else
             marker=" "
         fi
@@ -224,26 +224,26 @@ interactive_select() {
     done
     echo ""
     
-    # Запрашиваем выбор
-    read -p "Выберите кластер (1-${#clusters[@]}) или 'q' для выхода: " choice
+    # Ask for a choice
+    read -p "Select a cluster (1-${#clusters[@]}) or 'q' to quit: " choice
     
     if [ "$choice" = "q" ] || [ "$choice" = "Q" ]; then
-        echo "Отменено"
+        echo "Cancelled"
         return 0
     fi
     
-    # Проверяем валидность выбора
+    # Validate the choice
     if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt ${#clusters[@]} ]; then
-        echo -e "${RED}Неверный выбор!${NC}"
+        echo -e "${RED}Invalid choice!${NC}"
         return 1
     fi
     
-    # Переключаемся на выбранный кластер
+    # Switch to the selected cluster
     local selected_cluster="${clusters[$((choice-1))]}"
     switch_cluster "$selected_cluster"
 }
 
-# Основная логика
+# Main logic
 main() {
     local command="${1:-}"
     
@@ -266,6 +266,6 @@ main() {
     esac
 }
 
-# Запуск
+# Run
 main "$@"
 

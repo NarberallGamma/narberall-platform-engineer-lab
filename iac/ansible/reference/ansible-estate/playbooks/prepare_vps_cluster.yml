@@ -1,10 +1,10 @@
 ---
-# Подготовка VPS blockchain egress: firewall, Envoy (Docker Compose), chrony, опциональный SSH hardening.
-# Хосты: inventories/*/hosts.ini → [vps_cluster]
-# Переменные: group_vars/vps_cluster.yml
-# Предусловие: prepare_servers (Docker уже установлен, enable_docker: true).
+# Prepare VPS blockchain egress: firewall, Envoy (Docker Compose), chrony, optional SSH hardening.
+# Hosts: inventories/*/hosts.ini → [vps_cluster]
+# Variables: group_vars/vps_cluster.yml
+# Prerequisite: prepare_servers (Docker already installed, enable_docker: true).
 
-- name: Подготовка VPS-кластера для blockchain egress
+- name: Prepare the VPS cluster for blockchain egress
   hosts: vps_cluster
   gather_facts: true
   become: true
@@ -13,11 +13,11 @@
     - "{{ playbook_dir }}/../group_vars/vps_cluster.yml"
 
   pre_tasks:
-    - name: Информация о прогоне
+    - name: Run information
       ansible.builtin.debug:
         msg:
-          - "Хост: {{ inventory_hostname }} ({{ ansible_host }})"
-          - "Приложения Docker: {{ vps_docker_apps_base_dir }}/<app>/docker-compose.yml"
+          - "Host: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "Docker apps: {{ vps_docker_apps_base_dir }}/<app>/docker-compose.yml"
           - "Envoy: {{ vps_docker_apps_base_dir }}/{{ vps_envoy_app_name }}"
           - "Firewall :{{ vps_envoy_listen_port }} ← {{ vps_k8s_egress_source_cidrs | length }} CIDR"
           - "SSH restrict: {{ vps_ssh_restrict_source_ips }}, root login: {{ 'disabled' if vps_ssh_disable_root_login else 'allowed' }}"
@@ -27,6 +27,6 @@
     - role: prepare_vps_cluster
 
   post_tasks:
-    - name: Итог по хосту
+    - name: Host summary
       ansible.builtin.debug:
         msg: "VPS egress prepare completed on {{ inventory_hostname }}"

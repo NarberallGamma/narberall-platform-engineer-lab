@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа GitLab
+# Primary backup method for GitLab
 
-# Принцип работы:
-#   - создание резервной копии GitLab с помощью команды 'gitlab-rake gitlab:backup:create SKIP=registry'
-#     в каталоге /var/opt/gitlab/backups
-#   - резервное копирование каталогов /etc/gitlab и /var/opt/gitlab/backups с помощью скрипта restic_backup_files.sh
-#   - удаление старых резервных копий GitLab из каталога /var/opt/gitlab/backups
+# How it works:
+#   - create a GitLab backup with 'gitlab-rake gitlab:backup:create SKIP=registry'
+#     in /var/opt/gitlab/backups
+#   - back up /etc/gitlab and /var/opt/gitlab/backups with restic_backup_files.sh
+#   - delete old GitLab backups from /var/opt/gitlab/backups
 
-# Поддерживаемые опции:
-# -k|--prune      - строка с опциями алгоритма сохранения резервных копий в
-#                   формате программы restic, например '--keep-hourly 72 --keep-within 30d'
-#                   Необязательный аргумент, без указания этой опции будет
-#                   использовано значение ${CUSTOMPRUNE_DEFAULT}
+# Supported options:
+# -k|--prune      - retention-options string in
+#                   restic format, e.g. '--keep-hourly 72 --keep-within 30d'
+#                   Optional. When omitted,
+#                   ${CUSTOMPRUNE_DEFAULT} is used
 
-# Позиционные аргументы:
-# ${1} - имя задания, тег restic-репозитория, без указания будет
-#        использовано имя заданное в ${NAMEOFBACKUP_DEFAULT}
+# Positional arguments:
+# ${1} - job name, restic repository tag. When omitted,
+#        the name from ${NAMEOFBACKUP_DEFAULT} is used
 
-# Примеры использования в schedule:
+# Schedule examples:
 # restic_run_on.sh 10.0.0.1 <restic_bucket_from_values> restic_backup_gitlab.sh
 # restic_run_on.sh 10.0.0.1 <restic_bucket_from_values> restic_backup_gitlab.sh 'GITLAB'
 # restic_run_on.sh 10.0.0.1 <restic_bucket_from_values> restic_backup_gitlab.sh 'GITLAB --prune "--keep-hourly 3 --keep-within 30d"'
@@ -43,7 +43,7 @@ function alert {
 
 CUSTOMPRUNE=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options k: --longoptions ,prune: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

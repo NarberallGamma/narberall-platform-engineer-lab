@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Создание read-only пользователя PostgreSQL (схема public) по плейбуку ro_user_setup.yaml.
-# Запуск из корня каталога ansible: ./scripts/run/run_ro_user_setup.sh <db_name|all> --extra-vars "ro_user=... ro_password=..." [--check] [-v]
-# SSH не используется (inventory localhost). Для удалённых хостов см. scripts/run/lib/docker_ssh.sh
+# Create a read-only PostgreSQL user (public schema) via playbook ro_user_setup.yaml.
+# Run from the ansible directory root: ./scripts/run/run_ro_user_setup.sh <db_name|all> --extra-vars "ro_user=... ro_password=..." [--check] [-v]
+# SSH is not used (inventory localhost). For remote hosts see scripts/run/lib/docker_ssh.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -44,7 +44,7 @@ echo "=== RO USER SETUP (PostgreSQL read-only) ==="
 echo "Playbook: $PLAYBOOK_ABS"
 echo "Database(s): $DB_DESCRIPTION"
 echo ""
-echo "Пароли: ro_user, ro_password обязательны; pg_admin_password — из vars плейбука или --extra-vars."
+echo "Passwords: ro_user and ro_password are required; pg_admin_password from playbook vars or --extra-vars."
 echo ""
 read -p "Continue? (yes/no): " confirmation
 if [[ "$confirmation" != "yes" ]]; then

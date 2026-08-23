@@ -1,38 +1,38 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - делает бэкап содержимого pvc у pod
+# Backs up PVC contents of a pod
 
-# Принцип работы:
-#   - создание tar бэкапа файлов и/или каталогов в borg-репозитории с помощью
+# How it works:
+#   - create a tar backup of files and/or directories in the Borg repository with
 #     'borg create'
-#   - удаление старых бэкапов в borg-репозитории с помощью 'borg prune'
+#   - delete old backups in the Borg repository with 'borg prune'
 
-# Поддерживаемые опции:
-# -q|--add-quoted                - путь к файлу или каталогу который необходимо
-#                                  зарезервировать. Опция может быть указана несколько раз, в
-#                                  резервную копию попадут все указанные файлы и/или каталоги.
-#                                  Указанные пути будут помещены в одинарные кавычки - будут
-#                                  корректно обработаны пути с пробелами, но не будут работать
-#                                  wildcard-подстановки. Необязательный аргумент если не указан читаются все pvc в pod
-# -x|--exclude                   - паттерн для исключения файлов. Необязательный аргумент
-# -n|--namespace                 - namespace в кластере. Обязательный аргумент.
-# -p|--pod                       - префик либо полное имя пода для подключения. Обязательный аргумент.
-# -c|--container                 - Имя контейнера в поде. Необязательный аргумент.
-#    --context                   - Контект в конфиг файле kube. Необязательный аргумент.
-# -k|--prune                     - строка с опциями алгоритма сохранения резервных копий в
-#                                  формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                                  Необязательный аргумент, без указания этой опции будет
-#                                  использовано значение ${CUSTOMPRUNE_DEFAULT}
-#    --prefix                    - строка, помещаемая перед именем архива через знак '-',
-#                                  например 'PG-', 'files-'. Необязательный аргумент, без указания
-#                                  этой опции будет использовано значение ${TYPEOFBACKUP_DEFAULT}
-#    --skip-hostname-prefix      - позволяет исключить из имени Borg-репозитория
-#                                  префикс '$(hostname)-'. Необязательный аргумент
+# Supported options:
+# -q|--add-quoted                - path to a file or directory to
+#                                  back up. The option may be repeated; the
+#                                  backup will include all listed files and/or directories.
+#                                  Listed paths are wrapped in single quotes — paths
+#                                  with spaces are handled correctly, but wildcards
+#                                  will not expand. Optional; when omitted, all PVCs in the pod are read
+# -x|--exclude                   - file-exclusion pattern. Optional
+# -n|--namespace                 - cluster namespace. Required.
+# -p|--pod                       - pod name prefix or full name to connect to. Required.
+# -c|--container                 - Container name in the pod. Optional.
+#    --context                   - Context in the kube config file. Optional.
+# -k|--prune                     - retention-options string in
+#                                  Borg format, e.g. '--keep-hourly 72 --keep-within=30d'
+#                                  Optional. When omitted,
+#                                  ${CUSTOMPRUNE_DEFAULT} is used
+#    --prefix                    - string placed before the archive name, separated by '-',
+#                                  e.g. 'PG-', 'files-'. Optional. When omitted,
+#                                  this option, ${TYPEOFBACKUP_DEFAULT} is used
+#    --skip-hostname-prefix      - omit from the Borg repository name
+#                                  the '$(hostname)-' prefix. Optional
 
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория. Обязательный аргумент
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix. Required
 
-# Примеры использования в schedule:
+# Schedule examples:
 # borg_run_on.sh 10.0.0.1 borg_backup_kube_pvc.sh 'DATA  -q /app/data,/var -n production -p services-files-0 -c php --prune "--keep-hourly 3 --keep-within=30d"'
 
 ################################################################################
@@ -44,7 +44,7 @@ CUSTOMPRUNE_DEFAULT='--keep-hourly=1 --keep-within=14d --keep-weekly=4 --keep-mo
 
 export BORG_RSH="ssh -o ControlPath=none -o ControlMaster=no"
 
-# Путь до конфига kubectl
+# Path to the kubectl config
 KUBECONF_FILE="/root/.kube/config"
 export KUBECONFIG=${KUBECONF_FILE}
 KUBECTL="/opt/deckhouse/bin/kubectl"
@@ -74,7 +74,7 @@ POD_CONTAINER=""
 CONTEXT=""
 DONT_IGNORE_MISSING_FILES=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options q:n:p:c:k: --longoptions ,add-quoted:,namespace:,pod:,container:,context:,,prune:,prefix:,exclude:,dont-ignore-missing-files,skip-hostname-prefix -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

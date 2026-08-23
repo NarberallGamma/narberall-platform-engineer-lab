@@ -1,8 +1,8 @@
 ---
-# Включение/отключение логирования Xray через шаблон панели (xrayTemplateConfig).
-# Примеры:
+# Enable/disable Xray logging via the panel template (xrayTemplateConfig).
+# Examples:
 #   --tags xray_logging --limit jump-1.example.com
-#   -e xui_xray_logging_profile=default   # вернуть warning + access none
+#   -e xui_xray_logging_profile=default   # restore warning + access none
 
 - name: Resolve panel URL and credentials
   ansible.builtin.import_tasks: panel_resolve_context.yml

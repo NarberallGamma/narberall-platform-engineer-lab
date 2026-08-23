@@ -1,6 +1,6 @@
 ---
-# Ожидает _mkcol_batch — список элементов nextcloud_folders_flat (path, …). Параллельный MKCOL в пределах батча.
-- name: Запустить MKCOL (async) в батче
+# Expects _mkcol_batch — list of nextcloud_folders_flat items (path, …). Parallel MKCOL within the batch.
+- name: Fire MKCOL (async) in a batch
   ansible.builtin.uri:
     url: "{{ nextcloud_webdav_url }}/{{ _mkcol_folder.path | urlencode }}"
     method: MKCOL
@@ -16,7 +16,7 @@
   poll: 0
   register: _mkcol_async_fired
 
-- name: Дождаться завершения MKCOL батча
+- name: Wait for the MKCOL batch to finish
   ansible.builtin.async_status:
     jid: "{{ _mkcol_job.ansible_job_id }}"
   loop: "{{ _mkcol_async_fired.results }}"

@@ -1,5 +1,5 @@
 ---
-# Убрать старые rules для managed outbound и для inbound-vless-proxy-ru (без rejectattr/inboundTag).
+# Drop old rules for managed outbound and for inbound-vless-proxy-ru (without rejectattr/inboundTag).
 
 - name: Init filtered routing rules list
   ansible.builtin.set_fact:

@@ -1,5 +1,5 @@
 ---
-- name: Перезапустить docker compose приложения
+- name: Restart the application docker compose
   community.docker.docker_compose_v2:
     project_src: "{{ docker_app_base_dir }}/{{ docker_app.slug }}"
     env_files: "{{ docker_app_compose_env_files if docker_app_compose_env_files | length > 0 else omit }}"

@@ -5,8 +5,8 @@
       - xui_inbound_record is defined
       - xui_inbound_record | length > 0
     fail_msg: >-
-      Inbound «{{ xui_inbound_remark }}» не найден после inbounds/add.
-      Проверить ответ API и шаблон inbound-api-payload.
+      Inbound «{{ xui_inbound_remark }}» was not found after inbounds/add.
+      Check the API response and the inbound-api-payload template.
 
 - name: Set chain client email for inbound summary
   ansible.builtin.set_fact:
@@ -29,7 +29,7 @@
     that:
       - xui_chain_client_uuid | default('') | length > 0
     fail_msg: >-
-      Нет клиента {{ xui_system_client_email }} в inbound — chain UUID для proxy outbound не определён.
+      Client {{ xui_system_client_email }} is missing from the inbound — chain UUID for the proxy outbound is undefined.
 
 - name: Build inbound summary for artifacts and proxy
   ansible.builtin.set_fact:

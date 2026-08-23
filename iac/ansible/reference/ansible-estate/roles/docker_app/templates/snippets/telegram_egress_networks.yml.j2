@@ -1,4 +1,4 @@
-{# Telegram VPS egress (client): external network из docker_app.telegram_egress.network_name #}
+{# Telegram VPS egress (client): external network from docker_app.telegram_egress.network_name #}
 {% set te = app_item.value.telegram_egress | default({}) %}
 {% if te.enabled | default(false) | bool %}
 

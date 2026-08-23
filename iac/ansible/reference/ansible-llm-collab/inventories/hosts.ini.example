@@ -24,7 +24,7 @@ app-05.example.com ansible_host=10.10.1.24
 [nextcloud_dev]
 nextcloud-dev.example.com ansible_host=10.10.1.22
 
-# Nextcloud prod: nginx nextcloud.example.com.conf — upstream .8/.10 активные, .20 backup
+# Nextcloud prod: nginx nextcloud.example.com.conf — upstream .8/.10 active, .20 backup
 [nextcloud_prod_cluster]
 nextcloud-prod-oc1.example.com ansible_host=10.10.3.8
 nextcloud-prod-oc2.example.com ansible_host=10.10.3.10
@@ -34,12 +34,12 @@ nextcloud-prod-oc3.example.com ansible_host=10.10.3.20
 [nextcloud_regul]
 app-02.example.com
 
-# Docker-хосты (Nextcloud infra)
+# Docker hosts (Nextcloud infra)
 [docker_hosts]
 docker-01.example.com ansible_host=10.10.3.4
 docker-02.example.com ansible_host=10.10.3.7
 
-# ServiceDesk prod (группа sd_prod — не sd-prod.example.com, чтобы не совпадало с именем хоста)
+# ServiceDesk prod (group sd_prod — not sd-prod.example.com, so it does not collide with the host name)
 [sd_prod]
 sd-prod.example.com ansible_host=10.10.1.73
 
@@ -64,7 +64,7 @@ jsm-dev.example.com ansible_host=10.10.1.31
 llm-dev-01-old.example.com ansible_host=10.10.2.98
 llm-dev-01.example.com ansible_host=10.10.2.18
 
-# PostgreSQL / DB (1C, Jira, Nextcloud и др.)
+# PostgreSQL / DB (1C, Jira, Nextcloud, etc.)
 [db_platform]
 db-01.example.com ansible_host=10.10.2.17
 db-02.example.com ansible_host=10.10.1.40
@@ -78,7 +78,7 @@ postgresql-prod-01-member-0.example.com ansible_host=10.10.11.97
 postgresql-prod-01-member-1.example.com ansible_host=10.10.11.113
 postgresql-prod-01-member-2.example.com ansible_host=10.10.11.249
 
-# Redis (группа redis_cluster — не redis, чтобы не совпадало с хостом redis)
+# Redis (group redis_cluster — not redis, so it does not collide with the redis host)
 [redis_cluster]
 redis.example.com ansible_host=10.10.11.8
 redis-01.example.com ansible_host=10.10.11.114
@@ -92,7 +92,7 @@ redis-01.example.com ansible_host=10.10.11.114
 proxy-01.example.com ansible_host=10.10.12.21
 proxy-02.example.com ansible_host=10.10.12.41
 
-# Infra: LB, мониторинг, backup, тесты
+# Infra: LB, monitoring, backup, tests
 [infra]
 lb-01.example.com ansible_host=10.10.1.17
 nessus-01.example.com ansible_host=10.10.1.20
@@ -116,7 +116,7 @@ mtproto.example.com ansible_host=203.0.113.10
 [vmware:vars]
 ansible_user=ubuntu
 
-# Подготовка (prepare_servers, EDR agent и др.): имена хостов, ansible_host — в секциях выше
+# Prep (prepare_servers, EDR agent, etc.): host names and ansible_host — in the sections above
 [prepare]
 app-02.example.com
 app-03.example.com

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Unified CryptoPro bootstrap: optional keys import from archive + vendor PREGEN/GENKEY logic.
-# VM deploy: KEYS_IMPORT_ENABLED=false, keys копируются вручную в data/cprocsp/keys до compose up.
+# VM deploy: KEYS_IMPORT_ENABLED=false, keys are copied manually into data/cprocsp/keys before compose up.
 set -e
 
 USER_ID=10001

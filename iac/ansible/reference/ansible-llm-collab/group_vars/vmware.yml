@@ -1,7 +1,7 @@
-# Cloud.ru VMware (группа vmware): урезанный prepare_servers.
-# Пакеты, таймзона, Docker + containerd в /docker. Без AD/SSSD/SSH jobs,
-# hostname, edr-vendor, hardening, смены root и NVIDIA.
-# include_vars в playbooks/prepare_servers.yml перекрывает group_vars/prepare_servers.yml.
+# Cloud.ru VMware (vmware group): trimmed prepare_servers.
+# Packages, timezone, Docker + containerd under /docker. No AD/SSSD/SSH jobs,
+# hostname, edr-vendor, hardening, root password change, or NVIDIA.
+# include_vars in playbooks/prepare_servers.yml overrides group_vars/prepare_servers.yml.
 enable_timezone: true
 enable_apt_basics: true
 enable_apt_upgrade: true

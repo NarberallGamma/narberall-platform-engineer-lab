@@ -1,4 +1,4 @@
-# 3X-UI / Xray — профиль PROXY (Jump RU). Сверка с vless/README.md
+# 3X-UI / Xray — PROXY profile (Jump RU). Cross-check with vless/README.md
 
 profile: proxy
 server_role: jump_ru
@@ -80,10 +80,10 @@ outbound:
 routing:
   enabled: {{ xui_routing_enabled | bool | lower }}
   rule: "inbound_tag → {{ xui_routing_outbound_tag }}"
-  inbound_tag: "{{ xui_routing_inbound_tag }}"  # тег inbound в панели (inbound-443 / vless-main)
+  inbound_tag: "{{ xui_routing_inbound_tag }}"  # inbound tag in the panel (inbound-443 / vless-main)
   outbound_tag: "{{ xui_routing_outbound_tag }}"
 
-# Пример JSON исходящего (вставить в панель → Outbounds → JSON)
+# Sample outbound JSON (paste in the panel → Outbounds → JSON)
 outbound_json_example: |
   {
     "protocol": "vless",
@@ -93,7 +93,7 @@ outbound_json_example: |
         "address": "{{ xui_outbound_address }}",
         "port": {{ xui_outbound_port }},
         "users": [{
-          "id": "<UUID с NL inbound для Jump>",
+          "id": "<UUID from the NL inbound for Jump>",
           "encryption": "{{ xui_outbound_encryption }}",
           "flow": "{{ xui_outbound_flow }}"
         }]
@@ -105,8 +105,8 @@ outbound_json_example: |
       "realitySettings": {
         "serverName": "{{ xui_outbound_sni }}",
         "fingerprint": "{{ xui_outbound_fingerprint }}",
-        "publicKey": "<с NL inbound Reality>",
-        "shortId": "<shortId с NL>",
+        "publicKey": "<from NL inbound Reality>",
+        "shortId": "<shortId from NL>",
         "spiderX": "{{ xui_outbound_spider_x }}"
       },
       "tcpSettings": { "header": { "type": "none" } },

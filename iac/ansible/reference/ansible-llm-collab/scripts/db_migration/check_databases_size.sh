@@ -1,9 +1,9 @@
 #!/bin/bash
 # check_databases_size.sh
-# Скрипт для проверки размера баз данных и количества таблиц
-# Подключение через peer authentication (как postgres пользователь на localhost)
+# Script to check database size and table count
+# Connect via peer authentication (as the postgres user on localhost)
 # Usage: ./check_databases_size.sh [dblist_file.txt]
-#   Если указан файл со списком БД - проверит только указанные БД из списка
+#   When a list file is passed, only listed databases are checked
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -14,27 +14,27 @@ NC='\033[0m'
 DB_LIST_FILE="$1"
 
 # ============================================
-# ПРОВЕРКА ПОДКЛЮЧЕНИЯ
+# CONNECTION CHECK
 # ============================================
 
 echo "=== Database Size Check Tool ==="
 echo ""
 
-# Проверка подключения к PostgreSQL
+# Check PostgreSQL connection
 if ! psql -d postgres -c "SELECT 1" >/dev/null 2>&1; then
     echo -e "${RED}Error: Cannot connect to PostgreSQL!${NC}"
     echo "Make sure you are running as postgres user with peer authentication enabled."
     exit 1
 fi
 
-# Получить версию PostgreSQL
+# Get PostgreSQL version
 pg_version=$(psql -d postgres -tAc "SELECT version();" 2>/dev/null | head -n1)
 echo -e "${GREEN}✓ Connected to PostgreSQL${NC}"
 echo "  Version: $pg_version"
 echo ""
 
 # ============================================
-# ПОЛУЧЕНИЕ СПИСКА БАЗ ДАННЫХ
+# GET DATABASE LIST
 # ============================================
 
 if [ -n "$DB_LIST_FILE" ]; then
@@ -50,16 +50,16 @@ if [ -n "$DB_LIST_FILE" ]; then
     not_found_count=0
     > /tmp/missing_dbs.txt
     
-    # Проверить каждую БД из списка
+    # Check each database from the list
     while IFS= read -r requested_db || [ -n "$requested_db" ]; do
-        # Пропускаем пустые строки и комментарии, очищаем от пробелов и невидимых символов
+        # Skip empty lines and comments; strip spaces and invisible characters
         requested_db=$(echo "$requested_db" | sed 's/#.*$//' | tr -d '\r\n' | xargs)
         if [ -z "$requested_db" ]; then continue; fi
         
-        # Экранируем одинарные кавычки в имени БД для SQL (удваиваем их)
+        # Escape single quotes in the database name for SQL (double them)
         escaped_db=$(printf '%s' "$requested_db" | sed "s/'/''/g")
         
-        # Проверить существование БД через SQL запрос
+        # Check that the database exists via SQL
         db_exists=$(psql -d postgres -tAc \
             "SELECT 1 FROM pg_database WHERE datname = '$escaped_db'" 2>/dev/null | tr -d '[:space:]')
         
@@ -68,7 +68,7 @@ if [ -n "$DB_LIST_FILE" ]; then
             ((found_count++))
         else
             echo -e "${RED}✗ Database not found: $requested_db${NC}"
-            # Отладочный вывод - проверим что есть в базе (поиск похожих имен)
+            # Debug output - look for similar names in the instance
             escaped_pattern=$(printf '%s' "$requested_db" | sed "s/'/''/g")
             similar=$(psql -d postgres -tAc \
                 "SELECT datname FROM pg_database WHERE datname LIKE '%$escaped_pattern%' LIMIT 1" 2>/dev/null | xargs)
@@ -95,7 +95,7 @@ if [ -n "$DB_LIST_FILE" ]; then
     
     rm -f /tmp/all_available_dbs.txt /tmp/missing_dbs.txt
 else
-    # Получить все БД (кроме системных)
+    # Get all databases (except system ones)
     echo "Fetching database list from server..."
     psql -d postgres -tAc \
       "SELECT datname
@@ -115,7 +115,7 @@ if [ "$db_count" -eq 0 ]; then
 fi
 
 # ============================================
-# ФУНКЦИИ
+# FUNCTIONS
 # ============================================
 
 get_db_size() {
@@ -143,7 +143,7 @@ format_size() {
 }
 
 # ============================================
-# СБОР ДАННЫХ
+# COLLECT DATA
 # ============================================
 
 echo ""
@@ -172,7 +172,7 @@ while IFS= read -r dbname; do
 done < databases_to_check.txt
 
 # ============================================
-# ВЫВОД РЕЗУЛЬТАТОВ
+# PRINT RESULTS
 # ============================================
 
 echo ""
@@ -181,7 +181,7 @@ echo "=== Database Size Report ==="
 echo "========================================"
 echo ""
 
-# Таблица с результатами
+# Results table
 printf "%-30s %15s %10s\n" "Database Name" "Size" "Tables"
 echo "----------------------------------------------------------------"
 
@@ -197,7 +197,7 @@ total_size_display=$(format_size "$total_size")
 printf "%-30s %15s %10s\n" "TOTAL" "$total_size_display" "-"
 echo ""
 
-# Дополнительная статистика
+# Extra statistics
 echo "=== Statistics ==="
 total_tables=0
 while IFS='|' read -r dbname size_bytes table_count; do
@@ -212,7 +212,7 @@ avg_size=$((total_size / db_count))
 avg_size_display=$(format_size "$avg_size")
 echo "Average database size: $avg_size_display"
 
-# Топ-5 самых больших БД
+# Top 5 largest databases
 echo ""
 echo "=== Top 5 Largest Databases ==="
 sort -t'|' -k2 -rn /tmp/db_info.txt | head -5 | while IFS='|' read -r dbname size_bytes table_count; do

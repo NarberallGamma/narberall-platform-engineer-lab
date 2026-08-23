@@ -1,5 +1,5 @@
 ---
-- name: Создание пользователя в удалённой PostgreSQL и выдача прав
+- name: Create user on remote PostgreSQL and grant privileges
   hosts: localhost
   connection: local
   become: no
@@ -12,9 +12,9 @@
     pg_port: 5432
     pg_admin_user: root
     pg_admin_password: "{{ lookup('community.hashi_vault.hashi_vault', 'secret=secret/data/postgres_preprod:admin_password', url=vault_addr, token=vault_token) }}"
-    default_encoding: "UTF8"  # Кодировка по умолчанию
-    default_lc_collate: "en_US.UTF-8"  # Локаль для сортировки по умолчанию
-    default_lc_ctype: "en_US.UTF-8"  # Локаль для классификации символов по умолчанию
+    default_encoding: "UTF8"  # Default encoding
+    default_lc_collate: "en_US.UTF-8"  # Default collation locale
+    default_lc_ctype: "en_US.UTF-8"  # Default character classification locale
 
     target_schema: public
 

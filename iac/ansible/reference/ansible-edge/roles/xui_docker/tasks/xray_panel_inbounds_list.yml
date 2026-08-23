@@ -1,5 +1,5 @@
 ---
-# GET /panel/api/inbounds/list → register xui_inbounds_list (нужен до port migrate / match).
+# GET /panel/api/inbounds/list → register xui_inbounds_list (required before port migrate / match).
 
 - name: List existing inbounds via panel API
   ansible.builtin.uri:

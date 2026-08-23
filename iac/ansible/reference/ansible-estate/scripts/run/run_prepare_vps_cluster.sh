@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Подготовка VPS blockchain egress (prepare_vps_cluster): firewall, Envoy, chrony.
-# Обязательно: окружение (--prod) и scope (--all или --limit HOST).
-# Перед прогоном заполнить vps_k8s_egress_source_cidrs в group_vars/vps_cluster.yml.
+# VPS blockchain egress bootstrap (prepare_vps_cluster): firewall, Envoy, chrony.
+# Required: environment (--prod) and scope (--all or --limit HOST).
+# Before a run, fill vps_k8s_egress_source_cidrs in group_vars/vps_cluster.yml.
 #
-# Предусловие: prepare_servers на тех же хостах (Docker).
+# Prerequisite: prepare_servers on the same hosts (Docker).
 #
-# SSH-ключ с passphrase:
+# SSH key with passphrase:
 #   eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
 #   ./scripts/run/run_prepare_vps_cluster.sh --prod --limit estate-vps-cluster-01 --ssh-key ~/.ssh/your_key --ssh-agent
 set -euo pipefail
@@ -43,17 +43,17 @@ done
 if [[ "$COMMAND" == "help" ]]; then
   echo "Usage: $0 [deploy|status|help] --prod|--preprod (--all | --limit HOST) [options...]"
   echo ""
-  echo "  deploy  — ansible-playbook prepare_vps_cluster.yml (по умолчанию)"
-  echo "  status  — docker / ufw / listener :443 на vps_cluster"
+  echo "  deploy  — ansible-playbook prepare_vps_cluster.yml (default)"
+  echo "  status  — docker / ufw / listener :443 on vps_cluster"
   echo ""
   echo "Required: --prod and --all or --limit HOST"
-  echo "Vars: group_vars/vps_cluster.yml (vps_k8s_egress_source_cidrs при enable_vps_firewall)"
+  echo "Vars: group_vars/vps_cluster.yml (vps_k8s_egress_source_cidrs when enable_vps_firewall)"
   echo "Credentials: artifacts/vps_cluster_credentials/<hostname>/admin_vps_credentials.txt"
   exit 0
 fi
 
 if [[ -z "$INVENTORY" ]]; then
-  echo "ERROR: Specify environment: --prod (vps_cluster в prod inventory)"
+  echo "ERROR: Specify environment: --prod (vps_cluster is in the prod inventory)"
   exit 1
 fi
 if [[ -z "$SCOPE_SPECIFIED" ]]; then

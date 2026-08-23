@@ -1,34 +1,34 @@
 #!/usr/bin/env bash
 
-# Этот скрипт может быть использован для резервного копирования данных influxdb, работающего в кластере Kubernetes
+# Can be used to back up InfluxDB data running in a Kubernetes cluster
 
-# Принцип работы:
-#   - экспорт данных на ФС с помощью утилиты influxd backup
-#   - передача tar-архива каталога с полученными файлами в репозиторий borg с помощью
+# How it works:
+#   - export data to the filesystem with influxd backup
+#   - send a tar archive of the collected files into the Borg repository with
 #     'borg create'
-#   - удаление старых бекапов в borg-репозитории с помощью 'borg prune'
+#   - delete old backups in the Borg repository with 'borg prune'
 
-# Поддерживаемые опции:
-# -t|--tmpdir                    - путь к временному каталогу который будет использован для экспорта
-#                                  данных из influxd Необязательный аргумент, если не указан используется TMPDIR_DEFAULT
-# -n|--namespace                 - namespace в кластере. Обязательный аргумент.
-# -p|--pod                       - префикс либо полное имя pod-а для подключения. Обязательный аргумент.
-# -c|--container                 - Имя контейнера в pod-е. Необязательный аргумент.
-#    --context                   - Контекcт в конфиг-файле kubectl. Необязательный аргумент.
-# -k|--prune                     - строка с опциями алгоритма сохранения резервных копий в
-#                                  формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                                  Необязательный аргумент, без указания этой опции будет
-#                                  использовано значение ${CUSTOMPRUNE_DEFAULT}
-#    --prefix                    - строка, помещаемая перед именем архива через знак '-',
-#                                  например 'PG-', 'files-'. Необязательный аргумент, без указания
-#                                  этой опции будет использовано значение ${TYPEOFBACKUP_DEFAULT}
-#    --skip-hostname-prefix      - позволяет исключить из имени Borg-репозитория
-#                                  префикс '$(hostname)-'. Необязательный аргумент
+# Supported options:
+# -t|--tmpdir                    - path to the temporary directory used to export
+#                                  data from influxd. Optional; when omitted, TMPDIR_DEFAULT is used
+# -n|--namespace                 - cluster namespace. Required.
+# -p|--pod                       - pod name prefix or full name to connect to. Required.
+# -c|--container                 - Container name in the pod. Optional.
+#    --context                   - Context in the kubectl config file. Optional.
+# -k|--prune                     - retention-options string in
+#                                  Borg format, e.g. '--keep-hourly 72 --keep-within=30d'
+#                                  Optional. When omitted,
+#                                  ${CUSTOMPRUNE_DEFAULT} is used
+#    --prefix                    - string placed before the archive name, separated by '-',
+#                                  e.g. 'PG-', 'files-'. Optional. When omitted,
+#                                  this option, ${TYPEOFBACKUP_DEFAULT} is used
+#    --skip-hostname-prefix      - omit from the Borg repository name
+#                                  the '$(hostname)-' prefix. Optional
 
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория. Обязательный аргумент
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix. Required
 
-# Примеры использования в schedule:
+# Schedule examples:
 # borg_run_on.sh 10.0.0.1 borg_backup_kube_influx.sh 'DATA -q /app/data,/var --prune "--keep-hourly 3 --keep-within=30d"'
 
 ################################################################################
@@ -41,7 +41,7 @@ CUSTOMPRUNE_DEFAULT='--keep-hourly=1 --keep-within=14d --keep-weekly=4 --keep-mo
 
 export BORG_RSH="ssh -o ControlPath=none -o ControlMaster=no"
 
-# Путь до конфига kubectl
+# Path to the kubectl config
 KUBECONF_FILE="/root/.kube/config"
 export KUBECONFIG=${KUBECONF_FILE}
 KUBECTL="/opt/deckhouse/bin/kubectl"
@@ -70,7 +70,7 @@ POD_CONTAINER=""
 CONTEXT=""
 DONT_IGNORE_MISSING_FILES=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options t:n:p:c:k: --longoptions ,tmpdir:,namespace:,pod:,container:,context:,,prune:,prefix:,dont-ignore-missing-files,skip-hostname-prefix -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

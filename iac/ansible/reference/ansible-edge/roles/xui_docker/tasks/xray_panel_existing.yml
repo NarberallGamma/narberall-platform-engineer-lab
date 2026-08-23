@@ -3,7 +3,7 @@
   ansible.builtin.assert:
     that:
       - xui_inbound_record['id'] is defined
-    fail_msg: "Inbound «{{ xui_inbound_remark }}» не найден в панели."
+    fail_msg: "Inbound «{{ xui_inbound_remark }}» was not found in the panel."
 
 - name: Parse existing inbound stream settings
   ansible.builtin.set_fact:

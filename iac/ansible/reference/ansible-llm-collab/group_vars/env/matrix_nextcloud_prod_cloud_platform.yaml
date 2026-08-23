@@ -1,24 +1,24 @@
-# Шаблон структуры папок и матрицы прав — Clients INTFS
-# Источник: https://wiki.x.example.com/pages/viewpage.action?pageId=1212731
-# Профиль Ansible: nextcloud-prod; prod (https://nextcloud.x.example.com / Clients INTFS). Файл матрицы:
-#   matrix_nextcloud_prod_cloud_platform.yaml — содержимое как у dev (matrix_nextcloud_dev_cloud_platform.yaml); синхронизация с вики при изменениях.
+# Folder structure and ACL matrix template — Clients INTFS
+# Source: https://wiki.x.example.com/pages/viewpage.action?pageId=1212731
+# Ansible profile: nextcloud-prod; prod (https://nextcloud.x.example.com / Clients INTFS). Matrix file:
+#   matrix_nextcloud_prod_cloud_platform.yaml — same content as dev (matrix_nextcloud_dev_cloud_platform.yaml); keep in sync with the wiki on matrix changes.
 
-# Путь — относительно корня groupfolder (Clients INTFS). Плейсхолдер {client} подставляется именем клиента.
-# Порядок записей = порядок создания. view = просмотр (RO), edit = редактирование.
-# Соответствие во View: явный список групп → +read (nextcloud_occ_view_permissions); маркер __NC_MATRIX_RO_ALL__ во view —
-# все группы матрицы только RO (нет отдельной LDAP-группы «INTFS Clients RO», см. group_vars nextcloud_occ_ro_permissions).
+# Path is relative to the groupfolder root (Clients INTFS). Placeholder {client} is replaced with the client name.
+# Entry order = creation order. view = read-only, edit = write.
+# View mapping: an explicit group list → +read (nextcloud_occ_view_permissions); the __NC_MATRIX_RO_ALL__ marker in view —
+# all matrix groups RO only (no separate LDAP group "INTFS Clients RO"; see group_vars nextcloud_occ_ro_permissions).
 # edit → +read +write +create +delete (nextcloud_occ_edit_permissions).
-# Уровень 4 только под `{client}/{client}/Accounting`: `children_mkcol` — MKCOL; подпапки без своей строки в `children` наследуют view/edit узла Accounting (явный occ).
-# Опционально `children` — переопределения L4; для «Договоры» отдельной строки нет — наследование от родителя. `deny_on_l4_children` — явный deny (напр. Assistant на всех L4 кроме except_child_name «Договоры») для корректного advanced ACL в Nextcloud.
+# Level 4 only under `{client}/{client}/Accounting`: `children_mkcol` — MKCOL; subfolders without their own `children` row inherit the Accounting node view/edit (explicit occ).
+# Optional `children` — L4 overrides; "Contracts" has no separate row — inherit from the parent. `deny_on_l4_children` — explicit deny (e.g. Assistant on all L4 except except_child_name "Contracts") for correct Nextcloud advanced ACL.
 #
-# Якоря (defaults): &name задаёт именованный фрагмент, *name — подставляет его. Менять список прав —
-# править в defaults (одно место), в folders только ссылки *name. Новый набор: добавить запись в defaults
-# с &новое_имя и в folders указать view/edit: *новое_имя.
+# Anchors (defaults): &name defines a named fragment, *name inserts it. To change a permission list —
+# edit defaults (one place); folders only keep *name references. New set: add an entry in defaults
+# with &new_name and set view/edit: *new_name in folders.
 #
-# Во view вместо LDAP-группы «INTFS Clients RO» используется маркер __NC_MATRIX_RO_ALL__ (defaults: view_ro), Ansible разворачивает его в RO для объединения всех групп матрицы (см. roles/nextcloud_groupfolders groupfolders_apply_permissions.yml).
-# L3 «Требования PAY» под {client}/{client}: без __NC_MATRIX_RO_ALL__ — только INTFS Clients Payroll и INTFS Clients IntControl; явный matrix_deny по остальным группам матрицы плюс авто-deny в group_vars.
+# view uses the __NC_MATRIX_RO_ALL__ marker (defaults: view_ro) instead of the LDAP group "INTFS Clients RO"; Ansible expands it to RO for the union of all matrix groups (see roles/nextcloud_groupfolders groupfolders_apply_permissions.yml).
+# L3 "PAY requests" under {client}/{client}: no __NC_MATRIX_RO_ALL__ — only INTFS Clients Payroll and INTFS Clients IntControl; explicit matrix_deny for the other matrix groups plus auto-deny in group_vars.
 #
-# При расхождении путей occ с каталогом на диске — опциональный children_mkcol_occ_path_fallback в матрице (см. matrix_regul_cloud_platform.yaml).
+# When occ paths diverge from the on-disk tree — optional children_mkcol_occ_path_fallback in the matrix (see matrix_regul_cloud_platform.yaml).
 
 defaults:
   view_ro: &view_ro [__NC_MATRIX_RO_ALL__]
@@ -30,7 +30,7 @@ defaults:
     - INTFS Clients Finance
     - INTFS Clients Corp
     - INTFS Clients IntControl
-  # Внутренний обмен (уровень 2): те же группы на просмотр и на редактирование (как Corp — один якорь на view и edit)
+  # Internal exchange (level 2): the same groups for view and edit (like Corp — one anchor for view and edit)
   edit_internal: &edit_internal
     - INTFS Clients Payroll
     - INTFS Clients Accounting
@@ -139,42 +139,42 @@ folders:
     view: *view_ro
     edit: *edit_it
 
-  - path: "{client}/Внутренний обмен"
+  - path: "{client}/Internal exchange"
     view: *edit_internal
     edit: *edit_internal
 
-  - path: "{client}/Файлобменник"
+  - path: "{client}/File exchange"
     view: *view_ro
     edit: *edit_file_exchange
 
-  # Уровень 3 (Client name): просмотр и редактирование — одни и те же группы (кроме Clients info). L4 только здесь, не под Файлобменник/Accounting.
+  # Level 3 (Client name): the same groups for view and edit (except Clients info). L4 only here, not under File exchange/Accounting.
   - path: "{client}/{client}/Accounting"
     view: *edit_accounting
     edit: *edit_accounting
     children_mkcol:
-      - Авансовые отчеты
-      - Акты сверок
-      - Банк
-      - Выручка
-      - ГПХ
-      - Договоры
-      - Закрытие периода
-      - Инвентаризация
-      - Инструкции по клиенту
-      - НСО и депозиты
-      - Отчетность
-      - Представительские расходы
-      - Реализация
-      - Сверка ЕНС
-      - Статистика
-      - Счета на оплату
-      - Требования ИФНС
-      - Учетная политика
+      - Expense reports
+      - Reconciliations
+      - Bank
+      - Revenue
+      - Civil contracts
+      - Contracts
+      - Period close
+      - Inventory count
+      - Client instructions
+      - Minimum balances and deposits
+      - Reporting
+      - Entertainment expenses
+      - Sales
+      - Unified tax account reconciliation
+      - Statistics
+      - Invoices
+      - FTS requests
+      - Accounting policy
     deny_on_l4_children:
-      except_child_name: "Договоры"
+      except_child_name: "Contracts"
       groups: *assistant_only
 
-  # Clients info — исключение: просмотр RO (все группы матрицы), редактирование — свой список
+  # Clients info — exception: RO view (all matrix groups), edit — its own list
   - path: "{client}/{client}/Clients info"
     view: *view_ro
     edit: *edit_clients_info
@@ -207,29 +207,29 @@ folders:
     view: *edit_purchasing
     edit: *edit_purchasing
 
-  - path: "{client}/{client}/Внутренний контроль"
+  - path: "{client}/{client}/Internal control"
     view: *edit_int_control
     edit: *edit_int_control
 
-  - path: "{client}/{client}/Требования PAY"
+  - path: "{client}/{client}/PAY requests"
     view: *edit_trebovaniya_pay
     edit: *edit_trebovaniya_pay
     matrix_deny: *intfs_matrix_deny_trebovaniya_pay
 
-  # Уровень 3 (Файлобменник): просмотр и редактирование — одни и те же группы
-  - path: "{client}/Файлобменник/HRA"
+  # Level 3 (File exchange): the same groups for view and edit
+  - path: "{client}/File exchange/HRA"
     view: *edit_file_hra
     edit: *edit_file_hra
 
-  - path: "{client}/Файлобменник/Corp"
+  - path: "{client}/File exchange/Corp"
     view: *edit_file_corp
     edit: *edit_file_corp
 
-  # Без children_mkcol: дерево L4 только у {client}/{client}/Accounting выше.
-  - path: "{client}/Файлобменник/Accounting"
+  # No children_mkcol: the L4 tree exists only on {client}/{client}/Accounting above.
+  - path: "{client}/File exchange/Accounting"
     view: *edit_file_accounting
     edit: *edit_file_accounting
 
-  - path: "{client}/Файлобменник/IntSecurity"
+  - path: "{client}/File exchange/IntSecurity"
     view: *edit_file_intsecurity
     edit: *edit_file_intsecurity

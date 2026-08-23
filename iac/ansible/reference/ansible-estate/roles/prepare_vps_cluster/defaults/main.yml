@@ -1,8 +1,8 @@
 ---
-# Значения по умолчанию роли prepare_vps_cluster.
-# Переопределение: group_vars/vps_cluster.yml, host_vars.
+# Default values for the prepare_vps_cluster role.
+# Override: group_vars/vps_cluster.yml, host_vars.
 
-# Включатели блоков (Docker не устанавливается, только проверка)
+# Block toggles (Docker is not installed, check only)
 enable_vps_docker_check: true
 enable_vps_admin_user: true
 enable_vps_ssh: true
@@ -11,7 +11,7 @@ enable_vps_envoy: true
 enable_vps_envoy_logging: true
 enable_vps_chrony: true
 
-# Локальный admin-пользователь VPS (sudo, пароль + SSH keys)
+# Local VPS admin user (sudo, password + SSH keys)
 vps_admin_username: admin_vps
 vps_admin_password_length: 30
 vps_admin_regenerate_password: false
@@ -22,7 +22,7 @@ vps_admin_artifacts_dest: "{{ playbook_dir }}/../artifacts/vps_cluster_credentia
 vps_admin_credentials_tmp_path: /tmp/vps_admin_credentials.txt
 vps_admin_cleanup_credentials_tmp: true
 
-# SSH: по умолчанию открыт с любого IP, root разрешён; ограничения выключены
+# SSH: open from any IP by default, root allowed; restrictions are off
 vps_ssh_disable_root_login: false
 vps_ssh_restrict_source_ips: false
 vps_ssh_allowed_source_cidrs: []
@@ -31,10 +31,10 @@ vps_ssh_allowed_source_cidrs: []
 vps_firewall_allow_outgoing: true
 vps_envoy_listen_port: 443
 
-# Источники трафика от Kubernetes / estate NAT (CIDR, обычно /32 публичных NAT)
+# Traffic sources from Kubernetes / estate NAT (CIDR, typically /32 public NAT)
 vps_k8s_egress_source_cidrs: []
 
-# Каталог приложений Docker Compose на хосте
+# Docker Compose applications directory on the host
 vps_docker_apps_base_dir: "/docker/apps"
 
 # Envoy (blockchain egress, SNI dynamic forward proxy)
@@ -45,11 +45,11 @@ vps_envoy_container_name: "envoy-egress"
 vps_envoy_admin_port: 9901
 vps_envoy_compose_pull: "always"
 
-# Access log Envoy (TCP/SNI passthrough): файл на хосте + logrotate, опционально stdout (docker logs)
+# Envoy access log (TCP/SNI passthrough): file on the host + logrotate, optionally stdout (docker logs)
 vps_envoy_log_dir: "{{ vps_envoy_app_dir }}/logs"
 vps_envoy_access_log_container_path: "/var/log/envoy/access.log"
 vps_envoy_access_log_to_stdout: true
-# Формат: SNI из tls_inspector, upstream из tcp_proxy
+# Format: SNI from tls_inspector, upstream from tcp_proxy
 vps_envoy_access_log_format: '[%START_TIME%] %DOWNSTREAM_REMOTE_ADDRESS% sni=%REQUESTED_SERVER_NAME% upstream=%UPSTREAM_HOST% cluster=%UPSTREAM_CLUSTER% tx=%BYTES_SENT% rx=%BYTES_RECEIVED% dur=%DURATION%'
 vps_envoy_logrotate_path: "/etc/logrotate.d/envoy-egress"
 vps_envoy_logrotate_frequency: daily

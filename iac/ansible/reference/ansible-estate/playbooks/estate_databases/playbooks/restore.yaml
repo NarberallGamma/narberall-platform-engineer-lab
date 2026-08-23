@@ -1,5 +1,5 @@
 ---
-- name: Пересоздание баз данных PostgreSQL
+- name: Recreate PostgreSQL databases
   hosts: localhost
   connection: local
   become: no
@@ -12,52 +12,52 @@
     pg_admin_password: ""
     treasury_user: treasury_user
     treasury_password: ""
-    default_encoding: "UTF8"  # Кодировка по умолчанию
-    default_lc_collate: "en_US.UTF-8"  # Локаль для сортировки по умолчанию
-    default_lc_ctype: "en_US.UTF-8"  # Локаль для классификации символов по умолчанию
+    default_encoding: "UTF8"  # Default encoding
+    default_lc_collate: "en_US.UTF-8"  # Default collation locale
+    default_lc_ctype: "en_US.UTF-8"  # Default character-classification locale
 
     target_schema: public
 
-    # default_databases намеренно пуст: без явного db_name или db_list в --extra-vars плейбук
-    # останавливается (см. pre_tasks), чтобы не пересоздать все БД по ошибке.
-    # Сводка полного стека (22 БД), только для справки: прежние 19 + 3 новых
-    #   (новые) treasury_safe_deal_adapter, treasury_lp_adapter, cryptopro_service, nodes_btc
-    #   (прежние) treasury_treasury_adapter, treasury_contract, treasury_audit, hsm, treasury_aml, treasury_api,
+    # default_databases is intentionally empty: without an explicit db_name or db_list in --extra-vars the playbook
+    # stops (see pre_tasks) so every database is not recreated by mistake.
+    # Full-stack summary (22 databases), reference only: previous 19 + 3 new
+    #   (new) treasury_safe_deal_adapter, treasury_lp_adapter, cryptopro_service, nodes_btc
+    #   (previous) treasury_treasury_adapter, treasury_contract, treasury_audit, hsm, treasury_aml, treasury_api,
     #   treasury_csp, keycloak, nodes_eth, nodes_tron, treasury_aml, treasury_auth_provider,
     #   treasury_csp, treasury_notification, treasury_otp, treasury_rates, treasury_report, treasury_web, treasury_onboarding
-    # Переопределение: --extra-vars "db_name=treasury_contract" или "db_list=['db1','db2']"
+    # Override: --extra-vars "db_name=treasury_contract" or "db_list=['db1','db2']"
     default_databases: []
 
     users: root
 
   pre_tasks:
-    - name: Определить список баз данных для обработки
+    - name: Resolve the database list to process
       set_fact:
         db_list: "{{ db_list | default(default_databases) }}"
       when: db_name is not defined or db_name == "" or db_name is none
 
-    - name: Определить список баз данных из db_name (если указана одна БД)
+    - name: Resolve the database list from db_name (when a single database is set)
       set_fact:
         db_list: "{{ [db_name] }}"
       when: db_name is defined and db_name != "" and db_name is not none
 
-    - name: Инициализировать пустой список для БД
+    - name: Initialize an empty database list
       set_fact:
         db: []
 
-    - name: Создать список словарей для роли
+    - name: Build the dictionary list for the role
       set_fact:
         db: "{{ db + [{'name': item}] }}"
       loop: "{{ db_list }}"
 
-    - name: Проверить, что список БД не пуст
+    - name: Fail when the database list is empty
       ansible.builtin.fail:
-        msg: "❌ ОШИБКА: Список баз данных пуст! Укажите либо db_name='имя_базы', либо db_list=['db1','db2'] через --extra-vars"
+        msg: "ERROR: database list is empty. Set db_name='database_name' or db_list=['db1','db2'] via --extra-vars"
       when: db_list is not defined or db_list | length == 0
 
-    - name: Показать список БД для обработки
+    - name: Show the database list to process
       ansible.builtin.debug:
-        msg: "📋 Будет обработано {{ db_list | length }} баз данных: {{ db_list | join(', ') }}"
+        msg: "{{ db_list | length }} databases will be processed: {{ db_list | join(', ') }}"
 
   roles:
       - db

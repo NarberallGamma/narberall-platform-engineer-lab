@@ -7,19 +7,19 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Проба {{ $labels.probe_target }} не проходит"
-          description: "job={{ $labels.job }}: endpoint недоступен 5 минут."
+          summary: "Probe {{ $labels.probe_target }} is failing"
+          description: "job={{ $labels.job }}: endpoint has been unreachable for 5 minutes."
 
       - alert: TlsCertificateExpiring
         expr: 0 < (probe_ssl_earliest_cert_expiry - time()) < 86400 * 30
         labels:
           severity: warning
         annotations:
-          summary: "TLS-сертификат {{ $labels.probe_target }} истекает менее чем через 30 дней"
+          summary: "TLS certificate {{ $labels.probe_target }} expires in less than 30 days"
 
       - alert: TlsCertificateExpiringCritical
         expr: (probe_ssl_earliest_cert_expiry - time()) < 86400 * 7
         labels:
           severity: critical
         annotations:
-          summary: "TLS-сертификат {{ $labels.probe_target }} истекает менее чем через 7 дней"
+          summary: "TLS certificate {{ $labels.probe_target }} expires in less than 7 days"

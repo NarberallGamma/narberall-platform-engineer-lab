@@ -1,20 +1,20 @@
-# Роль для установки nodex_exporter(клиент prometheus).
+# Role to install node_exporter (Prometheus client).
 
-Устанавливается node_exporter из rpm репозитория prometheus.io и делаются следующие действия:
+Installs node_exporter from the prometheus.io RPM repository and applies the following:
 
- - добавлялется опция --collector.textfile.directory (запущенный процесс будет выглядить так: /usr/bin/node_exporter --collector.textfile.directory=/var/run/prometheus/)
+ - adds --collector.textfile.directory (running process looks like: /usr/bin/node_exporter --collector.textfile.directory=/var/run/prometheus/)
 
- - добавляется каталог /etc/prometheus/scripts
+ - adds directory /etc/prometheus/scripts
 
- - /etc/prometheus/scripts/main.sh  - скрипт для запуска через cron
+ - /etc/prometheus/scripts/main.sh  - script started from cron
 
- - /etc/prometheus/scripts/list_of_checks - в виде all:smartmon или в столбик hostname1:check1 check2 check3, для каждого хоста своя строка
+ - /etc/prometheus/scripts/list_of_checks - either all:smartmon or one line per host as hostname1:check1 check2 check3
 
- - /etc/prometheus/scripts/smartmon.sh - скрипт для запуск smart команд
+ - /etc/prometheus/scripts/smartmon.sh - script that runs SMART commands
 
- - /var/run/prometheus/smartmon.prom -  результат работы sh  скрипта,далее  метрики этoго скрипта будут добавлены метрикам node_exporter
+ - /var/run/prometheus/smartmon.prom - output of the sh script; those metrics are then added to node_exporter metrics
 
 
-Для debian-based таски взяты отсюда:
+Debian-based tasks are taken from:
  - https://github.com/UnderGreen/ansible-prometheus-exporters-common
  - https://github.com/UnderGreen/ansible-prometheus-node-exporter

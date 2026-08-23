@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа vault
+# Primary backup method for Vault
 
-# Принцип работы:
-#   - создание резервной копии vault с помощью команды 'curl --header "X-Vault-Token: xxx" --request GET http://127.0.0.1:8200/v1/sys/storage/raft/snapshot -o raft.snap'
-#   - востановление из бэкапа 'curl --header "X-Vault-Token: yyy" --request POST --data-binary @raft.snap http://127.0.0.1:8200/v1/sys/storage/raft/snapshot'
-# Безопастность:
-#   - политика
+# How it works:
+#   - create a Vault backup with 'curl --header "X-Vault-Token: xxx" --request GET http://127.0.0.1:8200/v1/sys/storage/raft/snapshot -o raft.snap'
+#   - restore from backup: 'curl --header "X-Vault-Token: yyy" --request POST --data-binary @raft.snap http://127.0.0.1:8200/v1/sys/storage/raft/snapshot'
+# Safety:
+#   - policy
 #     tee snapshot_policy.hcl <<EOF
 #     path "/sys/storage/raft/snapshot"
 #     {
@@ -14,38 +14,38 @@
 #     }
 #     EOF
 #     VAULT_TOKEN=yyy vault policy write snapshot_agent snapshot_policy.hcl
-#   - токен
+#   - token
 #     VAULT_TOKEN=yyy vault token create -policy=snapshot_agent -display-name=backup -no-default-policy=true
 #
-# Поддерживаемые опции:
-# -h|--host               - адрес подключения к Vault. Необязательный аргумент
-# -r|--port               - порт подключения к Vault. Необязательный аргумент
-# -s|--ssl                - протокол подключения к Vault. Необязательный аргумент
-# -p|--password           - путь к файлу с токеном, используемым для подключения к Vault,
-#                           или имя переменной окружения, содержащей этот пароль.
-# -k|--prune              - строка с опциями алгоритма сохранения резервных копий в
-#                           формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                           Необязательный аргумент, без указания этой опции будет
-#                           использовано значение ${CUSTOMPRUNE_DEFAULT}
-# --skip-hostname-prefix  - позволяет исключить из имени Borg-репозитория
-#                           префикс '$(hostname)-'. Необязательный аргумент
+# Supported options:
+# -h|--host               - Vault connection address. Optional
+# -r|--port               - Vault connection port. Optional
+# -s|--ssl                - Vault connection protocol. Optional
+# -p|--password           - path to the token file used to connect to Vault,
+#                           or the name of an environment variable that holds this password.
+# -k|--prune              - retention-options string in
+#                           Borg format, e.g. '--keep-hourly 72 --keep-within=30d'
+#                           Optional. When omitted,
+#                           ${CUSTOMPRUNE_DEFAULT} is used
+# --skip-hostname-prefix  - omit from the Borg repository name
+#                           the '$(hostname)-' prefix. Optional
 
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория, без указания будет
-#        использовано имя заданное в ${NAMEOFBACKUP_DEFAULT}
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix. When omitted,
+#        the name from ${NAMEOFBACKUP_DEFAULT} is used
 
-# Примеры использования в schedule:
+# Schedule examples:
 # borg_run_on.sh 10.0.0.1 borg_backup_vault.sh
 # borg_run_on.sh 10.0.0.1 borg_backup_vault.sh 'VAULT '
 # borg_run_on.sh 10.0.0.1 borg_backup_vault.sh 'VAULT --host 127.0.0.1 --port 8200'
 # borg_run_on.sh 10.0.0.1 borg_backup_vault.sh 'VAULT --prune "--keep-hourly 3 --keep-within=30d"'
 # wrapper_ssh-agent.sh borg_backup_vault.sh 'VAULT --host 10.0.0.1'
 
-# Запрещается указывать в качестве значения опции [-p, --password]
-# непосредственно пароль. В качестве ее значения необходимо указать:
-#   - путь к файлу с паролем. Владельцем этого файл должен быть 'root:root' и
-#     для него должны быть установлены права '0400'
-#   - имя переменной окружения, содержащей этот пароль
+# The value of [-p, --password] must not be
+# the password itself. Pass one of:
+#   - path to a password file. Owner must be 'root:root' and
+#     mode must be '0400'
+#   - the name of an environment variable that holds this password
 
 ################################################################################
 
@@ -90,7 +90,7 @@ HOST="127.0.0.1"
 PORT="8200"
 ERRLOG=`mktemp`
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options h:r:k:s:p: --longoptions ,host:,port:,prune:,ssl:,password:,skip-hostname-prefix -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

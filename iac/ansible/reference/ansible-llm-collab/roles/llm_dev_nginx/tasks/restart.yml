@@ -1,5 +1,5 @@
 ---
-- name: Пересоздать контейнер nginx LLM dev
+- name: Recreate the LLM-dev nginx container
   community.docker.docker_compose_v2:
     project_src: "{{ llm_dev_nginx_root }}"
     project_name: "{{ llm_dev_nginx_compose_project_name }}"

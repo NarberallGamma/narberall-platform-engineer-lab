@@ -1,56 +1,51 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа Mongo
+# This script is the primary Mongo backup method
 
-# Принцип работы:
-#   - вызов mongodump с передачей дампа в stdout
-#   - резервное копирование дампа с помощью borg с получением дампа из stdin
+# How it works:
+#   - invoke mongodump and stream the dump to stdout
+#   - back up the dump with borg, reading the dump from stdin
 
-# Поддерживаемые опции:
-# -h|--host                      - адрес подключения к Mongo. Обязательный аргумент, 
-#                                  для обратной совместимости осталась возможность 
-#                                  указать адрес подключения через второй (${2}) 
-#                                  позиционный аргумент. Эта опция имеет более 
-#                                  высокий приоритет чем позиционный аргумент
-# -r|--port                      - порт подключения к Mongo. Необязательный аргумент
-# -u|--user                      - имя пользователя, используемого для подключения 
-#                                  к Mongo. Необязательный аргумент, без указания 
-#                                  этой опции будет использовано значение ${USER_DEFAULT}
-# -p|--password                  - путь к файлу с паролем, используемым для 
-#                                  подключения к Mongo, или имя переменной 
-#                                  окружения, содержащей этот пароль. Необязательный аргумент
-#    --authenticationDatabase    - имя базы данных, используемой для хранения параметров 
-#                                  аутентификации. Необязательный аргумент, без указания этой 
-#                                  опции будет использовано значение ${AUTH_DATABASE_DEFAULT}
-# -a|--add-mongodump-option      - дополнительная опция которая будет передана 
-#                                  mongodump. Если опция mongodump имеет 
-#                                  значение, то его необходимо указать либо через 
-#                                  знак равенства ( = ) (возможно только для 
-#                                  длинных опций), либо через пробел, но в 
-#                                  этом случае опцию mongodump вместе с ее 
-#                                  значением необходимо поместить в двойные или 
-#                                  одинарные кавычки. Например:
+# Supported options:
+# -h|--host                      - Mongo connect address. Required argument;
+#                                  for backward compatibility the address may
+#                                  still be given as the second (${2}) positional
+#                                  argument. This option takes precedence over
+#                                  the positional argument
+# -r|--port                      - Mongo connect port. Optional argument
+# -u|--user                      - username used to connect to Mongo.
+#                                  Optional argument; if omitted,
+#                                  the value of ${USER_DEFAULT} is used
+# -p|--password                  - path to the password file used to connect to
+#                                  Mongo, or the name of an environment
+#                                  variable that holds the password. Optional argument
+#    --authenticationDatabase    - database that stores authentication settings.
+#                                  Optional argument; if omitted,
+#                                  the value of ${AUTH_DATABASE_DEFAULT} is used
+# -a|--add-mongodump-option      - extra option passed to mongodump. If the
+#                                  mongodump option has a value, pass it with
+#                                  an equals sign ( = ) (long options only) or a
+#                                  space; in the space form, quote the option and
+#                                  its value in double or single quotes. Examples:
 #                                   - --add-mongodump-option --db=db1
 #                                   - --add-mongodump-option '--db db1'
 #                                   - --add-mongodump-option "--db db1"
-#                                  Опция может быть указана несколько раз, 
-#                                  mongodump будут переданы все указанные опции. 
-#                                  Необязательный аргумент
-# -k|--prune                     - строка с опциями алгоритма сохранения резервных копий в 
-#                                  формате программы Borg, например '--keep-hourly 72 --keep-within=30d'
-#                                  Необязательный аргумент, без указания этой опции будет 
-#                                  использовано значение ${CUSTOMPRUNE_DEFAULT}
-#    --skip-hostname-prefix      - позволяет исключить из имени Borg-репозитория 
-#                                  префикс '$(hostname)-'. Необязательный аргумент
+#                                  The option may be given several times; all
+#                                  listed options are passed to mongodump.
+#                                  Optional argument
+# -k|--prune                     - retention algorithm options string in
+#                                  Borg format, for example '--keep-hourly 72 --keep-within=30d'
+#                                  Optional argument; if omitted,
+#                                  the value of ${CUSTOMPRUNE_DEFAULT} is used
+#    --skip-hostname-prefix      - omit the '$(hostname)-' prefix from
+#                                  the Borg repository name. Optional argument
 
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория (без использования опции 
-# --skip-hostname-prefix) или полное имя Borg-репозитория (при использовании опции 
-# --skip-hostname-prefix). Обязательный аргумент
-# ${2} - адрес подключения к Mongo. Обязательный аргумент, если НЕ использована 
-#        опция -h|--host
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix (without --skip-hostname-prefix)
+# or the full Borg repository name (with --skip-hostname-prefix). Required argument
+# ${2} - Mongo connect address. Required argument if -h|--host is not used
 
-# Примеры использования в schedule:
+# Usage examples in schedule:
 # borg_run_on.sh 10.0.0.1 borg_backup_mongo.sh 'MONGO 127.0.0.1'
 # borg_run_on.sh 10.0.0.1 borg_backup_mongo.sh 'MONGO --host 127.0.0.1'
 # borg_run_on.sh 10.0.0.1 borg_backup_mongo.sh 'MONGO --host 127.0.0.1 --port 27017'
@@ -62,11 +57,11 @@
 # wrapper_ssh-agent.sh  ${CI_PROJECT_DIR}/00-scripts/borg_backup_mongo.sh 'distinguished-name-MONGO --host 192.168.0.1 --port 27017 --password "/etc/backup/mongo-pass"'
 # wrapper_ssh-agent.sh  /app/00-scripts/borg_backup_mongo.sh 'distinguished-name-MONGO --host 192.168.0.1 --port 27017 --password "/etc/backup/mongo-pass"'
 
-# Запрещается указывать в качестве значения опции [-p, --password] 
-# непосредственно пароль. В качестве ее значения необходимо указать:
-#   - путь к файлу с паролем. Владельцем этого файл должен быть 'root:root' и 
-#     для него должны быть установлены права '0400'
-#   - имя переменной окружения, содержащей этот пароль
+# The [-p, --password] option must not be given
+# the password itself. Its value must be:
+#   - a path to a password file. The file owner must be 'root:root' and
+#     its mode must be '0400'
+#   - the name of an environment variable that holds the password
 
 ################################################################################
 
@@ -125,7 +120,7 @@ PASSWORD_EVOLVED=""
 REPOSITORY=""
 EFFECTIVE_OPTIONS=""
 
-#Разбор аргументов командной строки
+# Command-line argument parsing
 NORMALIZED_ARGS="$( getopt --options h:r:u:p:a:k: --longoptions ,host:,port:,user:,password:,authenticationDatabase:,add-mongodump-option:,prune:,skip-hostname-prefix -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

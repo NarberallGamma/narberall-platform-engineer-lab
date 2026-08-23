@@ -1,5 +1,5 @@
 ---
-# API token из контейнера (Bearer для /panel/api/*). Не путать с webBasePath.
+# API token from the container (Bearer for /panel/api/*). Not the same as webBasePath.
 
 - name: Fetch API token from container
   ansible.builtin.command: >-

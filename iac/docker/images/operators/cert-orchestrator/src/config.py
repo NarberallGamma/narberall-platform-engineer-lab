@@ -1,4 +1,4 @@
-"""YAML-конфиг cert-orchestrator."""
+"""YAML config for cert-orchestrator."""
 
 from __future__ import annotations
 
@@ -168,7 +168,7 @@ def _merge_regru_env(cfg: OrchestratorConfig) -> None:
 def load_config(path: str | Path) -> OrchestratorConfig:
     p = Path(path)
     if not p.is_file():
-        raise FileNotFoundError(f"Конфиг не найден: {p}")
+        raise FileNotFoundError(f"Config not found: {p}")
 
     raw: dict[str, Any]
     with p.open("r", encoding="utf-8") as f:

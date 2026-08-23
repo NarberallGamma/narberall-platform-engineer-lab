@@ -1,7 +1,7 @@
 ---
-# treasury-policy-gateway: bind-mount data/ (RocksDB + CryptoPro), bootstrap PREGEN без import archive.
+# treasury-policy-gateway: bind-mount data/ (RocksDB + CryptoPro), bootstrap PREGEN without import archive.
 
-- name: "{{ docker_app.slug }} | каталоги data (bind mounts)"
+- name: "{{ docker_app.slug }} | data directories (bind mounts)"
   ansible.builtin.file:
     path: "{{ docker_app_base_dir }}/treasury-policy-gateway/{{ item.path }}"
     state: directory
@@ -21,7 +21,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy, treasury_policy_gateway]
 
-- name: "{{ docker_app.slug }} | kafka-ca.crt (prod DMS chain, не Vault)"
+- name: "{{ docker_app.slug }} | kafka-ca.crt (prod DMS chain, not Vault)"
   ansible.builtin.copy:
     src: treasury-policy-gateway/kafka-ca-prod.crt
     dest: "{{ docker_app_base_dir }}/treasury-policy-gateway/config/kafka-ca.crt"

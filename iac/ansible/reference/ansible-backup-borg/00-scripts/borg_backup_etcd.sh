@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - основной способ бэкапа controlplane.
-# Он включает в себя бэкап etcd-кластера и содержимого /etc/kubernetes.
+# Primary way to back up the control plane.
+# Covers the etcd cluster and the contents of /etc/kubernetes.
 
-# Скрипт необходимо запускать на узле с Master-компонентами Kubernetes
+# Run this script on a node that has Kubernetes master components.
 
-# Принцип работы:
-#   - подключение к etcd кластера с помощью etcdctl с master-ноды
-#       - сохранение версии etcd кластера в файле etcd-version.txt
-#       - создание снимка данных ETCD с помощью 'etcdctl snapshot save'
-#   - копирование содержимого /etc/kubernetes/* в ${BACKUP_DIR}/kubernetes
-#   - резервное копирование каталога ${BACKUP_DIR} с помощью скрипта borg_backup_files.sh
+# How it works:
+#   - connect to the etcd cluster with etcdctl from a master node
+#       - save the etcd cluster version to etcd-version.txt
+#       - create an ETCD data snapshot with 'etcdctl snapshot save'
+#   - copy /etc/kubernetes/* into ${BACKUP_DIR}/kubernetes
+#   - back up ${BACKUP_DIR} with borg_backup_files.sh
 
-# Примеры использования в schedule:
+# Schedule usage examples:
 # borg_run_on.sh 10.0.0.1 borg_backup_kube_master.sh
 
 #################################################################################

@@ -1,6 +1,6 @@
 ---
-# Пересоздание стека (как при deploy), не «docker compose restart».
-- name: Пересоздать стек LLM dev (llama-server, Open WebUI, …)
+# Recreate the stack (same as deploy), not “docker compose restart”.
+- name: Recreate the LLM dev stack (llama-server, Open WebUI, …)
   community.docker.docker_compose_v2:
     project_src: "{{ llm_dev_app_root }}"
     project_name: "{{ llm_dev_compose_project_name }}"

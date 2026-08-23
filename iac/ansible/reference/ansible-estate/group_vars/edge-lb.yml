@@ -1,9 +1,9 @@
 # edge-lb — prod (estate-prod-lb-1/2, /docker/apps/edge-lb)
-# TLS-прокси + keepalived VIP для сервисов вне WAF/K8s (Vault, HSM adapter).
-# Плейбук: playbooks/docker_app_edge_lb.yml | inventory: [edge_lb]
-# Legacy-миграция: playbooks/migrate_edge_lb_legacy.yml (migrate завершён; switch в group_vars ниже).
+# TLS proxy + keepalived VIP for services outside WAF/K8s (Vault, HSM adapter).
+# Playbook: playbooks/docker_app_edge_lb.yml | inventory: [edge_lb]
+# Legacy migration: playbooks/migrate_edge_lb_legacy.yml (migrate complete; switch in group_vars below).
 #
-# Секреты Vault KV не используются; TLS раскладывается cert-orchestrator в ssl_dir ниже.
+# Vault KV secrets are not used; TLS is laid out by cert-orchestrator into ssl_dir below.
 # keepalived osixia: ./config/keepalived -> /container/service/keepalived/assets (+ notify.sh)
 
 docker_app_vault_enabled: false
@@ -35,7 +35,7 @@ edge_lb_virtual_ip: "10.10.16.16"
 edge_lb_virtual_interface: eth0
 edge_lb_keepalived_router_id: vault_lb_prod
 edge_lb_keepalived_vrrp_id: 51
-# Пусто: читается с хоста при deploy; при legacy migrate извлекается из /etc/keepalived/keepalived.conf
+# Empty: read from the host at deploy; on legacy migrate extracted from /etc/keepalived/keepalived.conf
 edge_lb_keepalived_auth_pass: ""
 edge_lb_keepalived_health_interval: 2
 edge_lb_keepalived_health_rise: 2
@@ -49,7 +49,7 @@ edge_lb_keepalived_nodes:
     state: BACKUP
     priority: 90
 
-# Включённые vhost (conf.d/*.conf)
+# Enabled vhosts (conf.d/*.conf)
 edge_lb_enabled_sites:
   - vault
   - hsm-adapter
@@ -65,10 +65,10 @@ edge_lb_vault_backends:
 edge_lb_vault_upstream_tries: 3
 edge_lb_vault_health_check_retries: 3
 edge_lb_vault_health_check_interval: 10
-# nginx OSS: retry на standby/sealed/unavailable; http_501/472/474 не поддерживаются
+# nginx OSS: retry on standby/sealed/unavailable; http_501/472/474 are not supported
 edge_lb_vault_proxy_next_upstream: "error timeout invalid_header http_429 http_503 http_500 http_502 http_504"
 
-# Dynamic upstream sidecar (prod HA: только active leader в vault_active_upstream.conf)
+# Dynamic upstream sidecar (prod HA: only the active leader in vault_active_upstream.conf)
 edge_lb_vault_upstream_sidecar_enabled: true
 edge_lb_vault_upstream_sidecar_image: alpine:3.20
 edge_lb_vault_upstream_sidecar_nginx_container: edge-lb-nginx
@@ -76,8 +76,8 @@ edge_lb_vault_upstream_sidecar_interval: 5
 edge_lb_vault_upstream_sidecar_probe_path: "/v1/sys/health?standbyok=false"
 edge_lb_vault_upstream_sidecar_probe_timeout: 3
 
-# Legacy hsm-adapter backend (estate-prod-cryptopro-01 VM, TLS на edge-lb VIP)
-# port: API и actuator/health (8080). health_port не задаётся, совпадает с port.
+# Legacy hsm-adapter backend (estate-prod-cryptopro-01 VM, TLS on the edge-lb VIP)
+# port: API and actuator/health (8080). health_port is not set; it matches port.
 edge_lb_hsm_adapter_domain: hsm-adapter.example.com
 edge_lb_hsm_adapter_path_prefix: /hsm-adapter/
 edge_lb_hsm_adapter_backend:
@@ -89,7 +89,7 @@ edge_lb_hsm_adapter_proxy_connect_timeout: 60s
 edge_lb_hsm_adapter_proxy_send_timeout: 60s
 edge_lb_hsm_adapter_proxy_read_timeout: 60s
 
-# treasury-policy-gateway (cryptopro-01 VM, отдельный vhost, не web-treasury WAF)
+# treasury-policy-gateway (cryptopro-01 VM, separate vhost, not web-treasury WAF)
 edge_lb_treasury_policy_gateway_domain: policy-gateway.example.com
 edge_lb_treasury_policy_gateway_path_prefix: /api/v0/treasury-policy-gateway/
 edge_lb_treasury_policy_gateway_backend:
@@ -117,7 +117,7 @@ edge_lb_cryptopro_proxy_read_timeout: 120s
 edge_lb_ssl_dir: "{{ docker_app_base_dir }}/edge-lb/certs"
 edge_lb_cert_basename: "{{ docker_app.cert_basename }}"
 
-# logrotate на хосте (logs/nginx mount)
+# logrotate on the host (logs/nginx mount)
 edge_lb_logrotate_path: /etc/logrotate.d/edge-lb-nginx
 edge_lb_logrotate_frequency: daily
 edge_lb_logrotate_rotate: 14
@@ -125,9 +125,9 @@ edge_lb_logrotate_maxage: 14
 
 # ---------------------------------------------------------------------------
 # Legacy migration (playbooks/migrate_edge_lb_legacy.yml)
-# Migrate на prod/preprod завершён (2026-06-19); секция для истории и других стендов.
-# Повторный прогон: edge_lb_legacy_migration_enabled: true + раскомментировать vars ниже.
-# Плейбук при migrate выставляет edge_lb_migrate_legacy_ssl: true.
+# Migrate on prod/preprod is complete (2026-06-19); section kept for history and other stands.
+# Repeat run: edge_lb_legacy_migration_enabled: true + uncomment the vars below.
+# The playbook sets edge_lb_migrate_legacy_ssl: true during migrate.
 # ---------------------------------------------------------------------------
 edge_lb_legacy_migration_enabled: false
 

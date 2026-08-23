@@ -1,70 +1,65 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - запасной способ бэкапа MySQL
+# This script is a fallback MySQL backup method
 
-# Его можно применять если (должны выполняться все условия):
-#   1. если есть хотя бы одна таблица для работы с которой НЕ используется движок InnoDB
-#   2. допустима блокировка баз MySQL на время бэкапа
-#   3. размер баз MySQL и другие условия позволяют выполнить бэкап за время, 
-#      отведенное на эту операцию резервного копирования
+# Can be used when (all conditions must hold):
+#   1. at least one table does not use the InnoDB engine
+#   2. locking MySQL databases for the duration of the backup is acceptable
+#   3. MySQL database size and other conditions allow the backup to finish
+#      within the time allotted for this backup job
 
-# Принцип работы:
-#   - вызов mysqldump с передачей дампа в stdout
-#   - резервное копирование дампа с помощью borg с получением дампа из stdin
+# How it works:
+#   - invoke mysqldump and stream the dump to stdout
+#   - back up the dump with borg, reading the dump from stdin
 
-# Поддерживаемые опции:
-# -c|--defaults-file         - путь к файлу с параметрами подключения к 
-#                              MySQL-серверу и работы с ним, такими как host, 
-#                              user, password, socket и т.п. (опция mysqldump 
-#                              --defaults-file). Без указания этой опции 
-#                              будет использован файл указанный в пременной 
-#                              ${DEFAULTS_FILE_DEFAULT}
-# -d|--db                    - имя базы данных которую необходимо бэкапить, 
-#                              опция может быть указана несколько раз, в 
-#                              резервную копию попадут все указанные базы. 
-#                              Без указания этой опции в резервную копию 
-#                              попадут все базы, включая служебные ( mysql, 
+# Supported options:
+# -c|--defaults-file         - path to the file with MySQL server connect and
+#                              work parameters such as host, user, password,
+#                              socket, and similar (mysqldump --defaults-file).
+#                              If omitted, the file set in
+#                              ${DEFAULTS_FILE_DEFAULT} is used
+# -d|--db                    - database name to back up; may be given several
+#                              times; all listed databases are included.
+#                              If omitted, all databases are included, including
+#                              system ones ( mysql,
 #                              information_schema, performance_schema )
-# -a|--add-mysqldump-option  - дополнительная опция которая будет передана 
-#                              mysqldump. Если опция mysqldump имеет значение, 
-#                              то его необходимо указать либо через знак 
-#                              равенства ( = ) (возможно только для длинных 
-#                              опций), либо через пробел, но в этом случае опцию 
-#                              mysqldump вместе с ее значением необходимо 
-#                              поместить в двойные или одинарные кавычки.
-#                              Например:
+# -a|--add-mysqldump-option  - extra option passed to mysqldump. If the
+#                              mysqldump option has a value, pass it with an
+#                              equals sign ( = ) (long options only) or a space;
+#                              in the space form, quote the option and its
+#                              value in double or single quotes.
+#                              Examples:
 #                               - --add-mysqldump-option --ignore-table=db1.table1
 #                               - --add-mysqldump-option '--ignore-table db1.table1'
 #                               - --add-mysqldump-option "--ignore-table db1.table1"
-#                              Опция может быть указана несколько раз, 
-#                              mysqldump будут переданы все указанные опции
-#                              Скрипт всегда пытается добавить опции 
-#                              перечисленные в ${DESIRED_OPTIONS}
-# -k|--prune                 - строка с опциями алгоритма сохранения резервных 
-#                              копий в формате программы Borg, например 
+#                              The option may be given several times; all
+#                              listed options are passed to mysqldump.
+#                              The script always tries to add the options
+#                              listed in ${DESIRED_OPTIONS}
+# -k|--prune                 - retention algorithm options
+#                              string in Borg format, for example
 #                              '--keep-hourly 72 --keep-within=30d'
-#                              Необязательный аргумент, без указания этой опции 
-#                              будет использовано значение ${CUSTOMPRUNE_DEFAULT}
-# -s|--svcname               - сторока с именем сервиса, применяется в случае 
-#                              изменяющегося hostname. Необязательный аргумент,
-#                              при его отсутствии для имени репозитория бэкапов
-#                              удет использован $(hostname)
-#    --skip-hostname-prefix  - позволяет исключить из имени Borg-репозитория
-#                              префикс '$(hostname)-'. Необязательный аргумент
+#                              Optional argument; if omitted,
+#                              the value of ${CUSTOMPRUNE_DEFAULT} is used
+# -s|--svcname               - service name string, used when the hostname
+#                              changes. Optional argument; if omitted,
+#                              $(hostname) is used for the backup repository name
+#    --skip-hostname-prefix  - omit the '$(hostname)-' prefix from
+#                              the Borg repository name. Optional argument
 
 
-# Позиционные аргументы:
-# ${1} - имя задания, суффикс имени Borg-репозитория, без указания будет 
-#        использовано имя заданное в ${NAMEOFBACKUP_DEFAULT}
+# Positional arguments:
+# ${1} - job name, Borg repository name suffix; if omitted,
+#        the name set in ${NAMEOFBACKUP_DEFAULT} is used
 
-# Владельцем файла указанного опцией --defaults-file должен быть 'root:root' и 
-# для него должны быть установлены права '0400'
+# The owner of the file given to --defaults-file must be 'root:root' and
+# its mode must be '0400'
 
-# Установка зависимостей:
+# Dependency installation:
 # - mysqldump:
 #   - Debian/Ubuntu - sudo apt-get install mysql-client
 
-# Пример использования в schedule:
+# Usage example in schedule:
 # borg_run_on.sh 10.0.0.1 borg_backup_mysqldump.sh
 # borg_run_on.sh 10.0.0.1 borg_backup_mysqldump.sh 'MYSQLDUMP'
 # borg_run_on.sh 10.0.0.1 borg_backup_mysqldump.sh 'MYSQLDUMP --defaults-file "/etc/mysql/debian.cnf"'
@@ -72,6 +67,7 @@
 # borg_run_on.sh 10.0.0.1 borg_backup_mysqldump.sh 'MYSQLDUMP --defaults-file "/etc/mysql/debian.cnf" --db db1 --db db2 --add-mysqldump-option "--ignore-table db1.table1"'
 # borg_run_on.sh 10.0.0.1 borg_backup_mysqldump.sh 'MYSQLDUMP --defaults-file "/etc/mysql/debian.cnf" --db db1 --db db2 --add-mysqldump-option "--ignore-table db1.table1" --add-mysqldump-option --hex-blob'
 # borg_run_on.sh 10.0.0.1 borg_backup_mysqldump.sh 'MYSQLDUMP --defaults-file "/etc/mysql/debian.cnf" --db db1 --db db2 --add-mysqldump-option "--ignore-table db1.table1" --add-mysqldump-option --hex-blob --prune "--keep-hourly 3 --keep-within=30d"'
+
 
 ################################################################################
 
@@ -126,7 +122,7 @@ DATABASES_OPTION=""
 EFFECTIVE_OPTIONS=""
 MYSQLDUMP_HELP=""
 
-#Разбор аргументов командной строки
+# Command-line argument parsing
 NORMALIZED_ARGS="$( getopt --options c:d:a:k:s: --longoptions ,defaults-file:,db:,add-mysqldump-option:,prune:,svcname:,skip-hostname-prefix -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

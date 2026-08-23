@@ -1,11 +1,11 @@
 ---
-- name: Проверить установленную версию
+- name: Check the installed version
   ansible.builtin.command: /usr/local/bin/node_exporter --version
   register: node_exporter_current
   failed_when: false
   changed_when: false
 
-- name: Скачать и распаковать node_exporter
+- name: Download and unpack node_exporter
   ansible.builtin.unarchive:
     src: >-
       https://github.com/prometheus/node_exporter/releases/download/v{{
@@ -15,7 +15,7 @@
   when: node_exporter_version not in
     (node_exporter_current.stdout | default('') + node_exporter_current.stderr | default(''))
 
-- name: Установить бинарник
+- name: Install the binary
   ansible.builtin.copy:
     src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
     dest: /usr/local/bin/node_exporter
@@ -25,7 +25,7 @@
     (node_exporter_current.stdout | default('') + node_exporter_current.stderr | default(''))
   notify: Restart node_exporter
 
-- name: Системный пользователь
+- name: System user
   ansible.builtin.user:
     name: node_exporter
     system: true
@@ -39,7 +39,7 @@
     mode: "0644"
   notify: Restart node_exporter
 
-- name: Запустить и включить
+- name: Start and enable
   ansible.builtin.systemd:
     name: node_exporter
     state: started

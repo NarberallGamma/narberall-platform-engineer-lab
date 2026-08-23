@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Удаление БД PostgreSQL (drop only, без restore).
-# Выполнять из корня каталога ansible: ./scripts/run/run_drop_db.sh <db_name> [--yes] [--check] ...
+# Drop a PostgreSQL database (drop only, no restore).
+# Run from the ansible directory root: ./scripts/run/run_drop_db.sh <db_name> [--yes] [--check] ...
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 

@@ -1,32 +1,32 @@
 #!/bin/bash
 
-# Универсальный скрипт для автоматической авторизации в Treasury API через Keycloak
-# Использование: ./auth_treasury_api.sh [ENV] [USERNAME] [PASSWORD] [CLIENT_ID] [CLIENT_SECRET]
+# Generic script for automatic Treasury API authorization via Keycloak
+# Usage: ./auth_treasury_api.sh [ENV] [USERNAME] [PASSWORD] [CLIENT_ID] [CLIENT_SECRET]
 #
-# Переменные окружения (опционально):
-#   KEYCLOAK_DOMAIN_PROD - домен Keycloak для PROD (по умолчанию: keycloak.example.com)
-#   KEYCLOAK_DOMAIN_PREPROD - домен Keycloak для PREPROD (по умолчанию: keycloak.preprod.example.com)
-#   KEYCLOAK_DOMAIN_DEMO - домен Keycloak для DEMO (по умолчанию: keycloak.demo.example.com)
-#   K8S_NAMESPACE - namespace Kubernetes для PROD (по умолчанию: your-namespace)
-#   KEYCLOAK_USERNAME - имя пользователя (можно указать через параметр)
-#   KEYCLOAK_PASSWORD - пароль пользователя (можно указать через параметр)
-#   KEYCLOAK_CLIENT_ID - ID клиента (можно указать через параметр)
-#   KEYCLOAK_CLIENT_SECRET - секрет клиента (можно указать через параметр)
-# Примеры:
+# Environment variables (optional):
+#   KEYCLOAK_DOMAIN_PROD - Keycloak domain for PROD (default: keycloak.example.com)
+#   KEYCLOAK_DOMAIN_PREPROD - Keycloak domain for PREPROD (default: keycloak.preprod.example.com)
+#   KEYCLOAK_DOMAIN_DEMO - Keycloak domain for DEMO (default: keycloak.demo.example.com)
+#   K8S_NAMESPACE - Kubernetes namespace for PROD (default: your-namespace)
+#   KEYCLOAK_USERNAME - username (can be passed as an argument)
+#   KEYCLOAK_PASSWORD - user password (can be passed as an argument)
+#   KEYCLOAK_CLIENT_ID - client ID (can be passed as an argument)
+#   KEYCLOAK_CLIENT_SECRET - client secret (can be passed as an argument)
+# Examples:
 #   export KEYCLOAK_USERNAME=username
 #   export KEYCLOAK_PASSWORD=password
-#   ./auth_treasury_api.sh prod                               # ENV=prod, параметры из переменных окружения
-#   ./auth_treasury_api.sh prod username password client_id client_secret  # Все параметры указаны
-# Параметры:
-#   - ENV: prod/preprod/demo (если не указан, будет запрошен интерактивно)
-#   - USERNAME: можно указать через параметр или переменную окружения KEYCLOAK_USERNAME
-#   - PASSWORD: можно указать через параметр или переменную окружения KEYCLOAK_PASSWORD
-#   - CLIENT_ID: можно указать через параметр или переменную окружения KEYCLOAK_CLIENT_ID
-#   - CLIENT_SECRET: можно указать через параметр или переменную окружения KEYCLOAK_CLIENT_SECRET
+#   ./auth_treasury_api.sh prod                               # ENV=prod, parameters from environment variables
+#   ./auth_treasury_api.sh prod username password client_id client_secret  # All parameters are set
+# Parameters:
+#   - ENV: prod/preprod/demo (if omitted, an interactive prompt is used)
+#   - USERNAME: can be passed as an argument or an environment variable KEYCLOAK_USERNAME
+#   - PASSWORD: can be passed as an argument or an environment variable KEYCLOAK_PASSWORD
+#   - CLIENT_ID: can be passed as an argument or an environment variable KEYCLOAK_CLIENT_ID
+#   - CLIENT_SECRET: can be passed as an argument or an environment variable KEYCLOAK_CLIENT_SECRET
 
-set -e  # Выход при ошибке
+set -e  # Exit on error
 
-# Цвета для красивого вывода
+# Colors for readable output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -34,142 +34,142 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Функция вывода справки
+# Help printer
 show_help() {
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}                    Treasury API - Авторизация через Keycloak${NC}"
+    echo -e "${CYAN}                    Treasury API - Keycloak authorization${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo -e "${BLUE}ОПИСАНИЕ:${NC}"
-    echo "  Скрипт для автоматической авторизации в Treasury API через Keycloak."
-    echo "  Получает Bearer JWT токен из Keycloak realm 'treasure' для дальнейшей работы с API."
+    echo -e "${BLUE}DESCRIPTION:${NC}"
+    echo "  Script for automatic Treasury API authorization via Keycloak."
+    echo "  Obtains a Bearer JWT token from the Keycloak realm 'treasure' for further API work."
     echo ""
-    echo -e "${BLUE}СИНТАКСИС:${NC}"
+    echo -e "${BLUE}SYNOPSIS:${NC}"
     echo "  ./auth_treasury_api.sh [ENV] [USERNAME] [PASSWORD] [CLIENT_ID] [CLIENT_SECRET]"
     echo "  ./auth_treasury_api.sh [--help|-h]"
     echo ""
-    echo -e "${BLUE}ПАРАМЕТРЫ:${NC}"
-    echo -e "  ${GREEN}ENV${NC}            Окружение: prod, preprod или demo"
-    echo "                 Если не указан, будет запрошен интерактивно"
+    echo -e "${BLUE}PARAMETERS:${NC}"
+    echo -e "  ${GREEN}ENV${NC}            Environment: prod, preprod or demo"
+    echo "                 If omitted, an interactive prompt is used"
     echo ""
-    echo -e "  ${GREEN}USERNAME${NC}       Имя пользователя для авторизации в Keycloak"
-    echo "                 Можно указать через параметр или переменную окружения KEYCLOAK_USERNAME"
+    echo -e "  ${GREEN}USERNAME${NC}       Username for Keycloak authorization"
+    echo "                 Can be passed as an argument or an environment variable KEYCLOAK_USERNAME"
     echo ""
-    echo -e "  ${GREEN}PASSWORD${NC}       Пароль пользователя"
-    echo "                 Можно указать через параметр или переменную окружения KEYCLOAK_PASSWORD"
+    echo -e "  ${GREEN}PASSWORD${NC}       User password"
+    echo "                 Can be passed as an argument or an environment variable KEYCLOAK_PASSWORD"
     echo ""
-    echo -e "  ${GREEN}CLIENT_ID${NC}      Идентификатор клиента в Keycloak"
-    echo "                 Можно указать через параметр или переменную окружения KEYCLOAK_CLIENT_ID"
+    echo -e "  ${GREEN}CLIENT_ID${NC}      Keycloak client identifier"
+    echo "                 Can be passed as an argument or an environment variable KEYCLOAK_CLIENT_ID"
     echo ""
-    echo -e "  ${GREEN}CLIENT_SECRET${NC}  Секрет клиента в Keycloak"
-    echo "                 Можно указать через параметр или переменную окружения KEYCLOAK_CLIENT_SECRET"
+    echo -e "  ${GREEN}CLIENT_SECRET${NC}  Keycloak client secret"
+    echo "                 Can be passed as an argument or an environment variable KEYCLOAK_CLIENT_SECRET"
     echo ""
-    echo -e "  ${GREEN}--help, -h${NC}     Показать эту справку"
+    echo -e "  ${GREEN}--help, -h${NC}     Show this help"
     echo ""
-    echo -e "${BLUE}ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ:${NC}"
+    echo -e "${BLUE}USAGE EXAMPLES:${NC}"
     echo ""
-    echo "  # Интерактивный выбор окружения, все параметры по умолчанию"
+    echo "  # Interactive environment choice, all parameters default"
     echo -e "  ${YELLOW}./auth_treasury_api.sh${NC}"
     echo ""
-    echo "  # Указано окружение PROD, параметры из переменных окружения"
+    echo "  # PROD environment set, parameters from environment variables"
     echo -e "  ${YELLOW}export KEYCLOAK_USERNAME=username${NC}"
     echo -e "  ${YELLOW}export KEYCLOAK_PASSWORD=password${NC}"
     echo -e "  ${YELLOW}./auth_treasury_api.sh prod${NC}"
     echo ""
-    echo "  # Указаны окружение, username и password"
+    echo "  # Environment, username and password are set"
     echo -e "  ${YELLOW}./auth_treasury_api.sh prod username password${NC}"
     echo ""
-    echo "  # Все параметры указаны"
+    echo "  # All parameters are set"
     echo -e "  ${YELLOW}./auth_treasury_api.sh prod username password client_id client_secret${NC}"
     echo ""
-    echo "  # Использование переменных окружения"
+    echo "  # Using environment variables"
     echo -e "  ${YELLOW}export KEYCLOAK_USERNAME=username${NC}"
     echo -e "  ${YELLOW}export KEYCLOAK_PASSWORD=password${NC}"
     echo -e "  ${YELLOW}./auth_treasury_api.sh prod${NC}"
     echo ""
-    echo "  # Показать справку"
+    echo "  # Show help"
     echo -e "  ${YELLOW}./auth_treasury_api.sh --help${NC}"
     echo ""
-    echo -e "${BLUE}ОКРУЖЕНИЯ:${NC}"
-    echo -e "  ${GREEN}prod${NC}     Production окружение"
-    echo "          • Использует port-forward для обхода WAF"
-    echo "          • Автоматически настраивает kubectl port-forward к keycloak-http сервису"
+    echo -e "${BLUE}ENVIRONMENTS:${NC}"
+    echo -e "  ${GREEN}prod${NC}     Production environment"
+    echo "          • Uses port-forward to bypass the WAF"
+    echo "          • Automatically sets up kubectl port-forward to the keycloak-http service"
     echo "          • URL: localhost:8081"
     echo ""
-    echo -e "  ${GREEN}preprod${NC}  Pre-production окружение"
-    echo "          • Прямое подключение через внешний URL"
-    echo "          • URL: настраивается через переменную KEYCLOAK_DOMAIN_PREPROD"
+    echo -e "  ${GREEN}preprod${NC}  Pre-production environment"
+    echo "          • Direct connection via an external URL"
+    echo "          • URL: configured via the KEYCLOAK_DOMAIN_PREPROD"
     echo ""
-    echo -e "  ${GREEN}demo${NC}     Demo окружение"
-    echo "          • Прямое подключение через внешний URL"
-    echo "          • URL: настраивается через переменную KEYCLOAK_DOMAIN_DEMO"
+    echo -e "  ${GREEN}demo${NC}     Demo environment"
+    echo "          • Direct connection via an external URL"
+    echo "          • URL: configured via the KEYCLOAK_DOMAIN_DEMO"
     echo ""
-    echo -e "${BLUE}ОСОБЕННОСТИ:${NC}"
-    echo "  • Простая авторизация через Keycloak (один запрос)"
-    echo "  • Для PROD: автоматическая настройка port-forward (обход WAF)"
-    echo "  • Красивый вывод с цветами и форматированием"
-    echo "  • Автоматическая очистка port-forward процесса при завершении"
+    echo -e "${BLUE}FEATURES:${NC}"
+    echo "  • Simple Keycloak authorization (one request)"
+    echo "  • For PROD: automatic port-forward setup (WAF bypass)"
+    echo "  • Colorized formatted output"
+    echo "  • Automatic cleanup of the port-forward process on exit"
     echo ""
-    echo -e "${BLUE}ЗАВИСИМОСТИ:${NC}"
-    echo "  • curl - для HTTP запросов"
-    echo "  • jq - для парсинга JSON (рекомендуется, но не обязательно)"
-    echo "  • kubectl - только для PROD окружения с port-forward"
+    echo -e "${BLUE}DEPENDENCIES:${NC}"
+    echo "  • curl - for HTTP requests"
+    echo "  • jq - for JSON parsing (recommended, not required)"
+    echo "  • kubectl - only for the PROD environment with port-forward"
     echo ""
     echo -e "${BLUE}KEYCLOAK:${NC}"
     echo "  • Realm: treasure"
     echo "  • Endpoint: /realms/treasure/protocol/openid-connect/token"
     echo "  • Grant type: password"
     echo ""
-    echo -e "${BLUE}НАСТРОЙКА В СКРИПТЕ:${NC}"
-    echo "  Вы можете настроить скрипт прямо в его коде:"
+    echo -e "${BLUE}IN-SCRIPT SETTINGS:${NC}"
+    echo "  The script can be configured in its source:"
     echo ""
     echo -e "  ${YELLOW}• Port-forward:${NC}"
-    echo "    Изменить USE_PORT_FORWARD для любого окружения:"
-    echo "    - Строки 160, 166, 171 (prod, preprod, demo)"
+    echo "    Change USE_PORT_FORWARD for any environment:"
+    echo "    - Lines 160, 166, 171 (prod, preprod, demo)"
     echo ""
-    echo -e "  ${YELLOW}• URL домены:${NC}"
-    echo "    Изменить KEYCLOAK_DOMAIN для окружений:"
-    echo "    - Строки 159, 165, 170 (prod, preprod, demo)"
+    echo -e "  ${YELLOW}• URL domains:${NC}"
+    echo "    Change KEYCLOAK_DOMAIN for environments:"
+    echo "    - Lines 159, 165, 170 (prod, preprod, demo)"
     echo ""
-    echo -e "  ${YELLOW}• URL пути:${NC}"
-    echo "    Изменить формирование TOKEN_URL в функции setup_urls():"
-    echo "    - Строки 346, 349 (для port-forward и обычного подключения)"
+    echo -e "  ${YELLOW}• URL paths:${NC}"
+    echo "    Change TOKEN_URL construction in setup_urls():"
+    echo "    - Lines 346, 349 (port-forward and regular connection)"
     echo ""
-    echo -e "  ${YELLOW}• Параметры по умолчанию:${NC}"
-    echo "    Изменить значения по умолчанию можно в коде скрипта"
+    echo -e "  ${YELLOW}• Default parameters:${NC}"
+    echo "    Default values can be changed in the script source"
     echo ""
-    echo -e "${BLUE}ВОЗВРАЩАЕТ:${NC}"
-    echo "  Bearer JWT Access Token, который можно использовать для авторизации в Treasury API"
+    echo -e "${BLUE}RETURNS:${NC}"
+    echo "  Bearer JWT Access Token, that can be used to authorize against Treasury API"
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
 }
 
-# Проверка параметров help
+# Check help arguments
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     show_help
     exit 0
 fi
 
-# Функция для выбора окружения
+# Environment picker
 select_environment() {
     local env_arg="$1"
     
     if [ -n "$env_arg" ]; then
         ENV=$(echo "$env_arg" | tr '[:upper:]' '[:lower:]')
     else
-        # Интерактивный выбор
+        # Interactive choice
         echo ""
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${CYAN}Выбор окружения${NC}"
+        echo -e "${CYAN}Environment selection${NC}"
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
         echo "  1) PROD    (production)"
         echo "  2) PREPROD (pre-production)"
         echo "  3) DEMO    (demo)"
         echo ""
-        read -p "Выберите окружение (1-3) [по умолчанию: 1]: " choice
+        read -p "Select environment (1-3) [default: 1]: " choice
         
         case "${choice:-1}" in
             1)
@@ -182,18 +182,18 @@ select_environment() {
                 ENV="demo"
                 ;;
             *)
-                echo -e "${YELLOW}Неверный выбор, используется PROD${NC}"
+                echo -e "${YELLOW}Invalid choice, PROD is used${NC}"
                 ENV="prod"
                 ;;
         esac
     fi
     
-    # Валидация окружения
+    # Validate environment
     case "$ENV" in
         prod|PROD|production)
             ENV="prod"
             KEYCLOAK_DOMAIN="${KEYCLOAK_DOMAIN_PROD:-keycloak.example.com}"
-            USE_PORT_FORWARD=true  # Для PROD используем port-forward
+            USE_PORT_FORWARD=true  # PROD uses port-forward
             K8S_NAMESPACE="${K8S_NAMESPACE:-your-namespace}"
             ;;
         preprod|PREPROD|pre-production)
@@ -207,13 +207,13 @@ select_environment() {
             USE_PORT_FORWARD=false
             ;;
         *)
-            echo -e "${RED}Ошибка: Неверное окружение '$ENV'. Используйте: prod, preprod или demo${NC}"
+            echo -e "${RED}Error: Invalid environment '$ENV'. Use: prod, preprod or demo${NC}"
             exit 1
             ;;
     esac
 }
 
-# Функция для красивого вывода заголовков
+# Pretty header printer
 print_header() {
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -222,42 +222,42 @@ print_header() {
     echo ""
 }
 
-# Функция для вывода информации
+# Info printer
 print_info() {
     echo -e "${BLUE}ℹ${NC} $1"
 }
 
-# Функция для вывода успеха
+# Success printer
 print_success() {
     echo -e "${GREEN}✅${NC} $1"
 }
 
-# Функция для вывода ошибки
+# Error printer
 print_error() {
     echo -e "${RED}❌${NC} $1"
 }
 
-# Функция для вывода предупреждения
+# Warning printer
 print_warning() {
     echo -e "${YELLOW}⚠️${NC} $1"
 }
 
-# Переменные для хранения PID процесса port-forward
+# Variables that store the port-forward process PID
 KEYCLOAK_PORT_FORWARD_PID=""
 KEYCLOAK_LOCAL_PORT=""
 
-# Функция очистки port-forward процесса при выходе
+# Clean up the port-forward process on exit
 cleanup_port_forward() {
     if [ -n "$KEYCLOAK_PORT_FORWARD_PID" ] && [[ "$KEYCLOAK_PORT_FORWARD_PID" =~ ^[0-9]+$ ]]; then
-        kill $KEYCLOAK_PORT_FORWARD_PID 2>/dev/null && print_info "Остановлен port-forward для keycloak (PID: $KEYCLOAK_PORT_FORWARD_PID)"
+        kill $KEYCLOAK_PORT_FORWARD_PID 2>/dev/null && print_info "Stopped port-forward for keycloak (PID: $KEYCLOAK_PORT_FORWARD_PID)"
         KEYCLOAK_PORT_FORWARD_PID=""
     fi
 }
 
-# Регистрация trap для очистки при выходе
+# Register a trap for cleanup on exit
 trap cleanup_port_forward EXIT INT TERM
 
-# Функция поиска сервиса в Kubernetes
+# Find a service in Kubernetes
 find_k8s_service() {
     local namespace="$1"
     local service_pattern="$2"
@@ -265,16 +265,16 @@ find_k8s_service() {
     kubectl -n "$namespace" get svc 2>/dev/null | grep "$service_pattern" | head -1 | awk '{print $1}'
 }
 
-# Функция получения порта сервиса из Kubernetes
+# Get the service port from Kubernetes
 get_k8s_service_port() {
     local namespace="$1"
     local service_name="$2"
     local port_name="${3:-http}"
     
-    # Пытаемся получить порт по имени
+    # Try to get the port by name
     local port=$(kubectl -n "$namespace" get svc "$service_name" -o jsonpath="{.spec.ports[?(@.name==\"$port_name\")].port}" 2>/dev/null)
     
-    # Если не найден по имени, берем первый порт
+    # If not found by name, take the first port
     if [ -z "$port" ]; then
         port=$(kubectl -n "$namespace" get svc "$service_name" -o jsonpath="{.spec.ports[0].port}" 2>/dev/null)
     fi
@@ -282,8 +282,8 @@ get_k8s_service_port() {
     echo "$port"
 }
 
-# Функция создания port-forward для сервиса
-# Возвращает PID процесса или пустую строку при ошибке
+# Create a port-forward for the service
+# Returns the process PID or an empty string on error
 setup_port_forward() {
     local namespace="$1"
     local service_name="$2"
@@ -294,11 +294,11 @@ setup_port_forward() {
         return 1
     fi
     
-    # Запускаем port-forward в фоне
+    # Start port-forward in the background
     kubectl -n "$namespace" port-forward "svc/$service_name" "$local_port:$service_port" > /dev/null 2>&1 &
     local pid=$!
     
-    # Ждем немного, чтобы проверить, что процесс запустился
+    # Wait briefly to confirm the process started
     sleep 1
     if ps -p $pid > /dev/null 2>&1; then
         echo "$pid"
@@ -308,103 +308,103 @@ setup_port_forward() {
     fi
 }
 
-# Функция настройки port-forward для PROD окружения
+# Set up port-forward for the PROD environment
 setup_prod_port_forward() {
     if [ "$USE_PORT_FORWARD" != "true" ]; then
         return 0
     fi
     
-    # Проверяем наличие kubectl
+    # Check that kubectl is present
     if ! command -v kubectl &> /dev/null; then
-        print_error "kubectl не найден. Установите kubectl для использования port-forward в PROD окружении."
+        print_error "kubectl not found. Install kubectl to use port-forward in the PROD environment."
         exit 1
     fi
     
-    # Проверяем доступность кластера
+    # Check cluster availability
     if ! kubectl cluster-info &> /dev/null; then
-        print_error "Не удается подключиться к Kubernetes кластеру. Проверьте контекст kubectl."
+        print_error "Cannot connect to the Kubernetes cluster. Check the kubectl context."
         exit 1
     fi
     
-    print_header "Настройка port-forward для PROD окружения"
-    print_info "Настраиваю port-forward для keycloak на порт 8081"
+    print_header "Set up port-forward for the PROD environment"
+    print_info "Setting up port-forward for keycloak on port 8081"
     echo ""
     
-    # Ищем keycloak-http сервис (как в примере)
-    print_info "Ищу keycloak-http сервис в namespace $K8S_NAMESPACE..."
+    # Search for the keycloak-http service (as in the example)
+    print_info "Looking up the keycloak-http service in namespace $K8S_NAMESPACE..."
     KEYCLOAK_SERVICE=$(find_k8s_service "$K8S_NAMESPACE" "keycloak-http")
     
     if [ -z "$KEYCLOAK_SERVICE" ]; then
-        # Пробуем найти любой keycloak сервис
+        # Try any keycloak service
         KEYCLOAK_SERVICE=$(find_k8s_service "$K8S_NAMESPACE" "keycloak")
     fi
     
     if [ -z "$KEYCLOAK_SERVICE" ]; then
-        print_error "Не найден keycloak-http/keycloak сервис в namespace $K8S_NAMESPACE"
-        print_info "Доступные сервисы:"
-        kubectl -n "$K8S_NAMESPACE" get svc | grep -E "NAME|keycloak" || echo "  (нет сервисов с 'keycloak' в названии)"
+        print_error "keycloak-http/keycloak service not found in namespace $K8S_NAMESPACE"
+        print_info "Available services:"
+        kubectl -n "$K8S_NAMESPACE" get svc | grep -E "NAME|keycloak" || echo "  (no services with 'keycloak' in the name)"
         exit 1
     fi
     
-    print_success "Найден сервис: $KEYCLOAK_SERVICE"
+    print_success "Found service: $KEYCLOAK_SERVICE"
     
-    # Получаем порт сервиса (по умолчанию 80 для http)
+    # Get the service port (default 80 for http)
     KEYCLOAK_SERVICE_PORT=$(get_k8s_service_port "$K8S_NAMESPACE" "$KEYCLOAK_SERVICE" "http")
     KEYCLOAK_SERVICE_PORT="${KEYCLOAK_SERVICE_PORT:-80}"
     KEYCLOAK_LOCAL_PORT="8081"
     
-    print_info "Порт сервиса $KEYCLOAK_SERVICE: $KEYCLOAK_SERVICE_PORT"
+    print_info "Service port $KEYCLOAK_SERVICE: $KEYCLOAK_SERVICE_PORT"
     
-    # Создаем port-forward для keycloak
-    print_info "Создаю port-forward для $KEYCLOAK_SERVICE: localhost:$KEYCLOAK_LOCAL_PORT -> $K8S_NAMESPACE/$KEYCLOAK_SERVICE:$KEYCLOAK_SERVICE_PORT"
+    # Create port-forward for keycloak
+    print_info "Creating port-forward for $KEYCLOAK_SERVICE: localhost:$KEYCLOAK_LOCAL_PORT -> $K8S_NAMESPACE/$KEYCLOAK_SERVICE:$KEYCLOAK_SERVICE_PORT"
     KEYCLOAK_PORT_FORWARD_PID=$(setup_port_forward "$K8S_NAMESPACE" "$KEYCLOAK_SERVICE" "$KEYCLOAK_LOCAL_PORT" "$KEYCLOAK_SERVICE_PORT" 2>/dev/null)
     if [ -z "$KEYCLOAK_PORT_FORWARD_PID" ]; then
-        print_error "Не удалось создать port-forward для $KEYCLOAK_SERVICE"
+        print_error "Failed to create port-forward for $KEYCLOAK_SERVICE"
         exit 1
     fi
-    # Проверяем, что PID - это число
+    # Confirm the PID is a number
     if ! [[ "$KEYCLOAK_PORT_FORWARD_PID" =~ ^[0-9]+$ ]]; then
-        print_error "Получен некорректный PID для port-forward: $KEYCLOAK_PORT_FORWARD_PID"
+        print_error "Invalid PID for port-forward: $KEYCLOAK_PORT_FORWARD_PID"
         exit 1
     fi
-    print_success "Port-forward для keycloak создан (PID: $KEYCLOAK_PORT_FORWARD_PID)"
+    print_success "Port-forward for keycloak created (PID: $KEYCLOAK_PORT_FORWARD_PID)"
     
     echo ""
-    print_info "Жду 2 секунды для стабилизации port-forward соединения..."
+    print_info "Waiting 2 seconds for the port-forward connection to settle..."
     sleep 2
 }
 
-# Функция настройки URL (вызывается после настройки port-forward для PROD)
+# URL setup (called after port-forward is set up for PROD)
 setup_urls() {
     if [ "$USE_PORT_FORWARD" = "true" ] && [ -n "$KEYCLOAK_LOCAL_PORT" ]; then
-        # Для PROD с port-forward используем localhost
-        # ВАЖНО: При port-forward мы минуем ingress, поэтому используем прямой путь
+        # For PROD with port-forward use localhost
+        # IMPORTANT: port-forward bypasses ingress, so the direct path is used
         TOKEN_URL="http://localhost:${KEYCLOAK_LOCAL_PORT}/realms/treasure/protocol/openid-connect/token"
     else
-        # Для других окружений используем обычный URL через ingress
+        # Other environments use a regular URL through ingress
         TOKEN_URL="https://${KEYCLOAK_DOMAIN}/realms/treasure/protocol/openid-connect/token"
     fi
 }
 
-# Проверка наличия jq
+# Check that jq is available
 if ! command -v jq &> /dev/null; then
-    print_warning "jq не установлен. Установите для корректной работы: apt-get install jq"
+    print_warning "jq is not installed. Install for correct operation: apt-get install jq"
     HAS_JQ=false
 else
     HAS_JQ=true
 fi
 
-# Выбор окружения (может быть передан как первый параметр)
+# Environment selection (may be passed as the first argument)
 if [ -n "$1" ] && [[ "$1" =~ ^(prod|preprod|demo|PROD|PREPROD|DEMO|production|pre-production)$ ]]; then
-    # ENV передан как первый параметр
+    # ENV passed as the first argument
     select_environment "$1"
-    # Параметры смещены - используем переменные окружения или параметры
+    # Arguments are shifted — use environment variables or arguments
     USERNAME="${2:-${KEYCLOAK_USERNAME:-}}"
     PASSWORD="${3:-${KEYCLOAK_PASSWORD:-}}"
     CLIENT_ID="${4:-${KEYCLOAK_CLIENT_ID:-}}"
     CLIENT_SECRET="${5:-${KEYCLOAK_CLIENT_SECRET:-}}"
 else
-    # ENV не передан, выберем интерактивно, параметры не смещены
+    # ENV not passed; pick interactively, arguments are not shifted
     select_environment ""
     USERNAME="${1:-${KEYCLOAK_USERNAME:-}}"
     PASSWORD="${2:-${KEYCLOAK_PASSWORD:-}}"
@@ -412,94 +412,94 @@ else
     CLIENT_SECRET="${4:-${KEYCLOAK_CLIENT_SECRET:-}}"
 fi
 
-# Проверка обязательных параметров
+# Check required parameters
 if [ -z "$USERNAME" ] || [ "$USERNAME" = "YOUR_USERNAME_HERE" ]; then
-    print_error "USERNAME не указан. Укажите через параметр или переменную окружения KEYCLOAK_USERNAME"
+    print_error "USERNAME is not set. Pass it as an argument or an environment variable KEYCLOAK_USERNAME"
     exit 1
 fi
 
 if [ -z "$PASSWORD" ] || [ "$PASSWORD" = "YOUR_PASSWORD_HERE" ]; then
-    print_error "PASSWORD не указан. Укажите через параметр или переменную окружения KEYCLOAK_PASSWORD"
+    print_error "PASSWORD is not set. Pass it as an argument or an environment variable KEYCLOAK_PASSWORD"
     exit 1
 fi
 
 if [ -z "$CLIENT_ID" ] || [ "$CLIENT_ID" = "YOUR_CLIENT_ID_HERE" ]; then
-    print_error "CLIENT_ID не указан. Укажите через параметр или переменную окружения KEYCLOAK_CLIENT_ID"
+    print_error "CLIENT_ID is not set. Pass it as an argument or an environment variable KEYCLOAK_CLIENT_ID"
     exit 1
 fi
 
 if [ -z "$CLIENT_SECRET" ] || [ "$CLIENT_SECRET" = "YOUR_CLIENT_SECRET_HERE" ]; then
-    print_error "CLIENT_SECRET не указан. Укажите через параметр или переменную окружения KEYCLOAK_CLIENT_SECRET"
+    print_error "CLIENT_SECRET is not set. Pass it as an argument or an environment variable KEYCLOAK_CLIENT_SECRET"
     exit 1
 fi
 
-# Настройка port-forward для PROD (если нужно)
+# Set up port-forward for PROD (when needed)
 if [ "$USE_PORT_FORWARD" = "true" ]; then
     setup_prod_port_forward
 fi
 
-# Настройка URL после port-forward
+# Set URLs after port-forward
 setup_urls
 
-# Начало работы
+# Start
 clear
-print_header "Treasury API Авторизация через Keycloak"
-echo -e "${BLUE}Окружение:${NC} ${ENV^^}"
+print_header "Treasury API Keycloak authorization"
+echo -e "${BLUE}Environment:${NC} ${ENV^^}"
 if [ "$USE_PORT_FORWARD" = "true" ]; then
-    echo -e "${BLUE}Режим:${NC} Port-forward (localhost)"
+    echo -e "${BLUE}Mode:${NC} Port-forward (localhost)"
     echo -e "${BLUE}Username:${NC} $USERNAME"
     echo -e "${BLUE}Client ID:${NC} $CLIENT_ID"
     echo ""
-    echo -e "${CYAN}Используемый URL через port-forward:${NC}"
+    echo -e "${CYAN}URL via port-forward:${NC}"
     echo -e "  • Keycloak: http://localhost:${KEYCLOAK_LOCAL_PORT}"
 else
     echo -e "${BLUE}Username:${NC} $USERNAME"
     echo -e "${BLUE}Client ID:${NC} $CLIENT_ID"
     echo ""
-    echo -e "${CYAN}Используемый URL:${NC}"
+    echo -e "${CYAN}URL in use:${NC}"
     echo -e "  • Keycloak: https://${KEYCLOAK_DOMAIN}"
 fi
 echo ""
 
-# Проверка, что URL установлен
+# Check that the URL is set
 if [ -z "$TOKEN_URL" ]; then
-    print_error "URL не был настроен. Проверьте конфигурацию."
+    print_error "URL was not configured. Check the configuration."
     exit 1
 fi
 
-# Отладочная информация перед запросом
-print_info "URL для запроса токена: $TOKEN_URL"
+# Debug info before the request
+print_info "URL for the token request: $TOKEN_URL"
 
 if [ "$USE_PORT_FORWARD" = "true" ]; then
     echo ""
-    print_info "Проверяю статус port-forward процесса..."
+    print_info "Checking the port-forward process status..."
     
-    # Проверяем keycloak port-forward
+    # Check keycloak port-forward
     if [ -n "$KEYCLOAK_PORT_FORWARD_PID" ] && [[ "$KEYCLOAK_PORT_FORWARD_PID" =~ ^[0-9]+$ ]]; then
         if ps -p $KEYCLOAK_PORT_FORWARD_PID > /dev/null 2>&1; then
-            print_success "Port-forward для keycloak активен (PID: $KEYCLOAK_PORT_FORWARD_PID, порт: $KEYCLOAK_LOCAL_PORT)"
+            print_success "Port-forward for keycloak is active (PID: $KEYCLOAK_PORT_FORWARD_PID, port: $KEYCLOAK_LOCAL_PORT)"
         else
-            print_error "Port-forward для keycloak НЕ работает (PID: $KEYCLOAK_PORT_FORWARD_PID не найден)"
+            print_error "Port-forward for keycloak is NOT working (PID: $KEYCLOAK_PORT_FORWARD_PID not found)"
         fi
     elif [ -n "$KEYCLOAK_PORT_FORWARD_PID" ]; then
-        print_warning "Port-forward для keycloak: некорректный PID (должен быть числом, получено: $KEYCLOAK_PORT_FORWARD_PID)"
+        print_warning "Port-forward for keycloak: invalid PID (must be a number, got: $KEYCLOAK_PORT_FORWARD_PID)"
     fi
     
-    # Тест доступности порта
-    print_info "Проверяю доступность порта..."
+    # Port availability test
+    print_info "Checking port availability..."
     if command -v nc &> /dev/null || command -v netcat &> /dev/null; then
         if nc -z localhost ${KEYCLOAK_LOCAL_PORT:-8081} 2>/dev/null; then
-            print_success "Порт ${KEYCLOAK_LOCAL_PORT:-8081} доступен"
+            print_success "Port ${KEYCLOAK_LOCAL_PORT:-8081} is available"
         else
-            print_error "Порт ${KEYCLOAK_LOCAL_PORT:-8081} НЕ доступен"
+            print_error "Port ${KEYCLOAK_LOCAL_PORT:-8081} is NOT available"
         fi
     fi
     echo ""
 fi
 
-# Шаг 1: Получение токена из Keycloak
-print_header "Получение токена из Keycloak"
-print_info "Отправляю запрос на получение токена..."
+# Step 1: Obtain a token from Keycloak
+print_header "Obtain a token from Keycloak"
+print_info "Sending a token request..."
 
 TOKEN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$TOKEN_URL" \
     -H 'Content-Type: application/x-www-form-urlencoded' \
@@ -509,50 +509,50 @@ TOKEN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$TOKEN_URL" \
     --data-urlencode "username=$USERNAME" \
     --data-urlencode "password=$PASSWORD")
 
-# Извлекаем HTTP код и тело ответа
+# Extract the HTTP status and response body
 HTTP_CODE=$(echo "$TOKEN_RESPONSE" | tail -n 1)
 TOKEN_RESPONSE=$(echo "$TOKEN_RESPONSE" | sed '$d')
 
-print_info "HTTP статус код: $HTTP_CODE"
+print_info "HTTP status code: $HTTP_CODE"
 
 if [ -z "$TOKEN_RESPONSE" ]; then
-    print_error "Пустой ответ от Keycloak"
-    print_info "HTTP код: $HTTP_CODE"
+    print_error "Empty response from Keycloak"
+    print_info "HTTP status: $HTTP_CODE"
     print_info "URL: $TOKEN_URL"
     if [ "$USE_PORT_FORWARD" = "true" ]; then
-        print_info "Проверьте port-forward процесс:"
+        print_info "Check the port-forward process:"
         print_info "  ps aux | grep 'port-forward'"
         print_info "  kubectl -n $K8S_NAMESPACE get svc | grep keycloak"
     fi
     exit 1
 fi
 
-# Проверка на ошибку
+# Error check
 if echo "$TOKEN_RESPONSE" | grep -q '"error"'; then
-    print_error "Ошибка при получении токена:"
+    print_error "Error obtaining the token:"
     if [ "$HAS_JQ" = true ]; then
         ERROR_DESC=$(echo "$TOKEN_RESPONSE" | jq -r '.error_description // .error')
         ERROR_CODE=$(echo "$TOKEN_RESPONSE" | jq -r '.error')
-        echo -e "  ${RED}Код ошибки:${NC} $ERROR_CODE"
-        echo -e "  ${RED}Описание:${NC} $ERROR_DESC"
+        echo -e "  ${RED}Error code:${NC} $ERROR_CODE"
+        echo -e "  ${RED}Description:${NC} $ERROR_DESC"
         echo ""
-        echo "Полный ответ:"
+        echo "Full response:"
         echo "$TOKEN_RESPONSE" | jq .
     else
         echo "$TOKEN_RESPONSE"
     fi
     echo ""
-    print_warning "Возможные причины:"
-    echo "  • Неверный username или password"
-    echo "  • Неверный client_id или client_secret"
-    echo "  • Пользователь не имеет доступа к realm 'treasure'"
+    print_warning "Possible causes:"
+    echo "  • Invalid username or password"
+    echo "  • Invalid client_id or client_secret"
+    echo "  • The user has no access to the realm 'treasure'"
     exit 1
 fi
 
-# Проверка наличия токена
+# Check that a token is present
 if ! echo "$TOKEN_RESPONSE" | grep -q '"access_token"'; then
-    print_error "В ответе отсутствует access_token"
-    print_info "Полный ответ:"
+    print_error "The response has no access_token"
+    print_info "Full response:"
     if [ "$HAS_JQ" = true ]; then
         echo "$TOKEN_RESPONSE" | jq .
     else
@@ -561,7 +561,7 @@ if ! echo "$TOKEN_RESPONSE" | grep -q '"access_token"'; then
     exit 1
 fi
 
-# Извлечение токена
+# Extract the token
 if [ "$HAS_JQ" = true ]; then
     ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
     TOKEN_TYPE=$(echo "$TOKEN_RESPONSE" | jq -r '.token_type // "Bearer"')
@@ -573,15 +573,15 @@ else
     EXPIRES_IN="N/A"
 fi
 
-print_success "Авторизация успешна!"
+print_success "Authorization succeeded!"
 
-# Финальный вывод токена
-print_header "Результат авторизации"
+# Final token output
+print_header "Authorization result"
 
 if [ "$HAS_JQ" = true ]; then
-    echo -e "${BLUE}Тип токена:${NC} $TOKEN_TYPE"
+    echo -e "${BLUE}Token type:${NC} $TOKEN_TYPE"
     if [ "$EXPIRES_IN" != "N/A" ] && [ "$EXPIRES_IN" != "null" ]; then
-        echo -e "${BLUE}Истекает через:${NC} $EXPIRES_IN секунд"
+        echo -e "${BLUE}Expires in:${NC} $EXPIRES_IN seconds"
     fi
     echo ""
 fi
@@ -595,17 +595,17 @@ echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Дополнительная информация
+# Additional information
 if [ "$HAS_JQ" = true ] && [ -n "$REFRESH_TOKEN" ] && [ "$REFRESH_TOKEN" != "null" ]; then
     echo -e "${BLUE}Refresh Token:${NC}"
     echo -e "${CYAN}$REFRESH_TOKEN${NC}"
     echo ""
 fi
 
-# Пример использования токена
-echo -e "${BLUE}Пример использования токена в curl:${NC}"
+# Example token usage
+echo -e "${BLUE}Example token usage with curl:${NC}"
 echo -e "${YELLOW}curl -H \"Authorization: Bearer $ACCESS_TOKEN\" ...${NC}"
 echo ""
 
-print_success "Готово! Токен скопирован выше."
+print_success "Done! The token is copied above."
 

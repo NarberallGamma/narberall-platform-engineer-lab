@@ -1,5 +1,5 @@
 ---
-- name: Apply Xray template config (form body; panel/api/xray/update на 3.3+ тоже принимает form)
+- name: Apply Xray template config (form body; panel/api/xray/update on 3.3+ also accepts form)
   ansible.builtin.uri:
     url: "{{ xui_xray_update_url }}"
     method: POST

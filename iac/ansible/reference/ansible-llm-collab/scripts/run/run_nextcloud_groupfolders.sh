@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
-# Nextcloud groupfolders. SSH-ключ с passphrase: eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
+# Nextcloud groupfolders. SSH key with a passphrase: eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
 #   ./scripts/run/run_nextcloud_groupfolders.sh --profile nextcloud-dev --limit HOST --ssh-key ~/.ssh/your_key --ssh-agent
-# Подробнее: scripts/run/lib/docker_ssh.sh
+# Details: scripts/run/lib/docker_ssh.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/docker_ssh.sh
 source "$(dirname "$0")/lib/docker_ssh.sh"
-# Подхват Vault-переменных с контрол-ноды (создаются пайплайном из CI Variables в /ansible/.env.vault).
+# Load Vault variables from the control node (created by the pipeline from CI Variables into /ansible/.env.vault).
 [ -f .env.vault ] && source .env.vault
 
 ANSIBLE_IMAGE="${ANSIBLE_IMAGE:-git.example.com/platform-infra/base-images/ansible:1.0}"
 
-# Обязательно одно из: --limit <хост из инвентаря> ИЛИ --profile nextcloud-dev|nextcloud-prod|regul (тогда выбирается хост по умолчанию: см. блок резолва ниже, должен совпадать с group_vars nextcloud_profile_default_inventory_host).
-# Профиль: --profile задаёт матрицу/WebDAV/Vault (nextcloud_matrix_profile_by_host подставляется для этого запуска). Можно сочетать с --limit.
-# Режим «один клиент»: передать имя клиента аргументом (с пробелами — в кавычках).
-# Режим «все клиенты»: --all-clients — список папок из WebDAV, применение прав по матрице ко всем (client_name не нужен).
-# Режим «все клиенты + создание папок по матрице»: --all-clients-create — то же + идемпотентный MKCOL для каждого клиента, затем ACL.
-# Режим «только ACL одному»: --permissions-only и имя клиента — переиграть ACL по матрице без MKCOL WebDAV (тест одной папки).
-# Режим «сброс LDAP»: --ldap-reset — только occ ldap:reset-group для групп из nextcloud_ldap_reset_groups (client_name не нужен).
-# Пример (один клиент, dev): ./run_nextcloud_groupfolders.sh --profile nextcloud-dev "ООО Рога и Копыта"
-# Пример (Regul, хост берётся из профиля app-02.example.com): ./run_nextcloud_groupfolders.sh --profile regul "Имя клиента"
-# Пример (--limit без смены профиля из group_vars): ./run_nextcloud_groupfolders.sh --limit nextcloud-dev.example.com "ООО …"
-# Пример (все клиенты):  ./run_nextcloud_groupfolders.sh --profile nextcloud-dev --all-clients
-# Пример (все клиенты, MKCOL+ACL): ./run_nextcloud_groupfolders.sh --profile regul --all-clients-create
-# Пример (только ACL одному, без MKCOL): ./run_nextcloud_groupfolders.sh --profile regul --permissions-only "Имя клиента"
-# Пример (LDAP reset):   ./run_nextcloud_groupfolders.sh --profile nextcloud-dev --ldap-reset
-# Параллелизм (Ansible throttle): --mkcol-threads N, --occ-threads N (переопределяют group_vars; без флагов — значения из group_vars/defaults).
-# Пример: ./run_nextcloud_groupfolders.sh --profile nextcloud-dev --mkcol-threads 4 --occ-threads 4 "ООО …"
+# One of: --limit <inventory host> OR --profile nextcloud-dev|nextcloud-prod|regul (then the default host is chosen: see the resolve block below; must match group_vars nextcloud_profile_default_inventory_host).
+# Profile: --profile sets matrix/WebDAV/Vault (nextcloud_matrix_profile_by_host is applied for this run). Can be combined with --limit.
+# Single-client mode: pass the client name as an argument (quote names with spaces).
+# All-clients mode: --all-clients — folder list from WebDAV, apply matrix ACLs to all (client_name not needed).
+# All-clients + create folders from the matrix: --all-clients-create — same plus idempotent MKCOL per client, then ACL.
+# ACL-only for one client: --permissions-only and a client name — replay matrix ACLs without WebDAV MKCOL (single-folder test).
+# LDAP reset mode: --ldap-reset — only occ ldap:reset-group for groups in nextcloud_ldap_reset_groups (client_name not needed).
+# Example (one client, dev): ./run_nextcloud_groupfolders.sh --profile nextcloud-dev "Acme LLC"
+# Example (Regul, host from profile app-02.example.com): ./run_nextcloud_groupfolders.sh --profile regul "Client name"
+# Example (--limit without changing the group_vars profile): ./run_nextcloud_groupfolders.sh --limit nextcloud-dev.example.com "Acme …"
+# Example (all clients):  ./run_nextcloud_groupfolders.sh --profile nextcloud-dev --all-clients
+# Example (all clients, MKCOL+ACL): ./run_nextcloud_groupfolders.sh --profile regul --all-clients-create
+# Example (ACL only for one, no MKCOL): ./run_nextcloud_groupfolders.sh --profile regul --permissions-only "Client name"
+# Example (LDAP reset):   ./run_nextcloud_groupfolders.sh --profile nextcloud-dev --ldap-reset
+# Parallelism (Ansible throttle): --mkcol-threads N, --occ-threads N (override group_vars; without flags — values from group_vars/defaults).
+# Example: ./run_nextcloud_groupfolders.sh --profile nextcloud-dev --mkcol-threads 4 --occ-threads 4 "Acme …"
 INV="inventories/hosts.ini"
 LIMIT_HOST=""
 MATRIX_PROFILE=""
@@ -69,18 +69,18 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -n "$PERMISSIONS_ONLY" ]] && [[ -n "$REAPPLY_ALL_CLIENTS" ]]; then
-  echo "Ошибка: нельзя одновременно указывать --permissions-only и --all-clients / --all-clients-create." >&2
+  echo "Error: --permissions-only cannot be combined with --all-clients / --all-clients-create." >&2
   exit 1
 fi
 if [[ -n "$PERMISSIONS_ONLY" ]] && [[ -n "$ALL_CLIENTS_MKCOL" ]]; then
-  echo "Ошибка: нельзя одновременно указывать --permissions-only и --all-clients-create." >&2
+  echo "Error: --permissions-only cannot be combined with --all-clients-create." >&2
   exit 1
 fi
 if [[ -n "$PERMISSIONS_ONLY" ]] && [[ -n "$LDAP_RESET" ]]; then
-  echo "Ошибка: нельзя одновременно указывать --permissions-only и --ldap-reset." >&2
+  echo "Error: --permissions-only cannot be combined with --ldap-reset." >&2
   exit 1
 fi
-# Если имя клиента передано одним аргументом — пишем в файл и передаём -e @файл (через аргументы Docker пробелы режутся)
+# When the client name is a single argument — write it to a file and pass -e @file (Docker args split on spaces)
 CLIENT_VARS_FILE=""
 MATRIX_VARS_FILE=""
 if [[ -n "$CLIENT_NAME_ARG" ]]; then
@@ -90,23 +90,23 @@ if [[ -n "$CLIENT_NAME_ARG" ]]; then
   printf '{"client_name": "%s"}\n' "$escaped" > "$CLIENT_VARS_FILE"
   EXTRA=(-e "@${CLIENT_VARS_FILE}" "${EXTRA[@]}")
 fi
-# Режим «все клиенты»: nextcloud_reapply_all_clients_enabled; при --all-clients-create — ещё nextcloud_reapply_all_clients_mkcol_enabled
+# All-clients mode: nextcloud_reapply_all_clients_enabled; with --all-clients-create also nextcloud_reapply_all_clients_mkcol_enabled
 if [[ -n "$REAPPLY_ALL_CLIENTS" ]]; then
   EXTRA=(-e "nextcloud_reapply_all_clients_enabled=true" "${EXTRA[@]}")
 fi
 if [[ -n "$ALL_CLIENTS_MKCOL" ]]; then
   EXTRA=(-e "nextcloud_reapply_all_clients_mkcol_enabled=true" "${EXTRA[@]}")
 fi
-# Режим «только ACL одному»: nextcloud_reapply_permissions_only без MKCOL
+# ACL-only for one client: nextcloud_reapply_permissions_only without MKCOL
 if [[ -n "$PERMISSIONS_ONLY" ]]; then
   EXTRA=(-e "nextcloud_reapply_permissions_only=true" "${EXTRA[@]}")
 fi
-# Режим «сброс LDAP»: только occ ldap:reset-group для групп из group_vars (client_name не передаём)
+# LDAP reset mode: only occ ldap:reset-group for groups from group_vars (client_name is not passed)
 if [[ -n "$LDAP_RESET" ]]; then
   EXTRA=(-e "nextcloud_ldap_reset_groups_enabled=true" "${EXTRA[@]}")
 fi
 
-# Если --profile без --limit: выбрать хост инвентаря (должен совпадать с inventories/hosts.ini и group_vars/nextcloud_profile_default_inventory_host)
+# When --profile is set without --limit: pick the inventory host (must match inventories/hosts.ini and group_vars/nextcloud_profile_default_inventory_host)
 if [[ -z "$LIMIT_HOST" ]] && [[ -n "$MATRIX_PROFILE" ]]; then
   case "$MATRIX_PROFILE" in
     nextcloud-dev)
@@ -119,28 +119,28 @@ if [[ -z "$LIMIT_HOST" ]] && [[ -n "$MATRIX_PROFILE" ]]; then
       LIMIT_HOST="app-02.example.com"
       ;;
     *)
-      echo "Ошибка: неизвестный --profile для авто-хоста: ${MATRIX_PROFILE} (ожидаются nextcloud-dev, nextcloud-prod или regul). Используйте --limit явно или расширьте блок резолва в скрипте." >&2
+      echo "Error: unknown --profile for auto-host: ${MATRIX_PROFILE} (expected nextcloud-dev, nextcloud-prod, or regul). Pass --limit explicitly or extend the resolve block in the script." >&2
       exit 1
       ;;
   esac
 fi
 
 if [[ -z "$LIMIT_HOST" ]]; then
-  echo "Ошибка: задайте --limit <хост из инвентаря> или --profile nextcloud-dev|nextcloud-prod|regul Пример: --profile nextcloud-dev \"ООО …\"" >&2
+  echo "Error: set --limit <inventory host> or --profile nextcloud-dev|nextcloud-prod|regul Example: --profile nextcloud-dev \"Acme …\"" >&2
   exit 1
 fi
 
 if [[ -n "$NC_CONCURRENCY_MKCOL" ]] && ! [[ "$NC_CONCURRENCY_MKCOL" =~ ^[1-9][0-9]*$ ]]; then
-  echo "Ошибка: --mkcol-threads ожидает целое число >= 1 (получено: ${NC_CONCURRENCY_MKCOL})" >&2
+  echo "Error: --mkcol-threads expects an integer >= 1 (got: ${NC_CONCURRENCY_MKCOL})" >&2
   exit 1
 fi
 if [[ -n "$NC_CONCURRENCY_OCC" ]] && ! [[ "$NC_CONCURRENCY_OCC" =~ ^[1-9][0-9]*$ ]]; then
-  echo "Ошибка: --occ-threads ожидает целое число >= 1 (получено: ${NC_CONCURRENCY_OCC})" >&2
+  echo "Error: --occ-threads expects an integer >= 1 (got: ${NC_CONCURRENCY_OCC})" >&2
   exit 1
 fi
 
-# Явный профиль матрицы для выбранного --limit: через JSON-файл, чтобы переменная пришла в Ansible как dict, а не str
-# (inline -e nextcloud_matrix_profile_by_host={...} после docker/ansible часто даёт строку → ошибка доступа [...] по inventory_hostname).
+# Explicit matrix profile for the chosen --limit: via a JSON file so Ansible receives a dict, not a str
+# (inline -e nextcloud_matrix_profile_by_host={...} after docker/ansible often becomes a string → [...] lookup error on inventory_hostname).
 if [[ -n "$MATRIX_PROFILE" ]]; then
   case "$MATRIX_PROFILE" in
     nextcloud-dev|nextcloud-prod|regul)
@@ -149,7 +149,7 @@ if [[ -n "$MATRIX_PROFILE" ]]; then
       EXTRA=(-e "@${MATRIX_VARS_FILE}" "${EXTRA[@]}")
       ;;
     *)
-      echo "Ошибка: --profile: допустимы nextcloud-dev, nextcloud-prod или regul (получено: ${MATRIX_PROFILE})" >&2
+      echo "Error: --profile: allowed values are nextcloud-dev, nextcloud-prod, or regul (got: ${MATRIX_PROFILE})" >&2
       exit 1
       ;;
   esac
@@ -162,17 +162,17 @@ if ((${#_NC_GF_CLEANUP[@]} > 0)); then
   trap 'rm -f "${_NC_GF_CLEANUP[@]}"' EXIT
 fi
 
-# Параллелизм MKCOL/OCC: в конец EXTRA — перекрывает group_vars при явной передаче
+# MKCOL/OCC parallelism: append to EXTRA — overrides group_vars when passed explicitly
 [[ -n "$NC_CONCURRENCY_MKCOL" ]] && EXTRA+=(-e "nextcloud_concurrency_mkcol=${NC_CONCURRENCY_MKCOL}")
 [[ -n "$NC_CONCURRENCY_OCC" ]] && EXTRA+=(-e "nextcloud_concurrency_occ=${NC_CONCURRENCY_OCC}")
 
 if [[ -n "$PERMISSIONS_ONLY" ]] && [[ -z "$CLIENT_NAME_ARG" ]]; then
-  echo "Ошибка: --permissions-only требует имя клиента, например: $0 --profile regul --permissions-only \"Имя клиента\"" >&2
+  echo "Error: --permissions-only requires a client name, for example: $0 --profile regul --permissions-only \"Client name\"" >&2
   exit 1
 fi
 
 if [[ -z "$CLIENT_NAME_ARG" ]] && [[ -z "$REAPPLY_ALL_CLIENTS" ]] && [[ -z "$LDAP_RESET" ]] && [[ -z "$PERMISSIONS_ONLY" ]]; then
-  echo "Ошибка: укажите имя клиента, --all-clients, --all-clients-create или --ldap-reset. Пример: $0 --profile nextcloud-dev \"ООО Рога и Копыта\" | $0 --profile regul \"…\" | $0 --limit nextcloud-dev.example.com …" >&2
+  echo "Error: pass a client name, --all-clients, --all-clients-create, or --ldap-reset. Example: $0 --profile nextcloud-dev \"Acme LLC\" | $0 --profile regul \"…\" | $0 --limit nextcloud-dev.example.com …" >&2
   exit 1
 fi
 
@@ -189,13 +189,13 @@ VAULT_ENV=()
 [[ -n "${VAULT_ADDR:-}" ]] && VAULT_ENV+=(-e "VAULT_ADDR=$VAULT_ADDR")
 [[ -n "${VAULT_TOKEN:-}" ]] && VAULT_ENV+=(-e "VAULT_TOKEN=$VAULT_TOKEN")
 
-# Лог вывода плейбука в artifacts/logs (имя плейбука + дата/время) для отладки
+# Playbook output log in artifacts/logs (playbook name + date/time) for debugging
 LOG_DIR="artifacts/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_DIR}/nextcloud_groupfolders_$(date +%Y-%m-%d_%H-%M-%S).log"
-echo "Лог вывода: $LOG_FILE" >&2
+echo "Output log: $LOG_FILE" >&2
 
-# При ручном запуске в терминале — -it для удобного вывода; из n8n по SSH TTY нет — без -it
+# Interactive terminal run — -it for readable output; n8n over SSH has no TTY — omit -it
 DOCKER_TTY=""
 [[ -t 0 ]] && [[ -t 1 ]] && DOCKER_TTY="-it"
 docker run --rm $DOCKER_TTY \

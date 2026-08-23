@@ -1,4 +1,4 @@
-{# PlainLoginModule: в JAAS точка с запятой только у последней опции модуля — иначе Line N: expected [controlFlag] #}
+{# PlainLoginModule: in JAAS a semicolon is only on the last module option — otherwise Line N: expected [controlFlag] #}
 KafkaServer {
   org.apache.kafka.common.security.plain.PlainLoginModule required
   username="{{ kafka_sasl_admin_username }}"

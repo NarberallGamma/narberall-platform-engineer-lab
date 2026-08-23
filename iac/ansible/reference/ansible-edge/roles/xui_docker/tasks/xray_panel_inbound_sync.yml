@@ -3,7 +3,7 @@
   ansible.builtin.assert:
     that:
       - xui_inbound_record['id'] is defined
-    fail_msg: "Inbound «{{ xui_inbound_remark }}» не найден для sync."
+    fail_msg: "Inbound «{{ xui_inbound_remark }}» was not found for sync."
 
 - name: Parse existing inbound for sync
   ansible.builtin.set_fact:

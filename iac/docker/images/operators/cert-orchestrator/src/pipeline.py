@@ -1,4 +1,4 @@
-"""certbot → kubectl (SA token) → nginx SSH → опционально https_verification."""
+"""certbot → kubectl (SA token) → nginx SSH → optional https_verification."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from state import record_renewal_attempt
 
 
 def certbot_regru_credentials_cli(cfg: OrchestratorConfig) -> list[str]:
-    """`--dns-credentials` и путь к INI (Certbot 3.x; см. certbot_run.build_certbot_cmd)."""
+    """`--dns-credentials` and the INI path (Certbot 3.x; see certbot_run.build_certbot_cmd)."""
     p: Path = resolve_regru_credentials_path(cfg.letsencrypt)
     return ["--dns-credentials", str(p)]
 
@@ -80,7 +80,7 @@ def _collect_state_results(
 
 def run_renewal(cfg: OrchestratorConfig, force_renewal: bool = False) -> int:
     logger = get_logger()
-    logger.info("Конвейер renewal: старт%s", " (certbot --force-renewal)" if force_renewal else "")
+    logger.info("Renewal pipeline: start%s", " (certbot --force-renewal)" if force_renewal else "")
     step_lines: List[Tuple[str, bool, str]] = []
     target_results: List[TargetDeployResult] = []
 
@@ -102,7 +102,7 @@ def run_renewal(cfg: OrchestratorConfig, force_renewal: bool = False) -> int:
         record_renewal_attempt(success=False, partial=False, target_results=[])
         return 1
     if rc != 0:
-        logger.error("certbot завершился с кодом %s", rc)
+        logger.error("certbot exited with code %s", rc)
         notify_renewal_error(cfg, "Certbot", f"exit code {rc}")
         record_renewal_attempt(success=False, partial=False, target_results=[])
         return rc
@@ -110,8 +110,8 @@ def run_renewal(cfg: OrchestratorConfig, force_renewal: bool = False) -> int:
 
     cert_path, key_path = pem_paths(cfg.letsencrypt)
     if not cert_path.is_file() or not key_path.is_file():
-        logger.error("После certbot нет PEM: %s / %s", cert_path, key_path)
-        notify_renewal_error(cfg, "PEM", f"нет файлов: {cert_path} / {key_path}")
+        logger.error("No PEM after certbot: %s / %s", cert_path, key_path)
+        notify_renewal_error(cfg, "PEM", f"files missing: {cert_path} / {key_path}")
         record_renewal_attempt(success=False, partial=False, target_results=[])
         return 1
 
@@ -126,17 +126,17 @@ def run_renewal(cfg: OrchestratorConfig, force_renewal: bool = False) -> int:
             step_lines.extend(results_to_step_lines(k8s_results))
             ok_n, total_n = summarize(k8s_results)
             if total_n == 0:
-                step_lines.append(("Kubernetes", True, "нет targets"))
+                step_lines.append(("Kubernetes", True, "no targets"))
             elif ok_n == total_n:
                 logger.info("kubectl TLS secret: OK (%s namespace(s))", total_n)
             elif ok_n > 0:
                 logger.warning(
-                    "kubectl TLS secret: частично (%s/%s OK)", ok_n, total_n
+                    "kubectl TLS secret: partial (%s/%s OK)", ok_n, total_n
                 )
             else:
-                logger.error("kubectl TLS secret: все %s namespace(s) failed", total_n)
+                logger.error("kubectl TLS secret: all %s namespace(s) failed", total_n)
         else:
-            step_lines.append(("Kubernetes", True, "выключено"))
+            step_lines.append(("Kubernetes", True, "disabled"))
 
         if cfg.targets.nginx_remotes.enabled:
             nginx_results = deploy_nginx_hosts(cfg, cert_path, key_path, _ssh_timeout(cfg))
@@ -145,15 +145,15 @@ def run_renewal(cfg: OrchestratorConfig, force_renewal: bool = False) -> int:
             step_lines.extend(results_to_step_lines(nginx_results))
             ok_n, total_n = summarize(nginx_results)
             if total_n == 0:
-                step_lines.append(("nginx", True, "нет хостов"))
+                step_lines.append(("nginx", True, "no hosts"))
             elif ok_n == total_n:
                 logger.info("nginx remotes: OK (%s host(s))", total_n)
             elif ok_n > 0:
-                logger.warning("nginx remotes: частично (%s/%s OK)", ok_n, total_n)
+                logger.warning("nginx remotes: partial (%s/%s OK)", ok_n, total_n)
             else:
-                logger.error("nginx remotes: все %s host(s) failed", total_n)
+                logger.error("nginx remotes: all %s host(s) failed", total_n)
         else:
-            step_lines.append(("nginx", True, "выключено"))
+            step_lines.append(("nginx", True, "disabled"))
 
         if cfg.https_verification.enabled:
             https_results = run_all(cfg)
@@ -170,13 +170,13 @@ def run_renewal(cfg: OrchestratorConfig, force_renewal: bool = False) -> int:
                 )
             if https_results and not all(r.ok for r in https_results):
                 failed = sum(1 for r in https_results if not r.ok)
-                logger.warning("HTTPS-проверка: %s/%s сбоев", failed, len(https_results))
+                logger.warning("HTTPS check: %s/%s failures", failed, len(https_results))
         else:
-            step_lines.append(("HTTPS-проверки", True, "выключено"))
+            step_lines.append(("HTTPS checks", True, "disabled"))
 
     except FileNotFoundError as e:
         logger.error("%s", e)
-        notify_renewal_error(cfg, "Файл/ключ", str(e))
+        notify_renewal_error(cfg, "File/key", str(e))
         record_renewal_attempt(
             success=False,
             partial=False,
@@ -184,8 +184,8 @@ def run_renewal(cfg: OrchestratorConfig, force_renewal: bool = False) -> int:
         )
         return 1
     except RuntimeError as e:
-        logger.error("Конвейер: %s", e)
-        notify_renewal_error(cfg, "Конвейер", str(e))
+        logger.error("Pipeline: %s", e)
+        notify_renewal_error(cfg, "Pipeline", str(e))
         record_renewal_attempt(
             success=False,
             partial=bool(target_results and any(r.ok for r in target_results)),
@@ -197,8 +197,8 @@ def run_renewal(cfg: OrchestratorConfig, force_renewal: bool = False) -> int:
         )
         return 1
     except Exception as e:
-        logger.exception("Конвейер: непредвиденная ошибка: %s", e)
-        notify_renewal_error(cfg, "Конвейер", str(e))
+        logger.exception("Pipeline: unexpected error: %s", e)
+        notify_renewal_error(cfg, "Pipeline", str(e))
         record_renewal_attempt(
             success=False,
             partial=bool(target_results and any(r.ok for r in target_results)),
@@ -222,11 +222,11 @@ def run_renewal(cfg: OrchestratorConfig, force_renewal: bool = False) -> int:
         notify_next_rotation_reminder(cfg)
 
     if full_success:
-        logger.info("Конвейер renewal: успешно")
+        logger.info("Renewal pipeline: success")
     elif partial:
-        logger.warning("Конвейер renewal: частичный успех")
+        logger.warning("Renewal pipeline: partial success")
     else:
-        logger.error("Конвейер renewal: certbot OK, раскладка не удалась")
+        logger.error("Renewal pipeline: certbot OK, deploy failed")
 
     record_renewal_attempt(
         success=full_success,

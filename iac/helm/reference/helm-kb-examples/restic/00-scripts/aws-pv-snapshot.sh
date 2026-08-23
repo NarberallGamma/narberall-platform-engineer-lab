@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# Этот скрипт - способ ручного управления снепшотами pv в AWS
+# Manual AWS PV snapshot management
 
-# Скрипт необходимо запускать на узле с Master-компонентами Kubernetes, чаще
-# всего им является узел с именем kube-master или именем bastion
-# На этом сервере должен быть установлен aws cli.
-# В home-каталоге пользователя restic должен быть .aws с корректным конфигом и кредами.
+# Start this script on a node that runs Kubernetes master components, most
+# often a node named kube-master or bastion
+# aws cli must be installed on this server.
+# The restic user's home directory must contain .aws with a valid config and credentials.
 
-# Принцип работы:
-#   - определение нужного pvc
-#   - определение по pvc его pv
-#   - определение по pv соответствующий ему volume-id в AWS
-#   - создание снепшота aws volume с заданным description
-#   - получение списка снепшотов с указанным description и их ротация в соответствии с prune
+# How it works:
+#   - resolve the target PVC
+#   - resolve the PV from the PVC
+#   - resolve the AWS volume-id from the PV
+#   - create an AWS volume snapshot with the given description
+#   - list snapshots with the given description and rotate them according to prune
 
-# Пример использования в schedule:
+# Schedule example:
 # restic_run_on.sh 10.0.0.1 aws-pv-snapshot.sh '-n clickhouse-production -po ch-cluster-0 -volume data-storage -description ClickHouse-backup -k "2 month"'
 
 ################################################################################
 
-# Путь до конфига kubectl
+# Path to the kubectl config
 KUBECONF_FILE="/root/.kube/config"
 export KUBECONFIG=${KUBECONF_FILE}
 KUBECTL="/opt/deckhouse/bin/kubectl"
@@ -34,7 +34,7 @@ function alert {
   backup_notify --trigger backup --label backup_target="${BACKUP_TARGET}" --label backup_type="${BACKUP_TYPE}" --summary "${MESSAGE}" "${FULL_MESSAGE}"
 }
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options n:p:v:d:k: --longoptions ,namespace:,pod:,volume:,description:,prune: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then
@@ -105,7 +105,7 @@ then
   exit 1
 fi
 
-# Делаем снепшот
+# Create a snapshot
 RESULT=`aws ec2 create-snapshot --volume-id ${AWS_VOLUME} --description "${DESCRIPTION}" 2>&1`
 if test "${?}" -ne 0 || test "${AWS_VOLUME}" -ne "null";
 then
@@ -115,11 +115,11 @@ else
   echo ${RESULT}
 fi
 
-# Список снепшотов на удаление:
+# Snapshots to delete:
 aws ec2 describe-snapshots --owner self --output json | \
     jq '.Snapshots[] | select(.Description == "'${DESCRIPTION}'" and .StartTime < "'$(date --date="-${CUSTOMPRUNE:-${CUSTOMPRUNE_DEFAULT}}" +%Y-%m-%d)'") | [.Description, .StartTime, .SnapshotId]'
 
-# Удаляем старые
+# Delete old ones
 aws ec2 describe-snapshots --owner self --output json | \
     jq '.Snapshots[] | select(.Description == "'${DESCRIPTION}'" and .StartTime < "'$(date --date="-${CUSTOMPRUNE:-${CUSTOMPRUNE_DEFAULT}}" +%Y-%m-%d)'") | [.SnapshotId]' | \
     jq -cr '.[]' | \

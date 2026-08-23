@@ -1,5 +1,5 @@
 ---
-- name: "{{ docker_app.slug }} | каталоги приложения"
+- name: "{{ docker_app.slug }} | application directories"
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
@@ -12,7 +12,7 @@
     label: "{{ item.path }}"
   tags: [docker_app, deploy]
 
-- name: "{{ docker_app.slug }} | конфиг cert-monitoring"
+- name: "{{ docker_app.slug }} | cert-monitoring config"
   ansible.builtin.template:
     src: cert-monitoring/cert-monitoring.conf.j2
     dest: "{{ docker_app_base_dir }}/cert-monitoring/config/cert-monitoring.conf"
@@ -21,7 +21,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy]
 
-- name: "{{ docker_app.slug }} | конфиг cert-orchestrator"
+- name: "{{ docker_app.slug }} | cert-orchestrator config"
   ansible.builtin.template:
     src: cert-orchestrator/config.yaml.j2
     dest: "{{ docker_app_base_dir }}/cert-orchestrator/config/config.yaml"
@@ -30,7 +30,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy]
 
-- name: cert-orchestrator | каталог .ssh (ключ из Vault, только для mount в контейнер)
+- name: cert-orchestrator | .ssh directory (key from Vault, mount into the container only)
   ansible.builtin.file:
     path: "{{ docker_app_base_dir }}/cert-orchestrator/.ssh"
     state: directory
@@ -38,7 +38,7 @@
   when: docker_app.slug == 'cert-orchestrator'
   tags: [docker_app, deploy, vault]
 
-- name: cert-orchestrator | приватный SSH ключ из Vault
+- name: cert-orchestrator | private SSH key from Vault
   ansible.builtin.template:
     src: cert-orchestrator/id_estate.j2
     dest: "{{ docker_app_base_dir }}/cert-orchestrator/.ssh/id_estate"
@@ -51,7 +51,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy, vault]
 
-- name: cert-orchestrator | проверить формат SSH ключа
+- name: cert-orchestrator | validate SSH key format
   ansible.builtin.command:
     argv:
       - ssh-keygen
@@ -67,7 +67,7 @@
     - app_vault.ssh_private_key | length > 0
   tags: [docker_app, deploy, vault]
 
-- name: cert-orchestrator | размер SSH ключа (диагностика при ошибке ssh-keygen)
+- name: cert-orchestrator | SSH key size (diagnostics when ssh-keygen fails)
   ansible.builtin.command:
     argv:
       - wc
@@ -82,13 +82,13 @@
     - cert_orchestrator_ssh_key_validate.rc != 0
   tags: [docker_app, deploy, vault]
 
-- name: cert-orchestrator | подсказка при битом SSH ключе
+- name: cert-orchestrator | hint when the SSH key is corrupt
   ansible.builtin.fail:
     msg: >-
-      ssh-keygen не прочитал {{ docker_app_base_dir }}/cert-orchestrator/.ssh/id_estate
-      (размер {{ cert_orchestrator_ssh_key_size.stdout | default('?') }}, ожидается 419 байт для ed25519).
-      Частая причина: нет перевода строки после -----END OPENSSH PRIVATE KEY-----.
-      Перезалить ключ в Vault через ssh_private_key=@file; повторить deploy.
+      ssh-keygen could not read {{ docker_app_base_dir }}/cert-orchestrator/.ssh/id_estate
+      (size {{ cert_orchestrator_ssh_key_size.stdout | default('?') }}, expected 419 bytes for ed25519).
+      Common cause: no newline after -----END OPENSSH PRIVATE KEY-----.
+      Re-upload the key to Vault via ssh_private_key=@file; repeat deploy.
   when:
     - docker_app.slug == 'cert-orchestrator'
     - cert_orchestrator_ssh_key_validate is defined
@@ -96,7 +96,7 @@
     - cert_orchestrator_ssh_key_validate.rc != 0
   tags: [docker_app, deploy, vault]
 
-- name: cert-orchestrator | каталог .k8s (CA API из Vault)
+- name: cert-orchestrator | .k8s directory (API CA from Vault)
   ansible.builtin.file:
     path: "{{ docker_app_base_dir }}/cert-orchestrator/.k8s"
     state: directory
@@ -104,7 +104,7 @@
   when: docker_app.slug == 'cert-orchestrator'
   tags: [docker_app, deploy, vault]
 
-- name: cert-orchestrator | CA сертификат K8s API из Vault
+- name: cert-orchestrator | K8s API CA certificate from Vault
   ansible.builtin.template:
     src: cert-orchestrator/k8s_ca.crt.j2
     dest: "{{ docker_app_base_dir }}/cert-orchestrator/.k8s/ca.crt"
@@ -117,7 +117,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy, vault]
 
-- name: "{{ docker_app.slug }} | конфиг cloud-hibernate-operator"
+- name: "{{ docker_app.slug }} | cloud-hibernate-operator config"
   ansible.builtin.template:
     src: cloud-hibernate-operator/cloud-hibernate-operator.conf.j2
     dest: "{{ docker_app_base_dir }}/cloud-hibernate-operator/config/cloud-hibernate-operator.conf"
@@ -126,7 +126,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy]
 
-- name: "{{ docker_app.slug }} | каталоги gitlab-nginx"
+- name: "{{ docker_app.slug }} | gitlab-nginx directories"
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
@@ -193,7 +193,7 @@
   notify: restart docker app compose
   tags: [docker_app, deploy]
 
-- name: "{{ docker_app.slug }} | .env (секреты Vault)"
+- name: "{{ docker_app.slug }} | .env (Vault secrets)"
   ansible.builtin.template:
     src: "{{ docker_app.slug }}/dotenv.j2"
     dest: "{{ docker_app_base_dir }}/{{ docker_app.slug }}/.env"

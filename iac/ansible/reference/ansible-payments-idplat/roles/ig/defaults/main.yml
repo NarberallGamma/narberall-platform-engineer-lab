@@ -5,9 +5,9 @@ ig_loglevel: "Debug"
 ig_ssl_cert: "ig-hosting.pfx"  # SSL port binding cert
 ig_ssl_cert_passwd: 123456  # SSL pwd
 
-  ## работает на версии => identity-gateway:5.4.0.0-master-240925.118700
+  ## works on identity-gateway:5.4.0.0-master-240925.118700 and later
 ig_UseHealthCheckEndpoint: true
-ig_HealthCheckEndpoint_RequestTracing: false ## false выключение логирования запросов на helth
+ig_HealthCheckEndpoint_RequestTracing: false ## false disables request logging on the health endpoint
 ig_caching_redis_server: "{{ redis_server | default((redis_name | default('redis', true)) + ':' + (redis_port | default(6379, true) | string), true) }}"
 ig_caching_redis_user: "{{ redis_default_user | default('', true) }}"  # because of keyword 'user' is not supported
 ig_caching_redis_passwd: "{{ redis_default_passwd | default('', true) }}"

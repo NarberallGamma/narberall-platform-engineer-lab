@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Legacy-миграция GitLab Omnibus TLS -> внешний docker gitlab-nginx (/docker/apps/gitlab-nginx)
+# Legacy migration: GitLab Omnibus TLS -> external docker gitlab-nginx (/docker/apps/gitlab-nginx)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/docker_ssh.sh
@@ -38,8 +38,8 @@ while [[ $# -gt 0 ]]; do
       cat <<'EOF'
 Usage: run_migrate_gitlab_nginx_legacy.sh --prod|--preprod (--all | --limit HOST) [options] [-- ansible-args]
 
-Legacy-миграция: перенос TLS с GitLab Omnibus nginx во внешний gitlab-nginx.
-Краткий downtime на 443. См. playbooks/migrate_gitlab_nginx_legacy.yml
+Legacy migration: move TLS from GitLab Omnibus nginx to external gitlab-nginx.
+Brief downtime on 443. See playbooks/migrate_gitlab_nginx_legacy.yml
 
 Examples:
   ./scripts/run/run_migrate_gitlab_nginx_legacy.sh --preprod --limit estate-preprod-gitlab

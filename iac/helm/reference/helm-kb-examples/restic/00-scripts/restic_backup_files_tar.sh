@@ -1,39 +1,39 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - запасной способ бэкапа файлов. Файлы сперва помещаются в tar-архив.
-# Это необходимо для хранения в одном бэкапе restic переменного списка файлов, чтобы на это не срабатывал мониторинг.
-# Актуально, например, для binlog-файлов, хранящихся в общем каталоге mysql.
+# Fallback file backup method. Files are placed in a tar archive first.
+# Needed so a restic backup can hold a variable file list without triggering monitoring.
+# Useful, for example, for binlog files stored in a shared MySQL directory.
 
-# Принцип работы:
-#   - создание бэкапа файлов и/или каталогов в restic-репозитории с помощью
+# How it works:
+#   - create a file and/or directory backup in the restic repository with
 #     'restic backup'
-#   - удаление старых бэкапов в restic-репозитории с помощью 'restic forget --prune'
+#   - delete old backups in the restic repository with 'restic forget --prune'
 
-# Поддерживаемые опции:
-# -q|--add-quoted                - путь к файлу или каталогу который необходимо
-#                                  зарезервировать. Опция может быть указана несколько раз, в
-#                                  резервную копию попадут все указанные файлы и/или каталоги.
-#                                  Указанные пути будут помещены в одинарные кавычки - будут
-#                                  корректно обработаны пути с пробелами, но не будут работать
-#                                  wildcard-подстановки. Необязательный аргумент, пути к
-#                                  файлам и/или каталогам должны быть указаны или с помощью
-#                                  этой опции, или с помощью позиционного аргумента ${2},
-#                                  также они могут быть использованы совместно
-# -t|--tar-options               - Опции tar для формировании архива. Необязательный аргумент.
-# -k|--prune                     - строка с опциями алгоритма сохранения резервных копий в
-#                                  формате программы restic, например '--keep-hourly 72 --keep-within 30d'
-#                                  Необязательный аргумент, без указания этой опции будет
-#                                  использовано значение ${CUSTOMPRUNE_DEFAULT}
+# Supported options:
+# -q|--add-quoted                - path to a file or directory to
+#                                  back up. The option may be repeated; the
+#                                  backup will include all listed files and/or directories.
+#                                  Listed paths are wrapped in single quotes — paths
+#                                  with spaces are handled correctly, but wildcards
+#                                  will not expand. Optional; file and/or directory
+#                                  paths must be given either with
+#                                  this option or with positional argument ${2};
+#                                  they may also be used together
+# -t|--tar-options               - tar options for building the archive. Optional.
+# -k|--prune                     - retention-options string in
+#                                  restic format, e.g. '--keep-hourly 72 --keep-within 30d'
+#                                  Optional. When omitted,
+#                                  ${CUSTOMPRUNE_DEFAULT} is used
 
-# Позиционные аргументы:
-# ${1} - имя задания, тег restic-репозитория. Обязательный аргумент
-# ${2} - разделенные запятыми, пути к файлам или каталогам которые необходимо
-#        зарезервировать. Можно использовать wildcard-подстановки, пробелы в
-#        путях будут обработаны НЕкорректно. Обязательный аргумент, если не
-#        использована опция -q|--add-quoted или требуется указать исключения
-#        из резервного копирования с помощью позиционного аргумента ${3}
+# Positional arguments:
+# ${1} - job name, restic repository tag. Required
+# ${2} - comma-separated paths to files or directories to
+#        back up. Wildcards are accepted; spaces in
+#        paths are NOT handled correctly. Required when
+#        -q|--add-quoted is unused, or exclusions must be given
+#        from the backup via positional argument ${3}
 
-# Примеры использования в schedule:
+# Schedule examples:
 # restic_run_on.sh 10.0.0.1 <restic_bucket_from_values> restic_backup_files.sh 'SYSTEM /etc,/var/spool/cron,/etc/backup-agent/config.d'
 # restic_run_on.sh 10.0.0.1 <restic_bucket_from_values> restic_backup_files.sh 'DATA /var'
 # restic_run_on.sh 10.0.0.1 <restic_bucket_from_values> restic_backup_files.sh 'DATA /var --tar-options "--exclude=temp-* --exclude=lost+found"'
@@ -61,7 +61,7 @@ DIRS_QUOTED=""
 TAR_OPTIONS=""
 CUSTOMPRUNE=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options q:t:k: --longoptions ,add-quoted:,tar-options:,prune:,prefix: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

@@ -1,13 +1,13 @@
 #!/bin/bash
-# Удаление в app_data/export файлов старше RETENTION_DAYS суток (по mtime).
-# Переопределение: RETENTION_DAYS=45 EXPORT_DIR=... LOG_FILE=... /path/to/cleanup_jira_export.sh
+# Delete files in app_data/export older than RETENTION_DAYS days (by mtime).
+# Override: RETENTION_DAYS=45 EXPORT_DIR=... LOG_FILE=... /path/to/cleanup_jira_export.sh
 #
-# Crontab (root), ежедневно в 04:00, ретенция 30 дней (отдельно на каждом хосте):
+# Crontab (root), daily at 04:00, 30-day retention (separately on each host):
 #
 # app-02 / Service Desk lab:
 #   0 4 * * * RETENTION_DAYS=30 /bin/bash /docker/servicedesk.example.com/scripts/cleanup_jira_export.sh
 #
-# sd-prod.example.com / servicedesk.example.com (обязательно EXPORT_DIR и LOG_FILE):
+# sd-prod.example.com / servicedesk.example.com (EXPORT_DIR and LOG_FILE required):
 #   0 4 * * * RETENTION_DAYS=30 EXPORT_DIR=/docker/apps/servicedesk.example.com/Volumes/app_data/export LOG_FILE=/var/log/jira-servicedesk-export-cleanup.log /bin/bash /docker/apps/servicedesk.example.com/scripts/cleanup_jira_export.sh
 set -u
 

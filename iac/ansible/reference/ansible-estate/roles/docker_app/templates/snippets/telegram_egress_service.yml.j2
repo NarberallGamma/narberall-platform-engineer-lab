@@ -1,4 +1,4 @@
-{# Telegram VPS egress (client): только docker_app.telegram_egress, без vars роли egress. #}
+{# Telegram VPS egress (client): docker_app.telegram_egress only, without egress role vars. #}
 {% set te = app_item.value.telegram_egress | default({}) %}
 {% if te.enabled | default(false) | bool %}
     networks:

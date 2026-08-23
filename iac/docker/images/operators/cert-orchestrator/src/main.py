@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Точка входа cert-orchestrator: daemon | renew | verify-https
+cert-orchestrator entry point: daemon | renew | verify-https
 """
 
 from __future__ import annotations
@@ -24,11 +24,11 @@ def _log_regru_creds(cfg, logger) -> None:
     try:
         creds_path = resolve_regru_credentials_path(cfg.letsencrypt)
         if str(creds_path).startswith("/run/cert-orchestrator"):
-            logger.info("REG.RU DNS: INI сформирован из env → %s", creds_path)
+            logger.info("REG.RU DNS: INI built from env → %s", creds_path)
     except RegruCredentialsError as e:
         logger.warning(
-            "REG.RU DNS: %s — выпуск certbot будет невозможен до настройки REG_RU_DNS_USERNAME "
-            "и REG_RU_DNS_PASSWORD в .env контейнера",
+            "REG.RU DNS: %s — certbot issuance is not possible until REG_RU_DNS_USERNAME "
+            "and REG_RU_DNS_PASSWORD are set in the container .env",
             e,
         )
 
@@ -37,12 +37,12 @@ def cmd_daemon(cfg, config_path: str) -> int:
     setup_logging(cfg)
     logger = get_logger()
 
-    logger.info("=== cert-orchestrator старт (daemon) ===")
-    logger.info("Окружение: %s | конфиг: %s", cfg.meta.environment, config_path)
+    logger.info("=== cert-orchestrator start (daemon) ===")
+    logger.info("Environment: %s | config: %s", cfg.meta.environment, config_path)
     _log_regru_creds(cfg, logger)
 
     if telegram_enabled(cfg):
-        logger.info("Telegram: проверка при отправке startup-уведомления (getMe пропущен)")
+        logger.info("Telegram: checked when sending the startup notification (getMe skipped)")
         notify_startup(cfg)
 
     running = True
@@ -50,7 +50,7 @@ def cmd_daemon(cfg, config_path: str) -> int:
     def _stop(*_args):
         nonlocal running
         running = False
-        logger.info("Получен сигнал завершения")
+        logger.info("Shutdown signal received")
 
     signal.signal(signal.SIGINT, _stop)
     signal.signal(signal.SIGTERM, _stop)
@@ -59,23 +59,23 @@ def cmd_daemon(cfg, config_path: str) -> int:
     tick = min(60, max(10, poll))
     skip_scheduled_once = False
     if cfg.schedule.renew_on_container_start:
-        logger.info("Старт контейнера: запуск renewal (renew_on_container_start=true)")
+        logger.info("Container start: running renewal (renew_on_container_start=true)")
         rc = run_renewal(cfg)
-        logger.info("renewal на старте завершён с кодом %s", rc)
+        logger.info("startup renewal finished with code %s", rc)
         skip_scheduled_once = True
 
     while running:
         if should_run_renewal(cfg):
             if skip_scheduled_once:
                 logger.info(
-                    "Пропуск окна расписания: renewal уже выполнен на старте контейнера"
+                    "Skipping the schedule window: renewal already ran on container start"
                 )
                 skip_scheduled_once = False
             else:
-                logger.info("Расписание: запуск renewal")
+                logger.info("Schedule: running renewal")
                 rc = run_renewal(cfg)
-                logger.info("renewal завершён с кодом %s", rc)
-        logger.debug("Следующая проверка расписания через %s с", tick)
+                logger.info("renewal finished with code %s", rc)
+        logger.debug("Next schedule check in %s s", tick)
         for _ in range(tick):
             if not running:
                 break
@@ -83,14 +83,14 @@ def cmd_daemon(cfg, config_path: str) -> int:
         if not running:
             break
 
-    logger.info("cert-orchestrator остановлен")
+    logger.info("cert-orchestrator stopped")
     return 0
 
 
 def cmd_renew(cfg, config_path: str, force_renewal: bool = False) -> int:
     setup_logging(cfg)
     logger = get_logger()
-    logger.info("CLI renew | конфиг: %s%s", config_path, " | --force" if force_renewal else "")
+    logger.info("CLI renew | config: %s%s", config_path, " | --force" if force_renewal else "")
     _log_regru_creds(cfg, logger)
     return run_renewal(cfg, force_renewal=force_renewal)
 
@@ -98,10 +98,10 @@ def cmd_renew(cfg, config_path: str, force_renewal: bool = False) -> int:
 def cmd_verify_https(cfg, config_path: str) -> int:
     setup_logging(cfg)
     logger = get_logger()
-    logger.info("CLI verify-https | конфиг: %s", config_path)
+    logger.info("CLI verify-https | config: %s", config_path)
 
     if not cfg.https_verification.enabled:
-        logger.warning("https_verification.enabled=false — нечего проверять")
+        logger.warning("https_verification.enabled=false — nothing to check")
         return 0
 
     results = run_all(cfg)
@@ -118,7 +118,7 @@ def main() -> None:
     parser.add_argument(
         "--config",
         default=os.environ.get("CONFIG_FILE", "/etc/cert-orchestrator/config.yaml"),
-        help="Путь к YAML (или CONFIG_FILE)",
+        help="Path to YAML (or CONFIG_FILE)",
     )
     parser.add_argument(
         "command",
@@ -130,7 +130,7 @@ def main() -> None:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="С командой renew: принудительный выпуск сертификата (certbot --force-renewal), в обход срока действия",
+        help="With renew: force certificate issuance (certbot --force-renewal), ignoring remaining validity",
     )
     args = parser.parse_args()
 

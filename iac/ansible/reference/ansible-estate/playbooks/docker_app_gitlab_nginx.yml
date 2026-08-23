@@ -1,12 +1,12 @@
 ---
-# Deploy gitlab-nginx (внешний TLS-прокси GitLab + Registry в /docker/apps/gitlab-nginx)
-# Переменные: group_vars/gitlab-nginx.yml
+# Deploy gitlab-nginx (external TLS proxy for GitLab + Registry under /docker/apps/gitlab-nginx)
+# Variables: group_vars/gitlab-nginx.yml
 #
-# Запуск:
+# Run:
 #   ./scripts/run/run_docker_app.sh deploy gitlab-nginx --preprod --limit estate-preprod-gitlab
 #   ./scripts/run/run_docker_app.sh deploy gitlab-nginx --prod --limit estate-prod-gitlab
 #
-# Перед первым запуском на живом GitLab с встроенным nginx: migrate_gitlab_nginx_legacy.yml
+# Before the first run on a live GitLab with built-in nginx: migrate_gitlab_nginx_legacy.yml
 
 - name: Deploy gitlab-nginx
   hosts: gitlab_nginx

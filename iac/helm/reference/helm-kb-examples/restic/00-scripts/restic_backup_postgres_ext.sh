@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Этот скрипт - запасной способ бэкапа PostgreSQL
+# Fallback backup method for PostgreSQL
 
 source /app/vars
 NAMEOFBACKUP=${2}

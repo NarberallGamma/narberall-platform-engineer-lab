@@ -1,27 +1,27 @@
-# Матрица папок и прав — cloud.example.com (групповая папка в NC: «Regul clients»).
-# Источник: Confluence «Матрица доступа файлового ресурса Clients Regul INTFS» + дерево уровней.
+# Folder and ACL matrix — cloud.example.com (NC group folder: "Regul clients").
+# Source: Confluence "Clients Regul INTFS file-share access matrix" + level tree.
 #
-# Соглашения (как matrix_nextcloud_dev_cloud_platform.yaml для профиля nextcloud-dev):
-# - Плейсхолдер {client} — имя клиента (каталог уровня 1). Пути относительно корня groupfolder.
-# - view для явного списка групп: +read; маркер __NC_MATRIX_RO_ALL__ — все группы матрицы только RO (см. group_vars nextcloud_occ_ro_permissions).
-# - edit: +read +write +create +delete (см. nextcloud_occ_edit_permissions).
-# - Если в Confluence одна колонка на просмотр и редактирование — view и edit совпадают (одинаковые группы).
-# - Уровень 4 (children_mkcol + при необходимости children со словарями) только у {client}/{client}/Accounting —
-#   не у «Файлобменник/Accounting» ни у «Внутренний обмен».
-# - children_mkcol — имена L4 только для MKCOL; по умолчанию каждая L4-подпапка получает те же view/edit, что узел L3 Accounting.
-# - L4 «Договоры»: те же view/edit, что у {client}/{client}/Accounting (наследование с L3, включая Cloud Clients Regul Assistant).
-# - deny_on_l4_children: для Assistant — явный deny на все L4 под Accounting, кроме except_child_name «Договоры»
-#   (Assistant видит только «Договоры» на уровне 4; остальные группы с L3 Accounting по-прежнему на всех L4, где не переопределено).
-# - Группы: полное имя «Cloud Clients Regul …»; в таблице короткие «IT», «Admin» нормализованы до полного префикса.
-# - L3 «Требования PAY» под {client}/{client}: без __NC_MATRIX_RO_ALL__ — только Cloud Clients Regul Payroll и
-#   Cloud Clients Regul IntControl (view/edit *regul_edit_trebovaniya_pay); явный matrix_deny по остальным группам матрицы
-#   плюс авто-deny в group_vars (дубли не попадают в occ).
+# Conventions (same as matrix_nextcloud_dev_cloud_platform.yaml for the nextcloud-dev profile):
+# - Placeholder {client} — client name (level-1 directory). Paths are relative to the groupfolder root.
+# - view for an explicit group list: +read; __NC_MATRIX_RO_ALL__ marker — all matrix groups RO only (see group_vars nextcloud_occ_ro_permissions).
+# - edit: +read +write +create +delete (see nextcloud_occ_edit_permissions).
+# - If Confluence has one column for view and edit — view and edit match (same groups).
+# - Level 4 (children_mkcol + children dicts when needed) only on {client}/{client}/Accounting —
+#   not on "File exchange/Accounting" or "Internal exchange".
+# - children_mkcol — L4 names for MKCOL only; by default each L4 subfolder gets the same view/edit as the L3 Accounting node.
+# - L4 "Contracts": same view/edit as {client}/{client}/Accounting (inherit from L3, including Cloud Clients Regul Assistant).
+# - deny_on_l4_children: for Assistant — explicit deny on all L4 under Accounting except except_child_name "Contracts"
+#   (Assistant sees only "Contracts" at level 4; other L3 Accounting groups stay on all L4 unless overridden).
+# - Groups: full name "Cloud Clients Regul …"; short "IT", "Admin" in the table are normalized to the full prefix.
+# - L3 "PAY requests" under {client}/{client}: no __NC_MATRIX_RO_ALL__ — only Cloud Clients Regul Payroll and
+#   Cloud Clients Regul IntControl (view/edit *regul_edit_trebovaniya_pay); explicit matrix_deny for the other matrix groups
+#   plus auto-deny in group_vars (duplicates are not sent to occ).
 
-# - В view вместо LDAP-группы «Cloud Clients Regul RO» используется маркер __NC_MATRIX_RO_ALL__ (см. defaults):
-#   не существует группы RO в AD — на объект с таким view всем группам из объединения матрицы выдаётся только чтение
-#   (nextcloud_occ_ro_permissions в group_vars), кроме групп из edit этой строки.
+# - view uses the __NC_MATRIX_RO_ALL__ marker instead of the LDAP group "Cloud Clients Regul RO" (see defaults):
+#   there is no RO group in AD — an object with this view gets read-only for every group in the matrix union
+#   (nextcloud_occ_ro_permissions in group_vars), except groups listed in edit on that row.
 #
-# Альтернативные имена L4 на диске для occ — список children_mkcol_occ_path_fallback под узлом Accounting (тот же порядок и длина, что children_mkcol).
+# Alternate on-disk L4 names for occ — children_mkcol_occ_path_fallback under the Accounting node (same order and length as children_mkcol).
 
 defaults:
   regul_view_ro: &regul_view_ro [__NC_MATRIX_RO_ALL__]
@@ -142,62 +142,62 @@ folders:
     view: *regul_view_ro
     edit: *regul_edit_it
 
-  - path: "{client}/Внутренний обмен"
+  - path: "{client}/Internal exchange"
     view: *regul_internal_merged
     edit: *regul_internal_merged
 
-  - path: "{client}/Файлобменник"
+  - path: "{client}/File exchange"
     view: *regul_view_ro
     edit: *regul_edit_file_exchange
 
-  # L4: children_mkcol — MKCOL; children — «Договоры»: полный доступ как у L3 Accounting; deny_on_l4_children — deny Assistant на прочих L4.
+  # L4: children_mkcol — MKCOL; children — "Contracts": full access as on L3 Accounting; deny_on_l4_children — deny Assistant on the other L4.
   - path: "{client}/{client}/Accounting"
     view: *regul_edit_accounting_l3
     edit: *regul_edit_accounting_l3
     children_mkcol:
-      - Авансовые отчеты
-      - Акты сверок
-      - Банк
-      - Выручка
-      - ГПХ
-      - Договоры
-      - Закрытие периода
-      - Инвентаризация
-      - Инструкции по клиенту
-      - НСО и депозиты
-      - Отчетность
-      - Представительские расходы
-      - Реализация
-      - Сверка ЕНС
-      - Статистика
-      - Счета на оплату
-      - Требования ИФНС
-      - Учетная политика
+      - Expense reports
+      - Reconciliations
+      - Bank
+      - Revenue
+      - Civil contracts
+      - Contracts
+      - Period close
+      - Inventory count
+      - Client instructions
+      - Minimum balances and deposits
+      - Reporting
+      - Entertainment expenses
+      - Sales
+      - Unified tax account reconciliation
+      - Statistics
+      - Invoices
+      - FTS requests
+      - Accounting policy
     children_mkcol_occ_path_fallback:
-      - АВАНСОВЫЕ ОТЧЕТЫ
-      - АКТЫ СВЕРОК
-      - БАНК
-      - ВЫРУЧКА
-      - ГПХ
-      - ДОГОВОРЫ
-      - ЗАКРЫТИЕ ПЕРИОДА
-      - ИНВЕНТАРИЗАЦИЯ
-      - ИНСТРУКЦИИ ПО КЛИЕНТУ
-      - НСО И ДЕПОЗИТЫ
-      - ОТЧЕТНОСТЬ
-      - ПРЕДСТАВИТЕЛЬСКИЕ РАСХОДЫ
-      - РЕАЛИЗАЦИЯ
-      - СВЕРКА ЕНС
-      - СТАТИСТИКА
-      - СЧЕТА НА ОПЛАТУ
-      - ТРЕБОВАНИЯ ИФНС
-      - УЧЕТНАЯ ПОЛИТИКА
+      - EXPENSE REPORTS
+      - RECONCILIATIONS
+      - BANK
+      - REVENUE
+      - CIVIL CONTRACTS
+      - CONTRACTS
+      - PERIOD CLOSE
+      - INVENTORY COUNT
+      - CLIENT INSTRUCTIONS
+      - MINIMUM BALANCES AND DEPOSITS
+      - REPORTING
+      - ENTERTAINMENT EXPENSES
+      - SALES
+      - UNIFIED TAX ACCOUNT RECONCILIATION
+      - STATISTICS
+      - INVOICES
+      - FTS REQUESTS
+      - ACCOUNTING POLICY
     children:
-      - name: Договоры
+      - name: Contracts
         view: *regul_edit_accounting_l3
         edit: *regul_edit_accounting_l3
     deny_on_l4_children:
-      except_child_name: "Договоры"
+      except_child_name: "Contracts"
       groups: *regul_assistant_only
 
   - path: "{client}/{client}/Clients info"
@@ -232,20 +232,20 @@ folders:
     view: *regul_edit_purchasing
     edit: *regul_edit_purchasing
 
-  - path: "{client}/{client}/Требования PAY"
+  - path: "{client}/{client}/PAY requests"
     view: *regul_edit_trebovaniya_pay
     edit: *regul_edit_trebovaniya_pay
     matrix_deny: *regul_matrix_deny_trebovaniya_pay
 
-  - path: "{client}/Файлобменник/HRA"
+  - path: "{client}/File exchange/HRA"
     view: *regul_edit_file_hra
     edit: *regul_edit_file_hra
 
-  - path: "{client}/Файлобменник/Corp"
+  - path: "{client}/File exchange/Corp"
     view: *regul_edit_file_corp
     edit: *regul_edit_file_corp
 
-  # Уровень 3 «Файлобменник/Accounting» без children_mkcol (дерево L4 Confluence только под {client}/{client}/Accounting).
-  - path: "{client}/Файлобменник/Accounting"
+  # Level 3 "File exchange/Accounting" without children_mkcol (Confluence L4 tree only under {client}/{client}/Accounting).
+  - path: "{client}/File exchange/Accounting"
     view: *regul_edit_file_accounting
     edit: *regul_edit_file_accounting

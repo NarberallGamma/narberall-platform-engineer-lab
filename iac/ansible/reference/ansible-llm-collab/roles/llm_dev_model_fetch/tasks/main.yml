@@ -1,14 +1,14 @@
 ---
-# Роль llm_dev_model_fetch: скачивание GGUF в {{ llm_dev_models_dir }}, манифест в {{ llm_dev_sources_dir }}.
+# Role llm_dev_model_fetch: download GGUF into {{ llm_dev_models_dir }}, write a manifest under {{ llm_dev_sources_dir }}.
 
-- name: Проверить наличие curl на хосте
+- name: Check that curl is present on the host
   ansible.builtin.command:
     cmd: curl --version
   register: llm_dev_model_fetch_curl
   changed_when: false
   failed_when: llm_dev_model_fetch_curl.rc != 0
 
-- name: Убедиться, что задан пресет или параметры ручной загрузки
+- name: Assert that a preset or manual download parameters are set
   ansible.builtin.assert:
     that:
       - >
@@ -22,19 +22,19 @@
           (llm_dev_model_filename | default('') | string | length) > 0
         )
     fail_msg: >-
-      Указать llm_dev_model_preset (см. group_vars/llm_dev/main.yml → llm_dev_model_catalog)
-      или вручную llm_dev_model_hf_repo, llm_dev_model_hf_files / llm_dev_model_hf_file, llm_dev_model_filename.
+      Set llm_dev_model_preset (see group_vars/llm_dev/main.yml → llm_dev_model_catalog)
+      or provide llm_dev_model_hf_repo, llm_dev_model_hf_files / llm_dev_model_hf_file, llm_dev_model_filename manually.
 
-- name: Проверить пресет в каталоге
+- name: Validate preset against the catalog
   ansible.builtin.assert:
     that:
       - llm_dev_model_preset in llm_dev_model_catalog
     fail_msg: >-
-      Неизвестный llm_dev_model_preset={{ llm_dev_model_preset }}.
-      Доступные ключи: {{ llm_dev_model_catalog.keys() | list | join(', ') }}
+      Unknown llm_dev_model_preset={{ llm_dev_model_preset }}.
+      Available keys: {{ llm_dev_model_catalog.keys() | list | join(', ') }}
   when: llm_dev_model_preset | default('') | string | length > 0
 
-- name: Разрешить параметры модели из пресета
+- name: Resolve model parameters from the preset
   ansible.builtin.set_fact:
     llm_dev_model_fetch_resolved_repo: "{{ llm_dev_model_catalog[llm_dev_model_preset].hf_repo }}"
     llm_dev_model_fetch_resolved_revision: "{{ llm_dev_model_catalog[llm_dev_model_preset].hf_revision }}"
@@ -43,12 +43,12 @@
     llm_dev_model_fetch_resolved_description: "{{ llm_dev_model_catalog[llm_dev_model_preset].description | default('') }}"
   when: llm_dev_model_preset | default('') | string | length > 0
 
-- name: Зафиксировать локальное имя GGUF из пресета
+- name: Pin local GGUF filename from the preset
   ansible.builtin.set_fact:
     llm_dev_model_filename: "{{ llm_dev_model_catalog[llm_dev_model_preset].local_filename }}"
   when: llm_dev_model_preset | default('') | string | length > 0
 
-- name: Разрешить параметры модели в ручном режиме
+- name: Resolve model parameters in manual mode
   ansible.builtin.set_fact:
     llm_dev_model_fetch_resolved_repo: "{{ llm_dev_model_hf_repo }}"
     llm_dev_model_fetch_resolved_revision: "{{ llm_dev_model_hf_revision | default('main') }}"
@@ -57,28 +57,28 @@
     llm_dev_model_fetch_resolved_description: "custom"
   when: llm_dev_model_preset | default('') | string | length == 0
 
-- name: Согласовать первый шард с аргументом -m в compose
+- name: Align the first shard with the -m argument in compose
   ansible.builtin.assert:
     that:
       - llm_dev_model_fetch_resolved_hf_files[0] == llm_dev_model_filename
     fail_msg: >-
-      Имя файла для -m (llm_dev_model_filename / local_filename пресета) должно совпадать с первым элементом hf_files / hf_file
-      (первый шард GGUF; llama.cpp подхватывает остальные шарды из того же каталога).
+      Filename for -m (llm_dev_model_filename / preset local_filename) must match the first hf_files / hf_file entry
+      (first GGUF shard; llama.cpp picks up the remaining shards from the same directory).
 
-- name: Проверить список файлов модели на Hugging Face
+- name: Validate the Hugging Face file list
   ansible.builtin.assert:
     that:
       - llm_dev_model_fetch_resolved_hf_files | length > 0
       - llm_dev_model_fetch_resolved_hf_files | reject('equalto', '') | list | length == llm_dev_model_fetch_resolved_hf_files | length
     fail_msg: >-
-      Пустой или некорректный список файлов (hf_files / hf_file): пресет или ручной режим.
+      Empty or invalid file list (hf_files / hf_file): preset or manual mode.
 
-- name: Собрать URL загрузки Hugging Face (первый файл — для манифеста)
+- name: Build Hugging Face download URL (first file — for the manifest)
   ansible.builtin.set_fact:
     llm_dev_model_download_url: >-
       https://huggingface.co/{{ llm_dev_model_fetch_resolved_repo }}/resolve/{{ llm_dev_model_fetch_resolved_revision }}/{{ llm_dev_model_fetch_resolved_hf_files[0] }}
 
-- name: Каталоги моделей и sources
+- name: Model and sources directories
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
@@ -90,28 +90,28 @@
     - { path: "{{ llm_dev_models_dir }}", mode: "0755" }
     - { path: "{{ llm_dev_sources_dir }}", mode: "0755" }
 
-- name: Проверить HF token при обязательной аутентификации
+- name: Assert HF token when authentication is required
   ansible.builtin.assert:
     that:
       - llm_dev_hf_token is defined
       - (llm_dev_hf_token | default('') | string | length) > 0
     fail_msg: >-
-      При llm_dev_model_fetch_requires_hf_token=true задать токен в Vault (ключ {{ llm_dev_vault_key_hf_token }}) или -e llm_dev_hf_token=...
+      When llm_dev_model_fetch_requires_hf_token=true, set the token in Vault (key {{ llm_dev_vault_key_hf_token }}) or -e llm_dev_hf_token=...
   when: llm_dev_model_fetch_requires_hf_token | bool
 
-- name: Проверить наличие локальных шардов GGUF
+- name: Check for local GGUF shards
   ansible.builtin.stat:
     path: "{{ llm_dev_models_dir }}/{{ item }}"
   loop: "{{ llm_dev_model_fetch_resolved_hf_files }}"
   register: llm_dev_model_fetch_shard_stats
 
-- name: Определить необходимость загрузки
+- name: Decide whether a download is needed
   ansible.builtin.set_fact:
     llm_dev_model_fetch_shards_present: >-
       {{ llm_dev_model_fetch_shard_stats.results | selectattr('stat.exists') | list | length }}
     llm_dev_model_fetch_primary_size: "{{ llm_dev_model_fetch_shard_stats.results[0].stat.size | default(0) }}"
 
-- name: Зафиксировать флаг загрузки (принудительно, не все шарды, слишком мал первый шард)
+- name: Set download flag (force, missing shards, or first shard too small)
   ansible.builtin.set_fact:
     llm_dev_model_fetch_needs_download: >-
       {{
@@ -120,21 +120,21 @@
         (llm_dev_model_fetch_primary_size | int < 1048576)
       }}
 
-- name: Удалить существующие шарды при принудительной загрузке
+- name: Remove existing shards on forced download
   ansible.builtin.file:
     path: "{{ llm_dev_models_dir }}/{{ item }}"
     state: absent
   loop: "{{ llm_dev_model_fetch_resolved_hf_files }}"
   when: llm_dev_model_force_download | bool
 
-- name: Удалить partial при принудительной загрузке
+- name: Remove partial files on forced download
   ansible.builtin.file:
     path: "{{ llm_dev_models_dir }}/.{{ item }}.partial"
     state: absent
   loop: "{{ llm_dev_model_fetch_resolved_hf_files }}"
   when: llm_dev_model_force_download | bool
 
-- name: Записать манифест модели
+- name: Write model manifest
   ansible.builtin.template:
     src: model_manifest.yml.j2
     dest: "{{ llm_dev_sources_dir }}/model_manifest.yml"
@@ -142,7 +142,7 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
 
-- name: Скачать шард GGUF с Hugging Face (curl, поддержка докачки)
+- name: Download GGUF shard from Hugging Face (curl, resume support)
   ansible.builtin.shell: |
     set -euo pipefail
     dest="{{ llm_dev_models_dir }}/{{ item }}"
@@ -154,7 +154,7 @@
       extra=()
     fi
     mkdir -p "{{ llm_dev_models_dir }}"
-    # User-Agent нужен некоторым граням HF/CDN; при ошибках связи пробовать llm_dev_model_fetch_curl_extra_args=-4 на ВМ только с проблемным IPv6.
+    # Some HF/CDN edges require a User-Agent; on connectivity errors try llm_dev_model_fetch_curl_extra_args=-4 on VMs with broken IPv6 only.
     curl -fL --retry 10 --retry-delay 20 --connect-timeout 60 \
       -A "{{ llm_dev_model_fetch_curl_user_agent }}" {{ llm_dev_model_fetch_curl_extra_args | default('', true) }} \
       "${extra[@]}" -C - -o "$tmp" "$url"
@@ -171,28 +171,28 @@
   loop_control:
     label: "{{ item }}"
 
-- name: Убедиться, что целевой GGUF (первый шард) на месте
+- name: Confirm the target GGUF (first shard) is present
   ansible.builtin.stat:
     path: "{{ llm_dev_models_dir }}/{{ llm_dev_model_filename }}"
   register: llm_dev_model_fetch_verify
 
-- name: Убедиться, что все шард-файлы на месте
+- name: Confirm all shard files are present
   ansible.builtin.stat:
     path: "{{ llm_dev_models_dir }}/{{ item }}"
   loop: "{{ llm_dev_model_fetch_resolved_hf_files }}"
   register: llm_dev_model_fetch_verify_all
 
-- name: Проверить размер первого шарда и наличие остальных
+- name: Assert first-shard size and that remaining shards exist
   ansible.builtin.assert:
     that:
       - llm_dev_model_fetch_verify.stat.exists | default(false)
       - (llm_dev_model_fetch_verify.stat.size | default(0)) > 1048576
       - (llm_dev_model_fetch_verify_all.results | selectattr('stat.exists') | list | length) == (llm_dev_model_fetch_resolved_hf_files | length)
     fail_msg: >-
-      После загрузки модель отсутствует или слишком мала: {{ llm_dev_models_dir }}/{{ llm_dev_model_filename }}.
-      Проверить сеть, HF-токен и файлы в репозитории {{ llm_dev_model_fetch_resolved_repo }} (первый URL: {{ llm_dev_model_download_url }}).
+      After download the model is missing or too small: {{ llm_dev_models_dir }}/{{ llm_dev_model_filename }}.
+      Check the network, HF token, and files in repository {{ llm_dev_model_fetch_resolved_repo }} (first URL: {{ llm_dev_model_download_url }}).
 
-- name: Права на файлы модели
+- name: Permissions on model files
   ansible.builtin.file:
     path: "{{ llm_dev_models_dir }}/{{ item }}"
     state: file

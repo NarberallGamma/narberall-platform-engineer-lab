@@ -1,9 +1,9 @@
 # gitlab-nginx — prod (estate-prod-gitlab, /docker/apps/gitlab-nginx)
-# Внешний TLS-прокси: Omnibus nginx в GitLab отключён (nginx['enable']=false),
-# UI проксируется на gitlab-workhorse, Registry на :5000 (текущий порт Omnibus).
-# Плейбук: playbooks/docker_app_gitlab_nginx.yml | inventory: [gitlab_nginx]
+# External TLS proxy: Omnibus nginx in GitLab is disabled (nginx['enable']=false),
+# UI is proxied to gitlab-workhorse, Registry to :5000 (current Omnibus port).
+# Playbook: playbooks/docker_app_gitlab_nginx.yml | inventory: [gitlab_nginx]
 #
-# Секреты Vault не используются; TLS раскладывается cert-orchestrator в ssl_dir ниже.
+# Vault secrets are not used; TLS is laid out by cert-orchestrator into ssl_dir below.
 
 docker_app_vault_enabled: false
 docker_app_compose_env_files: []
@@ -34,8 +34,8 @@ gitlab_nginx_ssl_dir: "{{ docker_app_base_dir }}/gitlab-nginx/certs"
 
 # ---------------------------------------------------------------------------
 # Legacy migration (playbooks/migrate_gitlab_nginx_legacy.yml)
-# Migrate на prod/preprod завершён; секция для истории и других стендов.
-# Повторный прогон: gitlab_nginx_legacy_migration_enabled: true + раскомментировать vars ниже.
+# Migrate on prod/preprod is complete; section kept for history and other stands.
+# Repeat run: gitlab_nginx_legacy_migration_enabled: true + uncomment the vars below.
 # ---------------------------------------------------------------------------
 gitlab_nginx_legacy_migration_enabled: false
 

@@ -1,9 +1,9 @@
 # treasury-policy-gateway — docker app (prod VM cryptopro-01).
-# Master keys CryptoPro: bind mount ./data/cprocsp/keys (ручной перенос с hsm-adapter, без migrate в playbook).
-# TLS на edge-lb (vhost policy-gateway.example.com, не web-treasury WAF).
-# Плейбук: playbooks/docker_app_treasury_policy_gateway.yml | inventory: [cryptopro_vm]
+# Master keys CryptoPro: bind mount ./data/cprocsp/keys (manual copy from hsm-adapter, no migrate in the playbook).
+# TLS on edge-lb (vhost policy-gateway.example.com, not web-treasury WAF).
+# Playbook: playbooks/docker_app_treasury_policy_gateway.yml | inventory: [cryptopro_vm]
 #
-# Секреты: Vault mount secret, path treasury-policy-gateway-app (как ESO в k8s preprod).
+# Secrets: Vault mount secret, path treasury-policy-gateway-app (same as ESO in k8s preprod).
 
 docker_app_vault_mount_point: secret
 docker_app_vault_path: treasury-policy-gateway-app
@@ -13,13 +13,13 @@ docker_app_vault_key_map:
   TREASURY_POLICY_GATEWAY_DGTRY_PIN: treasury.policy-gateway.dgtry.pin
   EXTERNAL_CSP_LICENSE: EXTERNAL_CSP_LICENSE
   KAFKA_TRUSTSTORE_PASSWORD: spring.kafka.properties.ssl.truststore.password
-# Kafka password: как ESO preprod — secret/treasury-kafka, не treasury-policy-gateway-app
+# Kafka password: same as ESO preprod — secret/treasury-kafka, not treasury-policy-gateway-app
 docker_app_vault_extra_reads:
   - path: treasury-kafka
     mount: secret
     key_map:
       KAFKA_CLIENT_PASSWORD: kafkaClientPassword
-# Kafka CA: файл roles/docker_app/files/treasury-policy-gateway/kafka-ca-prod.crt (из k8s secret kafka-ca-cert)
+# Kafka CA: file roles/docker_app/files/treasury-policy-gateway/kafka-ca-prod.crt (from k8s secret kafka-ca-cert)
 
 docker_app_base_dir: /docker/apps
 docker_app_compose_pull: always
@@ -56,15 +56,15 @@ treasury_policy_gateway_data_dirs:
 treasury_policy_gateway_kafka_bootstrap: "kafka-2.example.com:9093,kafka-0.example.com:9093,kafka-1.example.com:9093"
 treasury_policy_gateway_kafka_consumer_group: treasury-policy-gateway-group-replica-0
 
-# S3 / OBS (prod bucket — сверить с фактическим OBS перед deploy)
+# S3 / OBS (prod bucket — verify against the actual OBS before deploy)
 treasury_policy_gateway_s3_url: https://estate-prod-treasury-policy-gateway.obs.example.com
 treasury_policy_gateway_s3_bucket: estate-prod-treasury-policy-gateway
 treasury_policy_gateway_s3_region: example-1
 
-# Feign (cert-verifier / pki в k8s — URL через ingress или internal; уточнить перед prod cutover)
+# Feign (cert-verifier / pki in k8s — URL via ingress or internal; confirm before prod cutover)
 treasury_policy_gateway_cert_verifier_url: http://treasury-cert-verifier-service-application:8080
 treasury_policy_gateway_pki_gateway_url: http://treasury-pki-gateway-service-application:8080
 
-# Публичный URL (edge-lb, конфиг позже)
+# Public URL (edge-lb, config later)
 treasury_policy_gateway_public_domain: policy-gateway.example.com
 treasury_policy_gateway_public_path_prefix: /api/v0/treasury-policy-gateway/

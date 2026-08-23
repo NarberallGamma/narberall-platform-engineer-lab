@@ -1,27 +1,27 @@
 ---
-- name: Проверить текущие настройки SSH для парольной аутентификации
+- name: Check current SSH settings for password authentication
   ansible.builtin.command: sshd -T
   register: sshd_config_current
   changed_when: false
   failed_when: false
 
-- name: Получить значение PasswordAuthentication из текущей конфигурации SSH
+- name: Get PasswordAuthentication from current SSH configuration
   ansible.builtin.set_fact:
     ssh_password_auth: "{{ sshd_config_current.stdout | regex_search('^passwordauthentication\\s+(yes|no)', '\\1') | default('no') | lower }}"
 
-- name: Получить значение ChallengeResponseAuthentication из текущей конфигурации SSH
+- name: Get ChallengeResponseAuthentication from current SSH configuration
   ansible.builtin.set_fact:
     ssh_challenge_response: "{{ sshd_config_current.stdout | regex_search('^challengeresponseauthentication\\s+(yes|no)', '\\1') | default('no') | lower }}"
 
-- name: Получить значение KbdInteractiveAuthentication из текущей конфигурации SSH
+- name: Get KbdInteractiveAuthentication from current SSH configuration
   ansible.builtin.set_fact:
     ssh_kbd_interactive: "{{ sshd_config_current.stdout | regex_search('^kbdinteractiveauthentication\\s+(yes|no)', '\\1') | default('no') | lower }}"
 
-- name: Получить значение UsePAM из текущей конфигурации SSH
+- name: Get UsePAM from current SSH configuration
   ansible.builtin.set_fact:
     ssh_use_pam: "{{ sshd_config_current.stdout | regex_search('^usepam\\s+(yes|no)', '\\1') | default('no') | lower }}"
 
-- name: Проверить наличие файлов в sshd_config.d которые могут переопределять настройки SSH
+- name: Find files in sshd_config.d that may override SSH settings
   ansible.builtin.find:
     paths: /etc/ssh/sshd_config.d
     patterns: '*.conf'
@@ -29,7 +29,7 @@
   register: sshd_configd_files
   changed_when: false
 
-- name: Удалить все конфигурационные файлы из sshd_config.d для использования основной конфигурации
+- name: Remove drop-in files from sshd_config.d so the main config is used
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
@@ -37,7 +37,7 @@
   when: sshd_configd_files.matched | default(0) > 0
   register: sshd_configd_removed
 
-- name: Убедиться что PasswordAuthentication установлен в yes в основном конфиге SSH
+- name: Ensure PasswordAuthentication is yes in the main SSH config
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
     regexp: '^#?PasswordAuthentication\s+(yes|no)'
@@ -45,7 +45,7 @@
     state: present
   when: ssh_password_auth != 'yes'
 
-- name: Убедиться что ChallengeResponseAuthentication установлен в yes в основном конфиге SSH
+- name: Ensure ChallengeResponseAuthentication is yes in the main SSH config
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
     regexp: '^#?ChallengeResponseAuthentication\s+(yes|no)'
@@ -53,7 +53,7 @@
     state: present
   when: ssh_challenge_response != 'yes'
 
-- name: Убедиться что KbdInteractiveAuthentication установлен в yes в основном конфиге SSH
+- name: Ensure KbdInteractiveAuthentication is yes in the main SSH config
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
     regexp: '^#?KbdInteractiveAuthentication\s+(yes|no)'
@@ -61,7 +61,7 @@
     state: present
   when: ssh_kbd_interactive != 'yes'
 
-- name: Убедиться что UsePAM установлен в yes в основном конфиге SSH
+- name: Ensure UsePAM is yes in the main SSH config
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
     regexp: '^#?UsePAM\s+(yes|no)'
@@ -69,40 +69,40 @@
     state: present
   when: ssh_use_pam != 'yes'
 
-# sshd -t требует каталог privilege separation; без него — «Missing privilege separation directory: /run/sshd»
-- name: Обеспечить каталог /run/sshd для проверки sshd -t
+# sshd -t requires the privilege separation directory; without it — "Missing privilege separation directory: /run/sshd"
+- name: Ensure /run/sshd exists for sshd -t
   ansible.builtin.file:
     path: /run/sshd
     state: directory
     mode: "0755"
 
-- name: Проверить синтаксис конфигурации SSH перед перезапуском
+- name: Check SSH configuration syntax before restart
   ansible.builtin.command: sshd -t
   register: sshd_test
   changed_when: false
   failed_when: sshd_test.rc != 0
 
-# Сначала проверяем наличие сервиса ssh (стандартное имя для Ubuntu)
-- name: Проверить наличие SSH сервиса (Ubuntu - ssh)
+# Check for the ssh service first (standard name on Ubuntu)
+- name: Check for SSH service (Ubuntu - ssh)
   ansible.builtin.command: systemctl list-unit-files ssh.service
   register: ssh_service_check
   changed_when: false
   failed_when: false
 
-# Если ssh не найден, проверяем sshd (может использоваться на некоторых Debian системах)
-- name: Проверить наличие SSH сервиса (Debian - sshd, если ssh не найден)
+# If ssh is missing, check sshd (used on some Debian systems)
+- name: Check for SSH service (Debian - sshd, when ssh is missing)
   ansible.builtin.command: systemctl list-unit-files sshd.service
   register: sshd_service_check
   changed_when: false
   failed_when: false
   when: ssh_service_check.rc != 0
 
-# Определяем имя сервиса: ssh для Ubuntu (по умолчанию), sshd для Debian (если ssh недоступен)
-- name: Установить имя SSH сервиса (Ubuntu по умолчанию, Debian если ssh недоступен)
+# Service name: ssh on Ubuntu (default), sshd on Debian (when ssh is unavailable)
+- name: Set SSH service name (Ubuntu by default, Debian when ssh is unavailable)
   ansible.builtin.set_fact:
     ssh_service_name: "{{ 'sshd' if (ssh_service_check.rc != 0 and sshd_service_check.rc == 0) else 'ssh' }}"
 
-- name: Перезапустить SSH сервис после изменения конфигурации (Ubuntu/Debian)
+- name: Restart SSH service after configuration changes (Ubuntu/Debian)
   ansible.builtin.systemd:
     name: "{{ ssh_service_name }}"
     state: restarted
@@ -114,13 +114,13 @@
     (sshd_configd_removed.changed | default(false))
   ignore_errors: true
 
-- name: Проверить финальные настройки SSH после перезапуска
+- name: Recheck SSH settings after restart
   ansible.builtin.command: sshd -T
   register: sshd_config_final
   changed_when: false
   failed_when: false
 
-- name: Извлечь финальные значения SSH настроек
+- name: Extract final SSH setting values
   ansible.builtin.shell: |
     echo "{{ sshd_config_final.stdout }}" | grep -E "^(passwordauthentication|challengeresponseauthentication|kbdinteractiveauthentication|usepam)" || echo "Settings not found"
   register: ssh_final_grep
@@ -128,11 +128,10 @@
   failed_when: false
   when: sshd_config_final.stdout is defined
 
-- name: Показать итоговые настройки SSH для парольной аутентификации
+- name: Show final SSH settings for password authentication
   ansible.builtin.debug:
     msg: |
       SSH Password Authentication Configuration:
       {{ ssh_final_grep.stdout | indent(2) }}
   when: sshd_config_final.stdout is defined and ssh_final_grep.stdout is defined
   failed_when: false
-

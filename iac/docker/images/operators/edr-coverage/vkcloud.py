@@ -10,30 +10,30 @@ import yaml
 AUTH_URL = "https://infra.mail.ru:35357/v3"
 NOVA_ENDPOINT = "https://infra.mail.ru:8774/v2.1"
 
-# Конфиг — из EDR_CONFIG_DIR (в контейнере read-only каталог из SOPS); выгрузки —
-# в EDR_DATA_DIR. По умолчанию текущий каталог (ручной прогон с ноутбука).
+# Config from EDR_CONFIG_DIR (in the container a read-only SOPS directory); exports
+# go to EDR_DATA_DIR. Defaults to the current directory (manual run from a laptop).
 CONFIG_DIR = Path(os.environ.get("EDR_CONFIG_DIR", "."))
 DATA_DIR = Path(os.environ.get("EDR_DATA_DIR", "."))
 
-# Managed-ресурсы (ноды managed БД, managed kubernetes и т.п.) попадают в список
-# Nova как обычные ВМ, но поставить на них агент EDR нельзя — в покрытии они
-# только занижают процент. VK Cloud помечает их метаданными, по ним и отличаем.
+# Managed resources (managed DB nodes, managed Kubernetes, etc.) appear in the
+# Nova list as ordinary VMs, but an EDR agent cannot be installed on them — they
+# only lower the coverage percentage. VK Cloud marks them with metadata.
 #
-# Ключи, само наличие которых означает managed-ресурс (ключ -> тип):
+# Keys whose mere presence means a managed resource (key -> kind):
 MANAGED_METADATA_KEYS = {
-    "datastore": "database",         # managed БД: datastore/datastore_version
-    "mcs_cluster_id": "kubernetes",  # ноды managed kubernetes (MKS)
+    "datastore": "database",         # managed DB: datastore/datastore_version
+    "mcs_cluster_id": "kubernetes",  # managed Kubernetes (MKS) nodes
     "k8s_cluster_id": "kubernetes",
 }
-# Пары ключ+значение (наличия ключа мало):
+# Key+value pairs (the key alone is not enough):
 MANAGED_METADATA_VALUES = {"sid": {"trove": "database"}}
 #
-# ВАЖНО: service_user_id для этого НЕ годится — он стоит у обычных ВМ (46 из 71
-# в проекте project-a), фильтр по нему выкосил бы треть инфраструктуры.
+# IMPORTANT: service_user_id is NOT usable for this — ordinary VMs have it
+# (46 of 71 in project-a); filtering on it would drop a third of the estate.
 
 
 def managed_kind(metadata: dict) -> str:
-    """Тип managed-сервиса по метаданным ВМ; пустая строка — обычная ВМ."""
+    """Managed-service kind from VM metadata; empty string is an ordinary VM."""
     metadata = metadata or {}
     for key, kind in MANAGED_METADATA_KEYS.items():
         if key in metadata:
@@ -70,8 +70,8 @@ def get_token(username: str, password: str, project_id: str,
                             "user": {
                                 "password": password,
                                 "name": username,
-                                # Личные УЗ — домен "users", сервисные —
-                                # "service-users" (см. openrc сервисной УЗ).
+                                # Personal accounts use domain "users"; service
+                                # accounts use "service-users" (see the service openrc).
                                 "domain":
                                     {
                                         "name": user_domain_name
@@ -149,18 +149,19 @@ def transform_vms(vms_all: list) -> list:
             "id": id,
             "tenant_id": tenant_id,
             "name": name,
-            # hostname внутри ОС ('OS-EXT-SRV-ATTR:hostname') у VK Cloud недоступен:
-            # максимальная microversion Nova здесь 2.42, поле появляется с 2.90 (всё
-            # выше — HTTP 406), и у не-админской учётки ключей 'OS-EXT-SRV-ATTR:*' нет
-            # вовсе. Поэтому имя ВМ — единственный источник, а расхождение с реальным
-            # hostname гасится нормализацией '_' -> '-' в merge3.
+            # In-guest hostname ('OS-EXT-SRV-ATTR:hostname') is unavailable on VK Cloud:
+            # the highest Nova microversion here is 2.42, the field appears in 2.90
+            # (anything higher is HTTP 406), and a non-admin account has no
+            # 'OS-EXT-SRV-ATTR:*' keys at all. The VM name is therefore the only
+            # source; mismatch with the real hostname is absorbed by '_' -> '-'
+            # normalization in merge3.
             "hostname": name,
             "status": status,
-            # Строкой через запятую, как в sbercloud-adv.py: список ушёл бы в CSV
-            # питоновским репром ("['10.0.2.19']"), а по нему не работают ни
-            # матчинг по IP в merge3, ни исключения по ips в exclusions.yaml.
+            # Comma-separated string, as in sbercloud-adv.py: a list would land in CSV
+            # as a Python repr ("['10.0.2.19']"), which breaks both IP matching in
+            # merge3 and ip exclusions in exclusions.yaml.
             "sourceip": ",".join(ip_addresses),
-            # пусто = обычная ВМ; иначе тип managed-сервиса, агент невозможен
+            # empty = ordinary VM; otherwise a managed-service kind, agent impossible
             "managed": managed_kind(vm.get("metadata")),
         }
 
@@ -170,18 +171,19 @@ def transform_vms(vms_all: list) -> list:
 
 
 def load_companies() -> list[dict]:
-    """Список тенантов VK Cloud из vkcloud_config.yaml.
+    """VK Cloud tenants from vkcloud_config.yaml.
 
-    Формат:
+    Format:
       companies:
         - name: project-a
           username: user@example.com
           password: secret
           project_id: <id>
 
-    Если файла нет — один тенант из переменных окружения (VKC_USERNAME/PASSWORD/
-    PROJECT_ID, имя из VKC_COMPANY или 'project-a'). Так ручной прогон с ноутбука
-    работает как раньше, а контейнер берёт список из смонтированного конфига.
+    If the file is missing — one tenant from environment variables
+    (VKC_USERNAME/PASSWORD/PROJECT_ID, name from VKC_COMPANY or 'project-a').
+    A manual laptop run then works as before, and the container reads the
+    list from the mounted config.
     """
     path = CONFIG_DIR / "vkcloud_config.yaml"
     if path.exists():
@@ -193,7 +195,7 @@ def load_companies() -> list[dict]:
             "username": VKC_USERNAME, "password": VKC_PASSWORD,
             "project_id": VKC_PROJECT_ID,
         }]
-    logger.warning("нет ни %s, ни VKC_* в окружении — тенантов VK Cloud нет", path)
+    logger.warning("neither %s nor VKC_* in the environment — no VK Cloud tenants", path)
     return []
 
 
@@ -206,12 +208,12 @@ def extract_company(company: dict) -> None:
     vms_transformed = transform_vms(vms_all)
     df_vm = pd.DataFrame.from_records(vms_transformed)
     if df_vm.empty:
-        # см. sbercloud-adv.py: пустой результат не должен затирать прошлый CSV
-        logger.warning("[%s] пустой список ВМ — CSV не перезаписываю (оставляю прошлый)", name)
+        # see sbercloud-adv.py: an empty result must not overwrite the previous CSV
+        logger.warning("[%s] empty VM list — leaving the previous CSV in place", name)
         return
     df_vm['company'] = name
     managed = df_vm[df_vm['managed'] != '']
-    logger.info("[%s] ВМ всего: %d, из них managed (агент невозможен): %d %s",
+    logger.info("[%s] VMs total: %d, of which managed (agent impossible): %d %s",
                 name, len(df_vm), len(managed),
                 dict(managed['managed'].value_counts()) if len(managed) else "")
     df_vm.to_csv(DATA_DIR / f"{name}-vkcloud.csv", index=False)

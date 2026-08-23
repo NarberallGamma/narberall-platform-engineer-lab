@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Установка logrotate для логов nginx WAF estate (как на proxy01mosvkc).
-# Запуск на хосте WAF от root: NGINX_ROOT=/docker/nginx ./install-logrotate.sh
-# В репозитории скрипт лежит относительно корня nginx: scripts/install-logrotate.sh
+# Install logrotate for estate nginx WAF logs (same layout as the WAF host).
+# On the WAF host as root: NGINX_ROOT=/docker/nginx ./install-logrotate.sh
+# In the repository the script lives relative to the nginx root: scripts/install-logrotate.sh
 #
-# Режимы:
-#   install (по умолчанию) — записать /etc/logrotate.d/nginx-proxy
-#   create_dirs — создать logs/ и подкаталоги по server_name из config/*.conf (как nginx-logs-setup-waf.sh)
-#   all — сначала create_dirs, затем install
+# Modes:
+#   install (default) — write /etc/logrotate.d/nginx-proxy
+#   create_dirs — create logs/ and per-server_name subdirs from config/*.conf (same as nginx-logs-setup-waf.sh)
+#   all — create_dirs first, then install
 
 set -e
 
@@ -18,10 +18,10 @@ SETUP_WAF="$SCRIPT_DIR/nginx-logs-setup-waf.sh"
 
 usage() {
     echo "Usage: $0 [ install | create_dirs | all ]" >&2
-    echo "  install      — $TARGET (по умолчанию)" >&2
-    echo "  create_dirs  — каталоги логов под все host из $NGINX_ROOT/config" >&2
-    echo "  all          — create_dirs, затем install" >&2
-    echo "Env: NGINX_ROOT, LOGS_DIR (для install), NGINX_UID (для create_dirs, см. nginx-logs-setup-waf.sh)" >&2
+    echo "  install      — $TARGET (default)" >&2
+    echo "  create_dirs  — log directories for every host in $NGINX_ROOT/config" >&2
+    echo "  all          — create_dirs, then install" >&2
+    echo "Env: NGINX_ROOT, LOGS_DIR (for install), NGINX_UID (for create_dirs, see nginx-logs-setup-waf.sh)" >&2
     exit 1
 }
 
@@ -32,8 +32,8 @@ install_logrotate() {
     fi
 
     cat > "$TARGET" << EOF
-# Nginx WAF logs: корневые error/access и по хостам.
-# Путь: $LOGS_DIR
+# Nginx WAF logs: root error/access and per-host logs.
+# Path: $LOGS_DIR
 
 $LOGS_DIR/*.log
 $LOGS_DIR/*/*.log

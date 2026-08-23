@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Vault HA Cluster Deployment Script for PREPROD Environment
-# Скрипт для развертывания отказоустойчивого Vault кластера в preprod окружении
+# Script to deploy a highly available Vault cluster in the preprod environment
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -8,7 +8,7 @@ cd "$(dirname "$0")/../.."
 COLL_DIR="$(pwd)/.collections"
 mkdir -p "$COLL_DIR"
 
-# Проверка аргументов
+# Validate arguments
 if [ $# -eq 0 ]; then
     echo "Usage: $0 [deploy|init|status|secrets|help]"
     echo ""
@@ -25,13 +25,13 @@ COMMAND=$1
 INVENTORY="inventories/preprod/hosts.ini"
 ENV="preprod"
 
-# Проверка наличия inventory
+# Check that inventory exists
 if [ ! -f "$INVENTORY" ]; then
     echo "ERROR: Inventory file not found: $INVENTORY"
     exit 1
 fi
 
-# Функция для получения значений из group_vars
+# Read values from group_vars
 get_vault_config() {
     local var_name=$1
     local group_vars_file="group_vars/$ENV/vault_cluster.yml"
@@ -41,15 +41,15 @@ get_vault_config() {
         exit 1
     fi
     
-    # Извлекаем значение переменной из YAML файла
+    # Extract the variable value from the YAML file
     grep "^${var_name}:" "$group_vars_file" | sed 's/.*: *"\(.*\)"/\1/' | sed 's/.*: *\([^"]*\)$/\1/' | head -1
 }
 
-# Получаем конфигурацию
+# Load configuration
 VAULT_DOMAIN=$(get_vault_config "vault_domain")
 VAULT_VIP=$(get_vault_config "vault_virtual_ip")
 
-# Проверка наличия SSL сертификатов
+# Check SSL certificates
 check_ssl_certificates() {
     echo "Checking SSL certificates..."
     
@@ -67,7 +67,7 @@ check_ssl_certificates() {
     echo "SUCCESS: SSL certificates found"
 }
 
-# Проверка Docker registry credentials
+# Check Docker registry credentials
 check_registry_credentials() {
     echo "Checking Docker registry credentials..."
     
@@ -83,10 +83,10 @@ check_registry_credentials() {
     echo "SUCCESS: Docker registry credentials configured"
 }
 
-# Установка коллекций Ansible
+# Install Ansible collections
 install_collections() {
     echo "Installing Ansible collections..."
-    # Удаляем старые коллекции
+    # Remove old collections
     rm -rf .collections
     mkdir -p .collections
     
@@ -97,7 +97,7 @@ install_collections() {
       ansible-galaxy collection install -r requirements.yml -p /work/.collections --force
 }
 
-# Развертывание Vault кластера
+# Deploy the Vault cluster
 deploy_vault() {
     echo "Starting Vault HA cluster deployment..."
     
@@ -129,7 +129,7 @@ deploy_vault() {
     fi
 }
 
-# Инициализация Vault кластера
+# Initialize the Vault cluster
 init_vault() {
     echo "Initializing Vault cluster..."
     
@@ -159,7 +159,7 @@ init_vault() {
     fi
 }
 
-# Проверка статуса кластера
+# Check cluster status
 check_status() {
     echo "Checking Vault cluster status..."
     
@@ -169,7 +169,7 @@ check_status() {
     echo "=== VAULT CLUSTER STATUS ==="
     echo ""
     
-    # Проверка Vault нод
+    # Check Vault nodes
     echo "Checking Vault nodes..."
     docker run --rm -t \
       -v "$(pwd):/work" -w /work \
@@ -183,7 +183,7 @@ check_status() {
     
     echo ""
     
-    # Проверка Load Balancer нод
+    # Check Load Balancer nodes
     echo "Checking Load Balancer nodes..."
     docker run --rm -t \
       -v "$(pwd):/work" -w /work \
@@ -197,7 +197,7 @@ check_status() {
     
     echo ""
     
-    # Проверка через VIP
+    # Check via VIP
     echo "Checking cluster through Virtual IP..."
     curl -k -s "https://$VAULT_VIP/v1/sys/health" | jq '.' 2>/dev/null || echo "Cluster not accessible through VIP"
     
@@ -205,11 +205,11 @@ check_status() {
     echo "SUCCESS: Status check completed"
 }
 
-# Загрузка секретов в Vault
+# Upload secrets to Vault
 upload_secrets() {
     echo "Uploading secrets to Vault cluster..."
     
-    # Проверка наличия VAULT_TOKEN
+    # Check that VAULT_TOKEN is set
     if [ -z "${VAULT_TOKEN:-}" ]; then
         echo "ERROR: VAULT_TOKEN environment variable is not set!"
         echo ""
@@ -253,7 +253,7 @@ upload_secrets() {
     fi
 }
 
-# Показать справку
+# Show help
 show_help() {
     echo "Vault HA Cluster Deployment Script"
     echo ""
@@ -287,7 +287,7 @@ show_help() {
     echo "  3. SSH access to target servers"
 }
 
-# Основная логика
+# Main logic
 case "$COMMAND" in
     deploy)
         deploy_vault "$@"

@@ -1,7 +1,7 @@
 ---
 # cryptopro (/docker/apps/cryptopro)
-# VM cryptopro-01; TLS на edge-lb. Сертификат подписи: Swagger importCertificate после deploy.
-# Переменные: group_vars/cryptopro.yml
+# VM cryptopro-01; TLS on edge-lb. Signing certificate: Swagger importCertificate after deploy.
+# Variables: group_vars/cryptopro.yml
 #
 #   ./scripts/run/run_docker_app.sh deploy cryptopro --prod --limit estate-prod-cryptopro-01
 

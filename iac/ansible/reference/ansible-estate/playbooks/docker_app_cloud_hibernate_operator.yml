@@ -1,6 +1,6 @@
 ---
-# Deploy cloud-hibernate-operator (docker compose в /docker/apps/cloud-hibernate-operator)
-# Переменные: group_vars/cloud-hibernate-operator.yml
+# Deploy cloud-hibernate-operator (docker compose under /docker/apps/cloud-hibernate-operator)
+# Variables: group_vars/cloud-hibernate-operator.yml
 
 - name: Deploy cloud-hibernate-operator
   hosts: cloud_hibernate_operator

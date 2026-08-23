@@ -6,17 +6,17 @@ import sys
 from pathlib import Path
 
 if len(sys.argv) < 2:
-    print("❌ Использование: convert_db_structure.py input.yml [output.yml]")
+    print("❌ Usage: convert_db_structure.py input.yml [output.yml]")
     sys.exit(1)
 
 input_file = Path(sys.argv[1])
 output_file = Path(sys.argv[2]) if len(sys.argv) > 2 else Path(f"converted_{input_file.name}")
 
 if not input_file.exists():
-    print(f"❌ Файл не найден: {input_file}")
+    print(f"❌ File not found: {input_file}")
     sys.exit(1)
 
-# YAML Dumper с читаемыми отступами
+# YAML Dumper with readable indentation
 class IndentDumper(yaml.SafeDumper):
     def increase_indent(self, flow=False, indentless=False):
         return super().increase_indent(flow, False)
@@ -25,7 +25,7 @@ with input_file.open("r") as f:
     data = yaml.safe_load(f)
 
 if "db" not in data or not isinstance(data["db"], list):
-    print("❌ В файле нет переменной 'db' или она не является списком.")
+    print("❌ File has no 'db' variable, or it is not a list.")
     sys.exit(1)
 
 converted = []
@@ -34,12 +34,12 @@ for entry in data["db"]:
     pass_val = entry.get("pass")
 
     if not name or not pass_val:
-        print(f"⚠️ Пропускаем некорректную запись: {entry}")
+        print(f"⚠️ Skipping invalid entry: {entry}")
         continue
 
     match = re.search(r"secret=([^:'\"]+):?([^'\")]+)?", pass_val)
     if not match:
-        print(f"⚠️ Не удалось разобрать pass: {pass_val}")
+        print(f"⚠️ Failed to parse pass: {pass_val}")
         continue
 
     path = match.group(1)
@@ -51,7 +51,7 @@ for entry in data["db"]:
         "vault_key": key
     })
 
-# Сериализация YAML
+# YAML serialization
 yaml_string = yaml.dump(
     {"db": converted},
     Dumper=IndentDumper,
@@ -61,11 +61,11 @@ yaml_string = yaml.dump(
     width=100
 )
 
-# Добавляем 4 пробела к каждой строке
+# Prefix each line with 4 spaces
 indented_yaml = "\n".join("    " + line if line.strip() != "" else "" for line in yaml_string.splitlines())
 
-# Сохраняем
+# Write output
 with output_file.open("w") as f:
     f.write(indented_yaml + "\n")
 
-print(f"✅ Готово. Отступы добавлены. Файл: {output_file}")
+print(f"✅ Done. Indentation applied. File: {output_file}")

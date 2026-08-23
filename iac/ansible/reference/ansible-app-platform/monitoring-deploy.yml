@@ -1,4 +1,4 @@
-#Решение не проверенное, протестировано в отрыве от контура monitoring-dev
+# Unverified approach; tested in isolation from the monitoring-dev contour
 ---
 - name: Deploy monitoring
   hosts:

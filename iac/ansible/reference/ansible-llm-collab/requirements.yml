@@ -7,4 +7,4 @@ collections:
   - name: community.hashi_vault
     version: ">=7.0.0"
 
-# CIS: roles/ansible-lockdown.ubuntu24_cis (vendored UBUNTU24-CIS 1.6.0, см. roles/.../VENDOR)
+# CIS: roles/ansible-lockdown.ubuntu24_cis (vendored UBUNTU24-CIS 1.6.0, see roles/.../VENDOR)

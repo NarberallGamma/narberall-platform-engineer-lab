@@ -1,30 +1,30 @@
 ---
-- name: Проверить уже присоединён ли хост к домену
+- name: Check whether the host is already joined to the domain
   ansible.builtin.command: realm list
   register: realm_list
   changed_when: false
   failed_when: false
 
-- name: Показать факт hostname перед присоединением
+- name: Show hostname fact before join
   ansible.builtin.debug:
     msg: "Current hostname: {{ ansible_facts['hostname'] }}, inventory_hostname: {{ inventory_hostname }}"
 
-- name: Сохранить текущий hostname
+- name: Store current hostname
   ansible.builtin.set_fact:
     original_hostname: "{{ ansible_facts['hostname'] }}"
 
-- name: Определить имя компьютера в AD
+- name: Determine AD computer name
   ansible.builtin.set_fact:
     ad_computer_name: "{{ domain_join_hostname if (domain_join_hostname | default('') | length > 0) else original_hostname }}"
 
-- name: Временно установить короткий hostname для присоединения к домену
+- name: Temporarily set short hostname for domain join
   ansible.builtin.hostname:
     name: "{{ domain_join_hostname }}"
   when:
     - (realm_list.rc != 0) or (ad_domain not in realm_list.stdout)
     - domain_join_hostname | default('') | length > 0
 
-- name: Вступить в домен (если ещё не в домене)
+- name: Join the domain (when not already joined)
   ansible.builtin.command: >-
     realm join
     --user={{ domain_admin_user }}
@@ -36,12 +36,12 @@
     stdin: "{{ domain_admin_password | default('') }}\n"
   when: (realm_list.rc != 0) or (ad_domain not in realm_list.stdout)
 
-- name: Задержка после realm join для синхронизации AD
+- name: Pause after realm join for AD sync
   ansible.builtin.pause:
     seconds: 10
   when: (realm_list.rc != 0) or (ad_domain not in realm_list.stdout)
 
-- name: Показать статус realm
+- name: Show realm status
   ansible.builtin.command: realm list
   register: realm_list_after
   changed_when: false

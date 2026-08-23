@@ -13,7 +13,7 @@ def live_directory(cfg: LetsEncryptConfig) -> Path:
         return Path(d)
     dom = (cfg.domain or "").strip()
     if not dom:
-        raise ValueError("letsencrypt.domain не задан")
+        raise ValueError("letsencrypt.domain is not set")
     return Path("/etc/letsencrypt/live") / dom
 
 

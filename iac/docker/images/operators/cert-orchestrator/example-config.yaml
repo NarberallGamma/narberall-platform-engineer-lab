@@ -1,7 +1,7 @@
-# Скопировать в config.yaml; секреты не коммитировать. CONFIG_FILE или /etc/cert-orchestrator/config.yaml
-# REG.RU: letsencrypt.regru или env REG_RU_DNS_USERNAME / REG_RU_DNS_PASSWORD
-# K8s: env K8S_TOKEN + kubernetes.api_server / ca_cert_path (CA mount с хоста).
-# SSH: identity_file для nginx_remotes. targets.*.host — reachable из контейнера.
+# Copy to config.yaml; do not commit secrets. CONFIG_FILE or /etc/cert-orchestrator/config.yaml
+# REG.RU: letsencrypt.regru or env REG_RU_DNS_USERNAME / REG_RU_DNS_PASSWORD
+# K8s: env K8S_TOKEN + kubernetes.api_server / ca_cert_path (CA mount from the host).
+# SSH: identity_file for nginx_remotes. targets.*.host — reachable from the container.
 
 meta:
   environment: preprod

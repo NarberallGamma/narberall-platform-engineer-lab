@@ -1,70 +1,70 @@
 output "eip_id" {
-  description = "Идентификатор EIP."
+  description = "EIP identifier."
   value       = try(sbercloud_vpc_eip.this[0].id, null)
 }
 
 output "eip_address" {
-  description = "Публичный IP-адрес."
+  description = "Public IP address."
   value       = try(sbercloud_vpc_eip.this[0].address, null)
 }
 
 output "eip_ipv6_address" {
-  description = "IPv6-адрес (если поддерживается)."
+  description = "IPv6 address (when supported)."
   value       = try(sbercloud_vpc_eip.this[0].ipv6_address, null)
 }
 
 output "bandwidth_id" {
-  description = "ID полосы пропускания."
+  description = "Bandwidth ID."
   value       = try(sbercloud_vpc_eip.this[0].bandwidth[0].id, null)
 }
 
 output "bandwidth_name" {
-  description = "Имя полосы пропускания."
+  description = "Bandwidth name."
   value       = try(sbercloud_vpc_eip.this[0].bandwidth[0].name, null)
 }
 
 output "bandwidth_size" {
-  description = "Размер полосы пропускания."
+  description = "Bandwidth size."
   value       = try(sbercloud_vpc_eip.this[0].bandwidth[0].size, null)
 }
 
 output "bandwidth_share_type" {
-  description = "Тип распределения полосы пропускания."
+  description = "Bandwidth share type."
   value       = try(sbercloud_vpc_eip.this[0].bandwidth[0].share_type, null)
 }
 
 output "bandwidth_charge_mode" {
-  description = "Режим оплаты полосы пропускания."
+  description = "Bandwidth charging mode."
   value       = try(sbercloud_vpc_eip.this[0].bandwidth[0].charge_mode, null)
 }
 
 output "enterprise_project_id" {
-  description = "ID корпоративного проекта."
+  description = "Enterprise project ID."
   value       = try(sbercloud_vpc_eip.this[0].enterprise_project_id, null)
 }
 
 output "status" {
-  description = "Статус EIP."
+  description = "EIP status."
   value       = try(sbercloud_vpc_eip.this[0].status, null)
 }
 
-# Атрибуты ассоциации (если используется sbercloud_compute_eip_associate)
+# Association attributes (when sbercloud_compute_eip_associate is used)
 output "associate_id" {
-  description = "Идентификатор ассоциации EIP с инстансом."
+  description = "Identifier of the EIP-to-instance association."
   value       = try(sbercloud_compute_eip_associate.this[0].id, null)
 }
 
 output "associate_instance_id" {
-  description = "ID инстанса, к которому привязан EIP."
+  description = "ID of the instance the EIP is bound to."
   value       = try(sbercloud_compute_eip_associate.this[0].instance_id, null)
 }
 
 output "associate_port_id" {
-  description = "ID порта, используемого в ассоциации (вычисляется автоматически)."
+  description = "Port ID used in the association (computed automatically)."
   value       = try(sbercloud_compute_eip_associate.this[0].port_id, null)
 }
 
 output "associate_fixed_ip" {
-  description = "Фиксированный IP на интерфейсе инстанса."
+  description = "Fixed IP on the instance interface."
   value       = try(sbercloud_compute_eip_associate.this[0].fixed_ip, null)
 }

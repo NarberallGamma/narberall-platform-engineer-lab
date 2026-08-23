@@ -9,7 +9,7 @@ BACKUP_USER="borg"
 
 ################################################################################
 
-# Отправляет алерт
+# Sends an alert
 # ${1} - if equal 'under_sudo' then try run alerting CLI under sudo, otherwise - without sudo
 alert()
 {

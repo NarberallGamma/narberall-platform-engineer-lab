@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Legacy-миграция host nginx/keepalived -> docker edge-lb (/docker/apps/edge-lb)
+# Legacy migration: host nginx/keepalived -> docker edge-lb (/docker/apps/edge-lb)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/docker_ssh.sh
@@ -38,10 +38,10 @@ while [[ $# -gt 0 ]]; do
       cat <<'EOF'
 Usage: run_migrate_edge_lb_legacy.sh --prod|--preprod (--all | --limit HOST) [options] [-- ansible-args]
 
-Legacy-миграция LB: host nginx + keepalived -> docker edge-lb.
-Краткий downtime на 443/VIP. См. playbooks/migrate_edge_lb_legacy.yml
+Legacy LB migration: host nginx + keepalived -> docker edge-lb.
+Brief downtime on 443/VIP. See playbooks/migrate_edge_lb_legacy.yml
 
-Prod порядок: сначала BACKUP estate-prod-lb-2, затем MASTER estate-prod-lb-1
+Prod order: BACKUP estate-prod-lb-2 first, then MASTER estate-prod-lb-1
 
 Examples:
   ./scripts/run/run_migrate_edge_lb_legacy.sh --preprod --limit estate-preprod-lb-1 --ssh-key ~/.ssh/estate-preprod-ecs-key.pem

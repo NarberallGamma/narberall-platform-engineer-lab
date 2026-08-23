@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Commit и push git-репозиториев estate (PREPROD/PROD).
-# Транспорт: --transport auto|https|ssh (PAT в ~/.config/ops/.env-cloud, см. README).
-# Документация: scripts/utility/git/README.md
+# Commit and push estate git repositories (PREPROD/PROD).
+# Transport: --transport auto|https|ssh (PAT in ~/.config/ops/.env-cloud, see README).
+# Documentation: scripts/utility/git/README.md
 #
 # Usage:
 #   git_commit_push.sh --env PREPROD --message "commit msg" --branch main
@@ -30,7 +30,7 @@
 
 set -euo pipefail
 
-# Без интерактивных credential GUI (GCM / ssh askpass). PAT через GIT_ASKPASS в HTTPS-режиме.
+# No interactive credential GUI (GCM / ssh askpass). PAT via GIT_ASKPASS in HTTPS mode.
 export GIT_TERMINAL_PROMPT=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -189,7 +189,7 @@ with_repo_git_transport() {
     git_https_cleanup_askpass
     return "$rc"
   fi
-  # SSH: WSL native ssh (не Windows ssh.exe — иначе GUI passphrase / GCM)
+  # SSH: WSL native ssh (not Windows ssh.exe — otherwise GUI passphrase / GCM)
   if [[ -z "${GIT_SSH_COMMAND:-}" ]]; then
     export GIT_SSH_COMMAND="ssh"
   fi

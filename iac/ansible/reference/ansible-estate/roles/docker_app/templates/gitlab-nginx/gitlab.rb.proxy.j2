@@ -1,5 +1,5 @@
 # Managed by migrate_gitlab_nginx_legacy.yml (blockinfile)
-# Omnibus nginx отключён; TLS и прокси только через docker gitlab-nginx.
+# Omnibus nginx is disabled; TLS and proxy only through docker gitlab-nginx.
 external_url 'https://{{ gitlab_nginx_gitlab_host }}'
 nginx['enable'] = false
 letsencrypt['enable'] = false

@@ -1,5 +1,5 @@
 ---
 galaxy_info:
   role_name: kafka_init
-  description: Загрузка init-секретов Kafka из HashiCorp Vault
+  description: Load Kafka init secrets from HashiCorp Vault
 dependencies: []

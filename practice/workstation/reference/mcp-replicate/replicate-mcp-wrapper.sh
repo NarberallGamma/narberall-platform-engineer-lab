@@ -10,8 +10,8 @@ set -a
 source "${CREDENTIALS}"
 set +a
 
-# Node/undici не умеет socks5h. API обычно ходит напрямую.
-# Если локальный v2ray SOCKS слушает — только метка для CLI replicate-img.
+# Node/undici does not support socks5h. The API usually goes direct.
+# When a local v2ray SOCKS listener is up — only a marker for the replicate-img CLI.
 if timeout 0.2 bash -c 'echo >/dev/tcp/127.0.0.1/10808' 2>/dev/null; then
   export REPLICATE_SOCKS="${REPLICATE_SOCKS:-socks5h://127.0.0.1:10808}"
 fi

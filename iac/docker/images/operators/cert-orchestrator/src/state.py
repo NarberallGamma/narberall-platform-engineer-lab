@@ -1,4 +1,4 @@
-"""state.json: CERT_ORCHESTRATOR_STATE_DIR или /var/lib/cert-orchestrator."""
+"""state.json: CERT_ORCHESTRATOR_STATE_DIR or /var/lib/cert-orchestrator."""
 
 from __future__ import annotations
 

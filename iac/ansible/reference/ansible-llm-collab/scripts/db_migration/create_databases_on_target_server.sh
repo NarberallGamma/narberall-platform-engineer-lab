@@ -1,12 +1,12 @@
 #!/bin/bash
 # create_databases_on_target_server.sh
 # Usage: ./create_databases_on_target_server.sh [dblist_file.txt]
-#   Если указан файл со списком БД - будет создавать только указанные БД из списка
+#   When a list file is passed, only listed databases are created
 
 TARGET_HOST="10.10.2.251"
 TARGET_USER="svc_postgres_1c"
-TARGET_PASSWORD=:""  # УДАЛИТЬ ПОСЛЕ ЗАВЕРШЕНИЯ!
-DB_OWNER="svc_postgres_1c"  # Владелец для ВСЕХ баз
+TARGET_PASSWORD=:""  # REMOVE AFTER THE RUN!
+DB_OWNER="svc_postgres_1c"  # owner for ALL databases
 
 export PGPASSWORD="$TARGET_PASSWORD"
 
@@ -26,12 +26,12 @@ fi
 echo ""
 
 # ============================================
-# ПРОВЕРКА ПОДКЛЮЧЕНИЙ И ВЫВОД ИНФОРМАЦИИ
+# CONNECTION CHECK AND INFO
 # ============================================
 
 echo "=== Connection Check ==="
 
-# Проверка подключения к исходной СУБД (локальной)
+# Check connection to the source (local) instance
 echo "Checking connection to SOURCE server (localhost)..."
 if psql -d postgres -c "SELECT version();" >/dev/null 2>&1; then
     echo -e "${GREEN}✓ Connected to source server${NC}"
@@ -55,7 +55,7 @@ fi
 
 echo ""
 
-# Проверка подключения к целевой СУБД
+# Check connection to the target instance
 echo "Checking connection to TARGET server ($TARGET_HOST)..."
 if psql -h $TARGET_HOST -U $TARGET_USER -d postgres -c "SELECT version();" >/dev/null 2>&1; then
     echo -e "${GREEN}✓ Connected to target server${NC}"
@@ -84,7 +84,7 @@ echo ""
 echo "========================================"
 echo ""
 
-# Если передан файл со списком БД
+# When a list file is passed
 if [ -n "$DB_LIST_FILE" ]; then
     if [ ! -f "$DB_LIST_FILE" ]; then
         echo -e "${RED}Error: File '$DB_LIST_FILE' not found!${NC}"
@@ -94,7 +94,7 @@ if [ -n "$DB_LIST_FILE" ]; then
     echo "Reading database list from file: $DB_LIST_FILE"
     echo "Validating databases exist in source server..."
     
-    # Получить все доступные БД из исходной СУБД
+    # Get all available databases from the source instance
     psql -t -A -c \
       "SELECT datname
        FROM pg_database
@@ -106,21 +106,21 @@ if [ -n "$DB_LIST_FILE" ]; then
     not_found_count=0
     > /tmp/missing_dbs.txt
     
-    # Проверить каждую БД из списка
+    # Check each database from the list
     while IFS= read -r requested_db || [ -n "$requested_db" ]; do
-        # Пропускаем пустые строки и комментарии, очищаем от пробелов и невидимых символов
+        # Skip empty lines and comments; strip spaces and invisible characters
         requested_db=$(echo "$requested_db" | sed 's/#.*$//' | tr -d '\r\n' | xargs)
         if [ -z "$requested_db" ]; then continue; fi
         
-        # Экранируем одинарные кавычки в имени БД для SQL (удваиваем их)
+        # Escape single quotes in the database name for SQL (double them)
         escaped_db=$(printf '%s' "$requested_db" | sed "s/'/''/g")
         
-        # Проверить существование БД через SQL запрос
+        # Check that the database exists via SQL
         db_exists=$(psql -t -A -c \
             "SELECT 1 FROM pg_database WHERE datname = '$escaped_db'" 2>/dev/null | tr -d '[:space:]')
         
         if [ "$db_exists" = "1" ]; then
-            # БД существует, получить размер
+            # Database exists; get size
             size_bytes=$(psql -t -A -c "SELECT pg_database_size('$escaped_db')" 2>/dev/null | xargs)
             echo "$requested_db|$size_bytes" >> databases_list.txt
             ((found_count++))
@@ -153,13 +153,13 @@ if [ -n "$DB_LIST_FILE" ]; then
         exit 1
     fi
     
-    # Сортировка по размеру (от больших к маленьким)
+    # Sort by size (largest first)
     sort -t'|' -k2 -rn databases_list.txt > databases_list_sorted.txt
     mv databases_list_sorted.txt databases_list.txt
     
     rm -f /tmp/all_available_dbs.txt /tmp/missing_dbs.txt
 else
-    # Получить список баз с правильным форматированием (старая логика)
+    # Get the database list with the original formatting (legacy logic)
     echo "Fetching database list from local server..."
     psql -t -A -F'|' -c \
       "SELECT datname, pg_database_size(datname)
@@ -171,7 +171,7 @@ else
        ORDER BY pg_database_size(datname) DESC" > databases_list.txt
 fi
 
-# Показать какие базы будут созданы
+# Show which databases will be created
 echo ""
 echo "=== Databases to create ==="
 total=0
@@ -184,7 +184,7 @@ while IFS='|' read -r dbname size_bytes; do
     if [ -z "$dbname" ]; then continue; fi
     ((total++))
 
-    # Убираем пробелы из size_bytes и проверяем что это число
+    # Strip spaces from size_bytes and check it is a number
     size_bytes=$(echo "$size_bytes" | tr -d ' ')
     if [[ ! "$size_bytes" =~ ^[0-9]+$ ]]; then
         size_bytes=0
@@ -193,14 +193,14 @@ while IFS='|' read -r dbname size_bytes; do
     size_mb=$((size_bytes / 1024 / 1024))
     size_gb=$((size_mb / 1024))
 
-    # Показываем в GB если больше 1024 MB
+    # Show in GB when larger than 1024 MB
     if [ $size_gb -gt 0 ]; then
         size_display="${size_gb} GB"
     else
         size_display="${size_mb} MB"
     fi
 
-    # Проверить существование базы на целевом (ДОБАВЛЕНО: -d postgres)
+    # Check that the database exists on the target (ADDED: -d postgres)
     db_exists=$(psql -h $TARGET_HOST -U $TARGET_USER -d postgres -tAc \
         "SELECT 1 FROM pg_database WHERE datname='$dbname'" 2>/dev/null)
 
@@ -245,7 +245,7 @@ while read -r dbname; do
 
     echo -n "Creating: $dbname (owner: $DB_OWNER)... "
 
-    # Создать базу с указанным владельцем (ДОБАВЛЕНО: -d postgres)
+    # Create the database with the configured owner (ADDED: -d postgres)
     if psql -h $TARGET_HOST -U $TARGET_USER -d postgres -c \
         "CREATE DATABASE \"$dbname\" OWNER \"$DB_OWNER\"" >/dev/null 2>&1; then
         echo -e "${GREEN}✓${NC}"

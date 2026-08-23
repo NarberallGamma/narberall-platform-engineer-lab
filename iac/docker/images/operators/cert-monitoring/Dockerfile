@@ -33,7 +33,7 @@ RUN adduser -D -s /bin/sh certmonitor \
 
 USER certmonitor
 
-# Health check - проверяем что приложение работает (простая проверка процесса)
+# Health check — verify the process is running (simple process check)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD pgrep -f "python.*main.py" > /dev/null || exit 1
 

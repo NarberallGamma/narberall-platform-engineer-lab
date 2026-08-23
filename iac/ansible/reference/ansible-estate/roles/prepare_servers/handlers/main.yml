@@ -19,7 +19,7 @@
     state: restarted
     daemon_reload: yes
 
-# После смены root в /etc/containerd/config.toml: остановить docker → перезапустить containerd → снова поднять docker.
+# After changing root in /etc/containerd/config.toml: stop docker → restart containerd → start docker again.
 - name: restart containerd stack
   ansible.builtin.shell: |
     systemctl stop docker.socket docker 2>/dev/null || true

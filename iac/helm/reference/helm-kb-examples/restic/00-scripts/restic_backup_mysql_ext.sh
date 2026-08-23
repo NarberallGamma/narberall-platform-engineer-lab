@@ -1,70 +1,70 @@
 #!/usr/bin/env bash
 
-# Этот скрипт - запасной способ бэкапа MySQL
+# Fallback backup method for MySQL
 
-# Его можно применять если (должны выполняться все условия):
-#   1. если есть хотя бы одна таблица для работы с которой НЕ используется движок InnoDB
-#   2. допустима блокировка баз MySQL на время бэкапа
-#   3. размер баз MySQL и другие условия позволяют выполнить бэкап за время,
-#      отведенное на эту операцию резервного копирования
+# Applicable when (all of the following must hold):
+#   1. at least one table does NOT use the InnoDB engine
+#   2. locking MySQL databases for the duration of the backup is acceptable
+#   3. MySQL database size and other conditions allow the backup to finish within the time
+#      allocated for this backup operation
 
-# Принцип работы:
-#   - вызов mysqldump с передачей дампа в stdout
-#   - резервное копирование дампа с помощью restic с получением дампа из stdin
+# How it works:
+#   - run mysqldump and send the dump to stdout
+#   - back up the dump with restic, reading the dump from stdin
 
-# Поддерживаемые опции:
-# -b|--bucket                - имя map из .helm/values.yaml
-# -c|--defaults-file         - путь к файлу с параметрами подключения к
-#                              MySQL-серверу и работы с ним, такими как host,
-#                              user, password, socket и т.п. (опция mysqldump
-#                              --defaults-file). Необязательный аргумент
-# -h|--host                  - адрес подключения к MySQL. Необязательный аргумент
-# -r|--port                  - порт подключения к MySQL. Необязательный аргумент
-# -u|--user                  - имя пользователя, используемого для подключения
-#                              к MySQL или запуска mysqldump. Необязательный
-#                              аргумент, без указания этой опции будет использовано
-#                              значение ${USER_DEFAULT}
-# -p|--password              - путь к файлу с паролем, используемым для
-#                              подключения к MySQL, или имя переменной
-#                              окружения, содержащей этот пароль. Необязательный аргумент
-# -d|--db                    - имя базы данных которую необходимо бэкапить,
-#                              опция может быть указана несколько раз, в
-#                              резервную копию попадут все указанные базы.
-#                              Без указания этой опции в резервную копию
-#                              попадут все базы, включая служебные ( mysql,
+# Supported options:
+# -b|--bucket                - map name from .helm/values.yaml
+# -c|--defaults-file         - path to the connection-parameter file for
+#                              the MySQL server (host,
+#                              user, password, socket, and similar (mysqldump option
+#                              --defaults-file). Optional
+# -h|--host                  - MySQL connection address. Optional
+# -r|--port                  - MySQL connection port. Optional
+# -u|--user                  - username used to connect
+#                              to MySQL or to run mysqldump. Optional
+#                              argument. When omitted,
+#                              value ${USER_DEFAULT}
+# -p|--password              - path to the password file used for
+#                              connecting to MySQL, or the name of an environment
+#                              variable that holds this password. Optional
+# -d|--db                    - database name to back up,
+#                              the option may be repeated; the
+#                              backup will include all listed databases.
+#                              When omitted, the backup
+#                              includes every database, including system ones ( mysql,
 #                              information_schema, performance_schema )
-# -a|--add-mysqldump-option  - дополнительная опция которая будет передана
-#                              mysqldump. Если опция mysqldump имеет значение,
-#                              то его необходимо указать либо через знак
-#                              равенства ( = ) (возможно только для длинных
-#                              опций), либо через пробел, но в этом случае опцию
-#                              mysqldump вместе с ее значением необходимо
-#                              поместить в двойные или одинарные кавычки.
-#                              Например:
+# -a|--add-mysqldump-option  - extra option passed to
+#                              mysqldump. When a mysqldump option has a value,
+#                              pass it either with an
+#                              equals sign ( = ) (long
+#                              options), or as a space, but in that case the option
+#                              mysqldump together with its value must
+#                              wrap in double or single quotes.
+#                              For example:
 #                               - --add-mysqldump-option --ignore-table=db1.table1
 #                               - --add-mysqldump-option '--ignore-table db1.table1'
 #                               - --add-mysqldump-option "--ignore-table db1.table1"
-#                              Опция может быть указана несколько раз,
-#                              mysqldump будут переданы все указанные опции
-#                              Скрипт всегда пытается добавить опции
-#                              перечисленные в ${DESIRED_OPTIONS}
-# -k|--prune                 - строка с опциями алгоритма сохранения резервных
-#                              копий в формате программы restic, например
+#                              The option may be repeated,
+#                              mysqldump will receive all listed options
+#                              The script always tries to add the options
+#                              listed in ${DESIRED_OPTIONS}
+# -k|--prune                 - retention-options string
+#                              copies in restic format, e.g.
 #                              '--keep-hourly 72 --keep-within 30d'
-#                              Необязательный аргумент, без указания этой опции
-#                              будет использовано значение ${CUSTOMPRUNE_DEFAULT}
+#                              Optional. When omitted,
+#                              ${CUSTOMPRUNE_DEFAULT} is used
 
-# Позиционные аргументы:
-# ${1} - имя задания, тег restic-репозитория. Обязательный аргумент
+# Positional arguments:
+# ${1} - job name, restic repository tag. Required
 
-# Владельцем файла указанного опцией --defaults-file должен быть 'root:root' и
-# для него должны быть установлены права '0400'
+# The file given by --defaults-file must be owned by 'root:root' and
+# mode must be '0400'
 
-# Установка зависимостей:
+# Dependency installation:
 # - mysqldump:
 #   - Debian/Ubuntu - sudo apt-get install mysql-client
 
-# Пример использования в schedule:
+# Schedule example:
 # restic_backup_mysql_ext.sh MYSQLDUMP --defaults-file "/etc/mysql/debian.cnf"
 # restic_backup_mysql_ext.sh MYSQLDUMP --bucket <restic_bucket_from_values> --defaults-file "/etc/mysql/debian.cnf" --db db1 --db db2
 # restic_backup_mysql_ext.sh MYSQLDUMP --bucket <restic_bucket_from_values> --host=mysql.mynamespace --port=3306 --user root --password /root/.mypass --db db1 --db db2 --add-mysqldump-option "--ignore-table db1.table1"
@@ -130,7 +130,7 @@ DATABASES_OPTION=""
 EFFECTIVE_OPTIONS=""
 MYSQLDUMP_HELP=""
 
-#Разбор аргументов командной строки
+# Parse command-line arguments
 NORMALIZED_ARGS="$( getopt --options b:c:h:r:u:p:d:a:k: --longoptions ,bucket:,defaults-file:,host:,port:,user:,password:,db:,add-mysqldump-option:,prune: -- "${@}" 2>/dev/null )"
 if test "${?}" -ne 0;
 then

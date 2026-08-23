@@ -1,6 +1,6 @@
 ---
-# Vault Secrets Role - загрузка секретов в Vault
-# Эта роль загружает секреты из group_vars в Vault KV v2
+# Vault Secrets Role - load secrets into Vault
+# This role loads secrets from group_vars into Vault KV v2
 
 - name: Check if VAULT_TOKEN is set
   fail:

@@ -1,9 +1,9 @@
 # cert-monitoring — prod
-# Плейбук: playbooks/docker_app_cert_monitoring.yml | inventory: [cert-monitoring]
-# Запуск: ./scripts/run/run_docker_app.sh deploy cert-monitoring --prod --limit estate-prod-gitlab
+# Playbook: playbooks/docker_app_cert_monitoring.yml | inventory: [cert-monitoring]
+# Run: ./scripts/run/run_docker_app.sh deploy cert-monitoring --prod --limit estate-prod-gitlab
 #
-# Секреты в Vault: mount ansible, path cert-monitoring (CLI: vault kv put ansible/cert-monitoring ...)
-# Имена ключей в секрете — docker_app_vault_key_map ниже (значения задаются в Vault, не в git).
+# Secrets in Vault: mount ansible, path cert-monitoring (CLI: vault kv put ansible/cert-monitoring ...)
+# Secret key names — docker_app_vault_key_map below (values are set in Vault, not in git).
 
 docker_app_vault_mount_point: ansible
 docker_app_vault_path: cert-monitoring

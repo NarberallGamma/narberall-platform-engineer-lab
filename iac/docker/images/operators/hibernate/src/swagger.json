@@ -1239,7 +1239,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
-        "description": "API Key для аутентификации. Получите ключ у администратора."
+        "description": "API key for authentication. Obtain the key from an administrator."
       }
     }
   },

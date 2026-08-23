@@ -42,7 +42,8 @@ Do not include `jobs/security/base-security.yml.example` and `jobs/security/base
 
 ## Honest gaps
 
-- `jobs/build/*` (`build.yml`, `build.gradle.yml`, `build.js.yml`, `build.helm.yml`, `build-manual.yml`, `maven-publish.yml`) are not in this tree. Hub includes for those files stay commented. No synthetic Kaniko / Helm / Maven jobs were written.
+- `jobs/build/*` (`build.yml`, `build.gradle.yml`, `build.js.yml`, `build.helm.yml`, `build-manual.yml`, `maven-publish.yml`) are not in this tree. Hub includes for those files stay commented. No synthetic Kaniko / Helm / Maven jobs were written. Those files were the **service** image push, Helm chart package, and Maven publish includes. The cleaned source referenced them; the files themselves were not in the tree.
+- Java **image** CI that *is* published is a different layer: estate Kaniko for the Temurin **base** pin ([`../common-ci-estate/builds/eclipse-temurin-build.yaml.example`](../common-ci-estate/builds/eclipse-temurin-build.yaml.example)), a Kaniko `--no-push` gate in [`jobs/test/test.yml.example`](jobs/test/test.yml.example), and Dockerfiles under [`../../../docker/images/apps/java-gradle/`](../../../docker/images/apps/java-gradle/) plus [`../../../docker/images/ci/jvm-base/`](../../../docker/images/ci/jvm-base/). That is not a substitute for the missing `jobs/build/*` includes.
 - `jobs/test/test.yml.example` and `jobs/test/sonarqube.yml.example` `needs:` `gradle build` and `build-manual`, which live in the missing build files. Those needs stay optional or will wait until the build jobs exist.
 - `jobs/test/sonarqube-java.yml.example` is on disk but not listed in any hub `include:`.
 - `jobs/e2e/run-e2e.yaml.example` is included only from `base.js.yml.example`, not from the Gradle hub.

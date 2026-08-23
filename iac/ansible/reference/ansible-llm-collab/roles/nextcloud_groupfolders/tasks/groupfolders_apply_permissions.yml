@@ -1,18 +1,18 @@
 ---
-# Применение прав по матрице для одного клиента (корень groupfolder + advanced по путям).
-# Ожидает: client_name, nextcloud_folders_flat (и матрица уже загружена в nextcloud_matrix).
-# Вызывается из groupfolders_main (после MKCOL) и из groupfolders_reapply_all_clients (в цикле по клиентам).
-# Разрешения (view/edit): в плоских строках матрицы; дополнительно matrix_deny генерируется из deny_on_l4_children родителя (см. env matrix).
+# Apply matrix permissions for one client (groupfolder root + advanced per path).
+# Expects: client_name, nextcloud_folders_flat (and the matrix already loaded into nextcloud_matrix).
+# Called from groupfolders_main (after MKCOL) and from groupfolders_reapply_all_clients (client loop).
+# Permissions (view/edit): in the flat matrix rows; extra matrix_deny is generated from the parent's deny_on_l4_children (see env matrix).
 #
-# Строки с occ_skip=false (по умолчанию все из развёртки): явный allow в occ и при необходимости авто-deny (nextcloud_occ_auto_deny_unlisted_matrix_groups).
+# Rows with occ_skip=false (by default all from the expansion): explicit allow in occ and auto-deny when needed (nextcloud_occ_auto_deny_unlisted_matrix_groups).
 
-- name: Список путей для явных allow (все строки без occ_skip; occ_skip исключает путь из occ)
+- name: Path list for explicit allow (all rows without occ_skip; occ_skip excludes the path from occ)
   ansible.builtin.set_fact:
     nextcloud_folders_flat_for_permissions: "{{ nextcloud_folders_flat | rejectattr('occ_skip', 'equalto', true) | list }}"
   when: nextcloud_folders_flat is defined
 
-# Объединение всех имён групп из матрицы (view без маркера RO, edit, deny) — для sentinel __NC_MATRIX_RO_ALL__ и для проверки occ group:list.
-- name: Собрать объединённые имена групп матрицы
+# Union of all group names from the matrix (view without the RO sentinel, edit, deny) — for sentinel __NC_MATRIX_RO_ALL__ and for the occ group:list check.
+- name: Collect union of matrix group names
   ansible.builtin.set_fact:
     nextcloud_matrix_all_group_names: "{{ ((_vflat + _eflat + _dflat) | unique | sort) | list }}"
   vars:
@@ -22,7 +22,7 @@
     _dflat: "{{ nextcloud_folders_flat | selectattr('matrix_deny', 'defined') | map(attribute='matrix_deny') | flatten | map(attribute='group') | list }}"
   when: nextcloud_folders_flat is defined
 
-- name: Получить folder_id групповой папки (occ groupfolders:list)
+- name: Get the group-folder folder_id (occ groupfolders:list)
   ansible.builtin.shell: |
     docker exec -u www-data {{ nextcloud_container_name }} php occ --no-warnings groupfolders:list 2>/dev/null
   register: _occ_groupfolders_list
@@ -30,16 +30,16 @@
   failed_when: false
   when: (nextcloud_apply_root_groups | default(true) | bool) or (nextcloud_apply_per_folder_permissions | default(true) | bool)
 
-# occ groupfolders:list выводит таблицу: | 1         | Clients INTFS                           | — парсим по формату колонок
-- name: Парсить folder_id по имени групповой папки
+# occ groupfolders:list prints a table: | 1         | Clients INTFS                           | — parse by column layout
+- name: Parse folder_id by group-folder name
   ansible.builtin.set_fact:
     nextcloud_folder_id: "{{ (_occ_groupfolders_list.stdout | regex_findall('\\|\\s*(\\d+)\\s+\\|\\s+' + (nextcloud_groupfolder_name | regex_escape) + '\\s*') | default([]) | first) | default('') }}"
   when:
     - (nextcloud_apply_root_groups | default(true) | bool) or (nextcloud_apply_per_folder_permissions | default(true) | bool)
     - _occ_groupfolders_list.stdout is defined and _occ_groupfolders_list.stdout | length > 0
 
-# ---- Проверка: группы из матрицы существуют в Nextcloud (до прав на корень и по путям) ----
-- name: Получить список групп Nextcloud (occ group:list)
+# ---- Check: matrix groups exist in Nextcloud (before root and per-path permissions) ----
+- name: Get the Nextcloud group list (occ group:list)
   ansible.builtin.shell: |
     docker exec -u www-data {{ nextcloud_container_name }} php occ --no-warnings group:list 2>/dev/null
   register: _occ_group_list
@@ -49,13 +49,13 @@
     - (nextcloud_apply_root_groups | default(true) | bool) or (nextcloud_apply_per_folder_permissions | default(true) | bool)
     - nextcloud_folder_id is defined and nextcloud_folder_id | length > 0
 
-# occ group:list выводит YAML: строки вида "  - Group Name:" — имя группы до двоеточия
-- name: Сформировать список групп Nextcloud из вывода occ group:list
+# occ group:list prints YAML: lines like "  - Group Name:" — group name is before the colon
+- name: Build the Nextcloud group list from occ group:list output
   ansible.builtin.set_fact:
     _nc_groups_list: "{{ (_occ_group_list.stdout | default('') | regex_findall('(?m)^\\s*-\\s*(.+?):\\s*$') | map('trim') | list) }}"
   when: _occ_group_list is defined and _occ_group_list.stdout is defined
 
-- name: Сформировать список групп матрицы, отсутствующих на сервере
+- name: Build the list of matrix groups missing on the server
   ansible.builtin.set_fact:
     _missing_groups_list: "{{ _matrix_groups | reject('in', _nc_groups_list) | list }}"
   vars:
@@ -64,22 +64,22 @@
     - _nc_groups_list is defined
     - nextcloud_folders_flat is defined
 
-- name: Предупредить — группы из матрицы отсутствуют на сервере, права для них применены не будут
+- name: Warn — matrix groups are missing on the server; permissions for them will not be applied
   ansible.builtin.debug:
-    msg: "Следующие группы из матрицы отсутствуют на сервере (occ group:list); права для них применены не будут: {{ _missing_groups_list | join(', ') }}"
+    msg: "The following matrix groups are missing on the server (occ group:list); permissions for them will not be applied: {{ _missing_groups_list | join(', ') }}"
   when:
     - _missing_groups_list is defined
     - _missing_groups_list | length > 0
 
-- name: Собрать уникальные группы из матрицы для корня (совпадает с объединением для sentinel RO без фиктивной группы)
+- name: Collect unique matrix groups for the root (same union as the RO sentinel, without a dummy group)
   ansible.builtin.set_fact:
     nextcloud_all_groups: "{{ nextcloud_matrix_all_group_names | default([]) }}"
   when:
     - nextcloud_apply_root_groups | default(true) | bool
     - nextcloud_folders_flat is defined
 
-# На корень добавляем только группы, существующие на сервере
-- name: Отфильтровать группы для корня по существующим на сервере
+# Add to the root only groups that exist on the server
+- name: Filter root groups to those that exist on the server
   ansible.builtin.set_fact:
     nextcloud_all_groups_filtered: "{{ nextcloud_all_groups | default([]) | select('in', _nc_groups_list) | list }}"
   when:
@@ -87,7 +87,7 @@
     - nextcloud_all_groups is defined
     - _nc_groups_list is defined
 
-- name: Для корня использовать полный список групп (список групп сервера недоступен)
+- name: Use the full group list for the root (server group list unavailable)
   ansible.builtin.set_fact:
     nextcloud_all_groups_filtered: "{{ nextcloud_all_groups | default([]) }}"
   when:
@@ -95,7 +95,7 @@
     - nextcloud_all_groups is defined
     - _nc_groups_list is not defined or _nc_groups_list is undefined
 
-- name: Применить права на корневую групповую папку (occ groupfolders:group) — только для групп, существующих на сервере
+- name: Apply permissions on the root group folder (occ groupfolders:group) — only for groups that exist on the server
   ansible.builtin.shell: |
     docker exec -u www-data {{ nextcloud_container_name }} php occ --no-warnings groupfolders:group {{ nextcloud_folder_id }} "{{ _root_group }}" {{ nextcloud_occ_group_permission | default('read write') }}
   loop: "{{ nextcloud_all_groups_filtered | default(nextcloud_all_groups) | default([]) }}"
@@ -109,8 +109,8 @@
   register: _occ_group
   failed_when: false
 
-# ---- Права по папкам (advanced permissions) ----
-- name: Включить advanced permissions для групповой папки (если ещё не включены)
+# ---- Per-folder permissions (advanced permissions) ----
+- name: Enable advanced permissions for the group folder (if not already enabled)
   ansible.builtin.shell: |
     docker exec -u www-data {{ nextcloud_container_name }} php occ --no-warnings groupfolders:permissions {{ nextcloud_folder_id }} -e 2>/dev/null
   when:
@@ -120,9 +120,9 @@
   changed_when: _occ_permissions_enable.rc == 0
   failed_when: false
 
-# Список правил: edit → nextcloud_occ_edit_permissions; явный view → nextcloud_occ_view_permissions;
-# маркер __NC_MATRIX_RO_ALL__ во view → на путь каждая группа из матрицы, кроме edit на этой строке → nextcloud_occ_ro_permissions (+read и deny после «--», как в UI).
-- name: Построить плоский список прав по путям (path, group, perms) из матрицы
+# Rule list: edit → nextcloud_occ_edit_permissions; explicit view → nextcloud_occ_view_permissions;
+# sentinel __NC_MATRIX_RO_ALL__ in view → every matrix group on the path except edit on that row → nextcloud_occ_ro_permissions (+read and deny after "--", as in the UI).
+- name: Build a flat per-path permission list (path, group, perms) from the matrix
   ansible.builtin.set_fact:
     nextcloud_permissions_flat: "{{ _perm_out }}"
   vars:
@@ -166,22 +166,22 @@
     - nextcloud_apply_per_folder_permissions | default(true) | bool
     - nextcloud_folders_flat is defined and nextcloud_folders_flat | length > 0
 
-# Оставляем только правила для групп, существующих на сервере; если список групп с сервера недоступен — применяем все из матрицы
-- name: Отфильтровать правила по существующим на сервере группам
+# Keep only rules for groups that exist on the server; if the server group list is unavailable — apply all from the matrix
+- name: Filter rules to groups that exist on the server
   ansible.builtin.set_fact:
     nextcloud_permissions_flat_filtered: "{{ nextcloud_permissions_flat | default([]) | selectattr('group', 'in', _nc_groups_list) | list }}"
   when:
     - nextcloud_permissions_flat is defined
     - _nc_groups_list is defined
 
-- name: Использовать полный список правил (список групп сервера недоступен)
+- name: Use the full rule list (server group list unavailable)
   ansible.builtin.set_fact:
     nextcloud_permissions_flat_filtered: "{{ nextcloud_permissions_flat | default([]) }}"
   when:
     - nextcloud_permissions_flat is defined
     - _nc_groups_list is not defined or _nc_groups_list is undefined
 
-- name: Построить deny (explicit matrix_deny + авто для групп матрицы вне RO/RW/edit на этом пути)
+- name: Build deny (explicit matrix_deny + auto for matrix groups outside RO/RW/edit on this path)
   ansible.builtin.set_fact:
     nextcloud_permissions_deny_flat: "{{ _deny_combined | from_json }}"
   vars:
@@ -237,7 +237,7 @@
     - nextcloud_apply_per_folder_permissions | default(true) | bool
     - nextcloud_folders_flat is defined and nextcloud_folders_flat | length > 0
 
-- name: Отфильтровать deny по группам сервера
+- name: Filter deny by server groups
   ansible.builtin.set_fact:
     nextcloud_permissions_deny_flat_filtered: "{{ nextcloud_permissions_deny_flat | selectattr('group', 'in', _nc_groups_list) | list }}"
   when:
@@ -245,7 +245,7 @@
     - nextcloud_permissions_deny_flat | length > 0
     - _nc_groups_list is defined
 
-- name: Deny без фильтра групп (список групп недоступен)
+- name: Deny without a group filter (group list unavailable)
   ansible.builtin.set_fact:
     nextcloud_permissions_deny_flat_filtered: "{{ nextcloud_permissions_deny_flat }}"
   when:
@@ -253,14 +253,14 @@
     - nextcloud_permissions_deny_flat | length > 0
     - _nc_groups_list is not defined or _nc_groups_list is undefined
 
-- name: Размер батча occ (allow/deny), один раз на применение прав
+- name: occ batch size (allow/deny), once per permission apply
   ansible.builtin.set_fact:
     _occ_parallel_n: "{{ [nextcloud_concurrency_occ | default(1) | int, 1] | max }}"
   when:
     - nextcloud_apply_per_folder_permissions | default(true) | bool
     - nextcloud_folder_id is defined and nextcloud_folder_id | length > 0
 
-- name: Применить права по пути (occ groupfolders:permissions) — только для групп, существующих на сервере (последовательно)
+- name: Apply per-path permissions (occ groupfolders:permissions) — only for groups that exist on the server (sequential)
   ansible.builtin.script: nextcloud_occ_groupfolders_permissions.sh
   environment:
     GF_CONTAINER: "{{ nextcloud_container_name }}"
@@ -283,7 +283,7 @@
   register: _occ_permissions
   failed_when: false
 
-- name: Инициализация накопления результатов occ allow (батчи async)
+- name: Initialize occ allow result accumulator (async batches)
   ansible.builtin.set_fact:
     _occ_perm_acc: []
   when:
@@ -292,19 +292,19 @@
     - (_occ_parallel_n | default(1) | int) > 1
     - (nextcloud_permissions_flat_filtered | default(nextcloud_permissions_flat) | default([])) | length > 0
 
-- name: Применить права allow батчами async
+- name: Apply allow permissions in async batches
   ansible.builtin.include_tasks: groupfolders_occ_allow_async_batch.yml
   loop: "{{ (nextcloud_permissions_flat_filtered | default(nextcloud_permissions_flat) | default([])) | batch(_occ_parallel_n | int) | list }}"
   loop_control:
     loop_var: _occ_allow_batch
-    label: "occ allow async, правил в батче={{ _occ_allow_batch | length }}"
+    label: "occ allow async, rules in batch={{ _occ_allow_batch | length }}"
   when:
     - nextcloud_apply_per_folder_permissions | default(true) | bool
     - nextcloud_folder_id is defined and nextcloud_folder_id | length > 0
     - (nextcloud_permissions_flat_filtered | default(nextcloud_permissions_flat) | default([])) | length > 0
     - (_occ_parallel_n | default(1) | int) > 1
 
-- name: Собрать register occ allow после async-батчей
+- name: Collect occ allow register after async batches
   ansible.builtin.set_fact:
     _occ_permissions:
       results: "{{ _occ_perm_acc }}"
@@ -313,7 +313,7 @@
     - (_occ_parallel_n | default(1) | int) > 1
     - _occ_perm_acc is defined
 
-- name: Применить deny по пути (occ groupfolders:permissions; флаги из матрицы после -- ), последовательно
+- name: Apply per-path deny (occ groupfolders:permissions; flags from the matrix after -- ), sequential
   ansible.builtin.script: nextcloud_occ_groupfolders_permissions.sh
   environment:
     GF_CONTAINER: "{{ nextcloud_container_name }}"
@@ -336,7 +336,7 @@
   register: _occ_permissions_deny
   failed_when: false
 
-- name: Инициализация накопления результатов occ deny (батчи async)
+- name: Initialize occ deny result accumulator (async batches)
   ansible.builtin.set_fact:
     _occ_deny_acc: []
   when:
@@ -345,19 +345,19 @@
     - (_occ_parallel_n | default(1) | int) > 1
     - (nextcloud_permissions_deny_flat_filtered | default(nextcloud_permissions_deny_flat) | default([])) | length > 0
 
-- name: Применить deny батчами async
+- name: Apply deny in async batches
   ansible.builtin.include_tasks: groupfolders_occ_deny_async_batch.yml
   loop: "{{ (nextcloud_permissions_deny_flat_filtered | default(nextcloud_permissions_deny_flat) | default([])) | batch(_occ_parallel_n | int) | list }}"
   loop_control:
     loop_var: _occ_deny_batch
-    label: "occ deny async, правил в батче={{ _occ_deny_batch | length }}"
+    label: "occ deny async, rules in batch={{ _occ_deny_batch | length }}"
   when:
     - nextcloud_apply_per_folder_permissions | default(true) | bool
     - nextcloud_folder_id is defined and nextcloud_folder_id | length > 0
     - (nextcloud_permissions_deny_flat_filtered | default(nextcloud_permissions_deny_flat | default([]))) | length > 0
     - (_occ_parallel_n | default(1) | int) > 1
 
-- name: Собрать register occ deny после async-батчей
+- name: Collect occ deny register after async batches
   ansible.builtin.set_fact:
     _occ_permissions_deny:
       results: "{{ _occ_deny_acc }}"
@@ -366,7 +366,7 @@
     - (_occ_parallel_n | default(1) | int) > 1
     - _occ_deny_acc is defined
 
-- name: Показать ошибки occ groupfolders:permissions (rc != 0)
+- name: Show occ groupfolders:permissions errors (rc != 0)
   ansible.builtin.debug:
     msg: "occ groupfolders:permissions FAILED — path={{ (_err_item._perm_rule | default(_err_item.item | default({}))).path }}, group={{ (_err_item._perm_rule | default(_err_item.item | default({}))).group }}, rc={{ _err_item.rc }}, stderr={{ _err_item.stderr | default('') | trim }}, stdout={{ _err_item.stdout | default('') | trim }}"
   loop: "{{ _occ_permissions.results | default([]) | selectattr('rc', 'defined') | selectattr('rc', 'ne', 0) | list }}"
@@ -377,7 +377,7 @@
     label: "{{ (_err_item._perm_rule | default(_err_item.item | default({}))).path }} → {{ (_err_item._perm_rule | default(_err_item.item | default({}))).group }} (rc={{ _err_item.rc }})"
     loop_var: _err_item
 
-- name: Показать ошибки occ deny matrix (rc != 0)
+- name: Show occ deny matrix errors (rc != 0)
   ansible.builtin.debug:
     msg: "occ deny FAILED — path={{ _err_dn.item.path | default('?') }}, group={{ _err_dn.item.group | default('?') }}, rc={{ _err_dn.rc }}, stderr={{ _err_dn.stderr | default('') | trim }}"
   loop: "{{ _occ_permissions_deny.results | default([]) | selectattr('rc', 'defined') | selectattr('rc', 'ne', 0) | list }}"
@@ -388,14 +388,14 @@
     label: "{{ _err_dn.item.path | default('?') }} deny (rc={{ _err_dn.rc }})"
     loop_var: _err_dn
 
-- name: Лог итога по клиенту
+- name: Per-client summary log
   ansible.builtin.debug:
-    msg: "Клиент {{ client_name }}: папок {{ nextcloud_folders_flat | length }} (MKCOL по матрице). Явный allow по путям: {{ nextcloud_folders_flat_for_permissions | default(nextcloud_folders_flat) | default([]) | length }} путей (подпапки L4 с наследованием не считаются). Корень: folder_id={{ nextcloud_folder_id | default('?') }}. Число правил groupfolders:permissions: allow {{ (nextcloud_permissions_flat_filtered | default(nextcloud_permissions_flat) | default([])) | length }}{% if nextcloud_permissions_deny_flat is defined %} | deny {{ (nextcloud_permissions_deny_flat_filtered | default(nextcloud_permissions_deny_flat) | default([])) | length }}{% endif %}."
+    msg: "Client {{ client_name }}: folders {{ nextcloud_folders_flat | length }} (matrix MKCOL). Explicit allow on paths: {{ nextcloud_folders_flat_for_permissions | default(nextcloud_folders_flat) | default([]) | length }} paths (inherited L4 subfolders are not counted). Root: folder_id={{ nextcloud_folder_id | default('?') }}. groupfolders:permissions rule count: allow {{ (nextcloud_permissions_flat_filtered | default(nextcloud_permissions_flat) | default([])) | length }}{% if nextcloud_permissions_deny_flat is defined %} | deny {{ (nextcloud_permissions_deny_flat_filtered | default(nextcloud_permissions_deny_flat) | default([])) | length }}{% endif %}."
   when: nextcloud_folders_flat is defined
 
-- name: Итог — для каких групп права не применены (отсутствуют на сервере)
+- name: Summary — groups whose permissions were not applied (missing on the server)
   ansible.builtin.debug:
-    msg: "Для следующих групп права не применены (группы отсутствуют на сервере): {{ _missing_groups_list | join(', ') }}"
+    msg: "Permissions were not applied for the following groups (groups are missing on the server): {{ _missing_groups_list | join(', ') }}"
   when:
     - _missing_groups_list is defined
     - _missing_groups_list | length > 0

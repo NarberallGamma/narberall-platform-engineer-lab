@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Legacy-миграция hsm-adapter + host apt nginx -> docker_app hsm-adapter (TLS на edge-lb)
+# Legacy migration: hsm-adapter + host apt nginx -> docker_app hsm-adapter (TLS on edge-lb)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/docker_ssh.sh
@@ -38,8 +38,8 @@ while [[ $# -gt 0 ]]; do
       cat <<'EOF'
 Usage: run_migrate_hsm_adapter_legacy.sh --prod|--preprod (--all | --limit HOST) [options] [-- ansible-args]
 
-Legacy-миграция: /docker/hsm_adapter + apt nginx -> docker hsm-adapter (TLS на edge-lb, без nginx на hsm-хосте).
-Перед migrate: deploy edge-lb с vhost hsm-adapter. См. playbooks/migrate_hsm_adapter_legacy.yml
+Legacy migration: /docker/hsm_adapter + apt nginx -> docker hsm-adapter (TLS on edge-lb, no nginx on the hsm host).
+Before migrate: deploy edge-lb with the hsm-adapter vhost. See playbooks/migrate_hsm_adapter_legacy.yml
 
 Examples:
   ./scripts/run/run_migrate_hsm_adapter_legacy.sh --preprod --limit estate-preprod-hsm-adapter

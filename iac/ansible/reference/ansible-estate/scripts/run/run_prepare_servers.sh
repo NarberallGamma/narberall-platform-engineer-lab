@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Подготовка серверов (prepare_servers). Обязательно: окружение (--prod/--preprod/--demo) и scope (--all или --limit HOST).
-# Выполнять из корня ansible: ./scripts/run/run_prepare_servers.sh --prod (--all | --limit HOST) [опции]
+# Server bootstrap (prepare_servers). Required: environment (--prod/--preprod/--demo) and scope (--all or --limit HOST).
+# Run from the ansible root: ./scripts/run/run_prepare_servers.sh --prod (--all | --limit HOST) [options]
 #
-# SSH-ключ с passphrase: eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
+# SSH key with passphrase: eval "$(ssh-agent -s)" && ssh-add ~/.ssh/your_key
 #   ./scripts/run/run_prepare_servers.sh --prod --limit HOST --ssh-key ~/.ssh/your_key --ssh-agent
-# Подробнее: scripts/run/lib/docker_ssh.sh
+# Details: scripts/run/lib/docker_ssh.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=lib/docker_ssh.sh
@@ -42,7 +42,7 @@ if [[ -z "$INVENTORY" ]]; then
   exit 1
 fi
 if [[ -z "$SCOPE_SPECIFIED" ]]; then
-  echo "ERROR: Specify scope: --all or --limit HOST (или --local для localhost)"
+  echo "ERROR: Specify scope: --all or --limit HOST (or --local for localhost)"
   echo "Usage: $0 --prod|--preprod|--demo (--all | --limit HOST) [options...]"
   exit 1
 fi

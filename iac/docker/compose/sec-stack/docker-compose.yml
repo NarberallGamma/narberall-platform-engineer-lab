@@ -1,41 +1,41 @@
-# Центральный стек мониторинга. Живёт на ВМ в management-сегменте облака A.
-# Версии пиновые (latest stable на 2026-07-15).
+# Central monitoring stack. Lives on a VM in the management segment of cloud A.
+# Versions are pinned (latest stable as of 2026-07-15).
 services:
 
   victoriametrics:
     image: victoriametrics/victoria-metrics:v1.147.0
     command:
       - --storageDataPath=/storage
-      - --retentionPeriod=6           # месяцев хранения
+      - --retentionPeriod=6           # months of retention
       - --httpListenAddr=:8428
     volumes:
       - vmdata:/storage
     ports:
-      # Наружу — это endpoint для remote_write с vmagent'ов других площадок
-      # (облако B, on-prem). Закрыть файрволом до их адресов + позже добавить
-      # TLS/basic auth (vmauth или nginx перед VM).
+      # Exposed as the remote_write endpoint for vmagents from other sites
+      # (cloud B, on-prem). Restrict with a firewall to those addresses and later
+      # add TLS/basic auth (vmauth or nginx in front of VM).
       - "8428:8428"
     restart: unless-stopped
 
   vmagent:
-    # Локальный сборщик площадки site-a: скрейпит таргеты и пишет в VM.
-    # На остальных площадках будет ровно такой же vmagent + свой prometheus.yml,
-    # с remoteWrite.url на этот хост.
+    # Local collector for site-a: scrapes targets and writes to VM.
+    # Other sites get the same vmagent plus their own prometheus.yml,
+    # with remoteWrite.url pointing at this host.
     image: victoriametrics/vmagent:v1.147.0
     command:
       - --promscrape.config=/etc/vmagent/prometheus.yml
-      - --promscrape.configCheckInterval=60s   # подхватывать новый конфиг без рестарта
+      - --promscrape.configCheckInterval=60s   # pick up a new config without a restart
       - --remoteWrite.url=http://victoriametrics:8428/api/v1/write
       - --remoteWrite.tmpDataPath=/vmagentdata
     volumes:
-      # каталог, не файл: bind-mount файла держит inode, и после замены файла
-      # ansible'ом авто-reload видел бы старый конфиг
+      # directory, not a file: a file bind-mount keeps the inode, and after ansible
+      # replaces the file, auto-reload would still see the old config
       - ./vmagent:/etc/vmagent:ro
       - vmagentdata:/vmagentdata
     restart: unless-stopped
 
   vmalert:
-    # VictoriaMetrics сама правила не считает — этим занимается vmalert.
+    # VictoriaMetrics does not evaluate rules itself — vmalert does.
     image: victoriametrics/vmalert:v1.147.0
     command:
       - --datasource.url=http://victoriametrics:8428
@@ -43,9 +43,9 @@ services:
       - --remoteRead.url=http://victoriametrics:8428
       - --notifier.url=http://alertmanager:9093
       - --rule=/etc/vmalert/rules/*.yml
-      - --configCheckInterval=60s              # перечитывать правила без рестарта
+      - --configCheckInterval=60s              # reread rules without a restart
       - --external.label=site=site-a
-      # GeneratorURL алерта = ссылка в vmui с запросом правила (📈 в телеграме)
+      # Alert GeneratorURL = a vmui link with the rule query (📈 in Telegram)
       - --external.url=http://10.10.1.10:8428
       - "--external.alert.source=vmui/#/?g0.expr={{.Expr|queryEscape}}&g0.range_input=1h"
     volumes:
@@ -58,8 +58,8 @@ services:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
     volumes:
-      # каталог целиком: конфиг + templates/, и замена файлов ansible'ом не
-      # ломает bind-mount (та же история с inode, что у vmagent)
+      # whole directory: config + templates/, so ansible file replacement does
+      # not break the bind-mount (same inode story as vmagent)
       - ./alertmanager:/etc/alertmanager:ro
       - alertmanagerdata:/alertmanager
     restart: unless-stopped
@@ -83,17 +83,17 @@ services:
       - --config.file=/etc/blackbox/blackbox.yml
     volumes:
       - ./blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
-    # ICMP-пробы требуют CAP_NET_RAW
+    # ICMP probes require CAP_NET_RAW
     cap_add:
       - NET_RAW
     restart: unless-stopped
 
   panos-exporter:
-    # Кастомный экспортер PAN-OS: HA, IPsec, лицензии, сертификаты, сессии.
+    # Custom PAN-OS exporter: HA, IPsec, licenses, certificates, sessions.
     build: ./exporters/panos
     environment:
       - PANOS_EXPORTER_CONFIG=/etc/panos-exporter/config.yml
-    # API-ключи файрволов приходят из .env (PANOS_API_KEY_<NAME>)
+    # Firewall API keys come from .env (PANOS_API_KEY_<NAME>)
     env_file:
       - .env
     volumes:
@@ -101,21 +101,21 @@ services:
     restart: unless-stopped
 
   edr-exporter:
-    # Покрытие инфраструктуры агентами EDR. Образ собирает CI проекта
-    # edr-coverage по тегу; здесь пинится версия. Исходников на ВМ нет.
+    # Infrastructure coverage by EDR agents. The image is built by CI of
+    # edr-coverage on a tag; the version is pinned here. No sources on the VM.
     image: example.registry/sec/edr-coverage:v0.7.2
     environment:
       - EDR_DATA_DIR=/data
       - EDR_CONFIG_DIR=/config
-      # Гонять сборщики (AD, облако A, облако B, EDR) перед merge. Источник без
-      # конфига в /config просто пропускается — не ошибка.
+      # Run collectors (AD, cloud A, cloud B, EDR) before a merge. A source
+      # without a config in /config is skipped — not an error.
       - EDR_COLLECT_SOURCES=1
-      # Сбор ходит в LDAP и облачные API — раз в 6 часов, а не на каждый scrape;
-      # /metrics отдаёт последний снапшот (см. README экспортера).
+      # Collection hits LDAP and cloud APIs — every 6 hours, not on every scrape;
+      # /metrics serves the last snapshot (see the exporter README).
       - EDR_COLLECT_INTERVAL=21600
     volumes:
       - ./exporters/edr/data:/data
-      # конфиги сборщиков с кредами — read-only, рендерятся ansible из SOPS
+      # collector configs with creds — read-only, rendered by ansible from SOPS
       - ./exporters/edr/config:/config:ro
     restart: unless-stopped
 

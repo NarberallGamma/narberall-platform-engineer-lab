@@ -3,7 +3,7 @@
 **Class:** Huawei Cloud (AWS-shaped). Provider: `sbercloud-terraform/sbercloud`.  
 **Role:** Platform Engineer. Brownfield compute root next to a sibling Terragrunt network live.
 
-This folder is a **curated, sanitized copy** of a live compute stack: CCE, RDS PostgreSQL, and purpose-split ECS (GitLab, Vault, AppSec, Teleport, test). VPC, subnet, peering, EIP, VIP, and NGFW stay in a **separate Terragrunt live** (`live/<env>/<unit>`). This root only **catalogs** those IDs. It does not declare `sbercloud_vpc` / `sbercloud_vpc_subnet`.
+This folder is a **curated, sanitized copy** of a live compute stack: CCE, RDS PostgreSQL, purpose-split ECS (GitLab, Vault, AppSec, Teleport, test), and a **private DNS** zone on the dev VPC so CCE kubelet can pull images without `/etc/hosts` on every node. VPC, subnet, peering, EIP, VIP, and NGFW stay in a **separate Terragrunt live** (`live/<env>/<unit>`). This root only **catalogs** those IDs. It does not declare `sbercloud_vpc` / `sbercloud_vpc_subnet`.
 
 Experience: [`../../cloud/cloud-ru-huawei.md`](../../cloud/cloud-ru-huawei.md)  
 Inventory (counts, not client names): [`ESTATE.md`](ESTATE.md)  
@@ -23,6 +23,7 @@ Map: [`../RESOURCES.md`](../RESOURCES.md)
 | `deploy/ecs-appsec.tf` | Nessus, Semgrep, Dependency-Track, DefectDojo |
 | `deploy/ecs-test.tf` | Stopped test ECS (two stands) |
 | `deploy/ecs-teleport.tf` | New Teleport DB-agent VM (create path, not import) |
+| `deploy/dns-dev.tf` | Private zone `example.com.` on the dev VPC, `RECURSIVE`, A records for registry/git/vault |
 | `audit/` | Read-only catalog outputs. No `resource` blocks |
 | `IMPORT.md` | `terraform import` with fake IDs |
 

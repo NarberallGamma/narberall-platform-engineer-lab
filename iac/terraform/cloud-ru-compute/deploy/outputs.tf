@@ -32,3 +32,13 @@ output "do_not_import" {
   description = "Resources already in live/*. Do not declare as resource here."
   value       = local.do_not_import
 }
+
+output "dns_private_dev_zone_id" {
+  description = "Private DNS zone on the dev VPC (RECURSIVE)"
+  value       = sbercloud_dns_zone.example_com_private_dev.id
+}
+
+output "dns_private_dev_recordset_ids" {
+  description = "A record set IDs in the private dev zone (registry/git/vault)"
+  value       = { for k, rs in sbercloud_dns_recordset.example_com_private_dev_a : k => rs.id }
+}

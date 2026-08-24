@@ -17,6 +17,7 @@ flowchart TB
     RDS[RDS PG x3]
     ECS[GitLab Vault AppSec test]
     TP[Teleport new VM]
+    DNS[Private DNS vpc-dev]
     Audit[Audit outputs]
   end
   live --> Cat
@@ -24,6 +25,8 @@ flowchart TB
   Cat --> RDS
   Cat --> ECS
   Cat --> TP
+  Cat --> DNS
+  ECS --> DNS
   Cat --> Audit
   LiveKey --> live
   DeployKey --> compute

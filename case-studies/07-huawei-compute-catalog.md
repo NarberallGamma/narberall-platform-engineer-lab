@@ -23,14 +23,15 @@ See diagram: [`diagrams/case-studies/07-huawei-compute-catalog.md`](../diagrams/
 4) Import compute addresses; do_not_import lists live/* leftovers
 5) plan until No changes (no apply to "fix" the estate)
 6) New VM (Teleport): key_pair from catalog, prevent_destroy only
-7) Audit stack: same maps, no resource, second backend key
+7) Private DNS on the dev VPC (`RECURSIVE`) so CCE kubelet resolves registry/git/vault without node `/etc/hosts`
+8) Audit stack: same maps, no resource, second backend key
 ```
 
 Honest scope: Istio / ESO live in cluster-resources, not this root. Kafka / OBS stay in the generic Huawei folder when that estate uses them.
 
 ## What shipped
 
-- Compute root: 3 CCE, 3 RDS PostgreSQL 17 (HA on prod/preprod), 10 imported ECS + boot volumes, 1 created Teleport host
+- Compute root: 3 CCE, 3 RDS PostgreSQL 17 (HA on prod/preprod), 10 imported ECS + boot volumes, 1 created Teleport host, private DNS zone on vpc-dev
 - Catalog: 6 VPCs, 9 subnets, SG / flavor / AZ / image / keypair maps
 - Remote state: `platform/deploy` and `platform/audit` next to `live/`, never overlapping
 - Guardrails: `prevent_destroy`, brownfield `ignore_changes`, `do_not_import`

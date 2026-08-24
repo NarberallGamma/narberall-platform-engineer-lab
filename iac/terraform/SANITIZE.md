@@ -14,6 +14,7 @@ This lab publishes **curated slices**, not full production Terraform trees (secu
 - AWS multi-account: no real account IDs, VPC/SG/pcx IDs, office VPN lists, live WAF address dumps, or SSH public keys. Peering uses fake keys (`vpc-aaaa0001`). ACM hostnames stay on `example.com`
 - Selectel: no account IDs, IAM tokens, live project UUIDs, HV FQDNs, or real WAN CIDRs. Public product hostnames (`cloud.api.selcloud.ru`, `s3.ru-1.storage.selcloud.ru`) and volume type names are allowed. Dedicated guests use `pve-sel-0N` and `10.20.22.0/24`
 - Huawei compute catalog: fake UUIDs, documentation CIDRs (`10.10.x.x`), generic hostnames (`gitlab-dev-01`, `vault-prod-01`). No client project names, no live OBS bucket names, no AK/SK
+- Huawei private DNS: zone `example.com.`, records `registry-dev` / `git-dev` / `vault-dev`. No live corporate FQDNs, no personal email on the zone, IPs from catalog ECS only
 - Cloudflare: documentation IPs only (`203.0.113.0/24`, `198.51.100.0/24`). No live zone IDs or account IDs
 - Ansible payments identity (`iac/ansible/reference/ansible-payments-idplat/`): no PFX/PEM, no live `passwd.yaml`, no employer brand or AD DNS
 - Ansible kits (`ansible-llm-collab`, `ansible-estate`, `ansible-app-platform`, `ansible-kb-linux`, `ansible-backup-borg`, `ansible-aws-hosts`): no EDR packages, no live PEM/PFX, no bootstrap credential dumps, no employer/client brands. Detail: [`../ansible/SANITIZE.md`](../ansible/SANITIZE.md)

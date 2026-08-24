@@ -17,7 +17,7 @@ Experience write-ups: [`../cloud/`](../cloud/).
 | Messaging | `sbercloud_dms_kafka_instance`, topic, user | `dms_kafka.tf` |
 | Object storage | `sbercloud_obs_bucket` | `obs.tf` |
 | Terragrunt live | VPC, subnet, route, SG, compute units | `cloud-ru-huawei/live/` |
-| Compute catalog | CCE x3, RDS PG x3, purpose ECS (GitLab, Vault, AppSec, Teleport, test), EVS, `do_not_import` | `cloud-ru-compute/deploy/` |
+| Compute catalog | CCE x3, RDS PG x3, purpose ECS (GitLab, Vault, AppSec, Teleport, test), EVS, private DNS (`sbercloud_dns_zone` RECURSIVE + A records), `do_not_import` | `cloud-ru-compute/deploy/` |
 | Audit (read-only) | Same catalog maps, no `resource` | `cloud-ru-compute/audit/` |
 
 ## AWS

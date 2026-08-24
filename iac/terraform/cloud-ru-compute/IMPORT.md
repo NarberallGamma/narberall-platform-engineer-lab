@@ -58,4 +58,4 @@ terraform plan
 #    anything already under live/<env>/<unit>/
 ```
 
-Private run imported the compute addresses above with fail=0, then aligned HCL until plan exit 0. Apply was not used to "fix" the estate. Teleport was a later `apply` of a new address, not an import.
+Private run imported the compute addresses above with fail=0, then aligned HCL until plan exit 0. Apply was not used to "fix" the estate. Teleport was a later `apply` of a new address, not an import. Private DNS (`dns-dev.tf`) is the same create path: zone + A records on the catalog GitLab/Vault IPs.

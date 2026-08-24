@@ -21,6 +21,7 @@ This is **not** a second 70-VM OpenStack story. That proof is [`../vkcloud/ESTAT
 | Flavors / AZ / images / volume types | Full maps used by every file | Public catalog names |
 | `terraform plan` after import | **No changes** (no apply to "fix" the estate) | Pattern only; this slice is not wired to a live project |
 | New VM after import | Teleport DB agent: `key_pair` from catalog, `prevent_destroy` only | `ecs-teleport.tf` |
+| Private DNS | Zone on the dev VPC, `proxy_pattern = RECURSIVE`, A for registry/git/vault | `dns-dev.tf` (FQDNs on `example.com`) |
 
 Network, default route via NGFW, peering, EIP, VIP, and the Palo Alto-class NGFW ECS stay in the sibling Terragrunt live. This root must not declare them as `resource`.
 
@@ -58,6 +59,7 @@ cloud-ru-compute/
     ecs-appsec.tf
     ecs-test.tf
     ecs-teleport.tf
+    dns-dev.tf               # private DNS on vpc-dev, RECURSIVE
     outputs.tf
     terraform.tfvars.example
     variables/               # child-module maps (fake UUIDs)
@@ -94,11 +96,11 @@ network {
 | Prefix | Owner | Contents |
 |--------|-------|----------|
 | `live/<env>/<unit>/` | Sibling Terragrunt (network / NGFW) | VPC, subnet, route, peering, EIP, VIP, NGFW ECS |
-| `platform/deploy/` | This root | CCE, RDS, standalone ECS |
+| `platform/deploy/` | This root | CCE, RDS, standalone ECS, private DNS on vpc-dev |
 | `platform/audit/` | This root | Catalog outputs only |
 
 OBS checksum workaround on Terraform 1.11+: `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` and `AWS_RESPONSE_CHECKSUM_VALIDATION=when_required`.
 
 ## Keywords
 
-Huawei Cloud, cloud.ru, sbercloud, CCE, RDS, ECS, GitLab, Vault, Teleport, AppSec, Nessus, Semgrep, Dependency-Track, DefectDojo, catalog, split state, Terragrunt live, brownfield import, No changes, prevent_destroy, do_not_import
+Huawei Cloud, cloud.ru, sbercloud, CCE, RDS, ECS, GitLab, Vault, Teleport, AppSec, Nessus, Semgrep, Dependency-Track, DefectDojo, private DNS, VPC DNS, RECURSIVE, catalog, split state, Terragrunt live, brownfield import, No changes, prevent_destroy, do_not_import

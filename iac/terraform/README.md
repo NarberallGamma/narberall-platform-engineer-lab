@@ -12,7 +12,7 @@ Layout is meant to be **obvious**: one folder per cloud, shared `modules`, `live
 terraform/
   aws/                 # AWS root + multi-account roots + Terragrunt live
   cloud-ru-huawei/     # Huawei-class stacks + Terragrunt live
-  cloud-ru-compute/    # Huawei-class compute catalog: CCE, RDS, purpose ECS, split state
+  cloud-ru-compute/    # Huawei-class compute catalog: CCE, RDS, purpose ECS, private DNS, split state
   openstack-selectel/  # Selectel Cloud / OpenStack VPC
   selectel/            # Hub + dedicated Proxmox on Selectel HVs
   vkcloud/             # VK Cloud / NOVA Cloud class (OpenStack IaaS, catalog + purpose VMs)
@@ -31,7 +31,7 @@ terraform/
 | [`aws/`](aws/) | Standalone root + multi-account slice + EKS Terragrunt live |
 | [`selectel/`](selectel/) | Selectel hub: dedicated Proxmox DC + pointer to OpenStack VPC |
 | [`cloud-ru-huawei/`](cloud-ru-huawei/) | Multi-env root + Terragrunt (CCE, RDS, Kafka, OBS) |
-| [`cloud-ru-compute/`](cloud-ru-compute/) | **Compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport ECS; network stays in sibling live |
+| [`cloud-ru-compute/`](cloud-ru-compute/) | **Compute catalog:** CCE, RDS, GitLab/Vault/AppSec/Teleport ECS, private DNS on vpc-dev; network stays in sibling live |
 | [`openstack-selectel/`](openstack-selectel/) | Selectel Cloud VPC: volume-boot, AZ, Postgres WAL, kube etcd |
 | [`vkcloud/`](vkcloud/) | **Legacy as code:** vkcs, catalog maps, purpose-split VMs, import |
 | [`vmware/`](vmware/) | **VCD greenfield:** catalog, guest init, extra disks, audit stack |
@@ -54,7 +54,7 @@ flowchart TB
   Mods[modules] --> CRstack
   Mods --> CRlive
   TF --> CRC[cloud-ru-compute]
-  CRC --> CRCdep[deploy CCE RDS ECS]
+  CRC --> CRCdep[deploy CCE RDS ECS DNS]
   CRC --> CRCaud[audit]
   TF --> OS[openstack-selectel]
   TF --> SEL[selectel/proxmox-dc]

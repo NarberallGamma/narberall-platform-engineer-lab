@@ -1,19 +1,19 @@
-# При любом обновлении main — деплой репо на хост Git (раннер) в /ansible через common-ci.
-# Переменные доступны в Run pipeline → Inputs.
+# Every update to main deploys the repo to the Git host (the runner) under /ansible via common-ci.
+# The inputs are available under Run pipeline -> Inputs.
 spec:
   inputs:
     PLAYBOOK:
       default: ""
-      description: "Плейбук после синхронизации репо (пусто = только синхронизация)"
+      description: "Playbook to run after the repo sync (empty = sync only)"
     ANSIBLE_REPO_CHOWN_USER:
       default: "ansible"
-      description: "Владелец каталога репо"
+      description: "Owner of the repo directory"
     ANSIBLE_REPO_CHOWN_UID:
       default: "1001"
-      description: "UID владельца"
+      description: "Owner UID"
     ANSIBLE_REPO_CHOWN_GID:
       default: "1001"
-      description: "GID владельца"
+      description: "Owner GID"
 ---
 include:
   - project: 'platform/common-ci'

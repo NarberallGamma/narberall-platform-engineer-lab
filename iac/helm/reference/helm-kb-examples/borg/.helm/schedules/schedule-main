@@ -9,27 +9,27 @@
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 MAILTO=""
 
-# здесь и далее нужно заменить строку SERVER_IP на IP-адрес сервера, на котором должен выполняться скрипт, имя которого передаётся borg_run_on.sh вторым аргументом
+# Here and below, replace SERVER_IP with the address of the server that must run the script passed to borg_run_on.sh as its second argument.
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_files.sh 'SYSTEM /etc,/opt'
 
 ###################
-# Примеры бекапов
-# Внимание! Имена заданий, являющихся также суффиксами имен Borg-репозиториев, необходимо писать в верхнем регистре!
-# Например: SYSTEM, DATA, VAR, PG, WAL, MYSQL, BINLOG, GITLAB, ETCD, MONGO, CLCKHS и т.д.
+# Backup examples
+# Note: job names double as Borg repository name suffixes and must be uppercase.
+# For example: SYSTEM, DATA, VAR, PG, WAL, MYSQL, BINLOG, GITLAB, ETCD, MONGO, CLCKHS and so on.
 
 ###################
-# Бэкап системы (SYSTEM)
+# System backup (SYSTEM)
 # backup SYSTEM (borg repositary name will be $(hostname)-SYSTEM)
-# Внимание! Имя SYSTEM-бэкапа необходимо писать в верхнем регистре т.е. SYSTEM, иначе в бэкапы не будет попадать список установленных пакетов!
+# Note: the SYSTEM backup name must be uppercase (SYSTEM), otherwise the installed-package list is left out of the backup.
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_files.sh 'SYSTEM /etc,/var/spool/cron,/etc/estate-agent/etc/config.d ^\/etc\/\.git$'
 
 ###################
-# Бэкап любых файлов
+# Backup of arbitrary files
 # backup var dir, exclude /var/.*/lock (borg repositary name will be $(hostname)-VAR)
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_files.sh 'VAR /var ^\/var\/.*\/lock$'
 
 ###################
-# Бэкап PostgreSQL
+# PostgreSQL backup
 # backup postgres databases (borg repositary name will be $(hostname)-PG)
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_postgres_stdout.sh 'PG'
 
@@ -37,7 +37,7 @@ MAILTO=""
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_wals.sh '/var/backups/pgsql/wal 14'
 
 ###################
-# Бэкап MySQL
+# MySQL backup
 # backup mysql databases via innobackupex (borg repositary name will be $(hostname)-MYSQL)
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_mysql.sh 'MYSQL'
 
@@ -48,17 +48,17 @@ MAILTO=""
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_files.sh 'BINLOG "/var/lib/mysql/mysql-bin.*"'
 
 ###################
-# Бэкап GitLab
+# GitLab backup
 # backup gitlab (borg repositary name will be $(hostname)-GITLAB)
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_gitlab.sh 'GITLAB'
 
 ###################
-# Бэкап etcd
+# etcd backup
 # backup kubernetes etcd (borg repositary name will be $(hostname)-ETCD)
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_etcd.sh
 
 ###################
-# Бэкап ElasticSearch
+# ElasticSearch backup
 # backup elastic all indices (borg repositary name will be $(hostname)-ESDUMP)
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_es_esdump.sh 'ESDUMP'
 
@@ -66,13 +66,13 @@ MAILTO=""
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_es_esdump.sh 'ESDUMP blog'
 
 ###################
-# Бэкап ardb
+# ardb backup
 # backup ardb (borg repositary name will be $(hostname)-ARDB, port ARDB - 2280, temporary directory of backup - /backup/ardb)
 0 23 * * * /app/00-scripts/borg_run_on.sh SERVER_IP borg_backup_ardb.sh 'ARDB 2280 /backup/ardb'
 
 ###################
-# Бэкап Mongo снаружи узла
+# Mongo backup from outside the node
 0 23 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_mongo_auth.sh k8s-production-MONGO "MainRepSet/mongod-0.mongo.production.svc.cluster.local:27017,mongod-1.mongo.production.svc.cluster.local:27017,mongod-2.mongo.production.svc.cluster.local:27017"
 
-# Бэкап Sentry из kube кластера
+# Sentry backup from the kube cluster
 0 23 * * * /app/00-scripts/wrapper_ssh-agent.sh /app/00-scripts/borg_backup_pg_dump.sh 'KUBE-DEV-SENTRY-PGDUMP --db SENTRY_DATABASE --host SENTRY_HOST --user SENTRY_USER'

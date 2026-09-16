@@ -1,1 +1,1 @@
-# example.com.crt и example.com.key — копия с estate-prod-app-01 /docker/nginx/certs (не коммитировать ключи).
+# example.com.crt and example.com.key are copied from estate-prod-app-01 /docker/nginx/certs (keys are never committed).

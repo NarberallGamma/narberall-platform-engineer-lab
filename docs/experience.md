@@ -2,7 +2,7 @@
 
 NDA-safe narrative. Client names stay out. Scale and sector stay in. This is the same six years as the cloud and Kubernetes pages — the part hiring usually cannot infer from Terraform alone.
 
-**Same years, buyer language:** whatever the infra needs, in **days to a couple of weeks**, **documented**, **minimal windows**, **~99.9% SLA**. Audit then import. Park idle non-prod. OCR/LLM as a **multiplier** for accounting / analysts / developers. Cloud move is one of the things I do quickly when asked. Outcomes: [`for-business.md`](for-business.md). Diagrams: [`../architecture/`](../architecture/). Full domain and stack tables: [root README](../README.md#six-years-domains-apps-brokers-jvm).
+**Same years, buyer language:** whatever the infra needs, in **days to a couple of weeks**, **documented**, **minimal windows**, **~99.9% SLA**. Audit then import. Park idle non-prod. OCR/LLM as a **multiplier** for accounting / analysts / developers. Cloud move is one of the things I do quickly when asked. Outcomes: [`for-business.md`](for-business.md). Diagrams: [`../architecture/`](../architecture/). Full domain and stack tables: [below](#domains-what-production-actually-was).
 
 **Role on the market:** about **six years** (through 2026). Positioned as a **strong senior in my niches**: platform / cloud / loaded production, CI/CD, operate serious applications — not a generalist who “also clicked AWS once.” AI/LLM delivery is an additional niche on the same ownership pattern.
 
@@ -25,7 +25,7 @@ Reporting was **direct**, not buried under three layers of “infra tickets”:
 | Tech leads of a team | Shared backlog, reviews, who owns which service |
 | Tech leads of the **whole project** | Cross-team contracts: payments vs shop vs identity vs platform |
 
-I have also sat **in a large engineering organisation with a dedicated lead** — that mode is normal and welcome. The other mode (one platform owner, sometimes several products at once, reachable) is documented in the [root README](../README.md#how-i-work-team-solo-and-de-facto-lead). Both are real. Neither is a story about missing management.
+I have also sat **in a large engineering organisation with a dedicated lead** — that mode is normal and welcome. The other mode (one platform owner, sometimes several products at once, reachable) is documented in [positioning](positioning.md). Both are real. Neither is a story about missing management.
 
 ---
 

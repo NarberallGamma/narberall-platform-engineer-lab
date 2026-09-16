@@ -1,4 +1,4 @@
-# SOPS-файлы содержат шифроблобы с длинными строками — линтить их бессмысленно
-# (yaml[line-length] падал на secrets.sops.yml).
+# SOPS files hold encrypted blobs on very long lines; linting them is pointless
+# (yaml[line-length] kept failing on secrets.sops.yml).
 exclude_paths:
   - inventory/group_vars/sec_stack/secrets.sops.yml

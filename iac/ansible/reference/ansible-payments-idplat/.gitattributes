@@ -1,0 +1,9 @@
+# LF everywhere: a CRLF shebang breaks the rendered script (bash\r: No such file)
+# and corrupts playbooks when the tree is edited from Windows.
+* text=auto eol=lf
+*.sh text eol=lf
+*.j2 text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.cfg text eol=lf
+*.config text eol=lf

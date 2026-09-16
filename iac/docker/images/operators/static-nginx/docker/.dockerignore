@@ -1,9 +1,9 @@
-# Исключаем ненужные файлы из Docker context
+# Keep unneeded files out of the Docker context
 .git
 .gitignore
 .gitlab-ci.yml
 
-# Документация
+# Documentation
 README.md
 ARCHITECTURE.md
 FILE_INDEX.md
@@ -11,31 +11,31 @@ DEPLOY_INSTRUCTIONS.txt
 CHANGELOG_v1.1.md
 sequence_diagram.md
 
-# Задачи
+# Task notes
 task.txt
 task2.txt
 task3.txt
 task4.txt
 req.txt
 
-# Бэкапы и архивы
+# Backups and archives
 backup-*/
 *.zip
 *.tar.gz
 
-# Старые версии файлов
+# Superseded file versions
 *-old.*
 *_old.*
 scripts_old.js
 
-# Локальные серверные файлы
+# Local server files
 server.log
 server.pid
 server.port
 webserver.sh
 cleanup-ports.sh
 
-# Python кеш
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class

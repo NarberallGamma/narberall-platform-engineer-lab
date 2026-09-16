@@ -1,25 +1,25 @@
-# Переменные ниже появятся в Run pipeline → Inputs; можно менять перед запуском.
-# SSH_PRIVATE_KEY задаётся в Settings → CI/CD → Variables (только для деплоя на другой хост).
+# The inputs below show up under Run pipeline -> Inputs and can be changed before a run.
+# SSH_PRIVATE_KEY is set in Settings -> CI/CD -> Variables (only for deploying to another host).
 spec:
   inputs:
     DEPLOY_TARGET_HOST:
       default: ""
-      description: "Хост для деплоя по SSH (пусто = деплой на хост раннера без SSH)"
+      description: "Target host for the SSH deploy (empty = deploy on the runner host, no SSH)"
     PLAYBOOK:
       default: ""
-      description: "Плейбук после синхронизации репо (пусто = только синхронизация)"
+      description: "Playbook to run after the repo sync (empty = sync only)"
     SSH_USER:
       default: "root"
-      description: "SSH-пользователь на удалённом хосте"
+      description: "SSH user on the remote host"
     ANSIBLE_REPO_CHOWN_USER:
       default: "ansible"
-      description: "Владелец каталога репо"
+      description: "Owner of the repo directory"
     ANSIBLE_REPO_CHOWN_UID:
       default: "1001"
-      description: "UID владельца"
+      description: "Owner UID"
     ANSIBLE_REPO_CHOWN_GID:
       default: "1001"
-      description: "GID владельца"
+      description: "Owner GID"
 ---
 include:
   - project: 'platform-infra/common-ci'

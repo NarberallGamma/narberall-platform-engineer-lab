@@ -1,4 +1,4 @@
-# LF для WSL/Linux (избежать shebang bash\r и сбоев ansible)
+# LF for WSL/Linux (avoids a bash\r shebang and ansible parse failures)
 *.sh text eol=lf
 *.ini text eol=lf
 *.yml text eol=lf

@@ -158,6 +158,6 @@ kubectl get virtualservice -n monitoring -l app.kubernetes.io/component=vps-egre
 
 ## Sanitize
 
-[`../../SANITIZE.md`](../../SANITIZE.md). No live VPS IPs, no employer namespaces, no product release names, no alert-API FQDNs.
+[`../../../SANITIZE.md`](../../../SANITIZE.md). No live VPS IPs, no employer namespaces, no product release names, no alert-API FQDNs.
 
 **Keywords:** Istio, PeerAuthentication, mTLS, egress gateway, ServiceEntry, DestinationRule, VirtualService, VPS proxy, Grafana

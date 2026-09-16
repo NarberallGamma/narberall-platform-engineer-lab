@@ -1,14 +1,15 @@
-# CI для git.example.com: собирает образ экспортера и кладёт в registry этого
-# проекта. Стек sec-stack подтягивает его по версии (см. stack/docker-compose.yml
-# в sec-stack) — исходники на ВМ мониторинга не едут вообще.
+# CI for git.example.com: builds the exporter image and pushes it to this
+# project registry. The sec-stack stack pulls it by version (see
+# stack/docker-compose.yml in sec-stack) - no sources ever land on the
+# monitoring VM.
 #
-# Образ собирается kaniko: privileged-раннер и docker:dind не нужны.
+# The image is built with kaniko: no privileged runner and no docker:dind.
 #
-# Требование к раннеру одно: он должен быть доступен этому проекту (групповой
-# раннер либо зарегистрированный сюда отдельно).
+# Only one runner requirement: it must be available to this project (a group
+# runner, or one registered here separately).
 #
-# Пуш в registry идёт под CI_JOB_TOKEN собственного проекта — отдельных
-# кредов заводить не нужно.
+# The registry push uses this project own CI_JOB_TOKEN - no separate
+# credentials to provision.
 
 stages: [lint, build]
 
@@ -27,8 +28,8 @@ lint:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG
 
-# Тесты матчинга: правила, которые уже ломались молча (имена, дубли, проход по
-# IP). Данных из облаков и EDR не требуют — фикстуры собираются в самих тестах.
+# Matching tests: the rules that have already failed silently (names, duplicates,
+# IP fallback). No cloud or EDR data needed - fixtures are built inside the tests.
 test:
   stage: lint
   image: python:3.12-slim
@@ -45,16 +46,16 @@ build:image:
   stage: build
   image:
     name: gcr.io/kaniko-project/executor:v1.24.0-debug
-    entrypoint: [""] # у образа свой entrypoint, gitlab-runner'у нужен пустой
+    entrypoint: [""] # the image ships its own entrypoint; gitlab-runner needs it empty
   script:
-    # Креды registry для kaniko: он читает их из docker-конфига, docker login тут
-    # неоткуда взять — демона нет by design
+    # Registry credentials for kaniko: it reads them from the docker config.
+    # docker login is not an option here - there is no daemon, by design
     - mkdir -p /kaniko/.docker
     - |
       AUTH=$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')
       printf '{"auths":{"%s":{"auth":"%s"}}}' "$CI_REGISTRY" "$AUTH" > /kaniko/.docker/config.json
-    # По тегу — релизная версия (её и пинит sec-stack), с main — плавающий edge
-    # для проверок; на проде плавающий тег не используем.
+    # A tag builds the release version (the one sec-stack pins); main builds a
+    # floating edge tag for checks. Prod never runs a floating tag.
     - |
       if [ -n "$CI_COMMIT_TAG" ]; then
         TAGS="$CI_COMMIT_TAG latest"
@@ -64,9 +65,9 @@ build:image:
       DESTINATIONS=""
       for t in $TAGS; do
         DESTINATIONS="$DESTINATIONS --destination $CI_REGISTRY_IMAGE:$t"
-        echo "будет опубликован $CI_REGISTRY_IMAGE:$t"
+        echo "will publish $CI_REGISTRY_IMAGE:$t"
       done
-      # один проход сборки, несколько тегов на выходе
+      # one build pass, several tags on the output
       /kaniko/executor \
         --context "$CI_PROJECT_DIR" \
         --dockerfile "$CI_PROJECT_DIR/Dockerfile" \

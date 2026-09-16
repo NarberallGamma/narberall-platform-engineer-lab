@@ -2,6 +2,8 @@
 
 **Duration:** depends on footprint (typical multi-day to multi-week)
 
+**Commercials:** scope and calendar are what this page fixes. The number is set per engagement, after a short scoping call — it follows footprint and the import backlog, not a rate card. Rationale: [`../docs/for-business.md`](../docs/for-business.md#what-i-do-not-sell-here).
+
 **Business:** IAM, network, CI, and monitoring in **days to a couple of weeks**. Night park for idle non-prod is in scope when the estate is cloud.ru / Huawei-class or AWS-shaped. [`../architecture/00-days-not-months.md`](../architecture/00-days-not-months.md).
 
 ## Deliverables

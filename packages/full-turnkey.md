@@ -2,6 +2,8 @@
 
 **Duration:** scoped per MVP
 
+**Commercials:** scope and calendar are what this page fixes. The number is set per engagement, after a short scoping call — it follows footprint and the import backlog, not a rate card. Rationale: [`../docs/for-business.md`](../docs/for-business.md#what-i-do-not-sell-here).
+
 **Business:** one owner who stands up, accompanies, and can migrate. Days-to-weeks for the baseline, then the product path. [`../docs/for-business.md`](../docs/for-business.md).
 
 ## Deliverables

@@ -2,6 +2,8 @@
 
 **Duration:** 1–2 weeks (typical)
 
+**Commercials:** scope and calendar are what this page fixes. The number is set per engagement, after a short scoping call — it follows footprint and the import backlog, not a rate card. Rationale: [`../docs/for-business.md`](../docs/for-business.md#what-i-do-not-sell-here).
+
 **Business:** private LLM/OCR so finance, analysts, and developers finish document loops faster. Not a chatbot demo. [`../architecture/01-llmops.md`](../architecture/01-llmops.md).
 
 ## Deliverables

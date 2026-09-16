@@ -1,6 +1,6 @@
 # Packages (fixed-scope offers)
 
-English copy for the site and Upwork/LinkedIn. Prices are indicative; adjust later.
+English copy for the site and Upwork/LinkedIn. These pages fix **scope and calendar**. Commercials are agreed per engagement: the number follows footprint, how much of the estate must be imported rather than applied, and whether accompany is part of it. A figure published before that conversation would be wrong in both directions.
 
 **Leitmotif:** 1–2 weeks to a usable API or foundation, not a quarter of workshops. Idle non-prod can park. OCR/LLM is a process multiplier. Buyer page: [`../docs/for-business.md`](../docs/for-business.md). Package bodies below stay.
 

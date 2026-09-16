@@ -49,3 +49,5 @@ Full six-year narrative: [`experience.md`](experience.md). Diagrams for managers
 ## What I do not sell here
 
 A dump of private client trees. A claim that every GPU cluster is public. A 15-minute miracle with no credentials or DNS. What is published is enough to see the **shape** and the **calendar**.
+
+No rate card either. Scope and calendar are public because they are what a buyer needs to judge fit; the number is set per engagement, after a short scoping call. Two estates that read the same on a slide differ by an order of magnitude once footprint, existing automation, and the import backlog are known. Quoting before that is guesswork sold as precision. Packages: [`../packages/`](../packages/).
